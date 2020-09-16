@@ -1,0 +1,12 @@
+[submodule "Dymatic/vendor/spdlog"]
+	path = Dymatic/vendor/spdlog
+	url = https://github.com/gabime/spdlog
+[submodule "Dymatic/vendor/GLFW"]
+	path = Dymatic/vendor/GLFW
+	url = https://github.com/TheCherno/glfw.git
+[submodule "Dymatic/vendor/imgui"]
+	path = Dymatic/vendor/imgui
+	url = https://github.com/TheCherno/imgui.git
+[submodule "Dymatic/vendor/glm"]
+	path = Dymatic/vendor/glm
+	url = https://github.com/g-truc/glm.git
