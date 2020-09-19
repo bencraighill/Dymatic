@@ -16,9 +16,6 @@
     <Filter Include="src\Platform">
       <UniqueIdentifier>{21CA02E5-0D2D-9289-B6B2-CA3FA2F45D0C}</UniqueIdentifier>
     </Filter>
-    <Filter Include="src\Platform\OpenGL">
-      <UniqueIdentifier>{35A49437-A105-7245-2A73-B8F796D3A804}</UniqueIdentifier>
-    </Filter>
     <Filter Include="src\Platform\Windows">
       <UniqueIdentifier>{5B054582-4794-CE4B-F0B2-E246DC20DFF1}</UniqueIdentifier>
     </Filter>
@@ -92,9 +89,6 @@
     </ClInclude>
     <ClInclude Include="src\Dymatic\Window.h">
       <Filter>src\Dymatic</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Platform\OpenGL\ImGuiOpenGLRenderer.h">
-      <Filter>src\Platform\OpenGL</Filter>
     </ClInclude>
     <ClInclude Include="src\Platform\Windows\WindowsInput.h">
       <Filter>src\Platform\Windows</Filter>
@@ -1329,10 +1323,16 @@
     <ClInclude Include="vendor\glm\glm\vector_relational.hpp">
       <Filter>vendor\glm\glm</Filter>
     </ClInclude>
+    <ClInclude Include="src\Dymatic\Renderer\GraphicsContext.h" />
+    <ClInclude Include="src\Platform\OpenGL\OpenGLContext.h" />
+    <ClInclude Include="src\Dymatic\Renderer\Shader.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Dymatic\Application.cpp">
       <Filter>src\Dymatic</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Dymatic\ImGui\ImGuiBuild.cpp">
+      <Filter>src\Dymatic\ImGui</Filter>
     </ClCompile>
     <ClCompile Include="src\Dymatic\ImGui\ImGuiLayer.cpp">
       <Filter>src\Dymatic\ImGui</Filter>
@@ -1346,9 +1346,6 @@
     <ClCompile Include="src\Dymatic\Log.cpp">
       <Filter>src\Dymatic</Filter>
     </ClCompile>
-    <ClCompile Include="src\Platform\OpenGL\ImGuiOpenGLRenderer.cpp">
-      <Filter>src\Platform\OpenGL</Filter>
-    </ClCompile>
     <ClCompile Include="src\Platform\Windows\WindowsInput.cpp">
       <Filter>src\Platform\Windows</Filter>
     </ClCompile>
@@ -1358,5 +1355,7 @@
     <ClCompile Include="src\dypch.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="src\Platform\OpenGL\OpenGLContext.cpp" />
+    <ClCompile Include="src\Dymatic\Renderer\Shader.cpp" />
   </ItemGroup>
 </Project>

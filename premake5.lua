@@ -27,9 +27,10 @@ include "Dymatic/vendor/imgui"
 
 project "Dymatic"
 	location "Dymatic"
-	kind "SharedLib"
+	kind "StaticLib"
 	language "C++"
-	staticruntime "off"
+	cppdialect "C++17"
+	staticruntime "on"
 
 	targetdir ("bin/" .. outputdir .. "/%{prj.name}")
 	objdir ("bin-int/" .. outputdir .. "/%{prj.name}")
@@ -43,6 +44,11 @@ project "Dymatic"
 		"%{prj.name}/src/**.cpp",
 		"%{prj.name}/vendor/glm/glm/**.hpp",
 		"%{prj.name}/vendor/glm/glm/**.inl"
+	}
+
+	defines
+	{
+		"_CRT_SECURE_NO_WARNINGS"
 	}
 
 	includedirs
@@ -64,7 +70,6 @@ project "Dymatic"
 	}
 
 	filter "system:windows"
-		cppdialect "C++17"
 		systemversion "latest"
 
 		defines
@@ -74,31 +79,27 @@ project "Dymatic"
 			"GLFW_INCLUDE_NONE"
 		}
 
-		postbuildcommands
-		{
-			("{COPY} %{cfg.buildtarget.relpath} \"../bin/" .. outputdir .. "/Sandbox/\"")
-		}
-
 	filter "configurations:Debug"
 		 defines "DY_DEBUG"
 		 runtime "Debug"
-		 symbols "On"
+		 symbols "on"
 
 	filter "configurations:Release"
 		 defines "DY_RELEASE"
 		 runtime "Release"
-		 optimize "On"
+		 optimize "on"
 
 	filter "configurations:Dist"
 		 defines "DY_DIST"
 		 runtime "Release"
-		 optimize "On"
+		 optimize "on"
 
 project "Sandbox"
 	location "Sandbox"
 	kind "ConsoleApp"
 	language "C++"
-	staticruntime "off"
+	cppdialect "C++17"
+	staticruntime "on"
 
 	targetdir ("bin/" .. outputdir .. "/%{prj.name}")
 	objdir ("bin-int/" .. outputdir .. "/%{prj.name}")
@@ -113,6 +114,7 @@ project "Sandbox"
 	{
 		"Dymatic/vendor/spdlog/include",
 		"Dymatic/src",
+		"Dymatic/vendor",
 		"%{IncludeDir.glm}"
 	}
 
@@ -122,7 +124,6 @@ project "Sandbox"
 	}
 
 	filter "system:windows"
-		cppdialect "C++17"
 		systemversion "latest"
 
 		defines
@@ -134,14 +135,14 @@ project "Sandbox"
 	filter "configurations:Debug"
 		 defines "DY_DEBUG"
 		 runtime "Debug"
-		 symbols "On"
+		 symbols "on"
 
 	filter "configurations:Release"
 		 defines "DY_RELEASE"
 		 runtime "Release"
-		 optimize "On"
+		 optimize "on"
 
 	filter "configurations:Dist"
 		 defines "DY_DIST"
 		 runtime "Release"
-		 optimize "On"
+		 optimize "on"

@@ -1,11 +1,15 @@
 #pragma once
 
 #ifdef DY_PLATFORM_WINDOWS
+#if DY_DYNAMIC_LINK
 	#ifdef DY_BUILD_DLL
 		#define DYMATIC_API __declspec(dllexport)
 	#else
 		#define DYMATIC_API __declspec(dllimport)
 	#endif
+#else
+	#define DYMATIC_API
+#endif
 #else
 	#error Dymatic only supports Windows Opperating Systems!
 #endif

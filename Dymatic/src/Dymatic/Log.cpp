@@ -3,6 +3,7 @@
 
 #include "spdlog/sinks/stdout_color_sinks.h"
 
+
 namespace Dymatic {
 
 	std::shared_ptr<spdlog::logger> Log::s_CoreLogger;
@@ -17,6 +18,7 @@ namespace Dymatic {
 
 		s_ClientLogger = spdlog::stdout_color_mt("APPLICATION");
 		s_ClientLogger->set_level(spdlog::level::trace);
+
 	}
 
 }

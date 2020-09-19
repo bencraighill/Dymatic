@@ -5,14 +5,17 @@
 #include "Dymatic/Events/MouseEvent.h"
 #include "Dymatic/Events/KeyEvent.h"
 
-#include <glad/glad.h>
+#include "Platform/OpenGL/OpenGLContext.h"
+
+
+
 
 
 
 namespace Dymatic {
 
 	static bool s_GLFWInitialized = false;
-
+	  
 	static void GLFWErrorCallback(int error, const char* description)
 	{
 		DY_CORE_ERROR("GLFW Error ({0}): {1}", error, description);
@@ -39,7 +42,10 @@ namespace Dymatic {
 		m_Data.Width = props.Width;
 		m_Data.Height = props.Height;
 
+
 		DY_CORE_INFO("Creating Window {0} ({1}, {2})", props.Title, props.Width, props.Height);
+
+		
 
 		if (!s_GLFWInitialized)
 		{
@@ -51,9 +57,12 @@ namespace Dymatic {
 		}
 
 		m_Window = glfwCreateWindow((int)props.Width, (int)props.Height, m_Data.Title.c_str(), nullptr, nullptr);
-		glfwMakeContextCurrent(m_Window);
-		int status = gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
-		DY_CORE_ASSERT(status, "Failed to initialize Glad!");
+		
+		m_Context = new OpenGLContext(m_Window);
+		m_Context->Init();
+
+		
+
 		glfwSetWindowUserPointer(m_Window, &m_Data);
 		SetVSync(true);
 
@@ -156,7 +165,7 @@ namespace Dymatic {
 	void WindowsWindow::OnUpdate()
 	{
 		glfwPollEvents();
-		glfwSwapBuffers(m_Window);
+		m_Context->SwapBuffers();
 	}
 
 	void WindowsWindow::SetVSync(bool enabled)

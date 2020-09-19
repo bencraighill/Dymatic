@@ -1,5 +1,7 @@
 #include <Dymatic.h>
 
+#include "imgui/imgui.h"
+
 class ExampleLayer : public Dymatic::Layer
 {
 public:
@@ -17,6 +19,13 @@ public:
 	
 	}
 
+	virtual void OnImGuiRender() override
+	{
+		ImGui::Begin("Test");
+		ImGui::Text("Hello World!");
+		ImGui::End();
+	}
+
 	void OnEvent(Dymatic::Event& event) override
 	{
 		if (event.GetEventType() == Dymatic::EventType::KeyPressed)
@@ -26,7 +35,6 @@ public:
 				DY_TRACE("Tab key is pressed! (event)");
 			DY_TRACE("{0}", (char)e.GetKeyCode());
 		}
-		DY_TRACE("{0}", event);
 	}
 
 };
@@ -37,7 +45,6 @@ public:
 	Sandbox()
 	{
 		PushLayer(new ExampleLayer());
-		PushOverlay(new Dymatic::ImGuiLayer());
 	}
 
 	~Sandbox()
