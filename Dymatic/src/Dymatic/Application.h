@@ -10,7 +10,8 @@
 #include "Dymatic/ImGui/ImGuiLayer.h"
 
 #include "Dymatic/Renderer/Shader.h"
-
+#include "Dymatic/Renderer/Buffer.h"
+#include "Dymatic/Renderer/VertexArray.h"
 
 namespace Dymatic {
 
@@ -37,9 +38,12 @@ namespace Dymatic {
 		ImGuiLayer* m_ImGuiLayer;
 		bool m_Running = true;
 		LayerStack m_LayerStack;
+ 
+		std::shared_ptr<Shader> m_Shader;
+		std::shared_ptr<VertexArray> m_VertexArray;
 
-		unsigned int m_VertexArray, m_VertexBuffer, m_IndexBuffer;
-		std::unique_ptr<Shader> m_Shader;
+		std::shared_ptr<Shader> m_BlueShader;
+		std::shared_ptr<VertexArray> m_SquareVA;
 	private:
 		static Application* s_Instance;
 	};

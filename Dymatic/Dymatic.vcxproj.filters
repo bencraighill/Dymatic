@@ -13,8 +13,14 @@
     <Filter Include="src\Dymatic\ImGui">
       <UniqueIdentifier>{51162254-BD2C-20EA-06A4-AB0B72F9F071}</UniqueIdentifier>
     </Filter>
+    <Filter Include="src\Dymatic\Renderer">
+      <UniqueIdentifier>{6DA762C5-5936-EC8E-0255-008AEEC2FC34}</UniqueIdentifier>
+    </Filter>
     <Filter Include="src\Platform">
       <UniqueIdentifier>{21CA02E5-0D2D-9289-B6B2-CA3FA2F45D0C}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\Platform\OpenGL">
+      <UniqueIdentifier>{35A49437-A105-7245-2A73-B8F796D3A804}</UniqueIdentifier>
     </Filter>
     <Filter Include="src\Platform\Windows">
       <UniqueIdentifier>{5B054582-4794-CE4B-F0B2-E246DC20DFF1}</UniqueIdentifier>
@@ -87,8 +93,26 @@
     <ClInclude Include="src\Dymatic\MouseButtonCodes.h">
       <Filter>src\Dymatic</Filter>
     </ClInclude>
+    <ClInclude Include="src\Dymatic\Renderer\Buffer.h">
+      <Filter>src\Dymatic\Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Dymatic\Renderer\GraphicsContext.h">
+      <Filter>src\Dymatic\Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Dymatic\Renderer\Renderer.h">
+      <Filter>src\Dymatic\Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Dymatic\Renderer\Shader.h">
+      <Filter>src\Dymatic\Renderer</Filter>
+    </ClInclude>
     <ClInclude Include="src\Dymatic\Window.h">
       <Filter>src\Dymatic</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Platform\OpenGL\OpenGLBuffer.h">
+      <Filter>src\Platform\OpenGL</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Platform\OpenGL\OpenGLContext.h">
+      <Filter>src\Platform\OpenGL</Filter>
     </ClInclude>
     <ClInclude Include="src\Platform\Windows\WindowsInput.h">
       <Filter>src\Platform\Windows</Filter>
@@ -1323,9 +1347,8 @@
     <ClInclude Include="vendor\glm\glm\vector_relational.hpp">
       <Filter>vendor\glm\glm</Filter>
     </ClInclude>
-    <ClInclude Include="src\Dymatic\Renderer\GraphicsContext.h" />
-    <ClInclude Include="src\Platform\OpenGL\OpenGLContext.h" />
-    <ClInclude Include="src\Dymatic\Renderer\Shader.h" />
+    <ClInclude Include="src\Dymatic\Renderer\VertexArray.h" />
+    <ClInclude Include="src\Platform\OpenGL\OpenGLVertexArray.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Dymatic\Application.cpp">
@@ -1346,6 +1369,21 @@
     <ClCompile Include="src\Dymatic\Log.cpp">
       <Filter>src\Dymatic</Filter>
     </ClCompile>
+    <ClCompile Include="src\Dymatic\Renderer\Buffer.cpp">
+      <Filter>src\Dymatic\Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Dymatic\Renderer\Renderer.cpp">
+      <Filter>src\Dymatic\Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Dymatic\Renderer\Shader.cpp">
+      <Filter>src\Dymatic\Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Platform\OpenGL\OpenGLBuffer.cpp">
+      <Filter>src\Platform\OpenGL</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Platform\OpenGL\OpenGLContext.cpp">
+      <Filter>src\Platform\OpenGL</Filter>
+    </ClCompile>
     <ClCompile Include="src\Platform\Windows\WindowsInput.cpp">
       <Filter>src\Platform\Windows</Filter>
     </ClCompile>
@@ -1355,7 +1393,7 @@
     <ClCompile Include="src\dypch.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="src\Platform\OpenGL\OpenGLContext.cpp" />
-    <ClCompile Include="src\Dymatic\Renderer\Shader.cpp" />
+    <ClCompile Include="src\Dymatic\Renderer\VertexArray.cpp" />
+    <ClCompile Include="src\Platform\OpenGL\OpenGLVertexArray.cpp" />
   </ItemGroup>
 </Project>
