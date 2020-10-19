@@ -13,8 +13,8 @@ namespace Dymatic {
 	{
 		switch (Renderer::GetAPI())
 		{
-			case RendererAPI::None:		DY_CORE_ASSERT(false, "RendererAPI::None is currently not supported by Dymatic!");  return nullptr;
-			case RendererAPI::OpenGL:	return new OpenGLVertexBuffer(vertices, size);
+			case RendererAPI::API::None:		DY_CORE_ASSERT(false, "RendererAPI::None is currently not supported by Dymatic!");  return nullptr;
+			case RendererAPI::API::OpenGL:	return new OpenGLVertexBuffer(vertices, size);
 		}
 
 		DY_CORE_ASSERT(false, "Unknown RendererAPI!")
@@ -25,8 +25,8 @@ namespace Dymatic {
 	{
 		switch (Renderer::GetAPI())
 		{
-			case RendererAPI::None:		DY_CORE_ASSERT(false, "RendererAPI::None is currently not supported by Dymatic!");  return nullptr;
-			case RendererAPI::OpenGL:	return new OpenGLIndexBuffer(indices, size);
+			case RendererAPI::API::None:		DY_CORE_ASSERT(false, "RendererAPI::None is currently not supported by Dymatic!");  return nullptr;
+			case RendererAPI::API::OpenGL:	return new OpenGLIndexBuffer(indices, size);
 		}
 
 		DY_CORE_ASSERT(false, "Unknown RendererAPI!")

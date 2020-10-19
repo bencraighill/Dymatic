@@ -13,6 +13,8 @@
 #include "Dymatic/Renderer/Buffer.h"
 #include "Dymatic/Renderer/VertexArray.h"
 
+#include "Dymatic/Renderer/OrthographicCamera.h"
+
 namespace Dymatic {
 
 	class DYMATIC_API Application
@@ -44,6 +46,8 @@ namespace Dymatic {
 
 		std::shared_ptr<Shader> m_BlueShader;
 		std::shared_ptr<VertexArray> m_SquareVA;
+
+		OrthographicCamera m_Camera;
 	private:
 		static Application* s_Instance;
 	};

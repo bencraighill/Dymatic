@@ -99,10 +99,19 @@
     <ClInclude Include="src\Dymatic\Renderer\GraphicsContext.h">
       <Filter>src\Dymatic\Renderer</Filter>
     </ClInclude>
+    <ClInclude Include="src\Dymatic\Renderer\RenderCommand.h">
+      <Filter>src\Dymatic\Renderer</Filter>
+    </ClInclude>
     <ClInclude Include="src\Dymatic\Renderer\Renderer.h">
       <Filter>src\Dymatic\Renderer</Filter>
     </ClInclude>
+    <ClInclude Include="src\Dymatic\Renderer\RendererAPI.h">
+      <Filter>src\Dymatic\Renderer</Filter>
+    </ClInclude>
     <ClInclude Include="src\Dymatic\Renderer\Shader.h">
+      <Filter>src\Dymatic\Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Dymatic\Renderer\VertexArray.h">
       <Filter>src\Dymatic\Renderer</Filter>
     </ClInclude>
     <ClInclude Include="src\Dymatic\Window.h">
@@ -112,6 +121,12 @@
       <Filter>src\Platform\OpenGL</Filter>
     </ClInclude>
     <ClInclude Include="src\Platform\OpenGL\OpenGLContext.h">
+      <Filter>src\Platform\OpenGL</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Platform\OpenGL\OpenGLRendererAPI.h">
+      <Filter>src\Platform\OpenGL</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Platform\OpenGL\OpenGLVertexArray.h">
       <Filter>src\Platform\OpenGL</Filter>
     </ClInclude>
     <ClInclude Include="src\Platform\Windows\WindowsInput.h">
@@ -1347,8 +1362,7 @@
     <ClInclude Include="vendor\glm\glm\vector_relational.hpp">
       <Filter>vendor\glm\glm</Filter>
     </ClInclude>
-    <ClInclude Include="src\Dymatic\Renderer\VertexArray.h" />
-    <ClInclude Include="src\Platform\OpenGL\OpenGLVertexArray.h" />
+    <ClInclude Include="src\Dymatic\Renderer\OrthographicCamera.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Dymatic\Application.cpp">
@@ -1372,16 +1386,31 @@
     <ClCompile Include="src\Dymatic\Renderer\Buffer.cpp">
       <Filter>src\Dymatic\Renderer</Filter>
     </ClCompile>
+    <ClCompile Include="src\Dymatic\Renderer\RenderCommand.cpp">
+      <Filter>src\Dymatic\Renderer</Filter>
+    </ClCompile>
     <ClCompile Include="src\Dymatic\Renderer\Renderer.cpp">
       <Filter>src\Dymatic\Renderer</Filter>
     </ClCompile>
+    <ClCompile Include="src\Dymatic\Renderer\RendererAPI.cpp">
+      <Filter>src\Dymatic\Renderer</Filter>
+    </ClCompile>
     <ClCompile Include="src\Dymatic\Renderer\Shader.cpp">
+      <Filter>src\Dymatic\Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Dymatic\Renderer\VertexArray.cpp">
       <Filter>src\Dymatic\Renderer</Filter>
     </ClCompile>
     <ClCompile Include="src\Platform\OpenGL\OpenGLBuffer.cpp">
       <Filter>src\Platform\OpenGL</Filter>
     </ClCompile>
     <ClCompile Include="src\Platform\OpenGL\OpenGLContext.cpp">
+      <Filter>src\Platform\OpenGL</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Platform\OpenGL\OpenGLRendererAPI.cpp">
+      <Filter>src\Platform\OpenGL</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Platform\OpenGL\OpenGLVertexArray.cpp">
       <Filter>src\Platform\OpenGL</Filter>
     </ClCompile>
     <ClCompile Include="src\Platform\Windows\WindowsInput.cpp">
@@ -1393,7 +1422,6 @@
     <ClCompile Include="src\dypch.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="src\Dymatic\Renderer\VertexArray.cpp" />
-    <ClCompile Include="src\Platform\OpenGL\OpenGLVertexArray.cpp" />
+    <ClCompile Include="src\Dymatic\Renderer\OrthographicCamera.cpp" />
   </ItemGroup>
 </Project>

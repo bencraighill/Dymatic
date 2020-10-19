@@ -3,10 +3,12 @@
 
 
 #include "Dymatic/Log.h"
-#include <glad/glad.h>
+
+#include "Dymatic/Renderer/Renderer.h"
 
 
 #include "Input.h"
+
 
 
 namespace Dymatic {
@@ -17,6 +19,7 @@ namespace Dymatic {
 
 
 	Application::Application()
+		: m_Camera(-1.6f, 1.6f, -0.9f, 0.9f)
 	{
 		DY_CORE_ASSERT(!s_Instance, "Application already exists!")
 		s_Instance = this;
@@ -28,9 +31,6 @@ namespace Dymatic {
 		PushOverlay(m_ImGuiLayer);
 
 		m_VertexArray.reset(VertexArray::Create());
-
-		unsigned int id;
-		glGenVertexArrays(1, &id);
 
 
 		float vertices[3 * 7] = {
@@ -82,6 +82,8 @@ namespace Dymatic {
 			layout(location = 0) in vec3 a_Position;
 			layout(location = 1) in vec4 a_Color;
 
+			uniform mat4 u_ViewProjection;
+
 			out vec3 v_Position;
 			out vec4 v_Color;
 
@@ -89,7 +91,7 @@ namespace Dymatic {
 			{
 				v_Position = a_Position;
 				v_Color = a_Color;
-				gl_Position = vec4(a_Position, 1.0);
+				gl_Position = u_ViewProjection * vec4(a_Position, 1.0);
 			}
 
 		)";
@@ -121,10 +123,12 @@ namespace Dymatic {
 			out vec3 v_Position;
 			out vec4 v_Color;
 
+			uniform mat4 u_ViewProjection;
+
 			void main()
 			{
 				v_Position = a_Position;
-				gl_Position = vec4(a_Position, 1.0);
+				gl_Position = u_ViewProjection * vec4(a_Position, 1.0);
 			}
 
 		)";
@@ -184,18 +188,20 @@ namespace Dymatic {
 	void Application::Run()
 	{
 		while (m_Running)
-		{
-			glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-			glClear(GL_COLOR_BUFFER_BIT);
+		{ 
+			RenderCommand::SetClearColor({ 0.1f, 0.1f, 0.1f, 1.0f });
+			RenderCommand::Clear();
 
-			m_BlueShader->Bind();
-			m_SquareVA->Bind();
-			glDrawElements(GL_TRIANGLES, m_SquareVA->GetIndexBuffer()->GetCount(), GL_UNSIGNED_INT, nullptr);
+			m_Camera.SetRotation(45.0f);
 
-			m_Shader->Bind();
-			m_VertexArray->Bind();
-			glDrawElements(GL_TRIANGLES, m_VertexArray->GetIndexBuffer()->GetCount(), GL_UNSIGNED_INT, nullptr);
+			Renderer::BeginScene(m_Camera);
 
+			Renderer::Submit(m_BlueShader, m_SquareVA);
+			Renderer::Submit(m_Shader, m_VertexArray);
+
+			Renderer::EndScene();
+
+			
 			for (Layer* layer : m_LayerStack)
 				layer->OnUpdate();
 
