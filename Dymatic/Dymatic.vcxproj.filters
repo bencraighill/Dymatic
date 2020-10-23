@@ -99,6 +99,9 @@
     <ClInclude Include="src\Dymatic\Renderer\GraphicsContext.h">
       <Filter>src\Dymatic\Renderer</Filter>
     </ClInclude>
+    <ClInclude Include="src\Dymatic\Renderer\OrthographicCamera.h">
+      <Filter>src\Dymatic\Renderer</Filter>
+    </ClInclude>
     <ClInclude Include="src\Dymatic\Renderer\RenderCommand.h">
       <Filter>src\Dymatic\Renderer</Filter>
     </ClInclude>
@@ -1362,7 +1365,6 @@
     <ClInclude Include="vendor\glm\glm\vector_relational.hpp">
       <Filter>vendor\glm\glm</Filter>
     </ClInclude>
-    <ClInclude Include="src\Dymatic\Renderer\OrthographicCamera.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Dymatic\Application.cpp">
@@ -1384,6 +1386,9 @@
       <Filter>src\Dymatic</Filter>
     </ClCompile>
     <ClCompile Include="src\Dymatic\Renderer\Buffer.cpp">
+      <Filter>src\Dymatic\Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Dymatic\Renderer\OrthographicCamera.cpp">
       <Filter>src\Dymatic\Renderer</Filter>
     </ClCompile>
     <ClCompile Include="src\Dymatic\Renderer\RenderCommand.cpp">
@@ -1422,6 +1427,5 @@
     <ClCompile Include="src\dypch.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="src\Dymatic\Renderer\OrthographicCamera.cpp" />
   </ItemGroup>
 </Project>
