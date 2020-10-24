@@ -1,9 +1,0 @@
-﻿  Application.cpp
-  ImGuiLayer.cpp
-  Buffer.cpp
-  OrthographicCamera.cpp
-  Renderer.cpp
-  VertexArray.cpp
-  WindowsInput.cpp
-  Generating Code...
-  Dymatic.vcxproj -> C:\dev\Dymatic\Dymatic\..\bin\Debug-windows-x86_64\Dymatic\Dymatic.lib
