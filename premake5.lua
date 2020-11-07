@@ -17,6 +17,7 @@ IncludeDir["GLFW"] = "Dymatic/vendor/GLFW/include"
 IncludeDir["Glad"] = "Dymatic/vendor/Glad/include"
 IncludeDir["ImGui"] = "Dymatic/vendor/imgui"
 IncludeDir["glm"] = "Dymatic/vendor/glm"
+IncludeDir["stb_image"] = "Dymatic/vendor/stb_image"
 
 include "Dymatic/vendor/GLFW"
 include "Dymatic/vendor/Glad"
@@ -42,6 +43,8 @@ project "Dymatic"
 	{
 		"%{prj.name}/src/**.h",
 		"%{prj.name}/src/**.cpp",
+		"%{prj.name}/vendor/stb_image/**.h",
+		"%{prj.name}/vendor/stb_image/**.cpp",
 		"%{prj.name}/vendor/glm/glm/**.hpp",
 		"%{prj.name}/vendor/glm/glm/**.inl"
 	}
@@ -58,7 +61,8 @@ project "Dymatic"
 		"%{IncludeDir.GLFW}",
 		"%{IncludeDir.Glad}",
 		"%{IncludeDir.ImGui}",
-		"%{IncludeDir.glm}"
+		"%{IncludeDir.glm}",
+		"%{IncludeDir.stb_image}"
 	}
 
 	links

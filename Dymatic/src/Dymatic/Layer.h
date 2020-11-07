@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Dymatic/Core.h"
+#include "Dymatic/Core/Timestep.h"
 #include "Dymatic/Events/Event.h"
 
 namespace Dymatic {
@@ -13,7 +14,7 @@ namespace Dymatic {
 
 		virtual void OnAttach() {}
 		virtual void OnDetach() {}
-		virtual void OnUpdate() {}
+		virtual void OnUpdate(Timestep ts) {}
 		virtual void OnImGuiRender() {}
 		virtual void OnEvent(Event& event) {}
 

@@ -7,6 +7,9 @@
     <Filter Include="src\Dymatic">
       <UniqueIdentifier>{E78F9DA1-5345-1697-DC39-106E48EE0C9B}</UniqueIdentifier>
     </Filter>
+    <Filter Include="src\Dymatic\Core">
+      <UniqueIdentifier>{9FBCBFDB-8BB5-DE2D-B4E7-C3B2A03FBE39}</UniqueIdentifier>
+    </Filter>
     <Filter Include="src\Dymatic\Events">
       <UniqueIdentifier>{EB71C3CF-D755-8425-40B6-7E782CB96EA7}</UniqueIdentifier>
     </Filter>
@@ -46,6 +49,9 @@
     <Filter Include="vendor\glm\glm\gtx">
       <UniqueIdentifier>{B3A6A76B-9F8A-68C1-08EB-6214F4ED5243}</UniqueIdentifier>
     </Filter>
+    <Filter Include="vendor\stb_image">
+      <UniqueIdentifier>{0DA0BA59-F998-D9AB-22CB-BE300E23B9B7}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Dymatic.h">
@@ -56,6 +62,9 @@
     </ClInclude>
     <ClInclude Include="src\Dymatic\Core.h">
       <Filter>src\Dymatic</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Dymatic\Core\Timestep.h">
+      <Filter>src\Dymatic\Core</Filter>
     </ClInclude>
     <ClInclude Include="src\Dymatic\EntryPoint.h">
       <Filter>src\Dymatic</Filter>
@@ -114,6 +123,9 @@
     <ClInclude Include="src\Dymatic\Renderer\Shader.h">
       <Filter>src\Dymatic\Renderer</Filter>
     </ClInclude>
+    <ClInclude Include="src\Dymatic\Renderer\Texture.h">
+      <Filter>src\Dymatic\Renderer</Filter>
+    </ClInclude>
     <ClInclude Include="src\Dymatic\Renderer\VertexArray.h">
       <Filter>src\Dymatic\Renderer</Filter>
     </ClInclude>
@@ -127,6 +139,12 @@
       <Filter>src\Platform\OpenGL</Filter>
     </ClInclude>
     <ClInclude Include="src\Platform\OpenGL\OpenGLRendererAPI.h">
+      <Filter>src\Platform\OpenGL</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Platform\OpenGL\OpenGLShader.h">
+      <Filter>src\Platform\OpenGL</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Platform\OpenGL\OpenGLTexture.h">
       <Filter>src\Platform\OpenGL</Filter>
     </ClInclude>
     <ClInclude Include="src\Platform\OpenGL\OpenGLVertexArray.h">
@@ -1365,6 +1383,9 @@
     <ClInclude Include="vendor\glm\glm\vector_relational.hpp">
       <Filter>vendor\glm\glm</Filter>
     </ClInclude>
+    <ClInclude Include="vendor\stb_image\stb_image.h">
+      <Filter>vendor\stb_image</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Dymatic\Application.cpp">
@@ -1403,6 +1424,9 @@
     <ClCompile Include="src\Dymatic\Renderer\Shader.cpp">
       <Filter>src\Dymatic\Renderer</Filter>
     </ClCompile>
+    <ClCompile Include="src\Dymatic\Renderer\Texture.cpp">
+      <Filter>src\Dymatic\Renderer</Filter>
+    </ClCompile>
     <ClCompile Include="src\Dymatic\Renderer\VertexArray.cpp">
       <Filter>src\Dymatic\Renderer</Filter>
     </ClCompile>
@@ -1413,6 +1437,12 @@
       <Filter>src\Platform\OpenGL</Filter>
     </ClCompile>
     <ClCompile Include="src\Platform\OpenGL\OpenGLRendererAPI.cpp">
+      <Filter>src\Platform\OpenGL</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Platform\OpenGL\OpenGLShader.cpp">
+      <Filter>src\Platform\OpenGL</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Platform\OpenGL\OpenGLTexture.cpp">
       <Filter>src\Platform\OpenGL</Filter>
     </ClCompile>
     <ClCompile Include="src\Platform\OpenGL\OpenGLVertexArray.cpp">
@@ -1426,6 +1456,9 @@
     </ClCompile>
     <ClCompile Include="src\dypch.cpp">
       <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="vendor\stb_image\stb_image.cpp">
+      <Filter>vendor\stb_image</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>
