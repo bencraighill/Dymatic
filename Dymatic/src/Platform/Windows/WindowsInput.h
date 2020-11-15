@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Dymatic/Input.h"
+#include "Dymatic/Core/Input.h"
 
 namespace Dymatic {
 

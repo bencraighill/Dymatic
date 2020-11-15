@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|x64">
       <Configuration>Debug</Configuration>
@@ -19,27 +19,26 @@
     <IgnoreWarnCompileDuplicatedFilename>true</IgnoreWarnCompileDuplicatedFilename>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>Dymatic</RootNamespace>
-    <LatestTargetPlatformVersion>$([Microsoft.Build.Utilities.ToolLocationHelper]::GetLatestSDKTargetPlatformVersion('Windows', '10.0'))</LatestTargetPlatformVersion>
-    <WindowsTargetPlatformVersion>$(LatestTargetPlatformVersion)</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <CharacterSet>Unicode</CharacterSet>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <CharacterSet>Unicode</CharacterSet>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Dist|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <CharacterSet>Unicode</CharacterSet>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -142,31 +141,32 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="src\Dymatic.h" />
-    <ClInclude Include="src\Dymatic\Application.h" />
-    <ClInclude Include="src\Dymatic\Core.h" />
+    <ClInclude Include="src\Dymatic\Core\Application.h" />
+    <ClInclude Include="src\Dymatic\Core\Core.h" />
+    <ClInclude Include="src\Dymatic\Core\EntryPoint.h" />
+    <ClInclude Include="src\Dymatic\Core\Input.h" />
+    <ClInclude Include="src\Dymatic\Core\KeyCodes.h" />
+    <ClInclude Include="src\Dymatic\Core\Layer.h" />
+    <ClInclude Include="src\Dymatic\Core\LayerStack.h" />
+    <ClInclude Include="src\Dymatic\Core\Log.h" />
+    <ClInclude Include="src\Dymatic\Core\MouseButtonCodes.h" />
     <ClInclude Include="src\Dymatic\Core\Timestep.h" />
-    <ClInclude Include="src\Dymatic\EntryPoint.h" />
+    <ClInclude Include="src\Dymatic\Core\Window.h" />
     <ClInclude Include="src\Dymatic\Events\ApplicationEvent.h" />
     <ClInclude Include="src\Dymatic\Events\Event.h" />
     <ClInclude Include="src\Dymatic\Events\KeyEvent.h" />
     <ClInclude Include="src\Dymatic\Events\MouseEvent.h" />
     <ClInclude Include="src\Dymatic\ImGui\ImGuiLayer.h" />
-    <ClInclude Include="src\Dymatic\Input.h" />
-    <ClInclude Include="src\Dymatic\KeyCodes.h" />
-    <ClInclude Include="src\Dymatic\Layer.h" />
-    <ClInclude Include="src\Dymatic\LayerStack.h" />
-    <ClInclude Include="src\Dymatic\Log.h" />
-    <ClInclude Include="src\Dymatic\MouseButtonCodes.h" />
     <ClInclude Include="src\Dymatic\Renderer\Buffer.h" />
     <ClInclude Include="src\Dymatic\Renderer\GraphicsContext.h" />
     <ClInclude Include="src\Dymatic\Renderer\OrthographicCamera.h" />
+    <ClInclude Include="src\Dymatic\Renderer\OrthographicCameraController.h" />
     <ClInclude Include="src\Dymatic\Renderer\RenderCommand.h" />
     <ClInclude Include="src\Dymatic\Renderer\Renderer.h" />
     <ClInclude Include="src\Dymatic\Renderer\RendererAPI.h" />
     <ClInclude Include="src\Dymatic\Renderer\Shader.h" />
     <ClInclude Include="src\Dymatic\Renderer\Texture.h" />
     <ClInclude Include="src\Dymatic\Renderer\VertexArray.h" />
-    <ClInclude Include="src\Dymatic\Window.h" />
     <ClInclude Include="src\Platform\OpenGL\OpenGLBuffer.h" />
     <ClInclude Include="src\Platform\OpenGL\OpenGLContext.h" />
     <ClInclude Include="src\Platform\OpenGL\OpenGLRendererAPI.h" />
@@ -587,14 +587,15 @@
     <ClInclude Include="vendor\stb_image\stb_image.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\Dymatic\Application.cpp" />
+    <ClCompile Include="src\Dymatic\Core\Application.cpp" />
+    <ClCompile Include="src\Dymatic\Core\Layer.cpp" />
+    <ClCompile Include="src\Dymatic\Core\LayerStack.cpp" />
+    <ClCompile Include="src\Dymatic\Core\Log.cpp" />
     <ClCompile Include="src\Dymatic\ImGui\ImGuiBuild.cpp" />
     <ClCompile Include="src\Dymatic\ImGui\ImGuiLayer.cpp" />
-    <ClCompile Include="src\Dymatic\Layer.cpp" />
-    <ClCompile Include="src\Dymatic\LayerStack.cpp" />
-    <ClCompile Include="src\Dymatic\Log.cpp" />
     <ClCompile Include="src\Dymatic\Renderer\Buffer.cpp" />
     <ClCompile Include="src\Dymatic\Renderer\OrthographicCamera.cpp" />
+    <ClCompile Include="src\Dymatic\Renderer\OrthographicCameraController.cpp" />
     <ClCompile Include="src\Dymatic\Renderer\RenderCommand.cpp" />
     <ClCompile Include="src\Dymatic\Renderer\Renderer.cpp" />
     <ClCompile Include="src\Dymatic\Renderer\RendererAPI.cpp" />

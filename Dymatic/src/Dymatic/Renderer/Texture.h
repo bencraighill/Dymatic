@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "Dymatic/Core.h"
+#include "Dymatic/Core/Core.h"
 
 namespace Dymatic {
 

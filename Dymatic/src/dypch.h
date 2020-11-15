@@ -8,11 +8,12 @@
 
 #include <string>
 #include <sstream>
+#include <array>
 #include <vector>
 #include <unordered_map>
 #include <unordered_set>
 
-#include "Dymatic/Log.h"
+#include "Dymatic/Core/Log.h"
 
 #ifdef DY_PLATFORM_WINDOWS
 	#include <Windows.h>

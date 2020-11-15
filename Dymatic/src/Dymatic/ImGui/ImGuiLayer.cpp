@@ -6,7 +6,7 @@
 #include "examples/imgui_impl_opengl3.h"
 
 
-#include "Dymatic/Application.h"
+#include "Dymatic/Core/Application.h"
 
 
 //TEMPORARY:

@@ -169,6 +169,24 @@ public:
         log_it_(log_msg, log_enabled, traceback_enabled);
     }
 
+	//// log to string
+    //// UserMade
+    // template<typename... Args>
+    // static std::string log_to_str(const std::string &msg, const Args &... args)
+    //{
+    //    std::ostringstream oss;
+    //    auto oss_sink = std::make_shared<spdlog::sinks::ostream_sink_mt>(oss);
+    //    spdlog::logger oss_logger("pattern_tester", oss_sink);
+    //    oss_logger.set_level(spdlog::level::info);
+    //
+    //    oss_logger.set_formatter(std::unique_ptr<spdlog::formatter>(new spdlog::pattern_formatter(args...)));
+    //
+    //    oss_logger.info(msg);
+    //    return oss.str();
+    //}
+
+
+
     void log(level::level_enum lvl, string_view_t msg)
     {
         log(source_loc{}, lvl, msg);

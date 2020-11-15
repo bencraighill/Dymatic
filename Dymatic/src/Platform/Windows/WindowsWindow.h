@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Dymatic/Window.h"
+#include "Dymatic/Core/Window.h"
 #include "Dymatic/Renderer/GraphicsContext.h"
 
 #include <GLFW/glfw3.h>

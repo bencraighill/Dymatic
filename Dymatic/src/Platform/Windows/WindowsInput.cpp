@@ -1,7 +1,7 @@
 #include "dypch.h"
 #include "WindowsInput.h"
 
-#include "Dymatic/Application.h"
+#include "Dymatic/Core/Application.h"
 #include <GLFW/glfw3.h>
 
 namespace Dymatic {

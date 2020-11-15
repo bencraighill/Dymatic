@@ -2,7 +2,7 @@
 
 #include "dypch.h"
 
-#include "Dymatic/Core.h"
+#include "Dymatic/Core/Core.h"
 #include "Dymatic/Events/Event.h"
 
 namespace Dymatic {
