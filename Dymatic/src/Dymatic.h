@@ -20,6 +20,7 @@
 
 // ----RENDERER---------
 #include "Dymatic/Renderer/Renderer.h"
+#include "Dymatic/Renderer/Renderer2D.h"
 #include "Dymatic/Renderer/RenderCommand.h"
 
 #include "Dymatic/Renderer/Buffer.h"
@@ -28,10 +29,5 @@
 #include "Dymatic/Renderer/VertexArray.h"
 
 #include "Dymatic/Renderer/OrthographicCamera.h"
-// ------------------------
-
-
-// ----ENTRY POINT---------
-#include "Dymatic/Core/EntryPoint.h"
 // ------------------------
 

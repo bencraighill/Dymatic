@@ -15,6 +15,8 @@
 
 #include "Dymatic/Core/Log.h"
 
+#include "Dymatic/Debug/Instrumentor.h"
+
 #ifdef DY_PLATFORM_WINDOWS
 	#include <Windows.h>
 #endif
