@@ -58,6 +58,11 @@ void Sandbox2D::OnImGuiRender()
 
 	ImGui::Begin("Settings");
 	ImGui::ColorEdit4("Square Color", glm::value_ptr(m_SquareColor));
+
+	static const char* items[]{ "Default", "Dark", "Light" };
+	static int selectedItem = 0;
+
+	ImGui::Combo("Editor Color Scheme", &selectedItem, items, IM_ARRAYSIZE(items));
 	ImGui::End();
 }
 
