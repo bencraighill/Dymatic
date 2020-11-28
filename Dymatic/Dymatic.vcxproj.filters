@@ -60,9 +60,6 @@
     <ClInclude Include="src\Dymatic\Core\Application.h">
       <Filter>src\Dymatic\Core</Filter>
     </ClInclude>
-    <ClInclude Include="src\Dymatic\Core\Core.h">
-      <Filter>src\Dymatic\Core</Filter>
-    </ClInclude>
     <ClInclude Include="src\Dymatic\Core\EntryPoint.h">
       <Filter>src\Dymatic\Core</Filter>
     </ClInclude>
@@ -1391,6 +1388,14 @@
     </ClInclude>
     <ClInclude Include="src\Dymatic\Renderer\Renderer2D.h" />
     <ClInclude Include="src\Dymatic\Debug\Instrumentor.h" />
+    <ClInclude Include="vendor\CSplash_src\Splash.h" />
+    <ClInclude Include="vendor\CSplash_src\StdAfx.h" />
+    <ClInclude Include="src\Dymatic\Renderer\SubTexture2D.h" />
+    <ClInclude Include="src\Dymatic\Renderer\Framebuffer.h" />
+    <ClInclude Include="src\Platform\OpenGL\OpenGLFramebuffer.h" />
+    <ClInclude Include="src\Dymatic\Core\Base.h">
+      <Filter>src\Dymatic\Core</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Dymatic\Core\Application.cpp">
@@ -1469,5 +1474,14 @@
       <Filter>vendor\stb_image</Filter>
     </ClCompile>
     <ClCompile Include="src\Dymatic\Renderer\Renderer2D.cpp" />
+    <ClCompile Include="vendor\CSplash_src\Splash.cpp" />
+    <ClCompile Include="vendor\CSplash_src\SplashClient.cpp" />
+    <ClCompile Include="vendor\CSplash_src\StdAfx.cpp" />
+    <ClCompile Include="src\Dymatic\Renderer\SubTexture2D.cpp" />
+    <ClCompile Include="src\Dymatic\Renderer\Framebuffer.cpp" />
+    <ClCompile Include="src\Platform\OpenGL\OpenGLFramebuffer.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="vendor\CSplash_src\SplashClient.dsp" />
   </ItemGroup>
 </Project>

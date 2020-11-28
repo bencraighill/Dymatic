@@ -25,7 +25,9 @@
 
 #include "Dymatic/Renderer/Buffer.h"
 #include "Dymatic/Renderer/Shader.h"
+#include "Dymatic/Renderer/Framebuffer.h"
 #include "Dymatic/Renderer/Texture.h"
+#include "Dymatic/Renderer/SubTexture2D.h"
 #include "Dymatic/Renderer/VertexArray.h"
 
 #include "Dymatic/Renderer/OrthographicCamera.h"

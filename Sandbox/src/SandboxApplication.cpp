@@ -27,8 +27,7 @@ public:
 			 0.0f, 0.5f, 0.0f, 0.8f, 0.8f, 0.2f, 1.0f
 		};
 
-		Dymatic::Ref<Dymatic::VertexBuffer> vertexBuffer;
-		vertexBuffer.reset(Dymatic::VertexBuffer::Create(vertices, sizeof(vertices)));
+		Dymatic::Ref<Dymatic::VertexBuffer> vertexBuffer = Dymatic::VertexBuffer::Create(vertices, sizeof(vertices));
 		Dymatic::BufferLayout layout = {
 			{ Dymatic::ShaderDataType::Float3, "a_Position" },
 			{ Dymatic::ShaderDataType::Float4, "a_Color" }
@@ -39,8 +38,7 @@ public:
 
 
 		uint32_t indices[3] = { 0, 1, 2 };
-		Dymatic::Ref<Dymatic::IndexBuffer> indexBuffer;
-		indexBuffer.reset(Dymatic::IndexBuffer::Create(indices, sizeof(indices) / sizeof(uint32_t)));
+		Dymatic::Ref<Dymatic::IndexBuffer> indexBuffer = Dymatic::IndexBuffer::Create(indices, sizeof(indices) / sizeof(uint32_t));
 		m_VertexArray->SetIndexBuffer(indexBuffer);
 
 		m_SquareVA = Dymatic::VertexArray::Create();
@@ -52,8 +50,7 @@ public:
 			-0.5f,  0.5f, 0.0f,  0.0f, 1.0f
 		};
 
-		Dymatic::Ref<Dymatic::VertexBuffer> squareVB;
-		squareVB.reset(Dymatic::VertexBuffer::Create(squareVertices, sizeof(squareVertices)));
+		Dymatic::Ref<Dymatic::VertexBuffer> squareVB = Dymatic::VertexBuffer::Create(squareVertices, sizeof(squareVertices));
 		squareVB->SetLayout({
 			{ Dymatic::ShaderDataType::Float3, "a_Position" },
 			{ Dymatic::ShaderDataType::Float2, "a_TextCoord" }
@@ -61,8 +58,7 @@ public:
 		m_SquareVA->AddVertexBuffer(squareVB);
 
 		uint32_t squareIndices[6] = { 0, 1, 2, 2, 3, 0 };
-		Dymatic::Ref<Dymatic::IndexBuffer> squareIB;
-		squareIB.reset(Dymatic::IndexBuffer::Create(squareIndices, sizeof(squareIndices) / sizeof(uint32_t)));
+		Dymatic::Ref<Dymatic::IndexBuffer> squareIB = Dymatic::IndexBuffer::Create(squareIndices, sizeof(squareIndices) / sizeof(uint32_t));
 		m_SquareVA->SetIndexBuffer(squareIB);
 
 		std::string vertexSrc = R"(

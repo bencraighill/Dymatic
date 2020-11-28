@@ -10,6 +10,7 @@ namespace Dymatic {
 
 	static GLenum ShaderTypeFromString(const std::string& type)
 	{
+
 		if (type == "vertex") return GL_VERTEX_SHADER;
 		if (type == "fragment" || type == "pixel") return GL_FRAGMENT_SHADER;
 
@@ -19,6 +20,8 @@ namespace Dymatic {
 
 	OpenGLShader::OpenGLShader(const std::string& filepath)
 	{
+		DY_PROFILE_FUNCTION();
+
 		std::string source = ReadFile(filepath);
 		auto shaderSources = PreProcess(source);
 		Compile(shaderSources);
@@ -33,6 +36,8 @@ namespace Dymatic {
 	OpenGLShader::OpenGLShader(const std::string& name, const std::string& vertexSrc, const std::string& fragmentSrc)
 		: m_Name(name)
 	{
+		DY_PROFILE_FUNCTION();
+
 		std::unordered_map<GLenum, std::string> sources;
 		sources[GL_VERTEX_SHADER] = vertexSrc;
 		sources[GL_FRAGMENT_SHADER] = fragmentSrc;
@@ -41,11 +46,14 @@ namespace Dymatic {
 
 	OpenGLShader::~OpenGLShader()
 	{
+		DY_PROFILE_FUNCTION();
 		glDeleteProgram(m_RendererID);
 	}
 
 	std::string OpenGLShader::ReadFile(const std::string& filepath)
 	{
+		DY_PROFILE_FUNCTION();
+
 		std::string result;
 		std::ifstream in(filepath, std::ios::in | std::ios::binary);
 		if (in)
@@ -66,6 +74,8 @@ namespace Dymatic {
 
 	std::unordered_map<GLenum, std::string> OpenGLShader::PreProcess(const std::string& source)
 	{
+		DY_PROFILE_FUNCTION();
+
 		std::unordered_map<GLenum, std::string> shaderSources;
 
 		const char* typeToken = "#type";
@@ -89,6 +99,8 @@ namespace Dymatic {
 
 	void OpenGLShader::Compile(const std::unordered_map<GLenum, std::string>& shaderSources)
 	{
+		DY_PROFILE_FUNCTION();
+
 		GLuint program = glCreateProgram();
 		DY_CORE_ASSERT(shaderSources.size() <= 2, "Only 2 shader variations are supported");
 		std::array<GLenum, 2> glShaderIDs;
@@ -159,31 +171,55 @@ namespace Dymatic {
 
 	void OpenGLShader::Bind() const
 	{
+		DY_PROFILE_FUNCTION();
+
 		glUseProgram(m_RendererID);
 	}
 
 	void OpenGLShader::Unbind() const
 	{
+		DY_PROFILE_FUNCTION();
+
 		glUseProgram(0);
 	}
 
 	void OpenGLShader::SetInt(const std::string& name, int value)
 	{
+		DY_PROFILE_FUNCTION();
+
 		UploadUniformInt(name, value);
+	}
+
+	void OpenGLShader::SetIntArray(const std::string& name, int* values, uint32_t count)
+	{
+		UploadUniformIntArray(name, values, count);
+	}
+
+	void OpenGLShader::SetFloat(const std::string& name, float value)
+	{
+		DY_PROFILE_FUNCTION();
+
+		UploadUniformFloat(name, value);
 	}
 
 	void OpenGLShader::SetFloat3(const std::string& name, const glm::vec3& value)
 	{
+		DY_PROFILE_FUNCTION();
+
 		UploadUniformFloat3(name, value);
 	}
 
 	void OpenGLShader::SetFloat4(const std::string& name, const glm::vec4& value)
 	{
+		DY_PROFILE_FUNCTION();
+
 		UploadUniformFloat4(name, value);
 	}
 
 	void OpenGLShader::SetMat4(const std::string& name, const glm::mat4& value)
 	{
+		DY_PROFILE_FUNCTION();
+
 		UploadUniformMat4(name, value);
 	}
 
@@ -193,6 +229,12 @@ namespace Dymatic {
 		glUniform1i(location, value);
 	}
 
+
+	void OpenGLShader::UploadUniformIntArray(const std::string& name, int* values, uint32_t count)
+	{
+		GLint location = glGetUniformLocation(m_RendererID, name.c_str());
+		glUniform1iv(location, count, values);
+	}
 
 	void OpenGLShader::UploadUniformFloat(const std::string& name, float value)
 	{

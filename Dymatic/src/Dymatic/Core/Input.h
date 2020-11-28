@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Dymatic/Core/Core.h"
+#include "Dymatic/Core/Base.h"
 
 namespace Dymatic {
 

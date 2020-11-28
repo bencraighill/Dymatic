@@ -67,7 +67,7 @@ namespace Dymatic {
 		};
 	};
 
-	class DYMATIC_API BufferLayout
+	class BufferLayout
 	{
 	public:
 		BufferLayout() {}
@@ -104,7 +104,7 @@ namespace Dymatic {
 		uint32_t m_Stride = 0;
 	};
 
-	class DYMATIC_API VertexBuffer
+	class VertexBuffer
 	{
 	public:
 		virtual ~VertexBuffer() {}
@@ -113,13 +113,19 @@ namespace Dymatic {
 		virtual void Bind() const = 0;
 		virtual void Unbind() const = 0;
 
+		virtual void SetData(const void* data, uint32_t size) = 0;
+
 		virtual const BufferLayout& GetLayout() const = 0;
 		virtual void SetLayout(const BufferLayout& layout) = 0;
 
-		static VertexBuffer* Create(float* vertices, uint32_t size);
+
+		static Ref<VertexBuffer> Create(uint32_t size);
+		static Ref<VertexBuffer> Create(float* vertices, uint32_t size);
 	};
 
-	class DYMATIC_API IndexBuffer
+	//Only supports 32 index buffers
+
+	class IndexBuffer
 	{
 	public:
 		virtual ~IndexBuffer() {}
@@ -130,6 +136,6 @@ namespace Dymatic {
 
 		virtual uint32_t GetCount() const = 0;
 
-		static IndexBuffer* Create(uint32_t* indices, uint32_t size);
+		static Ref<IndexBuffer> Create(uint32_t* indices, uint32_t count);
 	};
 };

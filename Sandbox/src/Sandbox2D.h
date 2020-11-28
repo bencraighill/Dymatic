@@ -2,6 +2,8 @@
 
 #include "Dymatic.h"
 
+#include "ParticleSystem.h"
+
 class Sandbox2D : public Dymatic::Layer
 {
 public:
@@ -20,8 +22,12 @@ private:
 	//Temporary Code
 	Dymatic::Ref<Dymatic::VertexArray> m_SquareVA;
 	Dymatic::Ref<Dymatic::Shader> m_FlatColorShader;
+	Dymatic::Ref<Dymatic::Framebuffer> m_Framebuffer;
 
 	Dymatic::Ref<Dymatic::Texture2D> m_CheckerboardTexture;
 
 	glm::vec4 m_SquareColor = { 0.2f, 0.3f, 0.8f, 1.0f };
+
+	ParticleSystem m_ParticleSystem;
+	ParticleProps m_Particle;
 };
