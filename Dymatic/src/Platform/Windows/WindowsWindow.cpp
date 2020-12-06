@@ -1,31 +1,23 @@
 #include "dypch.h"
-#include "WindowsWindow.h"
+#include "Platform/Windows/WindowsWindow.h"
+
+#include "Dymatic/Core/Input.h"
 
 #include "Dymatic/Events/ApplicationEvent.h"
 #include "Dymatic/Events/MouseEvent.h"
 #include "Dymatic/Events/KeyEvent.h"
 
+#include "Dymatic/Renderer/Renderer.h"
+
 #include "Platform/OpenGL/OpenGLContext.h"
-
-
-
-
-
 
 namespace Dymatic {
 
 	static uint8_t s_GLFWWindowCount = 0;
 
-	//static bool s_GLFWInitialized = false;
-	  
 	static void GLFWErrorCallback(int error, const char* description)
 	{
 		DY_CORE_ERROR("GLFW Error ({0}): {1}", error, description);
-	}
-
-	Scope<Window> Window::Create(const WindowProps& props)
-	{
-		return CreateScope<WindowsWindow>(props);
 	}
 
 	WindowsWindow::WindowsWindow(const WindowProps& props)
@@ -50,35 +42,33 @@ namespace Dymatic {
 		m_Data.Width = props.Width;
 		m_Data.Height = props.Height;
 
-
-		DY_CORE_INFO("Creating Window {0} ({1}, {2})", props.Title, props.Width, props.Height);
-
-		
+		DY_CORE_INFO("Creating window {0} ({1}, {2})", props.Title, props.Width, props.Height);
 
 		if (s_GLFWWindowCount == 0)
 		{
 			DY_PROFILE_SCOPE("glfwInit");
 			int success = glfwInit();
-			DY_CORE_ASSERT(success, "Could not initiate GLFW!");
+			DY_CORE_ASSERT(success, "Could not initialize GLFW!");
 			glfwSetErrorCallback(GLFWErrorCallback);
-		} 
+		}
 
 		{
 			DY_PROFILE_SCOPE("glfwCreateWindow");
+#if defined(DY_DEBUG)
+			if (Renderer::GetAPI() == RendererAPI::API::OpenGL)
+				glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
+#endif
 			m_Window = glfwCreateWindow((int)props.Width, (int)props.Height, m_Data.Title.c_str(), nullptr, nullptr);
 			++s_GLFWWindowCount;
 		}
-		
 
-		m_Context = new OpenGLContext(m_Window);
+		m_Context = GraphicsContext::Create(m_Window);
 		m_Context->Init();
-
-		
 
 		glfwSetWindowUserPointer(m_Window, &m_Data);
 		SetVSync(true);
 
-		//Set GLFW Callbacks
+		// Set GLFW callbacks
 		glfwSetWindowSizeCallback(m_Window, [](GLFWwindow* window, int width, int height)
 		{
 			WindowData& data = *(WindowData*)glfwGetWindowUserPointer(window);
@@ -102,31 +92,31 @@ namespace Dymatic {
 
 			switch (action)
 			{
-				case GLFW_PRESS:
-				{
-					KeyPressedEvent event(key, 0);
-					data.EventCallback(event);
-					break;
-				}
-				case GLFW_RELEASE:
-				{
-					KeyReleasedEvent event(key);
-					data.EventCallback(event);
-					break;
-				}
-				case GLFW_REPEAT:
-				{
-					KeyPressedEvent event(key, 1);
-					data.EventCallback(event);
-					break;
-				}
+			case GLFW_PRESS:
+			{
+				KeyPressedEvent event(key, 0);
+				data.EventCallback(event);
+				break;
+			}
+			case GLFW_RELEASE:
+			{
+				KeyReleasedEvent event(key);
+				data.EventCallback(event);
+				break;
+			}
+			case GLFW_REPEAT:
+			{
+				KeyPressedEvent event(key, 1);
+				data.EventCallback(event);
+				break;
+			}
 			}
 		});
 
 		glfwSetCharCallback(m_Window, [](GLFWwindow* window, unsigned int keycode)
 		{
 			WindowData& data = *(WindowData*)glfwGetWindowUserPointer(window);
-			
+
 			KeyTypedEvent event(keycode);
 			data.EventCallback(event);
 		});
@@ -137,18 +127,18 @@ namespace Dymatic {
 
 			switch (action)
 			{
-				case GLFW_PRESS:
-				{
-					MouseButtonPressedEvent event(button);
-					data.EventCallback(event);
-					break;
-				}
-				case GLFW_RELEASE:
-				{
-					MouseButtonReleasedEvent event(button);
-					data.EventCallback(event);
-					break;
-				}
+			case GLFW_PRESS:
+			{
+				MouseButtonPressedEvent event(button);
+				data.EventCallback(event);
+				break;
+			}
+			case GLFW_RELEASE:
+			{
+				MouseButtonReleasedEvent event(button);
+				data.EventCallback(event);
+				break;
+			}
 			}
 		});
 
@@ -172,7 +162,7 @@ namespace Dymatic {
 	void WindowsWindow::Shutdown()
 	{
 		DY_PROFILE_FUNCTION();
-		
+
 		glfwDestroyWindow(m_Window);
 		--s_GLFWWindowCount;
 

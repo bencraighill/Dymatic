@@ -22,7 +22,6 @@ private:
 	//Temporary Code
 	Dymatic::Ref<Dymatic::VertexArray> m_SquareVA;
 	Dymatic::Ref<Dymatic::Shader> m_FlatColorShader;
-	Dymatic::Ref<Dymatic::Framebuffer> m_Framebuffer;
 
 	Dymatic::Ref<Dymatic::Texture2D> m_CheckerboardTexture;
 

@@ -1,16 +1,11 @@
 #include "dypch.h"
-#include "Layer.h"
+#include "Dymatic/Core/Layer.h"
 
 namespace Dymatic {
 
-	Layer::Layer(const std::string& debugname)
-		: m_DebugName(debugname)
+	Layer::Layer(const std::string& debugName)
+		: m_DebugName(debugName)
 	{
-	}
-
-	Layer::~Layer()
-	{
-	
 	}
 
 }

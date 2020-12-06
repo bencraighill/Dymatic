@@ -1,8 +1,8 @@
 #pragma once
 
-#include "Base.h"
+#include "Dymatic/Core/Base.h"
 
-#include "Window.h"
+#include "Dymatic/Core/Window.h"
 #include "Dymatic/Core/LayerStack.h"
 #include "Dymatic/Events/Event.h"
 #include "Dymatic/Events/ApplicationEvent.h"
@@ -11,16 +11,15 @@
 
 #include "Dymatic/ImGui/ImGuiLayer.h"
 
+int main(int argc, char** argv);
 
 namespace Dymatic {
 
-	class DYMATIC_API Application
+	class Application
 	{
 	public:
-		Application();
+		Application(const std::string& name = "Dymatic Engine");
 		virtual ~Application();
-
-		void Run();
 
 		void OnEvent(Event& e);
 
@@ -31,8 +30,11 @@ namespace Dymatic {
 
 		void Close();
 
-		inline static Application& Get() { return *s_Instance; }
+		ImGuiLayer* GetImGuiLayer() { return m_ImGuiLayer; }
+
+		static Application& Get() { return *s_Instance; }
 	private:
+		void Run();
 		bool OnWindowClose(WindowCloseEvent& e);
 		bool OnWindowResize(WindowResizeEvent& e);
 	private:
@@ -44,9 +46,10 @@ namespace Dymatic {
 		float m_LastFrameTime = 0.0f;
 	private:
 		static Application* s_Instance;
+		friend int ::main(int argc, char** argv);
 	};
 
-	//Define In Client
+	// To be defined in CLIENT
 	Application* CreateApplication();
 
 }

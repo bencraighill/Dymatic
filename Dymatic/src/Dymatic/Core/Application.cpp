@@ -1,64 +1,43 @@
 #include "dypch.h"
-#include "Application.h"
-
+#include "Dymatic/Core/Application.h"
 
 #include "Dymatic/Core/Log.h"
 
 #include "Dymatic/Renderer/Renderer.h"
 
-#include "Input.h"
+#include "Dymatic/Core/Input.h"
 
-#include <glfw/glfw3.h>
-
-#include "../vendor/CSplash_src/Splash.h"
-
-
+#include <GLFW/glfw3.h>
 
 namespace Dymatic {
 
-#define BIND_EVENT_FN(x) std::bind(&Application::x, this, std::placeholders::_1)
-
 	Application* Application::s_Instance = nullptr;
 
-	//CSplash Splash(TEXT("splash.bmp"), RGB(128, 128, 128));
-
-
-	Application::Application()
+	Application::Application(const std::string& name)
 	{
 		DY_PROFILE_FUNCTION();
 
-		DY_CORE_ASSERT(!s_Instance, "Application already exists!")
+		DY_CORE_ASSERT(!s_Instance, "Application already exists!");
 		s_Instance = this;
-
-		//  Display Engine Splash
-		{
-			//Splash.ShowSplash();
-		}
-
-		m_Window = std::unique_ptr<Window>(Window::Create());
-		m_Window->SetEventCallback(BIND_EVENT_FN(OnEvent));
+		m_Window = Window::Create(WindowProps(name));
+		m_Window->SetEventCallback(DY_BIND_EVENT_FN(Application::OnEvent));
 
 		Renderer::Init();
 
 		m_ImGuiLayer = new ImGuiLayer();
 		PushOverlay(m_ImGuiLayer);
-
-		
 	}
-
 
 	Application::~Application()
 	{
 		DY_PROFILE_FUNCTION();
 
+		Renderer::Shutdown();
 	}
 
 	void Application::PushLayer(Layer* layer)
 	{
 		DY_PROFILE_FUNCTION();
-
-		//Close Engine Splash
-		//Splash.CloseSplash();
 
 		m_LayerStack.PushLayer(layer);
 		layer->OnAttach();
@@ -82,28 +61,24 @@ namespace Dymatic {
 		DY_PROFILE_FUNCTION();
 
 		EventDispatcher dispatcher(e);
-		dispatcher.Dispatch<WindowCloseEvent>(BIND_EVENT_FN(OnWindowClose));
-		dispatcher.Dispatch<WindowResizeEvent>(BIND_EVENT_FN(OnWindowResize));
+		dispatcher.Dispatch<WindowCloseEvent>(DY_BIND_EVENT_FN(Application::OnWindowClose));
+		dispatcher.Dispatch<WindowResizeEvent>(DY_BIND_EVENT_FN(Application::OnWindowResize));
 
-		
-
-		for (auto it = m_LayerStack.end(); it != m_LayerStack.begin(); )
+		for (auto it = m_LayerStack.rbegin(); it != m_LayerStack.rend(); ++it)
 		{
-			(*--it)->OnEvent(e);
-				if (e.m_Handled)
-					break;
+			if (e.Handled)
+				break;
+			(*it)->OnEvent(e);
 		}
 	}
-
-	
 
 	void Application::Run()
 	{
 		DY_PROFILE_FUNCTION();
 
 		while (m_Running)
-		{ 
-			DY_PROFILE_FUNCTION("Run Loop");
+		{
+			DY_PROFILE_SCOPE("RunLoop");
 
 			float time = (float)glfwGetTime();
 			Timestep timestep = time - m_LastFrameTime;
@@ -117,16 +92,16 @@ namespace Dymatic {
 					for (Layer* layer : m_LayerStack)
 						layer->OnUpdate(timestep);
 				}
-			}
 
-			m_ImGuiLayer->Begin();
-			{
-				DY_PROFILE_SCOPE("LayerStack OnImGuiRender");
+				m_ImGuiLayer->Begin();
+				{
+					DY_PROFILE_SCOPE("LayerStack OnImGuiRender");
 
-				for (Layer* layer : m_LayerStack)
-					layer->OnImGuiRender();
+					for (Layer* layer : m_LayerStack)
+						layer->OnImGuiRender();
+				}
+				m_ImGuiLayer->End();
 			}
-			m_ImGuiLayer->End();
 
 			m_Window->OnUpdate();
 		}
@@ -153,4 +128,5 @@ namespace Dymatic {
 
 		return false;
 	}
+
 }

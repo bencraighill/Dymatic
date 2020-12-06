@@ -2,38 +2,32 @@
 
 #include <memory>
 
-#ifdef DY_PLATFORM_WINDOWS
-#if DY_DYNAMIC_LINK
-	#ifdef DY_BUILD_DLL
-		#define DYMATIC_API __declspec(dllexport)
-	#else
-		#define DYMATIC_API __declspec(dllimport)
-	#endif
-#else
-	#define DYMATIC_API
-#endif
-#else
-	#error Dymatic only supports Windows Opperating Systems!
-#endif
+#include "Dymatic/Core/PlatformDetection.h"
 
 #ifdef DY_DEBUG
-	#define DY_ENABLE_ASSERTS
-#endif
-
-#ifdef DY_ENABLE_ASSERTS
-	#define DY_ASSERT(x, ...) { if(!(x)) { DY_ERROR("Assertion Failed: {0}", __VA_ARGS__); __debugbreak(); } }
-	#define DY_CORE_ASSERT(x, ...) { if(!(x)) { DY_CORE_ERROR("Assertion Failed: {0}", __VA_ARGS__); __debugbreak(); } }
+#if defined(DY_PLATFORM_WINDOWS)
+#define DY_DEBUGBREAK() __debugbreak()
+#elif defined(DY_PLATFORM_LINUX)
+#include <signal.h>
+#define DY_DEBUGBREAK() raise(SIGTRAP)
 #else
-	#define DY_ASSERT(x, ...)
-	#define DY_CORE_ASSERT(x, ...)
+#error "Platform doesn't support debugbreak yet!"
+#endif
+#define DY_ENABLE_ASSERTS
+#else
+#define DY_DEBUGBREAK()
 #endif
 
-#define BIT(x) (1 <<x)
+#define DY_EXPAND_MACRO(x) x
+#define DY_STRINGIFY_MACRO(x) #x
+
+#define BIT(x) (1 << x)
+
+#define DY_BIND_EVENT_FN(fn) [this](auto&&... args) -> decltype(auto) { return this->fn(std::forward<decltype(args)>(args)...); }
 
 namespace Dymatic {
 
-
-	template <typename T>
+	template<typename T>
 	using Scope = std::unique_ptr<T>;
 	template<typename T, typename ... Args>
 	constexpr Scope<T> CreateScope(Args&& ... args)
@@ -41,7 +35,7 @@ namespace Dymatic {
 		return std::make_unique<T>(std::forward<Args>(args)...);
 	}
 
-	template <typename T>
+	template<typename T>
 	using Ref = std::shared_ptr<T>;
 	template<typename T, typename ... Args>
 	constexpr Ref<T> CreateRef(Args&& ... args)
@@ -51,4 +45,5 @@ namespace Dymatic {
 
 }
 
-#define DY_BIND_EVENT_FN(fn) std::bind(&fn, this, std::placeholders::_1)
+#include "Dymatic/Core/Log.h"
+#include "Dymatic/Core/Assert.h"

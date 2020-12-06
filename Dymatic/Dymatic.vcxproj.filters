@@ -10,6 +10,9 @@
     <Filter Include="src\Dymatic\Core">
       <UniqueIdentifier>{9FBCBFDB-8BB5-DE2D-B4E7-C3B2A03FBE39}</UniqueIdentifier>
     </Filter>
+    <Filter Include="src\Dymatic\Debug">
+      <UniqueIdentifier>{9DABC353-09C2-C1E9-5239-4D0BBE8E9271}</UniqueIdentifier>
+    </Filter>
     <Filter Include="src\Dymatic\Events">
       <UniqueIdentifier>{EB71C3CF-D755-8425-40B6-7E782CB96EA7}</UniqueIdentifier>
     </Filter>
@@ -18,6 +21,12 @@
     </Filter>
     <Filter Include="src\Dymatic\Renderer">
       <UniqueIdentifier>{6DA762C5-5936-EC8E-0255-008AEEC2FC34}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\Dymatic\Scene">
+      <UniqueIdentifier>{440ED254-B024-D0EA-F99B-5B0C65F1A072}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\Dymatic\Utils">
+      <UniqueIdentifier>{87A2FF54-F3B8-FDEA-3C30-890CA885CE72}</UniqueIdentifier>
     </Filter>
     <Filter Include="src\Platform">
       <UniqueIdentifier>{21CA02E5-0D2D-9289-B6B2-CA3FA2F45D0C}</UniqueIdentifier>
@@ -30,6 +39,9 @@
     </Filter>
     <Filter Include="vendor">
       <UniqueIdentifier>{B3738122-9F15-ACF8-88D0-BF4C74113349}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="vendor\ImGuizmo">
+      <UniqueIdentifier>{73BF7F4C-DF4A-ED10-E85B-700554664911}</UniqueIdentifier>
     </Filter>
     <Filter Include="vendor\glm">
       <UniqueIdentifier>{829FC5A8-6E57-07F6-D75E-E051C335A2E6}</UniqueIdentifier>
@@ -60,6 +72,12 @@
     <ClInclude Include="src\Dymatic\Core\Application.h">
       <Filter>src\Dymatic\Core</Filter>
     </ClInclude>
+    <ClInclude Include="src\Dymatic\Core\Assert.h">
+      <Filter>src\Dymatic\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Dymatic\Core\Base.h">
+      <Filter>src\Dymatic\Core</Filter>
+    </ClInclude>
     <ClInclude Include="src\Dymatic\Core\EntryPoint.h">
       <Filter>src\Dymatic\Core</Filter>
     </ClInclude>
@@ -78,7 +96,10 @@
     <ClInclude Include="src\Dymatic\Core\Log.h">
       <Filter>src\Dymatic\Core</Filter>
     </ClInclude>
-    <ClInclude Include="src\Dymatic\Core\MouseButtonCodes.h">
+    <ClInclude Include="src\Dymatic\Core\MouseCodes.h">
+      <Filter>src\Dymatic\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Dymatic\Core\PlatformDetection.h">
       <Filter>src\Dymatic\Core</Filter>
     </ClInclude>
     <ClInclude Include="src\Dymatic\Core\Timestep.h">
@@ -86,6 +107,9 @@
     </ClInclude>
     <ClInclude Include="src\Dymatic\Core\Window.h">
       <Filter>src\Dymatic\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Dymatic\Debug\Instrumentor.h">
+      <Filter>src\Dymatic\Debug</Filter>
     </ClInclude>
     <ClInclude Include="src\Dymatic\Events\ApplicationEvent.h">
       <Filter>src\Dymatic\Events</Filter>
@@ -105,6 +129,12 @@
     <ClInclude Include="src\Dymatic\Renderer\Buffer.h">
       <Filter>src\Dymatic\Renderer</Filter>
     </ClInclude>
+    <ClInclude Include="src\Dymatic\Renderer\Camera.h">
+      <Filter>src\Dymatic\Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Dymatic\Renderer\Framebuffer.h">
+      <Filter>src\Dymatic\Renderer</Filter>
+    </ClInclude>
     <ClInclude Include="src\Dymatic\Renderer\GraphicsContext.h">
       <Filter>src\Dymatic\Renderer</Filter>
     </ClInclude>
@@ -120,10 +150,16 @@
     <ClInclude Include="src\Dymatic\Renderer\Renderer.h">
       <Filter>src\Dymatic\Renderer</Filter>
     </ClInclude>
+    <ClInclude Include="src\Dymatic\Renderer\Renderer2D.h">
+      <Filter>src\Dymatic\Renderer</Filter>
+    </ClInclude>
     <ClInclude Include="src\Dymatic\Renderer\RendererAPI.h">
       <Filter>src\Dymatic\Renderer</Filter>
     </ClInclude>
     <ClInclude Include="src\Dymatic\Renderer\Shader.h">
+      <Filter>src\Dymatic\Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Dymatic\Renderer\SubTexture2D.h">
       <Filter>src\Dymatic\Renderer</Filter>
     </ClInclude>
     <ClInclude Include="src\Dymatic\Renderer\Texture.h">
@@ -132,10 +168,34 @@
     <ClInclude Include="src\Dymatic\Renderer\VertexArray.h">
       <Filter>src\Dymatic\Renderer</Filter>
     </ClInclude>
+    <ClInclude Include="src\Dymatic\Scene\Components.h">
+      <Filter>src\Dymatic\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Dymatic\Scene\Entity.h">
+      <Filter>src\Dymatic\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Dymatic\Scene\Scene.h">
+      <Filter>src\Dymatic\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Dymatic\Scene\SceneCamera.h">
+      <Filter>src\Dymatic\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Dymatic\Scene\SceneSerializer.h">
+      <Filter>src\Dymatic\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Dymatic\Scene\ScriptableEntity.h">
+      <Filter>src\Dymatic\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Dymatic\Utils\PlatformUtils.h">
+      <Filter>src\Dymatic\Utils</Filter>
+    </ClInclude>
     <ClInclude Include="src\Platform\OpenGL\OpenGLBuffer.h">
       <Filter>src\Platform\OpenGL</Filter>
     </ClInclude>
     <ClInclude Include="src\Platform\OpenGL\OpenGLContext.h">
+      <Filter>src\Platform\OpenGL</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Platform\OpenGL\OpenGLFramebuffer.h">
       <Filter>src\Platform\OpenGL</Filter>
     </ClInclude>
     <ClInclude Include="src\Platform\OpenGL\OpenGLRendererAPI.h">
@@ -150,14 +210,14 @@
     <ClInclude Include="src\Platform\OpenGL\OpenGLVertexArray.h">
       <Filter>src\Platform\OpenGL</Filter>
     </ClInclude>
-    <ClInclude Include="src\Platform\Windows\WindowsInput.h">
-      <Filter>src\Platform\Windows</Filter>
-    </ClInclude>
     <ClInclude Include="src\Platform\Windows\WindowsWindow.h">
       <Filter>src\Platform\Windows</Filter>
     </ClInclude>
     <ClInclude Include="src\dypch.h">
       <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="vendor\ImGuizmo\ImGuizmo.h">
+      <Filter>vendor\ImGuizmo</Filter>
     </ClInclude>
     <ClInclude Include="vendor\glm\glm\common.hpp">
       <Filter>vendor\glm\glm</Filter>
@@ -1386,16 +1446,7 @@
     <ClInclude Include="vendor\stb_image\stb_image.h">
       <Filter>vendor\stb_image</Filter>
     </ClInclude>
-    <ClInclude Include="src\Dymatic\Renderer\Renderer2D.h" />
-    <ClInclude Include="src\Dymatic\Debug\Instrumentor.h" />
-    <ClInclude Include="vendor\CSplash_src\Splash.h" />
-    <ClInclude Include="vendor\CSplash_src\StdAfx.h" />
-    <ClInclude Include="src\Dymatic\Renderer\SubTexture2D.h" />
-    <ClInclude Include="src\Dymatic\Renderer\Framebuffer.h" />
-    <ClInclude Include="src\Platform\OpenGL\OpenGLFramebuffer.h" />
-    <ClInclude Include="src\Dymatic\Core\Base.h">
-      <Filter>src\Dymatic\Core</Filter>
-    </ClInclude>
+    <ClInclude Include="src\Dymatic\Math\Math.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Dymatic\Core\Application.cpp">
@@ -1410,6 +1461,9 @@
     <ClCompile Include="src\Dymatic\Core\Log.cpp">
       <Filter>src\Dymatic\Core</Filter>
     </ClCompile>
+    <ClCompile Include="src\Dymatic\Core\Window.cpp">
+      <Filter>src\Dymatic\Core</Filter>
+    </ClCompile>
     <ClCompile Include="src\Dymatic\ImGui\ImGuiBuild.cpp">
       <Filter>src\Dymatic\ImGui</Filter>
     </ClCompile>
@@ -1417,6 +1471,12 @@
       <Filter>src\Dymatic\ImGui</Filter>
     </ClCompile>
     <ClCompile Include="src\Dymatic\Renderer\Buffer.cpp">
+      <Filter>src\Dymatic\Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Dymatic\Renderer\Framebuffer.cpp">
+      <Filter>src\Dymatic\Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Dymatic\Renderer\GraphicsContext.cpp">
       <Filter>src\Dymatic\Renderer</Filter>
     </ClCompile>
     <ClCompile Include="src\Dymatic\Renderer\OrthographicCamera.cpp">
@@ -1431,10 +1491,16 @@
     <ClCompile Include="src\Dymatic\Renderer\Renderer.cpp">
       <Filter>src\Dymatic\Renderer</Filter>
     </ClCompile>
+    <ClCompile Include="src\Dymatic\Renderer\Renderer2D.cpp">
+      <Filter>src\Dymatic\Renderer</Filter>
+    </ClCompile>
     <ClCompile Include="src\Dymatic\Renderer\RendererAPI.cpp">
       <Filter>src\Dymatic\Renderer</Filter>
     </ClCompile>
     <ClCompile Include="src\Dymatic\Renderer\Shader.cpp">
+      <Filter>src\Dymatic\Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Dymatic\Renderer\SubTexture2D.cpp">
       <Filter>src\Dymatic\Renderer</Filter>
     </ClCompile>
     <ClCompile Include="src\Dymatic\Renderer\Texture.cpp">
@@ -1443,10 +1509,25 @@
     <ClCompile Include="src\Dymatic\Renderer\VertexArray.cpp">
       <Filter>src\Dymatic\Renderer</Filter>
     </ClCompile>
+    <ClCompile Include="src\Dymatic\Scene\Entity.cpp">
+      <Filter>src\Dymatic\Scene</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Dymatic\Scene\Scene.cpp">
+      <Filter>src\Dymatic\Scene</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Dymatic\Scene\SceneCamera.cpp">
+      <Filter>src\Dymatic\Scene</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Dymatic\Scene\SceneSerializer.cpp">
+      <Filter>src\Dymatic\Scene</Filter>
+    </ClCompile>
     <ClCompile Include="src\Platform\OpenGL\OpenGLBuffer.cpp">
       <Filter>src\Platform\OpenGL</Filter>
     </ClCompile>
     <ClCompile Include="src\Platform\OpenGL\OpenGLContext.cpp">
+      <Filter>src\Platform\OpenGL</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Platform\OpenGL\OpenGLFramebuffer.cpp">
       <Filter>src\Platform\OpenGL</Filter>
     </ClCompile>
     <ClCompile Include="src\Platform\OpenGL\OpenGLRendererAPI.cpp">
@@ -1464,24 +1545,21 @@
     <ClCompile Include="src\Platform\Windows\WindowsInput.cpp">
       <Filter>src\Platform\Windows</Filter>
     </ClCompile>
+    <ClCompile Include="src\Platform\Windows\WindowsPlatformUtils.cpp">
+      <Filter>src\Platform\Windows</Filter>
+    </ClCompile>
     <ClCompile Include="src\Platform\Windows\WindowsWindow.cpp">
       <Filter>src\Platform\Windows</Filter>
     </ClCompile>
     <ClCompile Include="src\dypch.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="vendor\ImGuizmo\ImGuizmo.cpp">
+      <Filter>vendor\ImGuizmo</Filter>
+    </ClCompile>
     <ClCompile Include="vendor\stb_image\stb_image.cpp">
       <Filter>vendor\stb_image</Filter>
     </ClCompile>
-    <ClCompile Include="src\Dymatic\Renderer\Renderer2D.cpp" />
-    <ClCompile Include="vendor\CSplash_src\Splash.cpp" />
-    <ClCompile Include="vendor\CSplash_src\SplashClient.cpp" />
-    <ClCompile Include="vendor\CSplash_src\StdAfx.cpp" />
-    <ClCompile Include="src\Dymatic\Renderer\SubTexture2D.cpp" />
-    <ClCompile Include="src\Dymatic\Renderer\Framebuffer.cpp" />
-    <ClCompile Include="src\Platform\OpenGL\OpenGLFramebuffer.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="vendor\CSplash_src\SplashClient.dsp" />
+    <ClCompile Include="src\Dymatic\Math\Math.cpp" />
   </ItemGroup>
 </Project>

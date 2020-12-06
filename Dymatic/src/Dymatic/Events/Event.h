@@ -1,8 +1,10 @@
 #pragma once
 
+#include <functional>
+
+#include "Dymatic/Debug/Instrumentor.h"
+
 #include "Dymatic/Core/Base.h"
-
-
 
 namespace Dymatic {
 
@@ -32,10 +34,12 @@ namespace Dymatic {
 
 #define EVENT_CLASS_CATEGORY(category) virtual int GetCategoryFlags() const override { return category; }
 
-	class DYMATIC_API Event
+	class Event
 	{
 		friend class EventDispatcher;
 	public:
+		virtual ~Event() = default;
+
 		virtual EventType GetEventType() const = 0;
 		virtual const char* GetName() const = 0;
 		virtual int GetCategoryFlags() const = 0;
@@ -46,7 +50,7 @@ namespace Dymatic {
 			return GetCategoryFlags()& category;
 		}
 	public:
-		bool m_Handled = false;
+		bool Handled = false;
 	};
 
 	class EventDispatcher
@@ -64,7 +68,7 @@ namespace Dymatic {
 		{
 			if (m_Event.GetEventType() == T::GetStaticType())
 			{
-				m_Event.m_Handled = func(static_cast<T&>(m_Event));
+				m_Event.Handled = func(static_cast<T&>(m_Event));
 				return true;
 			}
 			return false;

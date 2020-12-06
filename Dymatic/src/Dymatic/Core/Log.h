@@ -1,48 +1,40 @@
 #pragma once
 
-#include "Base.h"
-#include "spdlog/spdlog.h"
-#include "spdlog/fmt/ostr.h"
+#include "Dymatic/Core/Base.h"
+
+// This ignores all warnings raised inside External headers
+#pragma warning(push, 0)
+#include <spdlog/spdlog.h>
+#include <spdlog/fmt/ostr.h>
+#pragma warning(pop)
+
 
 namespace Dymatic {
 
-	class DYMATIC_API Log
+	class Log
 	{
 	public:
 		static void Init();
-		static void SaveWindowOutput();
 
-		inline static std::shared_ptr<spdlog::logger>& GetCoreLogger() { return s_CoreLogger; }
-		inline static std::shared_ptr<spdlog::logger>& GetClientLogger() { return s_ClientLogger; }
-
+		static Ref<spdlog::logger>& GetCoreLogger() { return s_CoreLogger; }
+		static Ref<spdlog::logger>& GetClientLogger() { return s_ClientLogger; }
 	private:
-		static std::shared_ptr<spdlog::logger> s_CoreLogger;
-		static std::shared_ptr<spdlog::logger> s_ClientLogger;
-
-
+		static Ref<spdlog::logger> s_CoreLogger;
+		static Ref<spdlog::logger> s_ClientLogger;
 	};
 
 }
 
-// Core Log Macros for use
-//#define DY_CORE_TRACE(...)   ::Dymatic::Log::TestLog()
-#define DY_CORE_TRACE(...)   ::Dymatic::Log::GetCoreLogger()->trace(__VA_ARGS__)
-#define DY_CORE_INFO(...)    ::Dymatic::Log::GetCoreLogger()->info(__VA_ARGS__)
-#define DY_CORE_WARN(...)    ::Dymatic::Log::GetCoreLogger()->warn(__VA_ARGS__)
-#define DY_CORE_ERROR(...)   ::Dymatic::Log::GetCoreLogger()->error(__VA_ARGS__)
-#define DY_CORE_FATAL(...)   ::Dymatic::Log::GetCoreLogger()->fatal(__VA_ARGS__)
-// Client Log Macros for use													
-#define DY_TRACE(...)        ::Dymatic::Log::GetClientLogger()->trace(__VA_ARGS__)
-#define DY_INFO(...)         ::Dymatic::Log::GetClientLogger()->info(__VA_ARGS__)
-#define DY_WARN(...)         ::Dymatic::Log::GetClientLogger()->warn(__VA_ARGS__)
-#define DY_ERROR(...)        ::Dymatic::Log::GetClientLogger()->error(__VA_ARGS__)
-#define DY_FATAL(...)        ::Dymatic::Log::GetClientLogger()->fatal(__VA_ARGS__)
+// Core log macros
+#define DY_CORE_TRACE(...)    ::Dymatic::Log::GetCoreLogger()->trace(__VA_ARGS__)
+#define DY_CORE_INFO(...)     ::Dymatic::Log::GetCoreLogger()->info(__VA_ARGS__)
+#define DY_CORE_WARN(...)     ::Dymatic::Log::GetCoreLogger()->warn(__VA_ARGS__)
+#define DY_CORE_ERROR(...)    ::Dymatic::Log::GetCoreLogger()->error(__VA_ARGS__)
+#define DY_CORE_CRITICAL(...) ::Dymatic::Log::GetCoreLogger()->critical(__VA_ARGS__)
 
-
-
-
-
-
-
-
-
+// Client log macros
+#define DY_TRACE(...)         ::Dymatic::Log::GetClientLogger()->trace(__VA_ARGS__)
+#define DY_INFO(...)          ::Dymatic::Log::GetClientLogger()->info(__VA_ARGS__)
+#define DY_WARN(...)          ::Dymatic::Log::GetClientLogger()->warn(__VA_ARGS__)
+#define DY_ERROR(...)         ::Dymatic::Log::GetClientLogger()->error(__VA_ARGS__)
+#define DY_CRITICAL(...)      ::Dymatic::Log::GetClientLogger()->critical(__VA_ARGS__)

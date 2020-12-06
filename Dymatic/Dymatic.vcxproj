@@ -76,11 +76,13 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>dypch.h</PrecompiledHeaderFile>
       <WarningLevel>Level3</WarningLevel>
-      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;DY_PLATFORM_WINDOWS;DY_BUILD_DLL;GLFW_INCLUDE_NONE;DY_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>src;vendor\spdlog\include;vendor\GLFW\include;vendor\Glad\include;vendor\imgui;vendor\glm;vendor\stb_image;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;GLFW_INCLUDE_NONE;DY_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>src;vendor\spdlog\include;vendor\GLFW\include;vendor\Glad\include;vendor\imgui;vendor\glm;vendor\stb_image;vendor\entt\include;vendor\yaml-cpp\include;vendor\ImGuizmo;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
+      <MinimalRebuild>false</MinimalRebuild>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
@@ -96,14 +98,15 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>dypch.h</PrecompiledHeaderFile>
       <WarningLevel>Level3</WarningLevel>
-      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;DY_PLATFORM_WINDOWS;DY_BUILD_DLL;GLFW_INCLUDE_NONE;DY_RELEASE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>src;vendor\spdlog\include;vendor\GLFW\include;vendor\Glad\include;vendor\imgui;vendor\glm;vendor\stb_image;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;GLFW_INCLUDE_NONE;DY_RELEASE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>src;vendor\spdlog\include;vendor\GLFW\include;vendor\Glad\include;vendor\imgui;vendor\glm;vendor\stb_image;vendor\entt\include;vendor\yaml-cpp\include;vendor\ImGuizmo;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <Optimization>Full</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <MinimalRebuild>false</MinimalRebuild>
       <StringPooling>true</StringPooling>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
@@ -120,14 +123,15 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>dypch.h</PrecompiledHeaderFile>
       <WarningLevel>Level3</WarningLevel>
-      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;DY_PLATFORM_WINDOWS;DY_BUILD_DLL;GLFW_INCLUDE_NONE;DY_DIST;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>src;vendor\spdlog\include;vendor\GLFW\include;vendor\Glad\include;vendor\imgui;vendor\glm;vendor\stb_image;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;GLFW_INCLUDE_NONE;DY_DIST;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>src;vendor\spdlog\include;vendor\GLFW\include;vendor\Glad\include;vendor\imgui;vendor\glm;vendor\stb_image;vendor\entt\include;vendor\yaml-cpp\include;vendor\ImGuizmo;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <Optimization>Full</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <MinimalRebuild>false</MinimalRebuild>
       <StringPooling>true</StringPooling>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
@@ -142,6 +146,7 @@
   <ItemGroup>
     <ClInclude Include="src\Dymatic.h" />
     <ClInclude Include="src\Dymatic\Core\Application.h" />
+    <ClInclude Include="src\Dymatic\Core\Assert.h" />
     <ClInclude Include="src\Dymatic\Core\Base.h" />
     <ClInclude Include="src\Dymatic\Core\EntryPoint.h" />
     <ClInclude Include="src\Dymatic\Core\Input.h" />
@@ -149,7 +154,8 @@
     <ClInclude Include="src\Dymatic\Core\Layer.h" />
     <ClInclude Include="src\Dymatic\Core\LayerStack.h" />
     <ClInclude Include="src\Dymatic\Core\Log.h" />
-    <ClInclude Include="src\Dymatic\Core\MouseButtonCodes.h" />
+    <ClInclude Include="src\Dymatic\Core\MouseCodes.h" />
+    <ClInclude Include="src\Dymatic\Core\PlatformDetection.h" />
     <ClInclude Include="src\Dymatic\Core\Timestep.h" />
     <ClInclude Include="src\Dymatic\Core\Window.h" />
     <ClInclude Include="src\Dymatic\Debug\Instrumentor.h" />
@@ -158,7 +164,9 @@
     <ClInclude Include="src\Dymatic\Events\KeyEvent.h" />
     <ClInclude Include="src\Dymatic\Events\MouseEvent.h" />
     <ClInclude Include="src\Dymatic\ImGui\ImGuiLayer.h" />
+    <ClInclude Include="src\Dymatic\Math\Math.h" />
     <ClInclude Include="src\Dymatic\Renderer\Buffer.h" />
+    <ClInclude Include="src\Dymatic\Renderer\Camera.h" />
     <ClInclude Include="src\Dymatic\Renderer\Framebuffer.h" />
     <ClInclude Include="src\Dymatic\Renderer\GraphicsContext.h" />
     <ClInclude Include="src\Dymatic\Renderer\OrthographicCamera.h" />
@@ -171,6 +179,13 @@
     <ClInclude Include="src\Dymatic\Renderer\SubTexture2D.h" />
     <ClInclude Include="src\Dymatic\Renderer\Texture.h" />
     <ClInclude Include="src\Dymatic\Renderer\VertexArray.h" />
+    <ClInclude Include="src\Dymatic\Scene\Components.h" />
+    <ClInclude Include="src\Dymatic\Scene\Entity.h" />
+    <ClInclude Include="src\Dymatic\Scene\Scene.h" />
+    <ClInclude Include="src\Dymatic\Scene\SceneCamera.h" />
+    <ClInclude Include="src\Dymatic\Scene\SceneSerializer.h" />
+    <ClInclude Include="src\Dymatic\Scene\ScriptableEntity.h" />
+    <ClInclude Include="src\Dymatic\Utils\PlatformUtils.h" />
     <ClInclude Include="src\Platform\OpenGL\OpenGLBuffer.h" />
     <ClInclude Include="src\Platform\OpenGL\OpenGLContext.h" />
     <ClInclude Include="src\Platform\OpenGL\OpenGLFramebuffer.h" />
@@ -178,11 +193,9 @@
     <ClInclude Include="src\Platform\OpenGL\OpenGLShader.h" />
     <ClInclude Include="src\Platform\OpenGL\OpenGLTexture.h" />
     <ClInclude Include="src\Platform\OpenGL\OpenGLVertexArray.h" />
-    <ClInclude Include="src\Platform\Windows\WindowsInput.h" />
     <ClInclude Include="src\Platform\Windows\WindowsWindow.h" />
     <ClInclude Include="src\dypch.h" />
-    <ClInclude Include="vendor\CSplash_src\Splash.h" />
-    <ClInclude Include="vendor\CSplash_src\StdAfx.h" />
+    <ClInclude Include="vendor\ImGuizmo\ImGuizmo.h" />
     <ClInclude Include="vendor\glm\glm\common.hpp" />
     <ClInclude Include="vendor\glm\glm\detail\_features.hpp" />
     <ClInclude Include="vendor\glm\glm\detail\_fixes.hpp" />
@@ -598,10 +611,13 @@
     <ClCompile Include="src\Dymatic\Core\Layer.cpp" />
     <ClCompile Include="src\Dymatic\Core\LayerStack.cpp" />
     <ClCompile Include="src\Dymatic\Core\Log.cpp" />
+    <ClCompile Include="src\Dymatic\Core\Window.cpp" />
     <ClCompile Include="src\Dymatic\ImGui\ImGuiBuild.cpp" />
     <ClCompile Include="src\Dymatic\ImGui\ImGuiLayer.cpp" />
+    <ClCompile Include="src\Dymatic\Math\Math.cpp" />
     <ClCompile Include="src\Dymatic\Renderer\Buffer.cpp" />
     <ClCompile Include="src\Dymatic\Renderer\Framebuffer.cpp" />
+    <ClCompile Include="src\Dymatic\Renderer\GraphicsContext.cpp" />
     <ClCompile Include="src\Dymatic\Renderer\OrthographicCamera.cpp" />
     <ClCompile Include="src\Dymatic\Renderer\OrthographicCameraController.cpp" />
     <ClCompile Include="src\Dymatic\Renderer\RenderCommand.cpp" />
@@ -612,6 +628,10 @@
     <ClCompile Include="src\Dymatic\Renderer\SubTexture2D.cpp" />
     <ClCompile Include="src\Dymatic\Renderer\Texture.cpp" />
     <ClCompile Include="src\Dymatic\Renderer\VertexArray.cpp" />
+    <ClCompile Include="src\Dymatic\Scene\Entity.cpp" />
+    <ClCompile Include="src\Dymatic\Scene\Scene.cpp" />
+    <ClCompile Include="src\Dymatic\Scene\SceneCamera.cpp" />
+    <ClCompile Include="src\Dymatic\Scene\SceneSerializer.cpp" />
     <ClCompile Include="src\Platform\OpenGL\OpenGLBuffer.cpp" />
     <ClCompile Include="src\Platform\OpenGL\OpenGLContext.cpp" />
     <ClCompile Include="src\Platform\OpenGL\OpenGLFramebuffer.cpp" />
@@ -620,13 +640,14 @@
     <ClCompile Include="src\Platform\OpenGL\OpenGLTexture.cpp" />
     <ClCompile Include="src\Platform\OpenGL\OpenGLVertexArray.cpp" />
     <ClCompile Include="src\Platform\Windows\WindowsInput.cpp" />
+    <ClCompile Include="src\Platform\Windows\WindowsPlatformUtils.cpp" />
     <ClCompile Include="src\Platform\Windows\WindowsWindow.cpp" />
     <ClCompile Include="src\dypch.cpp">
       <PrecompiledHeader>Create</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="vendor\CSplash_src\Splash.cpp" />
-    <ClCompile Include="vendor\CSplash_src\SplashClient.cpp" />
-    <ClCompile Include="vendor\CSplash_src\StdAfx.cpp" />
+    <ClCompile Include="vendor\ImGuizmo\ImGuizmo.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="vendor\stb_image\stb_image.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -639,9 +660,9 @@
     <ProjectReference Include="vendor\imgui\ImGui.vcxproj">
       <Project>{C0FF640D-2C14-8DBE-F595-301E616989EF}</Project>
     </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="vendor\CSplash_src\SplashClient.dsp" />
+    <ProjectReference Include="vendor\yaml-cpp\yaml-cpp.vcxproj">
+      <Project>{88F1A057-74BE-FB62-9DD7-E90A890331F1}</Project>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

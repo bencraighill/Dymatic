@@ -1,152 +1,47 @@
- workspace "Dymatic"
-	architecture "x64"
-	startproject "Sandbox"
+include "./vendor/premake/premake_customization/solution_items.lua"
 
+workspace "Dymatic"
+	architecture "x86_64"
+	startproject "DymaticEditor"
 	configurations
 	{
 		"Debug",
 		"Release",
 		"Dist"
 	}
-	
 
+
+	solution_items
+	{
+		".editorconfig"
+	}
+
+	flags
+	{
+		"MultiProcessorCompile"
+	}
 outputdir = "%{cfg.buildcfg}-%{cfg.system}-%{cfg.architecture}"
 
+
+
 IncludeDir = {}
-IncludeDir["GLFW"] = "Dymatic/vendor/GLFW/include"
-IncludeDir["Glad"] = "Dymatic/vendor/Glad/include"
-IncludeDir["ImGui"] = "Dymatic/vendor/imgui"
-IncludeDir["glm"] = "Dymatic/vendor/glm"
-IncludeDir["stb_image"] = "Dymatic/vendor/stb_image"
+IncludeDir["GLFW"] = "%{wks.location}/Dymatic/vendor/GLFW/include"
+IncludeDir["Glad"] = "%{wks.location}/Dymatic/vendor/Glad/include"
+IncludeDir["ImGui"] = "%{wks.location}/Dymatic/vendor/imgui"
+IncludeDir["glm"] = "%{wks.location}/Dymatic/vendor/glm"
+IncludeDir["stb_image"] = "%{wks.location}/Dymatic/vendor/stb_image"
+IncludeDir["entt"] = "%{wks.location}/Dymatic/vendor/entt/include"
+IncludeDir["yaml_cpp"] = "%{wks.location}/Dymatic/vendor/yaml-cpp/include"
+IncludeDir["ImGuizmo"] = "%{wks.location}/Dymatic/vendor/ImGuizmo"
 
-include "Dymatic/vendor/GLFW"
-include "Dymatic/vendor/Glad"
-include "Dymatic/vendor/imgui"
+group "Dependencies"
+	include "vendor/premake"
+	include "Dymatic/vendor/GLFW"
+	include "Dymatic/vendor/Glad"
+	include "Dymatic/vendor/imgui"
+	include "Dymatic/vendor/yaml-cpp"
+group ""
 
-
-
-
-project "Dymatic"
-	location "Dymatic"
-	kind "StaticLib"
-	language "C++"
-	cppdialect "C++17"
-	staticruntime "on"
-
-	targetdir ("bin/" .. outputdir .. "/%{prj.name}")
-	objdir ("bin-int/" .. outputdir .. "/%{prj.name}")
-
-	pchheader "dypch.h"
-	pchsource "Dymatic/src/dypch.cpp"
-
-	files
-	{
-		"%{prj.name}/src/**.h",
-		"%{prj.name}/src/**.cpp",
-		"%{prj.name}/vendor/stb_image/**.h",
-		"%{prj.name}/vendor/stb_image/**.cpp",
-		"%{prj.name}/vendor/glm/glm/**.hpp",
-		"%{prj.name}/vendor/glm/glm/**.inl"
-	}
-
-	defines
-	{
-		"_CRT_SECURE_NO_WARNINGS"
-	}
-
-	includedirs
-	{
-		"%{prj.name}/src",
-		"%{prj.name}/vendor/spdlog/include",
-		"%{IncludeDir.GLFW}",
-		"%{IncludeDir.Glad}",
-		"%{IncludeDir.ImGui}",
-		"%{IncludeDir.glm}",
-		"%{IncludeDir.stb_image}"
-	}
-
-	links
-	{
-		"GLFW",
-		"Glad",
-		"ImGui",
-		"opengl32.lib"
-	}
-
-	filter "system:windows"
-		systemversion "latest"
-
-		defines
-		{
-			"DY_PLATFORM_WINDOWS",
-			"DY_BUILD_DLL",
-			"GLFW_INCLUDE_NONE"
-		}
-
-	filter "configurations:Debug"
-		 defines "DY_DEBUG"
-		 runtime "Debug"
-		 symbols "on"
-
-	filter "configurations:Release"
-		 defines "DY_RELEASE"
-		 runtime "Release"
-		 optimize "on"
-
-	filter "configurations:Dist"
-		 defines "DY_DIST"
-		 runtime "Release"
-		 optimize "on"
-
-project "Sandbox"
-	location "Sandbox"
-	kind "ConsoleApp"
-	language "C++"
-	cppdialect "C++17"
-	staticruntime "on"
-
-	targetdir ("bin/" .. outputdir .. "/%{prj.name}")
-	objdir ("bin-int/" .. outputdir .. "/%{prj.name}")
-
-	files
-	{
-		"%{prj.name}/src/**.h",
-		"%{prj.name}/src/**.cpp"
-	}
-
-	includedirs
-	{
-		"Dymatic/vendor/spdlog/include",
-		"Dymatic/src",
-		"Dymatic/vendor",
-		"%{IncludeDir.glm}"
-	}
-
-	links
-	{
-		"Dymatic"
-	}
-
-	filter "system:windows"
-		systemversion "latest"
-
-		defines
-		{
-			"DY_PLATFORM_WINDOWS"
-		}
-
-
-	filter "configurations:Debug"
-		 defines "DY_DEBUG"
-		 runtime "Debug"
-		 symbols "on"
-
-	filter "configurations:Release"
-		 defines "DY_RELEASE"
-		 runtime "Release"
-		 optimize "on"
-
-	filter "configurations:Dist"
-		 defines "DY_DIST"
-		 runtime "Release"
-		 optimize "on"
+include "Dymatic"
+include "Sandbox"
+include "DymaticEditor"

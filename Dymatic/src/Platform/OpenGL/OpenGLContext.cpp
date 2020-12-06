@@ -1,16 +1,15 @@
 #include "dypch.h"
-#include "OpenGLContext.h"
+#include "Platform/OpenGL/OpenGLContext.h"
 
 #include <GLFW/glfw3.h>
 #include <glad/glad.h>
-#include <GL/GL.h>
 
 namespace Dymatic {
 
 	OpenGLContext::OpenGLContext(GLFWwindow* windowHandle)
 		: m_WindowHandle(windowHandle)
 	{
-DY_CORE_ASSERT(windowHandle, "Window handle is null!")
+		DY_CORE_ASSERT(windowHandle, "Window handle is null!")
 	}
 
 	void OpenGLContext::Init()
@@ -21,16 +20,12 @@ DY_CORE_ASSERT(windowHandle, "Window handle is null!")
 		int status = gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
 		DY_CORE_ASSERT(status, "Failed to initialize Glad!");
 
-		DY_CORE_INFO("OpenGL Renderer in use: \n		Vendor: {0}\n		Renderer: {1}\n		Version: {2}\n", glGetString(GL_VENDOR), glGetString(GL_RENDERER), glGetString(GL_VERSION));
+		DY_CORE_INFO("OpenGL Info:");
+		DY_CORE_INFO("  Vendor: {0}", glGetString(GL_VENDOR));
+		DY_CORE_INFO("  Renderer: {0}", glGetString(GL_RENDERER));
+		DY_CORE_INFO("  Version: {0}", glGetString(GL_VERSION));
 
-	#ifdef DY_ENABLE_ASSERTS
-		int versionMajor;
-		int versionMinor;
-		glGetIntegerv(GL_MAJOR_VERSION, &versionMajor);
-		glGetIntegerv(GL_MINOR_VERSION, &versionMinor);
-
-		DY_CORE_ASSERT(versionMajor > 4 || (versionMajor == 4 && versionMinor >= 5), "Dymatic requires OpenGL version 4.5 or later");
-	#endif
+		DY_CORE_ASSERT(GLVersion.major > 4 || (GLVersion.major == 4 && GLVersion.minor >= 5), "Dymatic requires at least OpenGL version 4.5");
 	}
 
 	void OpenGLContext::SwapBuffers()

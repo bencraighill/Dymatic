@@ -1,5 +1,5 @@
 #include "dypch.h"
-#include "OpenGLShader.h"
+#include "Platform/OpenGL/OpenGLShader.h"
 
 #include <fstream>
 #include <glad/glad.h>
@@ -10,11 +10,12 @@ namespace Dymatic {
 
 	static GLenum ShaderTypeFromString(const std::string& type)
 	{
+		if (type == "vertex")
+			return GL_VERTEX_SHADER;
+		if (type == "fragment" || type == "pixel")
+			return GL_FRAGMENT_SHADER;
 
-		if (type == "vertex") return GL_VERTEX_SHADER;
-		if (type == "fragment" || type == "pixel") return GL_FRAGMENT_SHADER;
-
-		DY_CORE_ASSERT(false, "Unknown shader type");
+		DY_CORE_ASSERT(false, "Unknown shader type!");
 		return 0;
 	}
 
@@ -26,9 +27,10 @@ namespace Dymatic {
 		auto shaderSources = PreProcess(source);
 		Compile(shaderSources);
 
+		// Extract name from filepath
 		auto lastSlash = filepath.find_last_of("/\\");
 		lastSlash = lastSlash == std::string::npos ? 0 : lastSlash + 1;
-		auto lastDot = filepath.rfind(".");
+		auto lastDot = filepath.rfind('.');
 		auto count = lastDot == std::string::npos ? filepath.size() - lastSlash : lastDot - lastSlash;
 		m_Name = filepath.substr(lastSlash, count);
 	}
@@ -47,6 +49,7 @@ namespace Dymatic {
 	OpenGLShader::~OpenGLShader()
 	{
 		DY_PROFILE_FUNCTION();
+
 		glDeleteProgram(m_RendererID);
 	}
 
@@ -55,18 +58,25 @@ namespace Dymatic {
 		DY_PROFILE_FUNCTION();
 
 		std::string result;
-		std::ifstream in(filepath, std::ios::in | std::ios::binary);
+		std::ifstream in(filepath, std::ios::in | std::ios::binary); // ifstream closes itself due to RAII
 		if (in)
 		{
 			in.seekg(0, std::ios::end);
-			result.resize(in.tellg());
-			in.seekg(0, std::ios::beg);
-			in.read(&result[0], result.size());
-			in.close();
+			size_t size = in.tellg();
+			if (size != -1)
+			{
+				result.resize(size);
+				in.seekg(0, std::ios::beg);
+				in.read(&result[0], size);
+			}
+			else
+			{
+				DY_CORE_ERROR("Could not read from file '{0}'", filepath);
+			}
 		}
 		else
 		{
-			DY_CORE_ERROR("Could not open filepath '{0}'", filepath);
+			DY_CORE_ERROR("Could not open file '{0}'", filepath);
 		}
 
 		return result;
@@ -80,18 +90,20 @@ namespace Dymatic {
 
 		const char* typeToken = "#type";
 		size_t typeTokenLength = strlen(typeToken);
-		size_t pos = source.find(typeToken, 0);
+		size_t pos = source.find(typeToken, 0); //Start of shader type declaration line
 		while (pos != std::string::npos)
 		{
-			size_t eol = source.find_first_of("\r\n", pos);
+			size_t eol = source.find_first_of("\r\n", pos); //End of shader type declaration line
 			DY_CORE_ASSERT(eol != std::string::npos, "Syntax error");
-			size_t begin = pos + typeTokenLength + 1;
+			size_t begin = pos + typeTokenLength + 1; //Start of shader type name (after "#type " keyword)
 			std::string type = source.substr(begin, eol - begin);
 			DY_CORE_ASSERT(ShaderTypeFromString(type), "Invalid shader type specified");
 
-			size_t nextLinePos = source.find_first_not_of("\r\n", eol);
-			pos = source.find(typeToken, nextLinePos);
-			shaderSources[ShaderTypeFromString(type)] = source.substr(nextLinePos, pos - (nextLinePos == std::string::npos ? source.size() - 1 : nextLinePos));
+			size_t nextLinePos = source.find_first_not_of("\r\n", eol); //Start of shader code after shader type declaration line
+			DY_CORE_ASSERT(nextLinePos != std::string::npos, "Syntax error");
+			pos = source.find(typeToken, nextLinePos); //Start of next shader type declaration line
+
+			shaderSources[ShaderTypeFromString(type)] = (pos == std::string::npos) ? source.substr(nextLinePos) : source.substr(nextLinePos, pos - nextLinePos);
 		}
 
 		return shaderSources;
@@ -102,7 +114,7 @@ namespace Dymatic {
 		DY_PROFILE_FUNCTION();
 
 		GLuint program = glCreateProgram();
-		DY_CORE_ASSERT(shaderSources.size() <= 2, "Only 2 shader variations are supported");
+		DY_CORE_ASSERT(shaderSources.size() <= 2, "We only support 2 shaders for now");
 		std::array<GLenum, 2> glShaderIDs;
 		int glShaderIDIndex = 0;
 		for (auto& kv : shaderSources)
@@ -130,19 +142,22 @@ namespace Dymatic {
 				glDeleteShader(shader);
 
 				DY_CORE_ERROR("{0}", infoLog.data());
-				DY_CORE_ASSERT(false, "Shader compilation failure!")
+				DY_CORE_ASSERT(false, "Shader compilation failure!");
 				break;
 			}
 
 			glAttachShader(program, shader);
 			glShaderIDs[glShaderIDIndex++] = shader;
 		}
+
+		m_RendererID = program;
+
 		// Link our program
 		glLinkProgram(program);
 
 		// Note the different functions here: glGetProgram* instead of glGetShader*.
 		GLint isLinked = 0;
-		glGetProgramiv(program, GL_LINK_STATUS, (int *)&isLinked);
+		glGetProgramiv(program, GL_LINK_STATUS, (int*)&isLinked);
 		if (isLinked == GL_FALSE)
 		{
 			GLint maxLength = 0;
@@ -154,19 +169,20 @@ namespace Dymatic {
 
 			// We don't need the program anymore.
 			glDeleteProgram(program);
-	
+
 			for (auto id : glShaderIDs)
 				glDeleteShader(id);
 
 			DY_CORE_ERROR("{0}", infoLog.data());
-			DY_CORE_ASSERT(false, "Shader link failure!")
+			DY_CORE_ASSERT(false, "Shader link failure!");
 			return;
 		}
 
-		for (auto id : glShaderIDs)	
+		for (auto id : glShaderIDs)
+		{
 			glDetachShader(program, id);
-
-		m_RendererID = program;
+			glDeleteShader(id);
+		}
 	}
 
 	void OpenGLShader::Bind() const
@@ -228,7 +244,6 @@ namespace Dymatic {
 		GLint location = glGetUniformLocation(m_RendererID, name.c_str());
 		glUniform1i(location, value);
 	}
-
 
 	void OpenGLShader::UploadUniformIntArray(const std::string& name, int* values, uint32_t count)
 	{
