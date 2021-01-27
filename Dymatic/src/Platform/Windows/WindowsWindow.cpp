@@ -11,6 +11,10 @@
 
 #include "Platform/OpenGL/OpenGLContext.h"
 
+#include "Dymatic/Renderer/Texture.h"
+
+#include <stb_image.h>
+
 namespace Dymatic {
 
 	static uint8_t s_GLFWWindowCount = 0;
@@ -50,6 +54,7 @@ namespace Dymatic {
 			int success = glfwInit();
 			DY_CORE_ASSERT(success, "Could not initialize GLFW!");
 			glfwSetErrorCallback(GLFWErrorCallback);
+
 		}
 
 		{
@@ -58,8 +63,14 @@ namespace Dymatic {
 			if (Renderer::GetAPI() == RendererAPI::API::OpenGL)
 				glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
 #endif
+			glfwWindowHint(GLFW_DECORATED, false);
 			m_Window = glfwCreateWindow((int)props.Width, (int)props.Height, m_Data.Title.c_str(), nullptr, nullptr);
 			++s_GLFWWindowCount;
+
+			GLFWimage images[1];
+			images[0].pixels = stbi_load("assets/icons/DymaticLogo.png", &images[0].width, &images[0].height, 0, 4); //rgba channels 
+			glfwSetWindowIcon(m_Window, 2, images);
+			stbi_image_free(images[0].pixels);
 		}
 
 		m_Context = GraphicsContext::Create(m_Window);
@@ -157,6 +168,71 @@ namespace Dymatic {
 			MouseMovedEvent event((float)xPos, (float)yPos);
 			data.EventCallback(event);
 		});
+	}
+
+	void WindowsWindow::SetSize(int width, int height) const
+	{
+		glfwSetWindowSize(reinterpret_cast<GLFWwindow*>(GetNativeWindow()), width, height);
+	}
+
+	uint32_t WindowsWindow::GetPositionX() const
+	{
+		int x;
+		glfwGetWindowPos(reinterpret_cast<GLFWwindow*>(GetNativeWindow()), &x, NULL);
+		return x;
+	}
+
+	uint32_t WindowsWindow::GetPositionY() const
+	{
+		int y;
+		glfwGetWindowPos(reinterpret_cast<GLFWwindow*>(GetNativeWindow()), NULL, &y);
+		return y;
+	}
+
+	void WindowsWindow::SetPosition(int x, int y) const
+	{
+		glfwSetWindowPos(reinterpret_cast<GLFWwindow*>(GetNativeWindow()), x, y);
+	}
+
+	void WindowsWindow::MinimizeWindow() const
+	{
+		glfwIconifyWindow(m_Window);
+	}
+
+	void WindowsWindow::MaximizeWindow() const
+	{
+		glfwMaximizeWindow(m_Window);
+	}
+
+	void WindowsWindow::ReturnWindow() const
+	{
+		glfwRestoreWindow(m_Window);
+	}
+
+	bool WindowsWindow::IsWindowMaximized() const
+	{
+		return glfwGetWindowAttrib(m_Window, GLFW_MAXIMIZED);
+	}
+
+	void WindowsWindow::SetCursor(int shape) const
+	{
+		switch (shape)
+		{
+		case 0: {shape = GLFW_ARROW_CURSOR; break; }
+		case 1: {shape = GLFW_IBEAM_CURSOR; break; }
+		case 2: {shape = GLFW_CROSSHAIR_CURSOR; break; }
+		case 3: {shape = GLFW_POINTING_HAND_CURSOR; break; }
+		case 4: {shape = GLFW_RESIZE_EW_CURSOR; break; }
+		case 5: {shape = GLFW_RESIZE_NS_CURSOR; break; }
+		case 6: {shape = GLFW_RESIZE_NWSE_CURSOR; break; }
+		case 7: {shape = GLFW_RESIZE_NESW_CURSOR; break; }
+		case 8: {shape = GLFW_RESIZE_ALL_CURSOR; break; }
+		case 9: {shape = GLFW_NOT_ALLOWED_CURSOR; break; }
+		default: { DY_CORE_ASSERT(false, "Cannot set cursor shape to invalid type"); }
+		}
+
+		GLFWcursor* cursor = glfwCreateStandardCursor(shape);
+		glfwSetCursor(m_Window, cursor);
 	}
 
 	void WindowsWindow::Shutdown()

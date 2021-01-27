@@ -1,5 +1,10 @@
 #include "dypch.h"
 #include "Math.h"
+#include <Math.h>
+
+#include <iostream>
+#include <cstdlib> 
+#include <ctime>
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/matrix_decompose.hpp>
@@ -76,6 +81,70 @@ namespace Dymatic::Math {
 
 
 		return true;
+	}
+
+	std::string FloatToString(float Float)
+	{
+		std::string text = std::to_string(Float);
+		int check = text.find_last_not_of("0");
+		int checkStop = text.find_first_of(".");
+		int finalCheck = check <= checkStop ? check : check + 1;
+		return (text.substr(0, finalCheck));
+	}
+
+	unsigned int GetRandomInRange(int min, int max)
+	{
+		return ((rand() * std::time(nullptr)) % max + min);
+	}
+
+	// Normalizes any number to an arbitrary range 
+	// by assuming the range wraps around when going below min or above max 
+	float NormalizeAngle(const float value, const float shift, const float size)
+	{
+		return value + ceil((-value + shift) / size) * size;
+	}
+
+	float LerpAngle(float a, float b, float x)
+	{
+		float angleDifference = b - a;
+		while (angleDifference > 180) angleDifference -= 360;
+		while (angleDifference < -180) angleDifference += 360;
+		return NormalizeAngle(a + angleDifference * x, -180);
+	}
+
+	float Lerp(float a, float b, float x)
+	{
+		return a + (b - a) * x;
+	}
+
+	float Absolute(float x)
+	{
+		return (x < 0 ? (x * -1) : (x));
+	}
+
+	float FloatDistance(float x, float y)
+	{
+		return Absolute(Absolute(x) - Absolute(y));
+	}
+
+	float RoundUp(float numToRound, float multiple)
+	{
+		if (multiple == 0)
+			return numToRound;
+		int a = 6 % 4;
+		float remainder = std::fmod(abs(numToRound), multiple);
+		if (remainder == 0)
+			return numToRound;
+
+		if (numToRound < 0)
+			return -(abs(numToRound) - remainder);
+		else
+			return numToRound + multiple - remainder;
+	}
+
+	bool NearlyEqual(float a, float b, float ErrorTolerence)
+	{
+		return (Absolute(a - b) <= ErrorTolerence);
 	}
 
 }

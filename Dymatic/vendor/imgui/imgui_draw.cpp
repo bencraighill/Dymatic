@@ -227,6 +227,11 @@ void ImGui::StyleColorsDark(ImGuiStyle* dst)
     colors[ImGuiCol_NavWindowingHighlight]  = ImVec4(1.00f, 1.00f, 1.00f, 0.70f);
     colors[ImGuiCol_NavWindowingDimBg]      = ImVec4(0.80f, 0.80f, 0.80f, 0.20f);
     colors[ImGuiCol_ModalWindowDimBg]       = ImVec4(0.80f, 0.80f, 0.80f, 0.35f);
+    //IMGUI CUSTOM:
+    colors[ImGuiCol_ScrollbarDots]          = ImVec4(0.06f, 0.06f, 0.06f, 0.94f);
+    colors[ImGuiCol_ButtonToggled]          = ImVec4(0.325f, 0.475f, 0.706f, 1.0f);
+    colors[ImGuiCol_ButtonToggledHovered]   = ImVec4(0.425f, 0.575f, 0.806f, 1.0f);
+    //-----------//
 }
 
 void ImGui::StyleColorsClassic(ImGuiStyle* dst)
@@ -284,6 +289,11 @@ void ImGui::StyleColorsClassic(ImGuiStyle* dst)
     colors[ImGuiCol_NavWindowingHighlight]  = ImVec4(1.00f, 1.00f, 1.00f, 0.70f);
     colors[ImGuiCol_NavWindowingDimBg]      = ImVec4(0.80f, 0.80f, 0.80f, 0.20f);
     colors[ImGuiCol_ModalWindowDimBg]       = ImVec4(0.20f, 0.20f, 0.20f, 0.35f);
+    //IMGUI CUSTOM:
+    colors[ImGuiCol_ScrollbarDots]          = ImVec4(0.06f, 0.06f, 0.06f, 0.94f);
+    colors[ImGuiCol_ButtonToggled]          = ImVec4(0.325f, 0.475f, 0.706f, 1.0f);
+    colors[ImGuiCol_ButtonToggledHovered]   = ImVec4(0.425f, 0.575f, 0.806f, 1.0f);
+    //-----------//
 }
 
 // Those light colors are better suited with a thicker font than the default one + FrameBorder
@@ -342,6 +352,11 @@ void ImGui::StyleColorsLight(ImGuiStyle* dst)
     colors[ImGuiCol_NavWindowingHighlight]  = ImVec4(0.70f, 0.70f, 0.70f, 0.70f);
     colors[ImGuiCol_NavWindowingDimBg]      = ImVec4(0.20f, 0.20f, 0.20f, 0.20f);
     colors[ImGuiCol_ModalWindowDimBg]       = ImVec4(0.20f, 0.20f, 0.20f, 0.35f);
+    //IMGUI CUSTOM:
+    colors[ImGuiCol_ScrollbarDots]          = ImVec4(0.06f, 0.06f, 0.06f, 0.94f);
+    colors[ImGuiCol_ButtonToggled]          = ImVec4(0.325f, 0.475f, 0.706f, 1.0f);
+    colors[ImGuiCol_ButtonToggledHovered]   = ImVec4(0.425f, 0.575f, 0.806f, 1.0f);
+    //-----------//
 }
 
 //-----------------------------------------------------------------------------

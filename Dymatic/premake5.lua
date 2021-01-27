@@ -19,8 +19,17 @@ project "Dymatic"
 		"vendor/glm/glm/**.hpp",
 		"vendor/glm/glm/**.inl",
 
+		"vendor/CSplash/**.h",
+		"vendor/CSplash/**.cpp",
+
+		"vendor/WinToast/**.h",
+		"vendor/WinToast/**.cpp",
+
 		"vendor/ImGuizmo/ImGuizmo.h",
-		"vendor/ImGuizmo/ImGuizmo.cpp"
+		"vendor/ImGuizmo/ImGuizmo.cpp",
+
+		"vendor/ImGuiNode/**.h",
+		"vendor/ImGuiNode/**.cpp"
 	}
 
 	defines
@@ -36,8 +45,11 @@ project "Dymatic"
 		"%{IncludeDir.GLFW}",
 		"%{IncludeDir.Glad}",
 		"%{IncludeDir.ImGui}",
+		"%{IncludeDir.ImGuiNode}",
 		"%{IncludeDir.glm}",
 		"%{IncludeDir.stb_image}",
+		"%{IncludeDir.CSplash}",
+		"%{IncludeDir.WinToast}",
 		"%{IncludeDir.entt}",
 		"%{IncludeDir.yaml_cpp}",
 		"%{IncludeDir.ImGuizmo}"
@@ -53,6 +65,10 @@ project "Dymatic"
 	}
 
 	filter "files:vendor/ImGuizmo/**.cpp"
+	flags { "NoPCH" }
+	filter "files:vendor/ImGuiNode/**.cpp"
+	flags { "NoPCH" }
+	filter "files:vendor/WinToast/**.cpp"
 	flags { "NoPCH" }
 
 	filter "system:windows"

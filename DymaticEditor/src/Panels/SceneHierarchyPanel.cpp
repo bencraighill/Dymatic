@@ -67,6 +67,8 @@ namespace Dymatic {
 
 		ImGuiTreeNodeFlags flags = ((m_SelectionContext == entity) ? ImGuiTreeNodeFlags_Selected : 0) | ImGuiTreeNodeFlags_OpenOnArrow;
 		flags |= ImGuiTreeNodeFlags_SpanAvailWidth;
+		ImGui::Image(reinterpret_cast<void*>(m_IconEmptyEntity->GetRendererID()), ImVec2{ 16, 16 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 }, ImVec4{ 0.75f, 0.5f, 0.32f, 1.0f });
+		ImGui::SameLine();
 		bool opened = ImGui::TreeNodeEx((void*)(uint64_t)(uint32_t)entity, flags, tag.c_str());
 		if (ImGui::IsItemClicked())
 		{
@@ -76,18 +78,61 @@ namespace Dymatic {
 		bool entityDeleted = false;
 		if (ImGui::BeginPopupContextItem())
 		{
-			if (ImGui::MenuItem("Delete Entity"))
+			if (ImGui::MenuItem("Delete"))
 				entityDeleted = true;
+			if (ImGui::MenuItem("Duplicate"))
+			{
+				m_Context->DuplicateEntity(entity);
+			}
 
 			ImGui::EndPopup();
 		}
 
 		if (opened)
 		{
-			ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth;
-			bool opened = ImGui::TreeNodeEx((void*)9817239, flags, tag.c_str());
-			if (opened)
-				ImGui::TreePop();
+			//ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth;
+			//bool opened = ImGui::TreeNodeEx((void*)9817239, flags, tag.c_str());
+			//if (opened)
+			//	ImGui::TreePop();
+
+			ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_Leaf;
+			std::vector<std::string> ComponentName;
+			//if (entity.HasComponent<TransformComponent>()) { ComponentName.push_back("Transform"); }
+			if (entity.HasComponent<SpriteRendererComponent>()) { ComponentName.push_back("Sprite Renderer"); }
+			if (entity.HasComponent<CameraComponent>()) { ComponentName.push_back("Camera"); }
+
+			for (int i = 0; i < ComponentName.size(); i++)
+			{
+				ImVec2 valPos = ImGui::GetCursorScreenPos();
+				bool opened = ImGui::TreeNodeEx((void*)9817239, flags, ComponentName[i].c_str());
+				ImGui::GetWindowDrawList()->AddImage(reinterpret_cast<void*>((ComponentName[i] == "Transform" ? m_IconTransformComponent : ComponentName[i] == "Sprite Renderer" ? m_IconSpriteRendererComponent : m_IconCameraComponent)->GetRendererID()), valPos, ImVec2{ valPos.x + 16, valPos.y + 16 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 }, ImGui::ColorConvertFloat4ToU32(ImVec4{0.34f, 0.69f, 0.55f, 1.0f}));
+				if (opened)
+				{
+					ImGui::TreePop();
+				}
+
+				if (ImGui::IsItemClicked())
+				{
+					m_SelectionContext = entity;
+				}
+
+				bool entityDeleted = false;
+				if (ImGui::BeginPopupContextItem(("##ComponentHeirachyPopup" + ComponentName[i]).c_str()))
+				{
+					if (ImGui::MenuItem("Delete"))
+					{
+						if (ComponentName[i] == "Transform") { entity.RemoveComponent<TransformComponent>(); }
+						if (ComponentName[i] == "Sprite Renderer") { entity.RemoveComponent<SpriteRendererComponent>(); }
+						if (ComponentName[i] == "Camera") { entity.RemoveComponent<Camera>(); }
+					}
+					if (ImGui::MenuItem("Duplicate"))
+					{
+					}
+
+					ImGui::EndPopup();
+				}
+			}
+
 			ImGui::TreePop();
 		}
 
@@ -208,6 +253,8 @@ namespace Dymatic {
 
 	void SceneHierarchyPanel::DrawComponents(Entity entity)
 	{
+		bool entityDeleted = false;
+
 		if (entity.HasComponent<TagComponent>())
 		{
 			auto& tag = entity.GetComponent<TagComponent>().Tag;
@@ -224,8 +271,17 @@ namespace Dymatic {
 		ImGui::SameLine();
 		ImGui::PushItemWidth(-1);
 
-		if (ImGui::Button("Add Component"))
+		//if (ImGui::Button("Add Component"))
+		if (ImGui::ImageButton(reinterpret_cast<void*>(m_IconAddComponent->GetRendererID()), ImVec2{ 18, 18}, ImVec2{ 0, 1 }, ImVec2{ 1, 0 }))
 			ImGui::OpenPopup("AddComponent");
+
+		ImGui::SameLine();
+		if (ImGui::ImageButton(reinterpret_cast<void*>(m_IconDuplicate->GetRendererID()), ImVec2{ 18, 18 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 }))
+			m_SelectionContext = m_Context->DuplicateEntity(m_SelectionContext);
+
+		ImGui::SameLine();
+		if (ImGui::ImageButton(reinterpret_cast<void*>(m_IconDelete->GetRendererID()), ImVec2{ 18, 18 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 }))
+			entityDeleted = true;
 
 		if (ImGui::BeginPopup("AddComponent"))
 		{
@@ -318,12 +374,57 @@ namespace Dymatic {
 
 				ImGui::Checkbox("Fixed Aspect Ratio", &component.FixedAspectRatio);
 			}
-		});
+		});		
 
 		DrawComponent<SpriteRendererComponent>("Sprite Renderer", entity, [](auto& component)
 		{
-			ImGui::ColorEdit4("Color", glm::value_ptr(component.Color));
+			const char* spriteTypeStrings[] = { "Solid Color", "Texture" };
+			const char* currentSpriteTypeStrings = spriteTypeStrings[(int)!component.SolidColor];
+			if (ImGui::BeginCombo("Sprite Type", currentSpriteTypeStrings))
+			{
+				for (int i = 0; i < 2; i++)
+				{
+					bool isSelected = currentSpriteTypeStrings == spriteTypeStrings[i];
+					if (ImGui::Selectable(spriteTypeStrings[i], isSelected))
+					{
+						currentSpriteTypeStrings = spriteTypeStrings[i];
+						component.SolidColor = !(bool)i;
+					}
+
+					if (isSelected)
+						ImGui::SetItemDefaultFocus();
+				}
+
+				ImGui::EndCombo();
+			}
+
+			if (component.SolidColor)
+			{
+				ImGui::ColorEdit4("Color", glm::value_ptr(component.Color));
+			}
+			else
+			{
+				char* cstr = new char[(int)component.TexturePath.length() + (512)];
+				strcpy(cstr, component.TexturePath.c_str());
+
+				if (ImGui::InputTextWithHint("Texture Path", "Path:", cstr, component.TexturePath.length() + (512)))
+				{
+					std::string TexturePathString(cstr);
+					component.TexturePath = TexturePathString;
+				}
+
+
+				ImGui::DragFloat("Tiling Factor", &component.TilingFactor, 0.1f, 0.0f, 0.0f, "%.3f");
+				ImGui::ColorEdit4("Tint Color", glm::value_ptr(component.TintColor));
+			}
 		});
+
+
+		if (entityDeleted)
+		{
+			m_Context->DestroyEntity(m_SelectionContext);
+			m_SelectionContext = {};
+		}
 
 	}
 

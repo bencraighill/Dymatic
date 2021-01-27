@@ -45,6 +45,10 @@ namespace Dymatic {
 	struct SpriteRendererComponent
 	{
 		glm::vec4 Color{ 1.0f, 1.0f, 1.0f, 1.0f };
+		bool SolidColor = true;
+		std::string TexturePath;
+		float TilingFactor = 1.0f;
+		glm::vec4 TintColor{ 1.0f, 1.0f, 1.0f, 1.0f };
 
 		SpriteRendererComponent() = default;
 		SpriteRendererComponent(const SpriteRendererComponent&) = default;

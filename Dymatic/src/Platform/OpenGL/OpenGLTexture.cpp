@@ -50,6 +50,11 @@ namespace Dymatic {
 			internalFormat = GL_RGB8;
 			dataFormat = GL_RGB;
 		}
+		else if (channels == 2)
+		{
+			internalFormat = GL_RG8;
+			dataFormat = GL_RG;
+		}
 
 		m_InternalFormat = internalFormat;
 		m_DataFormat = dataFormat;

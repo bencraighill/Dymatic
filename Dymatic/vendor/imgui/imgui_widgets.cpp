@@ -683,10 +683,216 @@ bool ImGui::ButtonEx(const char* label, const ImVec2& size_arg, ImGuiButtonFlags
     return pressed;
 }
 
+//IMGUI CUSTOM:
+bool ImGui::ToggleButtonEx(const char* label, bool* v, const ImVec2& size_arg, ImGuiButtonFlags flags)
+{
+    ImGuiWindow* window = GetCurrentWindow();
+    if (window->SkipItems)
+        return false;
+
+    ImGuiContext& g = *GImGui;
+    const ImGuiStyle& style = g.Style;
+    const ImGuiID id = window->GetID(label);
+    const ImVec2 label_size = CalcTextSize(label, NULL, true);
+
+    ImVec2 pos = window->DC.CursorPos;
+    if ((flags & ImGuiButtonFlags_AlignTextBaseLine) && style.FramePadding.y < window->DC.CurrLineTextBaseOffset) // Try to vertically align buttons that are smaller/have no padding so that text baseline matches (bit hacky, since it shouldn't be a flag)
+        pos.y += window->DC.CurrLineTextBaseOffset - style.FramePadding.y;
+    ImVec2 size = CalcItemSize(size_arg, label_size.x + style.FramePadding.x * 2.0f, label_size.y + style.FramePadding.y * 2.0f);
+
+    const ImRect bb(pos, pos + size);
+    ItemSize(size, style.FramePadding.y);
+    if (!ItemAdd(bb, id))
+        return false;
+
+    if (window->DC.ItemFlags & ImGuiItemFlags_ButtonRepeat)
+        flags |= ImGuiButtonFlags_Repeat;
+    bool hovered, held;
+    bool pressed = ButtonBehavior(bb, id, &hovered, &held, flags);
+
+    if (pressed && hovered) { *v = !*v; }
+
+    // Render
+    const ImU32 col = GetColorU32((*v && hovered) ? ImGuiCol_ButtonToggledHovered : (*v) ? ImGuiCol_ButtonToggled : (held && hovered) ? ImGuiCol_ButtonActive : hovered ? ImGuiCol_ButtonHovered : ImGuiCol_Button);
+    RenderNavHighlight(bb, id);
+    RenderFrame(bb.Min, bb.Max, col, true, style.FrameRounding);
+    RenderTextClipped(bb.Min + style.FramePadding, bb.Max - style.FramePadding, label, NULL, &label_size, style.ButtonTextAlign, &bb);
+
+    // Automatically close popups
+    //if (pressed && !(flags & ImGuiButtonFlags_DontClosePopups) && (window->Flags & ImGuiWindowFlags_Popup))
+    //    CloseCurrentPopup();
+
+    IMGUI_TEST_ENGINE_ITEM_INFO(id, label, window->DC.LastItemStatusFlags);
+    return pressed;
+}
+//------------//
+
+//IMGUI CUSTOM:
+int ImGui::SwitchButtonEx(const char* ids, const char* const items[], int itemSize, int currentItem, const ImVec2& size_arg, ImGuiButtonFlags flags)
+{
+    ImGuiWindow* window = GetCurrentWindow();
+    if (window->SkipItems)
+        return false;
+
+    ImGuiContext& g = *GImGui;
+    const ImGuiStyle& style = g.Style;
+
+    int pressedButton = -1;
+
+    for (int i = 0; i < itemSize; i++)
+    {
+        const ImGuiID id = window->GetID(ids + i);
+        const ImVec2 label_size = CalcTextSize(items[i], NULL, true);
+
+        ImVec2 pos = window->DC.CursorPos - ImVec2{ style.FramePadding.x, 0 } * 2 * i;
+        if ((flags & ImGuiButtonFlags_AlignTextBaseLine) && style.FramePadding.y < window->DC.CurrLineTextBaseOffset) // Try to vertically align buttons that are smaller/have no padding so that text baseline matches (bit hacky, since it shouldn't be a flag)
+            pos.y += window->DC.CurrLineTextBaseOffset - style.FramePadding.y;
+        ImVec2 size = CalcItemSize(ImVec2{(size_arg.x - style.FrameRounding) / itemSize, size_arg.y}, label_size.x + style.FramePadding.x * 2.0f, label_size.y + style.FramePadding.y * 2.0f);
+
+        const ImRect bb(pos, pos + size);
+        ItemSize(size, style.FramePadding.y);
+        if (!ItemAdd(bb, id))
+            return false;
+
+        if (window->DC.ItemFlags & ImGuiItemFlags_ButtonRepeat)
+            flags |= ImGuiButtonFlags_Repeat;
+        bool hovered, held;
+        bool pressed = ButtonBehavior(bb, id, &hovered, &held, flags);
+
+        if (pressed)
+        {
+            pressedButton = i;
+        }
+
+        // Render
+        const ImU32 col = GetColorU32((currentItem == i && hovered) ? ImGuiCol_ButtonToggledHovered : (currentItem == i) ? ImGuiCol_ButtonToggled : (held && hovered) ? ImGuiCol_ButtonActive : hovered ? ImGuiCol_ButtonHovered : ImGuiCol_Button);
+        RenderNavHighlight(bb, id);
+
+        float rounding = style.FrameRounding;        
+
+        ImVec2 frameOffsetMin = { 0, 0 };
+        ImVec2 frameOffsetMax = { 0, 0 };
+
+        ImDrawCornerFlags_ cornerFlags = i == 0 ? ImDrawCornerFlags_Left : (i == itemSize - 1) ? ImDrawCornerFlags_Right : ImDrawCornerFlags_None;
+
+        window->DrawList->AddRectFilled(bb.Min + frameOffsetMin, bb.Max + frameOffsetMax, col, rounding, cornerFlags);
+        const float border_size = g.Style.FrameBorderSize;
+        //const float border_size = 0.0f;
+        if (true && border_size > 0.0f)
+        {
+            window->DrawList->AddRect(bb.Min + frameOffsetMin, bb.Max + frameOffsetMax, GetColorU32(ImGuiCol_BorderShadow), rounding, cornerFlags, border_size);
+            window->DrawList->AddRect(bb.Min + frameOffsetMin, bb.Max + frameOffsetMax, GetColorU32(ImGuiCol_Border), rounding, cornerFlags, border_size);
+        }
+
+        RenderTextClipped(bb.Min + style.FramePadding, bb.Max - style.FramePadding, items[i], NULL, &label_size, style.ButtonTextAlign, &bb);
+
+        // Automatically close popups
+        //if (pressed && !(flags & ImGuiButtonFlags_DontClosePopups) && (window->Flags & ImGuiWindowFlags_Popup))
+        //    CloseCurrentPopup();
+
+
+        if (i != itemSize - 1)
+        {
+            //ImGui::SameLine((size.x) * (i + 1));
+            ImGui::SameLine();
+        }
+    }
+    IMGUI_TEST_ENGINE_ITEM_INFO(id, label, window->DC.LastItemStatusFlags);
+    return pressedButton;
+}
+//-----------//
+
+
+//IMGUI CUSTOM:
+int ImGui::SwitchImageButtonEx(const char* ids, ImTextureID images[], int itemSize, ImVec2 imageSize, ImVec2 uvMin, ImVec2 uvMax, int currentItem, const ImVec2& size_arg, ImGuiButtonFlags flags)
+{
+    ImGuiWindow* window = GetCurrentWindow();
+    if (window->SkipItems)
+        return false;
+
+    ImGuiContext& g = *GImGui;
+    const ImGuiStyle& style = g.Style;
+
+    int pressedButton = -1;
+
+    for (int i = 0; i < itemSize; i++)
+    {
+        const ImGuiID id = window->GetID(ids + i);
+        const ImVec2 label_size = imageSize;
+
+        ImVec2 pos = window->DC.CursorPos - ImVec2{ style.FramePadding.x, 0 } *2 * i;
+        if ((flags & ImGuiButtonFlags_AlignTextBaseLine) && style.FramePadding.y < window->DC.CurrLineTextBaseOffset) // Try to vertically align buttons that are smaller/have no padding so that text baseline matches (bit hacky, since it shouldn't be a flag)
+            pos.y += window->DC.CurrLineTextBaseOffset - style.FramePadding.y;
+        ImVec2 size = CalcItemSize(ImVec2{ (size_arg.x - style.FrameRounding) / itemSize, size_arg.y }, label_size.x + style.FramePadding.x * 2.0f, label_size.y + style.FramePadding.y * 2.0f);
+
+        const ImRect bb(pos, pos + size);
+        ItemSize(size, style.FramePadding.y);
+        if (!ItemAdd(bb, id))
+            return false;
+
+        if (window->DC.ItemFlags & ImGuiItemFlags_ButtonRepeat)
+            flags |= ImGuiButtonFlags_Repeat;
+        bool hovered, held;
+        bool pressed = ButtonBehavior(bb, id, &hovered, &held, flags);
+
+        if (pressed)
+        {
+            pressedButton = i;
+        }
+
+        // Render
+        const ImU32 col = GetColorU32((currentItem == i && hovered) ? ImGuiCol_ButtonToggledHovered : (currentItem == i) ? ImGuiCol_ButtonToggled : (held && hovered) ? ImGuiCol_ButtonActive : hovered ? ImGuiCol_ButtonHovered : ImGuiCol_Button);
+        RenderNavHighlight(bb, id);
+
+        float rounding = style.FrameRounding;
+
+        ImVec2 frameOffsetMin = { 0, 0 };
+        ImVec2 frameOffsetMax = { 0, 0 };
+
+        ImDrawCornerFlags_ cornerFlags = i == 0 ? ImDrawCornerFlags_Left : (i == itemSize - 1) ? ImDrawCornerFlags_Right : ImDrawCornerFlags_None;
+
+        window->DrawList->AddRectFilled(bb.Min + frameOffsetMin, bb.Max + frameOffsetMax, col, rounding, cornerFlags);
+        const float border_size = g.Style.FrameBorderSize;
+        //const float border_size = 0.0f;
+        if (true && border_size > 0.0f)
+        {
+            window->DrawList->AddRect(bb.Min + frameOffsetMin, bb.Max + frameOffsetMax, GetColorU32(ImGuiCol_BorderShadow), rounding, cornerFlags, border_size);
+            window->DrawList->AddRect(bb.Min + frameOffsetMin, bb.Max + frameOffsetMax, GetColorU32(ImGuiCol_Border), rounding, cornerFlags, border_size);
+        }
+
+        //window->DrawList->AddImage(images[i], bb.Min + style.FramePadding, bb.Max - style.FramePadding, uvMin, uvMax );
+        imageSize = (imageSize.x > size.x ? (ImVec2{size.x , imageSize.y}) : (imageSize));
+        imageSize = (imageSize.y > size.y ? (ImVec2{ imageSize.x , size.y }) : (imageSize));
+        window->DrawList->AddImage(images[i], pos + ImVec2{size / 2 - imageSize / 2} , pos + ImVec2{ size / 2 + imageSize / 2 }, uvMin, uvMax);
+
+        // Automatically close popups
+        //if (pressed && !(flags & ImGuiButtonFlags_DontClosePopups) && (window->Flags & ImGuiWindowFlags_Popup))
+        //    CloseCurrentPopup();
+
+
+        if (i != itemSize - 1)
+        {
+            //ImGui::SameLine((size.x) * (i + 1));
+            ImGui::SameLine();
+        }
+    }
+    IMGUI_TEST_ENGINE_ITEM_INFO(id, label, window->DC.LastItemStatusFlags);
+    return pressedButton;
+}
+//-----------//
+
+
 bool ImGui::Button(const char* label, const ImVec2& size_arg)
 {
     return ButtonEx(label, size_arg, ImGuiButtonFlags_None);
 }
+
+//IMGUI CUSTOM:
+bool ImGui::ToggleButton(const char* label, bool* v, const ImVec2& size_arg)
+{
+    return ToggleButtonEx(label, v, size_arg, ImGuiButtonFlags_None);
+}
+//----------//
 
 // Small buttons fits within text without additional vertical spacing.
 bool ImGui::SmallButton(const char* label)
@@ -963,6 +1169,10 @@ bool ImGui::ScrollbarEx(const ImRect& bb_frame, ImGuiID id, ImGuiAxis axis, floa
     else
         grab_rect = ImRect(bb.Min.x, ImLerp(bb.Min.y, bb.Max.y, grab_v_norm), bb.Max.x, ImLerp(bb.Min.y, bb.Max.y, grab_v_norm) + grab_h_pixels);
     window->DrawList->AddRectFilled(grab_rect.Min, grab_rect.Max, grab_col, style.ScrollbarRounding);
+    //IMGUI CUSTOM:
+    window->DrawList->AddCircleFilled(ImVec2{ (grab_rect.Min.x + grab_rect.Max.x) / 2, grab_rect.Min.y + (rounding_corners / 2) }, 3.0f, GetColorU32(ImGuiCol_ScrollbarDots));
+    window->DrawList->AddCircleFilled(ImVec2{ (grab_rect.Min.x + grab_rect.Max.x) / 2, grab_rect.Max.y - (rounding_corners / 2) }, 3.0f, GetColorU32(ImGuiCol_ScrollbarDots));
+    //-----------//
 
     return held;
 }
@@ -1015,7 +1225,6 @@ bool ImGui::ImageButtonEx(ImGuiID id, ImTextureID texture_id, const ImVec2& size
     if (bg_col.w > 0.0f)
         window->DrawList->AddRectFilled(bb.Min + padding, bb.Max - padding, GetColorU32(bg_col));
     window->DrawList->AddImage(texture_id, bb.Min + padding, bb.Max - padding, uv0, uv1, GetColorU32(tint_col));
-
     return pressed;
 }
 
@@ -3881,7 +4090,6 @@ bool ImGui::InputTextEx(const char* label, const char* hint, char* buf, int buf_
         if (!is_multiline && (focus_requested_by_tab || (user_clicked && io.KeyCtrl)))
             select_all = true;
     }
-
     if (g.ActiveId != id && init_make_active)
     {
         IM_ASSERT(state && state->ID == id);
@@ -6421,6 +6629,7 @@ bool ImGui::BeginMenuBar()
 
     // We don't clip with current window clipping rectangle as it is already set to the area below. However we clip with window full rect.
     // We remove 1 worth of rounding to Max.x to that text in long menus and small windows don't tend to display over the lower-right rounded area, which looks particularly glitchy.
+    
     ImRect bar_rect = window->MenuBarRect();
     ImRect clip_rect(IM_ROUND(bar_rect.Min.x + window->WindowBorderSize), IM_ROUND(bar_rect.Min.y + window->WindowBorderSize), IM_ROUND(ImMax(bar_rect.Min.x, bar_rect.Max.x - ImMax(window->WindowRounding, window->WindowBorderSize))), IM_ROUND(bar_rect.Max.y));
     clip_rect.ClipWith(window->OuterRectClipped);

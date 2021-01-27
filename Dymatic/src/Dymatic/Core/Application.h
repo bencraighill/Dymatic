@@ -26,6 +26,9 @@ namespace Dymatic {
 		void PushLayer(Layer* layer);
 		void PushOverlay(Layer* layer);
 
+		bool GetCloseWindowButtonPressed() { return m_CloseWindowCallback == 2; }
+		void SetCloseWindowCallback(bool enabled) { m_CloseCallbackEnabled = enabled; }
+
 		Window& GetWindow() { return *m_Window; }
 
 		void Close();
@@ -38,12 +41,15 @@ namespace Dymatic {
 		bool OnWindowClose(WindowCloseEvent& e);
 		bool OnWindowResize(WindowResizeEvent& e);
 	private:
-		std::unique_ptr<Window> m_Window;
+		Scope<Window> m_Window;
 		ImGuiLayer* m_ImGuiLayer;
 		bool m_Running = true;
 		bool m_Minimized = false;
 		LayerStack m_LayerStack;
 		float m_LastFrameTime = 0.0f;
+		// Editor layer uses events to detect when trying to close window
+		bool m_CloseCallbackEnabled = false;
+		int m_CloseWindowCallback = 0;
 	private:
 		static Application* s_Instance;
 		friend int ::main(int argc, char** argv);

@@ -1,0 +1,54 @@
+Scene: Untitled
+Entities:
+  - Entity: 12837192831273
+    TagComponent:
+      Tag: Empty Entity.002
+    TransformComponent:
+      Translation: [0, 3.5, 0.276136458]
+      Rotation: [0, 0, 0]
+      Scale: [17.3110008, 10, 1]
+    SpriteRendererComponent:
+      Color: [1, 1, 1, 1]
+      SolidColor: false
+      TexturePath: C:/Users/thecr/Downloads/TestImage2.png
+      TilingFactor: 1
+      TintColor: [0.331463993, 0.56597048, 0.734177232, 1]
+  - Entity: 12837192831273
+    TagComponent:
+      Tag: Empty Entity.001
+    TransformComponent:
+      Translation: [0, 3.5, 0.276136458]
+      Rotation: [0, 0, 0]
+      Scale: [17.3110008, 10, 1]
+    SpriteRendererComponent:
+      Color: [1, 1, 1, 1]
+      SolidColor: false
+      TexturePath: C:/Users/thecr/
+      TilingFactor: 1
+      TintColor: [1, 1, 1, 1]
+  - Entity: 12837192831273
+    TagComponent:
+      Tag: Empty Entity.003
+    TransformComponent:
+      Translation: [0, 0, 3.10759282]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    SpriteRendererComponent:
+      Color: [1, 1, 1, 1]
+      SolidColor: false
+      TexturePath: C:/dev/Dymatic/DymaticEditor/assets/icons/Viewport/ShaderIconSolid.png
+      TilingFactor: 1
+      TintColor: [1, 1, 1, 1]
+  - Entity: 12837192831273
+    TagComponent:
+      Tag: Empty Entity
+    TransformComponent:
+      Translation: [0, 0, 4.10465765]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    SpriteRendererComponent:
+      Color: [1, 1, 1, 1]
+      SolidColor: false
+      TexturePath: C:/dev/Dymatic/DymaticEditor/assets/icons/Viewport/ShaderIconRendered.png
+      TilingFactor: 1
+      TintColor: [1, 1, 1, 1]

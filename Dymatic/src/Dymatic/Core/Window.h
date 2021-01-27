@@ -33,6 +33,19 @@ namespace Dymatic {
 
 		virtual uint32_t GetWidth() const = 0;
 		virtual uint32_t GetHeight() const = 0;
+		virtual  void SetSize(int width, int height) const = 0;
+
+		virtual uint32_t GetPositionX() const = 0;
+		virtual uint32_t GetPositionY() const = 0;
+		virtual void SetPosition(int x, int y) const = 0;
+
+		virtual void MinimizeWindow() const = 0;
+		virtual void MaximizeWindow() const = 0;
+		virtual void ReturnWindow() const = 0;
+
+		virtual bool IsWindowMaximized() const = 0;
+
+		virtual void SetCursor(int shape) const = 0;
 
 		// Window attributes
 		virtual void SetEventCallback(const EventCallbackFn& callback) = 0;

@@ -8,6 +8,12 @@
 
 namespace Dymatic {
 
+	enum EngineColorScheme
+	{
+		Light = 0,
+		Dark = 1
+	};
+
 	class ImGuiLayer : public Layer
 	{
 	public:
@@ -23,10 +29,13 @@ namespace Dymatic {
 
 		void BlockEvents(bool block) { m_BlockEvents = block; }
 
-		void SetDarkThemeColors();
+		void SetColorScheme(EngineColorScheme colorScheme);
 	private:
 		bool m_BlockEvents = true;
 		float m_Time = 0.0f;
+
+		//Custom Code
+		EngineColorScheme m_ColorScheme;
 	};
 
 }

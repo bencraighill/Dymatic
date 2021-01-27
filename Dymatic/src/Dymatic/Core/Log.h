@@ -8,6 +8,8 @@
 #include <spdlog/fmt/ostr.h>
 #pragma warning(pop)
 
+#include <Windows.h>
+
 
 namespace Dymatic {
 
@@ -15,6 +17,10 @@ namespace Dymatic {
 	{
 	public:
 		static void Init();
+
+		static void HideConsole();
+		static void ShowConsole();
+		static bool IsConsoleVisible();
 
 		static Ref<spdlog::logger>& GetCoreLogger() { return s_CoreLogger; }
 		static Ref<spdlog::logger>& GetClientLogger() { return s_ClientLogger; }

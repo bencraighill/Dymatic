@@ -9,13 +9,19 @@
 
 #include <GLFW/glfw3.h>
 
+#include "../vendor/CSplash/Splash.h"
+
 namespace Dymatic {
 
 	Application* Application::s_Instance = nullptr;
 
+	CSplash splash1(TEXT("splash.bmp"), RGB(128, 128, 128));
+
 	Application::Application(const std::string& name)
 	{
 		DY_PROFILE_FUNCTION();
+
+		splash1.ShowSplash();
 
 		DY_CORE_ASSERT(!s_Instance, "Application already exists!");
 		s_Instance = this;
@@ -38,6 +44,8 @@ namespace Dymatic {
 	void Application::PushLayer(Layer* layer)
 	{
 		DY_PROFILE_FUNCTION();
+
+		splash1.CloseSplash();
 
 		m_LayerStack.PushLayer(layer);
 		layer->OnAttach();
@@ -93,6 +101,8 @@ namespace Dymatic {
 						layer->OnUpdate(timestep);
 				}
 
+			}
+			//OnImGuiRender used to be reliant on being not minimized, but this meant unlocked windows wouldn't work when GLFW was minimized.
 				m_ImGuiLayer->Begin();
 				{
 					DY_PROFILE_SCOPE("LayerStack OnImGuiRender");
@@ -101,15 +111,28 @@ namespace Dymatic {
 						layer->OnImGuiRender();
 				}
 				m_ImGuiLayer->End();
-			}
+			
 
 			m_Window->OnUpdate();
+
+			if (m_CloseWindowCallback >= 2)
+				m_CloseWindowCallback = 0;
+
+			if (m_CloseWindowCallback == 1)
+				m_CloseWindowCallback = 2;
+
 		}
 	}
 
 	bool Application::OnWindowClose(WindowCloseEvent& e)
 	{
-		m_Running = false;
+		if (m_CloseCallbackEnabled)
+		{
+			m_CloseWindowCallback = 1;
+		}
+		else {
+			m_Running = false;
+		}
 		return true;
 	}
 

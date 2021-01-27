@@ -9,7 +9,7 @@ namespace Dymatic {
 	{
 	public:
 		DymaticEditor()
-			: Application("Dymatic Editor")
+			: Application("Dymatic Editor - V1.2.1")
 		{
 			PushLayer(new EditorLayer());
 		}

@@ -20,7 +20,8 @@ project "DymaticEditor"
 		"%{wks.location}/Dymatic/vendor",
 		"%{IncludeDir.glm}",
 		"%{IncludeDir.entt}",
-		"%{IncludeDir.ImGuizmo}"
+		"%{IncludeDir.ImGuizmo}",
+		"%{IncludeDir.ImGuiNode}"
 	}
 
 	links

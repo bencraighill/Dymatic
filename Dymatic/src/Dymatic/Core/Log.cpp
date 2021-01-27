@@ -29,5 +29,20 @@ namespace Dymatic {
 		s_ClientLogger->flush_on(spdlog::level::trace);
 	}
 
+	void Log::HideConsole()
+	{
+		::ShowWindow(::GetConsoleWindow(), SW_HIDE);
+	}
+
+	void Log::ShowConsole()
+	{
+		::ShowWindow(::GetConsoleWindow(), SW_SHOW);
+	}
+
+	bool Log::IsConsoleVisible()
+	{
+		return ::IsWindowVisible(::GetConsoleWindow()) != FALSE;
+	}
+
 }
 

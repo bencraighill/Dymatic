@@ -1,0 +1,65 @@
+Scene: Untitled
+Entities:
+  - Entity: 12837192831273
+    TagComponent:
+      Tag: Door
+    TransformComponent:
+      Translation: [0, -0.0999999791, 1]
+      Rotation: [0, 0, 0]
+      Scale: [0.5, 0.800000012, 1]
+    SpriteRendererComponent:
+      Color: [0.193050206, 0.0850339234, 0, 1]
+  - Entity: 12837192831273
+    TagComponent:
+      Tag: UnderFrontWallB
+    TransformComponent:
+      Translation: [1.13, -0.349999994, 1]
+      Rotation: [0, 0, 0]
+      Scale: [1.75, 0.300000012, 1]
+    SpriteRendererComponent:
+      Color: [0.549019635, 0.407756269, 0.241138026, 1]
+  - Entity: 12837192831273
+    TagComponent:
+      Tag: UnderBackWall
+    TransformComponent:
+      Translation: [0, -0.349999994, -1]
+      Rotation: [0, 0, 0]
+      Scale: [4, 0.300000012, 1]
+    SpriteRendererComponent:
+      Color: [0.352941185, 0.262129039, 0.155017301, 1]
+  - Entity: 12837192831273
+    TagComponent:
+      Tag: UnderFrontWallA
+    TransformComponent:
+      Translation: [-1.13, -0.350000024, 1]
+      Rotation: [0, 0, 0]
+      Scale: [1.75, 0.300000012, 1]
+    SpriteRendererComponent:
+      Color: [0.588235319, 0.436881721, 0.258362174, 1]
+  - Entity: 12837192831273
+    TagComponent:
+      Tag: UnderWallB
+    TransformComponent:
+      Translation: [1.99000001, -0.349999994, -2.37822533e-07]
+      Rotation: [0, -1.57079637, 0]
+      Scale: [1.99993944, 0.300000012, 0.999969721]
+    SpriteRendererComponent:
+      Color: [0.196078435, 0.145627245, 0.0861207172, 1]
+  - Entity: 12837192831273
+    TagComponent:
+      Tag: UnderWallA
+    TransformComponent:
+      Translation: [-2.00020552, -0.349999994, -0.000665564905]
+      Rotation: [0, -1.57079637, 0]
+      Scale: [1.99985671, 0.300000012, 0.999928594]
+    SpriteRendererComponent:
+      Color: [0.643137276, 0.477657348, 0.282475978, 1]
+  - Entity: 12837192831273
+    TagComponent:
+      Tag: HouseBase
+    TransformComponent:
+      Translation: [0, -0.499949992, -0.00707143545]
+      Rotation: [1.57079637, 0, 0]
+      Scale: [4, 1.99999976, 0.999999881]
+    SpriteRendererComponent:
+      Color: [0.3204633, 0.320460081, 0.320460081, 1]

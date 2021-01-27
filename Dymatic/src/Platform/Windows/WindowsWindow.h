@@ -15,8 +15,21 @@ namespace Dymatic {
 
 		void OnUpdate() override;
 
-		unsigned int GetWidth() const override { return m_Data.Width; }
-		unsigned int GetHeight() const override { return m_Data.Height; }
+		uint32_t GetWidth() const override { return m_Data.Width; }
+		uint32_t GetHeight() const override { return m_Data.Height; }
+		void SetSize(int width, int height) const override;
+
+		uint32_t GetPositionX() const override;
+		uint32_t GetPositionY() const override;
+		void SetPosition(int x, int y) const override;
+
+		void MinimizeWindow() const override;
+		void MaximizeWindow() const override;
+		void ReturnWindow() const override;
+
+		bool IsWindowMaximized() const override;
+
+		void SetCursor(int shape) const override;
 
 		// Window attributes
 		void SetEventCallback(const EventCallbackFn& callback) override { m_Data.EventCallback = callback; }
@@ -34,7 +47,7 @@ namespace Dymatic {
 		struct WindowData
 		{
 			std::string Title;
-			unsigned int Width, Height;
+			unsigned int Width = 1600, Height = 900;
 			bool VSync;
 
 			EventCallbackFn EventCallback;

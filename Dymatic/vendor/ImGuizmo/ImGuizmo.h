@@ -113,6 +113,9 @@ void EditTransform(const Camera& camera, matrix_t& matrix)
 
 namespace ImGuizmo
 {
+   //IMGUI CUSTOM: //IMGUIZMO CUSTOM: //
+   IMGUI_API void LookAt(const float* eye, const float* at, const float* up, float* m16);
+
 	// call inside your own window and before Manipulate() in order to draw gizmo to that window.
 	// Or pass a specific ImDrawList to draw to (e.g. ImGui::GetForegroundDrawList()).
 	IMGUI_API void SetDrawlist(ImDrawList* drawlist = nullptr);
