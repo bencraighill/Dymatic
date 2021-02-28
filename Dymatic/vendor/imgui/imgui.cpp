@@ -6455,7 +6455,10 @@ bool ImGui::Begin(const char* name, bool* p_open, ImGuiWindowFlags flags)
         if (dim_bg_for_modal || dim_bg_for_window_list)
         {
             const ImU32 dim_bg_col = GetColorU32(dim_bg_for_modal ? ImGuiCol_ModalWindowDimBg : ImGuiCol_NavWindowingDimBg, g.DimBgRatio);
+            //IMGUI CUSTOM:
+            //window->DrawList->AddRectFilled(viewport_rect.Min, viewport_rect.Max, dim_bg_col);
             window->DrawList->AddRectFilled(viewport_rect.Min, viewport_rect.Max, dim_bg_col);
+            //----------//
         }
 
         // Draw navigation selection/windowing rectangle background

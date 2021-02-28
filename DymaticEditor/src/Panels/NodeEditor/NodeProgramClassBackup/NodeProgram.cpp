@@ -24,8 +24,6 @@
 
 #include "Dymatic/Math/Math.h"
 
-#include "Dymatic/Core/Input.h"
-
 static inline ImRect ImGui_GetItemRect()
 {
     return ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
@@ -65,6 +63,7 @@ static ed::EditorContext* m_Editor = nullptr;
 enum class PinType
 {
     Flow,
+    Wildcard,
     Bool,
     Int,
     Float,
@@ -96,7 +95,7 @@ enum class NodeType
     Houdini
 };
 
-struct TypeValue
+struct PinTypeValue
 {
     bool Bool = false;
     int Int = 0;
@@ -113,7 +112,7 @@ struct Pin
 	std::string Name;
 	PinType     Type;
 	PinKind     Kind;
-	TypeValue Value;
+	PinTypeValue Value;
 
 	Pin(int id, const char* name, PinType type) :
 		ID(id), Node(nullptr), Name(name), Type(type), Kind(PinKind::Input)
@@ -159,25 +158,6 @@ struct Link
     }
 };
 
-struct SpawnNodeStruct
-{
-    std::string variableName;
-    PinType variableType;
-};
-
-struct Variable
-{
-    int ID;
-    std::string Name;
-    TypeValue Values;
-    PinType Type;
-
-    Variable(int id, std::string name, PinType type)
-        : ID(id), Name(name), Type(type)
-    {
-    }
-};
-
 struct NodeIdLess
 {
     bool operator()(const ed::NodeId& lhs, const ed::NodeId& rhs) const
@@ -191,8 +171,7 @@ class NodeEditorInternal;
 struct SearchResultData
 {
 	std::string Name;
-	Node* (NodeEditorInternal::*Function)(SpawnNodeStruct);
-    SpawnNodeStruct spawnStruct = {};
+	Node* (NodeEditorInternal::*Function)();
 };
 
 struct SearchData
@@ -212,28 +191,18 @@ struct SearchData
 		return &LowerTree.back();
 	}
 
-    void PushBackResult(std::string name, Node* (NodeEditorInternal::* function)(SpawnNodeStruct), SpawnNodeStruct spawnStruct = {})
+	void PushBackResult(std::string name, Node* (NodeEditorInternal::*function)())
 	{
 		SearchResultData newData;
 		newData.Name = name;
 		newData.Function = function;
-        newData.spawnStruct = spawnStruct;
 		Results.push_back(newData);
 	}
-
-    void Clear()
-    {
-        LowerTree = {};
-        Results = {};
-
-		bool open = false;
-		bool confirmed = true;
-    }
 };
 
 struct ConversionReturn
 {
-	Node* (NodeEditorInternal::* function)(SpawnNodeStruct);
+	Node* (NodeEditorInternal::* function)();
 };
 
 class NodeEditorInternal
@@ -256,69 +225,66 @@ public:
     void BuildNode(Node* node);
 
     //Nodes
-    Node* SpawnOnCreateNode(SpawnNodeStruct in);
-    Node* SpawnOnUpdateNode(SpawnNodeStruct in);
+    Node* SpawnOnCreateNode();
     //Make Literal Nodes
-    Node* SpawnMakeLiteralBoolNode(SpawnNodeStruct in);
-    Node* SpawnMakeLiteralIntNode(SpawnNodeStruct in);
-    Node* SpawnMakeLiteralFloatNode(SpawnNodeStruct in);
-    Node* SpawnMakeLiteralStringNode(SpawnNodeStruct in);
+    Node* SpawnMakeLiteralBoolNode();
+    Node* SpawnMakeLiteralIntNode();
+    Node* SpawnMakeLiteralFloatNode();
+    Node* SpawnMakeLiteralStringNode();
 
-    Node* SpawnIntToBoolNode(SpawnNodeStruct in);
-    Node* SpawnFloatToBoolNode(SpawnNodeStruct in);
-    Node* SpawnStringToBoolNode(SpawnNodeStruct in);
-    Node* SpawnBoolToFloatNode(SpawnNodeStruct in);
-    Node* SpawnIntToFloatNode(SpawnNodeStruct in);
-    Node* SpawnStringToFloatNode(SpawnNodeStruct in);
-    Node* SpawnBoolToIntNode(SpawnNodeStruct in);
-    Node* SpawnFloatToIntNode(SpawnNodeStruct in);
-    Node* SpawnStringToIntNode(SpawnNodeStruct in);
-    Node* SpawnBoolToStringNode(SpawnNodeStruct in);
-    Node* SpawnIntToStringNode(SpawnNodeStruct in);
-    Node* SpawnFloatToStringNode(SpawnNodeStruct in);
+    Node* SpawnIntToBoolNode();
+    Node* SpawnFloatToBoolNode();
+    Node* SpawnStringToBoolNode();
+    Node* SpawnBoolToFloatNode();
+    Node* SpawnIntToFloatNode();
+    Node* SpawnStringToFloatNode();
+    Node* SpawnBoolToIntNode();
+    Node* SpawnFloatToIntNode();
+    Node* SpawnStringToIntNode();
+    Node* SpawnBoolToStringNode();
+    Node* SpawnIntToStringNode();
+    Node* SpawnFloatToStringNode();
 
-    Node* SpawnANDBooleanNode(SpawnNodeStruct in);
-    Node* SpawnEqualBooleanNode(SpawnNodeStruct in);
-    Node* SpawnNANDBooleanNode(SpawnNodeStruct in);
-    Node* SpawnNORBooleanNode(SpawnNodeStruct in);
-    Node* SpawnNOTBooleanNode(SpawnNodeStruct in);
-    Node* SpawnNotEqualBooleanNode(SpawnNodeStruct in);
-    Node* SpawnORBooleanNode(SpawnNodeStruct in);
-    Node* SpawnXORBooleanNode(SpawnNodeStruct in);
-    Node* SpawnModuloFloatNode(SpawnNodeStruct in);
-    Node* SpawnAbsoluteFloatNode(SpawnNodeStruct in);
-    Node* SpawnCeilNode(SpawnNodeStruct in);
-    Node* SpawnClampFloatNode(SpawnNodeStruct in);
-    Node* SpawnNormalizeAngleNode(SpawnNodeStruct in);
-    Node* SpawnLerpAngleNode(SpawnNodeStruct in);
-    Node* SpawnEqualFloatNode(SpawnNodeStruct in);
-    Node* SpawnExpFloatNode(SpawnNodeStruct in);
+    Node* SpawnANDBooleanNode();
+    Node* SpawnEqualBooleanNode();
+    Node* SpawnNANDBooleanNode();
+    Node* SpawnNORBooleanNode();
+    Node* SpawnNOTBooleanNode();
+    Node* SpawnNotEqualBooleanNode();
+    Node* SpawnORBooleanNode();
+    Node* SpawnXORBooleanNode();
+    Node* SpawnModuloFloatNode();
+    Node* SpawnAbsoluteFloatNode();
+    Node* SpawnCeilNode();
+    Node* SpawnClampFloatNode();
+    Node* SpawnNormalizeAngleNode();
+    Node* SpawnLerpAngleNode();
+    Node* SpawnEqualFloatNode();
+    Node* SpawnExpFloatNode();
 
-    Node* SpawnInputActionNode(SpawnNodeStruct in);
-    Node* SpawnBranchNode(SpawnNodeStruct in);
-    Node* SpawnSequenceNode(SpawnNodeStruct in);
-    Node* SpawnDoNNode(SpawnNodeStruct in);
-    Node* SpawnOutputActionNode(SpawnNodeStruct in);
-    Node* SpawnPrintStringNode(SpawnNodeStruct in);
-    Node* SpawnMessageNode(SpawnNodeStruct in);
-    Node* SpawnSetTimerNode(SpawnNodeStruct in);
-    Node* SpawnLessNode(SpawnNodeStruct in);
-    Node* SpawnWeirdNode(SpawnNodeStruct in);
-    Node* SpawnTraceByChannelNode(SpawnNodeStruct in);
-    Node* SpawnTreeSequenceNode(SpawnNodeStruct in);
-    Node* SpawnTreeTaskNode(SpawnNodeStruct in);
-    Node* SpawnTreeTask2Node(SpawnNodeStruct in);
-    Node* SpawnComment(SpawnNodeStruct in);
-    Node* SpawnHoudiniTransformNode(SpawnNodeStruct in);
-    Node* SpawnHoudiniGroupNode(SpawnNodeStruct in);
-    //User Custom Nodes
-    Node* SpawnGetVariableNode(SpawnNodeStruct in);
-    Node* SpawnSetVariableNode(SpawnNodeStruct in);
+    Node* SpawnInputActionNode();
+    Node* SpawnBranchNode();
+    Node* SpawnSequenceNode();
+    Node* SpawnRerouteNode();
+    Node* SpawnDoNNode();
+    Node* SpawnOutputActionNode();
+    Node* SpawnPrintStringNode();
+    Node* SpawnMessageNode();
+    Node* SpawnSetTimerNode();
+    Node* SpawnLessNode();
+    Node* SpawnWeirdNode();
+    Node* SpawnTraceByChannelNode();
+    Node* SpawnTreeSequenceNode();
+    Node* SpawnTreeTaskNode();
+    Node* SpawnTreeTask2Node();
+    Node* SpawnComment();
+    Node* SpawnHoudiniTransformNode();
+    Node* SpawnHoudiniGroupNode();
 
     ConversionReturn NodeEditorInternal::ConversionAvalible(Pin* A, Pin* B);
     void BuildNodes();
     const char* Application_GetName();
-    bool Splitter(const char* label, bool split_vertically, float thickness, float* size1, float* size2, float min_size1, float min_size2, float splitter_long_axis_size = -1.0f);
+    bool Splitter(bool split_vertically, float thickness, float* size1, float* size2, float min_size1, float min_size2, float splitter_long_axis_size = -1.0f);
     ImColor GetIconColor(PinType type);
     void DrawPinIcon(const Pin& pin, bool connected, int alpha);
 
@@ -328,8 +294,7 @@ public:
     void OnEvent(Dymatic::Event& e);
     bool OnKeyPressed(Dymatic::KeyPressedEvent& e);
 
-    std::string ConvertPinTypeToString(PinType pinType, bool beginCaps = false);
-    std::string ConvertPinValueToString(PinType type, TypeValue value);
+    std::string ConvertPinTypeToString(PinType pinType);
     std::string UnderscoreSpaces(std::string inString);
     void CompileNodes();
 
@@ -356,7 +321,6 @@ private:
 	const int            m_PinIconSize = 24;
 	std::vector<Node>    m_Nodes;
 	std::vector<Link>    m_Links;
-    std::vector<Variable> m_Variables;
 
     Dymatic::Ref<Dymatic::Texture2D> m_HeaderBackground = nullptr;
     ImTextureID          m_SampleImage = nullptr;
@@ -371,8 +335,6 @@ private:
     SearchData m_SearchData;
 
     bool ResetSearchArea = false;
-
-    int m_SelectedVariable = -1;
 };
 
 static std::vector<NodeEditorInternal> EditorInternalStack;
@@ -509,7 +471,7 @@ void NodeEditorInternal::BuildNode(Node* node)
     }
 }
 
-Node* NodeEditorInternal::SpawnOnCreateNode(SpawnNodeStruct in)
+Node* NodeEditorInternal::SpawnOnCreateNode()
 {
 	m_Nodes.emplace_back(GetNextId(), "On Create", ImColor(255, 128, 128));
 	m_Nodes.back().Outputs.emplace_back(GetNextId(), "", PinType::Flow);
@@ -519,19 +481,8 @@ Node* NodeEditorInternal::SpawnOnCreateNode(SpawnNodeStruct in)
 	return &m_Nodes.back();
 }
 
-Node* NodeEditorInternal::SpawnOnUpdateNode(SpawnNodeStruct in)
-{
-	m_Nodes.emplace_back(GetNextId(), "On Update", ImColor(255, 128, 128));
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "", PinType::Flow);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "Delta Seconds", PinType::Float);
-
-	BuildNode(&m_Nodes.back());
-
-	return &m_Nodes.back();
-}
-
 //Make Literal Nodes
-Node* NodeEditorInternal::SpawnMakeLiteralBoolNode(SpawnNodeStruct in)
+Node* NodeEditorInternal::SpawnMakeLiteralBoolNode()
 {
 	m_Nodes.emplace_back(GetNextId(), "Make Literal Bool", ImColor(255, 128, 128));
 	m_Nodes.back().Inputs.emplace_back(GetNextId(), "Value", PinType::Bool);
@@ -542,7 +493,7 @@ Node* NodeEditorInternal::SpawnMakeLiteralBoolNode(SpawnNodeStruct in)
 	return &m_Nodes.back();
 }
 
-Node* NodeEditorInternal::SpawnMakeLiteralIntNode(SpawnNodeStruct in)
+Node* NodeEditorInternal::SpawnMakeLiteralIntNode()
 {
 	m_Nodes.emplace_back(GetNextId(), "Make Literal Int", ImColor(255, 128, 128));
 	m_Nodes.back().Inputs.emplace_back(GetNextId(), "Value", PinType::Int);
@@ -553,7 +504,7 @@ Node* NodeEditorInternal::SpawnMakeLiteralIntNode(SpawnNodeStruct in)
 	return &m_Nodes.back();
 }
 
-Node* NodeEditorInternal::SpawnMakeLiteralFloatNode(SpawnNodeStruct in)
+Node* NodeEditorInternal::SpawnMakeLiteralFloatNode()
 {
 	m_Nodes.emplace_back(GetNextId(), "Make Literal Float", ImColor(255, 128, 128));
 	m_Nodes.back().Inputs.emplace_back(GetNextId(), "Value", PinType::Float);
@@ -564,7 +515,7 @@ Node* NodeEditorInternal::SpawnMakeLiteralFloatNode(SpawnNodeStruct in)
 	return &m_Nodes.back();
 }
 
-Node* NodeEditorInternal::SpawnMakeLiteralStringNode(SpawnNodeStruct in)
+Node* NodeEditorInternal::SpawnMakeLiteralStringNode()
 {
 	m_Nodes.emplace_back(GetNextId(), "Make Literal String", ImColor(255, 128, 128));
 	m_Nodes.back().Inputs.emplace_back(GetNextId(), "Value", PinType::String);
@@ -577,7 +528,7 @@ Node* NodeEditorInternal::SpawnMakeLiteralStringNode(SpawnNodeStruct in)
 
 //ConversionNodes
 
-Node* NodeEditorInternal::SpawnIntToBoolNode(SpawnNodeStruct in)
+Node* NodeEditorInternal::SpawnIntToBoolNode()
 {
 	m_Nodes.emplace_back(GetNextId(), "Int To Bool", ImColor(255, 128, 128));
 	m_Nodes.back().Type = NodeType::Simple;
@@ -589,7 +540,7 @@ Node* NodeEditorInternal::SpawnIntToBoolNode(SpawnNodeStruct in)
 	return &m_Nodes.back();
 }
 
-Node* NodeEditorInternal::SpawnFloatToBoolNode(SpawnNodeStruct in)
+Node* NodeEditorInternal::SpawnFloatToBoolNode()
 {
 	m_Nodes.emplace_back(GetNextId(), "Float To Bool", ImColor(255, 128, 128));
 	m_Nodes.back().Type = NodeType::Simple;
@@ -601,7 +552,7 @@ Node* NodeEditorInternal::SpawnFloatToBoolNode(SpawnNodeStruct in)
 	return &m_Nodes.back();
 }
 
-Node* NodeEditorInternal::SpawnStringToBoolNode(SpawnNodeStruct in)
+Node* NodeEditorInternal::SpawnStringToBoolNode()
 {
 	m_Nodes.emplace_back(GetNextId(), "String To Bool", ImColor(255, 128, 128));
 	m_Nodes.back().Type = NodeType::Simple;
@@ -613,7 +564,7 @@ Node* NodeEditorInternal::SpawnStringToBoolNode(SpawnNodeStruct in)
 	return &m_Nodes.back();
 }
 
-Node* NodeEditorInternal::SpawnBoolToFloatNode(SpawnNodeStruct in)
+Node* NodeEditorInternal::SpawnBoolToFloatNode()
 {
 	m_Nodes.emplace_back(GetNextId(), "Bool To Float", ImColor(255, 128, 128));
 	m_Nodes.back().Type = NodeType::Simple;
@@ -625,7 +576,7 @@ Node* NodeEditorInternal::SpawnBoolToFloatNode(SpawnNodeStruct in)
 	return &m_Nodes.back();
 }
 
-Node* NodeEditorInternal::SpawnIntToFloatNode(SpawnNodeStruct in)
+Node* NodeEditorInternal::SpawnIntToFloatNode()
 {
 	m_Nodes.emplace_back(GetNextId(), "Int To Float", ImColor(255, 128, 128));
 	m_Nodes.back().Type = NodeType::Simple;
@@ -637,7 +588,7 @@ Node* NodeEditorInternal::SpawnIntToFloatNode(SpawnNodeStruct in)
 	return &m_Nodes.back();
 }
 
-Node* NodeEditorInternal::SpawnStringToFloatNode(SpawnNodeStruct in)
+Node* NodeEditorInternal::SpawnStringToFloatNode()
 {
 	m_Nodes.emplace_back(GetNextId(), "String To Float", ImColor(255, 128, 128));
 	m_Nodes.back().Type = NodeType::Simple;
@@ -649,7 +600,7 @@ Node* NodeEditorInternal::SpawnStringToFloatNode(SpawnNodeStruct in)
 	return &m_Nodes.back();
 }
 
-Node* NodeEditorInternal::SpawnBoolToIntNode(SpawnNodeStruct in)
+Node* NodeEditorInternal::SpawnBoolToIntNode()
 {
 	m_Nodes.emplace_back(GetNextId(), "Bool To Int", ImColor(255, 128, 128));
 	m_Nodes.back().Type = NodeType::Simple;
@@ -661,7 +612,7 @@ Node* NodeEditorInternal::SpawnBoolToIntNode(SpawnNodeStruct in)
 	return &m_Nodes.back();
 }
 
-Node* NodeEditorInternal::SpawnFloatToIntNode(SpawnNodeStruct in)
+Node* NodeEditorInternal::SpawnFloatToIntNode()
 {
 	m_Nodes.emplace_back(GetNextId(), "Float To Int", ImColor(255, 128, 128));
 	m_Nodes.back().Type = NodeType::Simple;
@@ -673,7 +624,7 @@ Node* NodeEditorInternal::SpawnFloatToIntNode(SpawnNodeStruct in)
 	return &m_Nodes.back();
 }
 
-Node* NodeEditorInternal::SpawnStringToIntNode(SpawnNodeStruct in)
+Node* NodeEditorInternal::SpawnStringToIntNode()
 {
 	m_Nodes.emplace_back(GetNextId(), "String To Int", ImColor(255, 128, 128));
 	m_Nodes.back().Type = NodeType::Simple;
@@ -685,7 +636,7 @@ Node* NodeEditorInternal::SpawnStringToIntNode(SpawnNodeStruct in)
 	return &m_Nodes.back();
 }
 
-Node* NodeEditorInternal::SpawnBoolToStringNode(SpawnNodeStruct in)
+Node* NodeEditorInternal::SpawnBoolToStringNode()
 {
 	m_Nodes.emplace_back(GetNextId(), "Bool To String", ImColor(255, 128, 128));
     m_Nodes.back().Type = NodeType::Simple;
@@ -697,7 +648,7 @@ Node* NodeEditorInternal::SpawnBoolToStringNode(SpawnNodeStruct in)
 	return &m_Nodes.back();
 }
 
-Node* NodeEditorInternal::SpawnIntToStringNode(SpawnNodeStruct in)
+Node* NodeEditorInternal::SpawnIntToStringNode()
 {
 	m_Nodes.emplace_back(GetNextId(), "Int To String", ImColor(255, 128, 128));
 	m_Nodes.back().Type = NodeType::Simple;
@@ -709,7 +660,7 @@ Node* NodeEditorInternal::SpawnIntToStringNode(SpawnNodeStruct in)
 	return &m_Nodes.back();
 }
 
-Node* NodeEditorInternal::SpawnFloatToStringNode(SpawnNodeStruct in)
+Node* NodeEditorInternal::SpawnFloatToStringNode()
 {
 	m_Nodes.emplace_back(GetNextId(), "Float To String", ImColor(255, 128, 128));
 	m_Nodes.back().Type = NodeType::Simple;
@@ -724,7 +675,7 @@ Node* NodeEditorInternal::SpawnFloatToStringNode(SpawnNodeStruct in)
 //Operator nodes
 
 //Bool Operators
-Node* NodeEditorInternal::SpawnANDBooleanNode(SpawnNodeStruct in)
+Node* NodeEditorInternal::SpawnANDBooleanNode()
 {
 	m_Nodes.emplace_back(GetNextId(), "AND Boolean", ImColor(255, 128, 128));
     m_Nodes.back().DisplayName = "AND";
@@ -738,7 +689,7 @@ Node* NodeEditorInternal::SpawnANDBooleanNode(SpawnNodeStruct in)
 	return &m_Nodes.back();
 }
 
-Node* NodeEditorInternal::SpawnEqualBooleanNode(SpawnNodeStruct in)
+Node* NodeEditorInternal::SpawnEqualBooleanNode()
 {
 	m_Nodes.emplace_back(GetNextId(), "Equal Boolean", ImColor(255, 128, 128));
 	m_Nodes.back().DisplayName = "==";
@@ -752,7 +703,7 @@ Node* NodeEditorInternal::SpawnEqualBooleanNode(SpawnNodeStruct in)
 	return &m_Nodes.back();
 }
 
-Node* NodeEditorInternal::SpawnNANDBooleanNode(SpawnNodeStruct in)
+Node* NodeEditorInternal::SpawnNANDBooleanNode()
 {
 	m_Nodes.emplace_back(GetNextId(), "NAND Boolean", ImColor(255, 128, 128));
 	m_Nodes.back().DisplayName = "NAND";
@@ -766,7 +717,7 @@ Node* NodeEditorInternal::SpawnNANDBooleanNode(SpawnNodeStruct in)
 	return &m_Nodes.back();
 }
 
-Node* NodeEditorInternal::SpawnNORBooleanNode(SpawnNodeStruct in)
+Node* NodeEditorInternal::SpawnNORBooleanNode()
 {
 	m_Nodes.emplace_back(GetNextId(), "NOR Boolean", ImColor(255, 128, 128));
 	m_Nodes.back().DisplayName = "NOR";
@@ -780,7 +731,7 @@ Node* NodeEditorInternal::SpawnNORBooleanNode(SpawnNodeStruct in)
 	return &m_Nodes.back();
 }
 
-Node* NodeEditorInternal::SpawnNOTBooleanNode(SpawnNodeStruct in)
+Node* NodeEditorInternal::SpawnNOTBooleanNode()
 {
 	m_Nodes.emplace_back(GetNextId(), "NOT Boolean", ImColor(255, 128, 128));
 	m_Nodes.back().DisplayName = "NOT";
@@ -793,7 +744,7 @@ Node* NodeEditorInternal::SpawnNOTBooleanNode(SpawnNodeStruct in)
 	return &m_Nodes.back();
 }
 
-Node* NodeEditorInternal::SpawnNotEqualBooleanNode(SpawnNodeStruct in)
+Node* NodeEditorInternal::SpawnNotEqualBooleanNode()
 {
 	m_Nodes.emplace_back(GetNextId(), "Not Equal Boolean", ImColor(255, 128, 128));
 	m_Nodes.back().DisplayName = "!=";
@@ -807,7 +758,7 @@ Node* NodeEditorInternal::SpawnNotEqualBooleanNode(SpawnNodeStruct in)
 	return &m_Nodes.back();
 }
 
-Node* NodeEditorInternal::SpawnORBooleanNode(SpawnNodeStruct in)
+Node* NodeEditorInternal::SpawnORBooleanNode()
 {
 	m_Nodes.emplace_back(GetNextId(), "OR Boolean", ImColor(255, 128, 128));
 	m_Nodes.back().DisplayName = "OR";
@@ -821,7 +772,7 @@ Node* NodeEditorInternal::SpawnORBooleanNode(SpawnNodeStruct in)
 	return &m_Nodes.back();
 }
 
-Node* NodeEditorInternal::SpawnXORBooleanNode(SpawnNodeStruct in)
+Node* NodeEditorInternal::SpawnXORBooleanNode()
 {
 	m_Nodes.emplace_back(GetNextId(), "XOR Boolean", ImColor(255, 128, 128));
 	m_Nodes.back().DisplayName = "XOR";
@@ -836,7 +787,7 @@ Node* NodeEditorInternal::SpawnXORBooleanNode(SpawnNodeStruct in)
 }
 
 //Float Operators
-Node* NodeEditorInternal::SpawnModuloFloatNode(SpawnNodeStruct in)
+Node* NodeEditorInternal::SpawnModuloFloatNode()
 {
 	m_Nodes.emplace_back(GetNextId(), "Modulo Float", ImColor(255, 128, 128));
 	m_Nodes.back().DisplayName = "%";
@@ -850,7 +801,7 @@ Node* NodeEditorInternal::SpawnModuloFloatNode(SpawnNodeStruct in)
 	return &m_Nodes.back();
 }
 
-Node* NodeEditorInternal::SpawnAbsoluteFloatNode(SpawnNodeStruct in)
+Node* NodeEditorInternal::SpawnAbsoluteFloatNode()
 {
 	m_Nodes.emplace_back(GetNextId(), "Absolute Float", ImColor(255, 128, 128));
 	m_Nodes.back().DisplayName = "ABS";
@@ -863,7 +814,7 @@ Node* NodeEditorInternal::SpawnAbsoluteFloatNode(SpawnNodeStruct in)
 	return &m_Nodes.back();
 }
 
-Node* NodeEditorInternal::SpawnCeilNode(SpawnNodeStruct in)
+Node* NodeEditorInternal::SpawnCeilNode()
 {
 	m_Nodes.emplace_back(GetNextId(), "Ceil", ImColor(255, 128, 128));
 	m_Nodes.back().Inputs.emplace_back(GetNextId(), "A", PinType::Float);
@@ -874,7 +825,7 @@ Node* NodeEditorInternal::SpawnCeilNode(SpawnNodeStruct in)
 	return &m_Nodes.back();
 }
 
-Node* NodeEditorInternal::SpawnClampFloatNode(SpawnNodeStruct in)
+Node* NodeEditorInternal::SpawnClampFloatNode()
 {
 	m_Nodes.emplace_back(GetNextId(), "Clamp Float", ImColor(255, 128, 128));
 	m_Nodes.back().Inputs.emplace_back(GetNextId(), "Value", PinType::Float);
@@ -888,7 +839,7 @@ Node* NodeEditorInternal::SpawnClampFloatNode(SpawnNodeStruct in)
 	return &m_Nodes.back();
 }
 
-Node* NodeEditorInternal::SpawnNormalizeAngleNode(SpawnNodeStruct in)
+Node* NodeEditorInternal::SpawnNormalizeAngleNode()
 {
 	m_Nodes.emplace_back(GetNextId(), "Normalize Angle", ImColor(255, 128, 128));
 	m_Nodes.back().Inputs.emplace_back(GetNextId(), "Value", PinType::Float);
@@ -899,7 +850,7 @@ Node* NodeEditorInternal::SpawnNormalizeAngleNode(SpawnNodeStruct in)
 	return &m_Nodes.back();
 }
 
-Node* NodeEditorInternal::SpawnLerpAngleNode(SpawnNodeStruct in)
+Node* NodeEditorInternal::SpawnLerpAngleNode()
 {
 	m_Nodes.emplace_back(GetNextId(), "Lerp Angle", ImColor(255, 128, 128));
 	m_Nodes.back().Inputs.emplace_back(GetNextId(), "A", PinType::Float);
@@ -912,7 +863,7 @@ Node* NodeEditorInternal::SpawnLerpAngleNode(SpawnNodeStruct in)
 	return &m_Nodes.back();
 }
 
-Node* NodeEditorInternal::SpawnEqualFloatNode(SpawnNodeStruct in)
+Node* NodeEditorInternal::SpawnEqualFloatNode()
 {
     m_Nodes.emplace_back(GetNextId(), "Equal Float", ImColor(255, 128, 128));
     m_Nodes.back().DisplayName = "==";
@@ -925,7 +876,7 @@ Node* NodeEditorInternal::SpawnEqualFloatNode(SpawnNodeStruct in)
     return &m_Nodes.back();
 }
 
-Node* NodeEditorInternal::SpawnExpFloatNode(SpawnNodeStruct in)
+Node* NodeEditorInternal::SpawnExpFloatNode()
 {
     m_Nodes.emplace_back(GetNextId(), "Exp Float", ImColor(255, 128, 128));
     m_Nodes.back().DisplayName = "e";
@@ -941,7 +892,7 @@ Node* NodeEditorInternal::SpawnExpFloatNode(SpawnNodeStruct in)
 
 //division (whole and remainder), all basic opperators, floor fraction, hypotenuse, in range, int * float, lerp, map range clamped and unclamped, max, min, max array, min array, multiply by pi, nearly equal, normalize to range power, search float for more, make sure to add the math/random library
 
-Node* NodeEditorInternal::SpawnInputActionNode(SpawnNodeStruct in)
+Node* NodeEditorInternal::SpawnInputActionNode()
 {
     m_Nodes.emplace_back(GetNextId(), "InputAction Fire", ImColor(255, 128, 128));
     m_Nodes.back().Outputs.emplace_back(GetNextId(), "", PinType::Delegate);
@@ -953,7 +904,7 @@ Node* NodeEditorInternal::SpawnInputActionNode(SpawnNodeStruct in)
     return &m_Nodes.back(); 
 }
 
-Node* NodeEditorInternal::SpawnBranchNode(SpawnNodeStruct in)
+Node* NodeEditorInternal::SpawnBranchNode()
 {
     m_Nodes.emplace_back(GetNextId(), "Branch");
     m_Nodes.back().Inputs.emplace_back(GetNextId(), "", PinType::Flow);
@@ -966,7 +917,7 @@ Node* NodeEditorInternal::SpawnBranchNode(SpawnNodeStruct in)
     return &m_Nodes.back();
 }
 
-Node* NodeEditorInternal::SpawnSequenceNode(SpawnNodeStruct in)
+Node* NodeEditorInternal::SpawnSequenceNode()
 {
 	m_Nodes.emplace_back(GetNextId(), "Sequence");
 	m_Nodes.back().Inputs.emplace_back(GetNextId(), "", PinType::Flow);
@@ -980,7 +931,20 @@ Node* NodeEditorInternal::SpawnSequenceNode(SpawnNodeStruct in)
 	return &m_Nodes.back();
 }
 
-Node* NodeEditorInternal::SpawnDoNNode(SpawnNodeStruct in)
+Node* NodeEditorInternal::SpawnRerouteNode()
+{
+    m_Nodes.emplace_back(GetNextId(), "Reroute");
+    m_Nodes.back().DisplayName = "";
+    m_Nodes.back().Type = NodeType::Simple;
+    m_Nodes.back().Inputs.emplace_back(GetNextId(), "", PinType::Wildcard);
+    m_Nodes.back().Outputs.emplace_back(GetNextId(), "", PinType::Wildcard);
+
+    BuildNode(&m_Nodes.back());
+
+    return &m_Nodes.back();
+}
+
+Node* NodeEditorInternal::SpawnDoNNode()
 {
     m_Nodes.emplace_back(GetNextId(), "Do N");
     m_Nodes.back().Inputs.emplace_back(GetNextId(), "Enter", PinType::Flow);
@@ -994,7 +958,7 @@ Node* NodeEditorInternal::SpawnDoNNode(SpawnNodeStruct in)
     return &m_Nodes.back();
 }
 
-Node* NodeEditorInternal::SpawnOutputActionNode(SpawnNodeStruct in)
+Node* NodeEditorInternal::SpawnOutputActionNode()
 {
     m_Nodes.emplace_back(GetNextId(), "OutputAction");
     m_Nodes.back().Inputs.emplace_back(GetNextId(), "Sample", PinType::Float);
@@ -1006,7 +970,7 @@ Node* NodeEditorInternal::SpawnOutputActionNode(SpawnNodeStruct in)
     return &m_Nodes.back();
 }
 
-Node* NodeEditorInternal::SpawnPrintStringNode(SpawnNodeStruct in)
+Node* NodeEditorInternal::SpawnPrintStringNode()
 {
     m_Nodes.emplace_back(GetNextId(), "Print String");
     m_Nodes.back().Inputs.emplace_back(GetNextId(), "", PinType::Flow);
@@ -1018,7 +982,7 @@ Node* NodeEditorInternal::SpawnPrintStringNode(SpawnNodeStruct in)
     return &m_Nodes.back();
 }
 
-Node* NodeEditorInternal::SpawnMessageNode(SpawnNodeStruct in)
+Node* NodeEditorInternal::SpawnMessageNode()
 {
     m_Nodes.emplace_back(GetNextId(), "", ImColor(128, 195, 248));
     m_Nodes.back().Type = NodeType::Simple;
@@ -1029,7 +993,7 @@ Node* NodeEditorInternal::SpawnMessageNode(SpawnNodeStruct in)
     return &m_Nodes.back();
 }
 
-Node* NodeEditorInternal::SpawnSetTimerNode(SpawnNodeStruct in)
+Node* NodeEditorInternal::SpawnSetTimerNode()
 {
     m_Nodes.emplace_back(GetNextId(), "Set Timer", ImColor(128, 195, 248));
     m_Nodes.back().Inputs.emplace_back(GetNextId(), "", PinType::Flow);
@@ -1044,7 +1008,7 @@ Node* NodeEditorInternal::SpawnSetTimerNode(SpawnNodeStruct in)
     return &m_Nodes.back();
 }
 
-Node* NodeEditorInternal::SpawnLessNode(SpawnNodeStruct in)
+Node* NodeEditorInternal::SpawnLessNode()
 {
     m_Nodes.emplace_back(GetNextId(), "<", ImColor(128, 195, 248));
     m_Nodes.back().Type = NodeType::Simple;
@@ -1057,7 +1021,7 @@ Node* NodeEditorInternal::SpawnLessNode(SpawnNodeStruct in)
     return &m_Nodes.back();
 }
 
-Node* NodeEditorInternal::SpawnWeirdNode(SpawnNodeStruct in)
+Node* NodeEditorInternal::SpawnWeirdNode()
 {
     m_Nodes.emplace_back(GetNextId(), "o.O", ImColor(128, 195, 248));
     m_Nodes.back().Type = NodeType::Simple;
@@ -1070,7 +1034,7 @@ Node* NodeEditorInternal::SpawnWeirdNode(SpawnNodeStruct in)
     return &m_Nodes.back();
 }
 
-Node* NodeEditorInternal::SpawnTraceByChannelNode(SpawnNodeStruct in)
+Node* NodeEditorInternal::SpawnTraceByChannelNode()
 {
     m_Nodes.emplace_back(GetNextId(), "Single Line Trace by Channel", ImColor(255, 128, 64));
     m_Nodes.back().Inputs.emplace_back(GetNextId(), "", PinType::Flow);
@@ -1090,7 +1054,7 @@ Node* NodeEditorInternal::SpawnTraceByChannelNode(SpawnNodeStruct in)
     return &m_Nodes.back();
 }
 
-Node* NodeEditorInternal::SpawnTreeSequenceNode(SpawnNodeStruct in)
+Node* NodeEditorInternal::SpawnTreeSequenceNode()
 {
     m_Nodes.emplace_back(GetNextId(), "Sequence");
     m_Nodes.back().Type = NodeType::Tree;
@@ -1102,7 +1066,7 @@ Node* NodeEditorInternal::SpawnTreeSequenceNode(SpawnNodeStruct in)
     return &m_Nodes.back();
 }
 
-Node* NodeEditorInternal::SpawnTreeTaskNode(SpawnNodeStruct in)
+Node* NodeEditorInternal::SpawnTreeTaskNode()
 {
     m_Nodes.emplace_back(GetNextId(), "Move To");
     m_Nodes.back().Type = NodeType::Tree;
@@ -1113,7 +1077,7 @@ Node* NodeEditorInternal::SpawnTreeTaskNode(SpawnNodeStruct in)
     return &m_Nodes.back();
 }
 
-Node* NodeEditorInternal::SpawnTreeTask2Node(SpawnNodeStruct in)
+Node* NodeEditorInternal::SpawnTreeTask2Node()
 {
     m_Nodes.emplace_back(GetNextId(), "Random Wait");
     m_Nodes.back().Type = NodeType::Tree;
@@ -1124,7 +1088,7 @@ Node* NodeEditorInternal::SpawnTreeTask2Node(SpawnNodeStruct in)
     return &m_Nodes.back();
 }
 
-Node* NodeEditorInternal::SpawnComment(SpawnNodeStruct in)
+Node* NodeEditorInternal::SpawnComment()
 {
     m_Nodes.emplace_back(GetNextId(), "Test Comment");
     m_Nodes.back().Type = NodeType::Comment;
@@ -1133,7 +1097,7 @@ Node* NodeEditorInternal::SpawnComment(SpawnNodeStruct in)
     return &m_Nodes.back();
 }
 
-Node* NodeEditorInternal::SpawnHoudiniTransformNode(SpawnNodeStruct in)
+Node* NodeEditorInternal::SpawnHoudiniTransformNode()
 {
     m_Nodes.emplace_back(GetNextId(), "Transform");
     m_Nodes.back().Type = NodeType::Houdini;
@@ -1145,7 +1109,7 @@ Node* NodeEditorInternal::SpawnHoudiniTransformNode(SpawnNodeStruct in)
     return &m_Nodes.back();
 }
 
-Node* NodeEditorInternal::SpawnHoudiniGroupNode(SpawnNodeStruct in)
+Node* NodeEditorInternal::SpawnHoudiniGroupNode()
 {
     m_Nodes.emplace_back(GetNextId(), "Group");
     m_Nodes.back().Type = NodeType::Houdini;
@@ -1156,33 +1120,6 @@ Node* NodeEditorInternal::SpawnHoudiniGroupNode(SpawnNodeStruct in)
     BuildNode(&m_Nodes.back());
 
     return &m_Nodes.back();
-}
-
-//User Custom Nodes
-Node* NodeEditorInternal::SpawnGetVariableNode(SpawnNodeStruct in)
-{
-	m_Nodes.emplace_back(GetNextId(), ("DymaticVariable_Get_" + in.variableName).c_str());
-	m_Nodes.back().DisplayName = ("Get " + in.variableName).c_str();
-    m_Nodes.back().Type = NodeType::Simple;
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "", in.variableType);
-
-	BuildNode(&m_Nodes.back());
-
-	return &m_Nodes.back();
-}
-
-Node* NodeEditorInternal::SpawnSetVariableNode(SpawnNodeStruct in)
-{
-	m_Nodes.emplace_back(GetNextId(), ("DymaticVariable_Set_" + in.variableName).c_str());
-    m_Nodes.back().DisplayName = ("Set " + in.variableName).c_str();
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "", PinType::Flow);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "", in.variableType);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "", PinType::Flow);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "", in.variableType);
-
-	BuildNode(&m_Nodes.back());
-
-	return &m_Nodes.back();
 }
 
 ConversionReturn NodeEditorInternal::ConversionAvalible(Pin* A, Pin* B)
@@ -1225,12 +1162,12 @@ const char* NodeEditorInternal::Application_GetName()
 
 //Original Init and deint location
 
-bool NodeEditorInternal::Splitter(const char* label, bool split_vertically, float thickness, float* size1, float* size2, float min_size1, float min_size2, float splitter_long_axis_size)
+bool NodeEditorInternal::Splitter(bool split_vertically, float thickness, float* size1, float* size2, float min_size1, float min_size2, float splitter_long_axis_size)
 {
     using namespace ImGui;
     ImGuiContext& g = *GImGui;
     ImGuiWindow* window = g.CurrentWindow;
-    ImGuiID id = window->GetID(label);
+    ImGuiID id = window->GetID("##Splitter");
     ImRect bb;
     bb.Min = window->DC.CursorPos + (split_vertically ? ImVec2(*size1, 0.0f) : ImVec2(0.0f, *size1));
     bb.Max = bb.Min + CalcItemSize(split_vertically ? ImVec2(thickness, splitter_long_axis_size) : ImVec2(splitter_long_axis_size, thickness), 0.0f, 0.0f);
@@ -1243,6 +1180,7 @@ ImColor NodeEditorInternal::GetIconColor(PinType type)
     {
         default:
         case PinType::Flow:     return ImColor(255, 255, 255);
+        case PinType::Wildcard: return ImColor(194, 194, 194);
         case PinType::Bool:     return ImColor(220,  48,  48);
         case PinType::Int:      return ImColor( 68, 201, 156);
         case PinType::Float:    return ImColor(147, 226,  74);
@@ -1261,6 +1199,7 @@ void NodeEditorInternal::DrawPinIcon(const Pin& pin, bool connected, int alpha)
     switch (pin.Type)
     {
         case PinType::Flow:     iconType = IconType::Flow;   break;
+        case PinType::Wildcard: iconType = IconType::Circle; break;
         case PinType::Bool:     iconType = IconType::Circle; break;
         case PinType::Int:      iconType = IconType::Circle; break;
         case PinType::Float:    iconType = IconType::Circle; break;
@@ -1534,77 +1473,23 @@ bool NodeEditorInternal::OnKeyPressed(Dymatic::KeyPressedEvent& e)
     return false;
 }
 
-std::string NodeEditorInternal::ConvertPinTypeToString(PinType pinType, bool beginCaps)
+std::string NodeEditorInternal::ConvertPinTypeToString(PinType pinType)
 {
     switch (pinType)
     {
-    case PinType::Bool:     return beginCaps ? "Bool" : "bool";
-    case PinType::Int:      return beginCaps ? "Int" : "int";
-    case PinType::Float:    return beginCaps ? "Float" : "float";
-    case PinType::String:   return beginCaps ? "String" : "string";
+    case PinType::Bool: return "bool";
+    case PinType::Int: return "int";
+    case PinType::Float: return "float";
+    case PinType::String: return "string";
     }
     DY_CORE_ASSERT("No node type conversion to string found");
 }
 
-std::string NodeEditorInternal::ConvertPinValueToString(PinType type, TypeValue value)
-{
-	switch (type)
-	{
-	case PinType::Bool: {return value.Bool ? "true" : "false";}
-	case PinType::Int: {return std::to_string(value.Int); }
-	case PinType::Float: {return (std::to_string(value.Float) + "f"); }
-	case PinType::String: {return "\"" + value.String + "\""; }
-	}
-    DY_CORE_ASSERT("No node value conversion to string found");
-}
-
 std::string NodeEditorInternal::UnderscoreSpaces(std::string inString)
-{   
+{
     std::string String = inString;
-    std::string outString = "";
-    for (int i = 0; i < String.size(); i++)
-    {
-        std::string character = String.substr(i, 1);
-
-		if (character == " ") { outString += "_"; }
-		else if (character == "_") { outString += "_"; }
-		else if (character == ".") { outString += "_Full_Stop_46"; }
-		else if (character == "!") { outString += "_Exclamation_Mark_33_"; }
-		else if (character == "@") { outString += "_At_Sign_64_"; }
-		else if (character == "#") { outString += "_Hashtag_35_"; }
-		else if (character == "$") { outString += "_Dollar_Sign_36_"; }
-		else if (character == "%") { outString += "_Percent_37_"; }
-		else if (character == "^") { outString += "_Circumflex_Accent_94_"; }
-		else if (character == "&") { outString += "_Ampersand_38_"; }
-		else if (character == "*") { outString += "_Asterisk_42_"; }
-		else if (character == "(") { outString += "_Left_Parenthesis_40_"; }
-		else if (character == ")") { outString += "_Right_Parenthesis_41_"; }
-		else if (character == "-") { outString += "_Hyphen_Minus_55_"; }
-		else if (character == "+") { outString += "_Plus_Sign_43_"; }
-		else if (character == "=") { outString += "Equal_Sign_61_"; }
-		else if (character == "/") { outString += "_Slash_47_"; }
-		else if (character == "\\") { outString += "_Backslash_92_"; }
-		else if (character == "?") { outString += "_Question_Mark_63_"; }
-		else if (character == "\"") { outString += "_Quotation_Mark_34_"; }
-		else if (character == "[") { outString += "_Left_Square_Bracket_91_"; }
-		else if (character == "]") { outString += "_Right_Square_Bracket_93_"; }
-		else if (character == "{") { outString += "_Left_Curly_Bracket_123_"; }
-		else if (character == "}") { outString += "_Right_Curly_Bracket_125_"; }
-		else if (character == ":") { outString += "_Colon_58_"; }
-		else if (character == ";") { outString += "_Semicolon_59_"; }
-		else if (character == "\'") { outString += "_Apostrophe_39_"; }
-		else if (character == "<") { outString += "_Less_Than_Sign_60_"; }
-		else if (character == ">") { outString += "_Greater_Than_Sign_62_"; }
-		else if (character == ",") { outString += "_Comma_44_"; }
-		else if (character == "~") { outString += "_Tilde_126_"; }
-		else if (character == "`") { outString += "_Grave_Accent_96_"; }
-		else if (character == "|") { outString += "_Vertical_Bar_124_"; }
-        
-        else if (!isdigit(character[0]) && !isalpha(character[0])) { outString += "_UnknownSpecialCharacter_00_"; }
-
-        else { outString += character; }
-    }
-    return outString;
+	std::replace(String.begin(), String.end(), ' ', '_');
+    return String;
 }
 
 void NodeEditorInternal::CompileNodes()
@@ -1628,34 +1513,6 @@ void NodeEditorInternal::CompileNodes()
 
     out += "public:\r";
 
-    out += "//Variables\r";
-    for (int i = 0; i < m_Variables.size(); i++)
-    {
-        out += ConvertPinTypeToString(m_Variables[i].Type) + " DymaticNodeVariable_" + UnderscoreSpaces(m_Variables[i].Name) + " = " + ConvertPinValueToString(m_Variables[i].Type, m_Variables[i].Values) + ";\r";
-    }
-
-    out += "\r//Custom Node Library Additions\r";
-    for (int i = 0; i < m_Variables.size(); i++)
-    {
-		out += "FunctionReturn DymaticVariable_Get_" + UnderscoreSpaces(m_Variables[i].Name) + "(FunctionReturn functionIn)\r{";
-		out += "FunctionReturn returnVal;\r";
-		out += "returnVal.PinValues.push_back({});\r";
-		out += "returnVal.PinValues[0]." + ConvertPinTypeToString(m_Variables[i].Type, true) + " = DymaticNodeVariable_" + UnderscoreSpaces(m_Variables[i].Name) + ";\r";
-		out += "return returnVal;\r";
-		out += "}\r\r";
-
-        out += "FunctionReturn DymaticVariable_Set_" + UnderscoreSpaces(m_Variables[i].Name) + "(FunctionReturn functionIn)\r{";
-        out += "FunctionReturn returnVal;\r";
-        out += "returnVal.PinValues.push_back({});\r";
-        out += "returnVal.PinValues.push_back({});\r";
-        out += "DymaticNodeVariable_" + UnderscoreSpaces(m_Variables[i].Name) + " = functionIn.PinValues[1]." + ConvertPinTypeToString(m_Variables[i].Type, true) + ";\r";
-        out += "returnVal.PinValues[1]." + ConvertPinTypeToString(m_Variables[i].Type, true) + " = DymaticNodeVariable_" + UnderscoreSpaces(m_Variables[i].Name) + ";\r";
-        out += "return returnVal;\r";
-        out += "}\r\r";
-    }
-
-    out += "\r//Function Save States\r";
-
     for (int i = 0; i < m_Nodes.size(); i++)
     {
         out += "FunctionReturn " + UnderscoreSpaces("s_NodeEditorFunctionSave_" + m_Nodes[i].Name + "_" + std::to_string(m_Nodes[i].ID.Get())) + ";\r";
@@ -1666,25 +1523,13 @@ void NodeEditorInternal::CompileNodes()
         out += "FunctionReturn NodeEvent_" + UnderscoreSpaces(m_Nodes[i].Name + "_" + std::to_string(m_Nodes[i].ID.Get())) + " ();\r\r";
     }
 
-    out += "virtual void OnCreate() override\r{\r";
     for (int i = 0; i < m_Nodes.size(); i++)
     {
         if (m_Nodes[i].Name == "On Create")
         {
-            out += "NodeEvent_" + UnderscoreSpaces(m_Nodes[i].Name + "_" + std::to_string(m_Nodes[i].ID.Get())) + "();\r";
+            out += "virtual void OnCreate() override\r{\rNodeEvent_" + UnderscoreSpaces(m_Nodes[i].Name + "_" + std::to_string(m_Nodes[i].ID.Get())) + "();\r}\r\r";
         }
     }
-    out += "}\r\r";
-
-	out += "virtual void OnUpdate(Timestep ts) override\r{\r";
-	for (int i = 0; i < m_Nodes.size(); i++)
-	{
-		if (m_Nodes[i].Name == "On Update")
-		{
-			out += "NodeEvent_" + UnderscoreSpaces(m_Nodes[i].Name + "_" + std::to_string(m_Nodes[i].ID.Get())) + "();\r";
-		}
-	}
-	out += "}\r\r";
 
     out += "};";
 
@@ -1720,12 +1565,28 @@ void NodeEditorInternal::CompileNodes()
 		{
 			if (node->Inputs[y].Type != PinType::Flow)
 			{
-                std::string PinValueName = ConvertPinTypeToString(node->Inputs[y].Type, true);
-                
+				std::string PinValueName;
+				switch (node->Inputs[y].Type)
+				{
+				case PinType::Bool: {PinValueName = "Bool"; break; }
+				case PinType::Int: {PinValueName = "Int"; break; }
+				case PinType::Float: {PinValueName = "Float"; break; }
+				case PinType::String: {PinValueName = "String"; break; }
+				}
 
 				if (!IsPinLinked(node->Inputs[y].ID))
 				{
-					std::string OutDefaultValue = ConvertPinValueToString(node->Inputs[y].Type, node->Inputs[y].Value);
+
+					auto funcVar = node->Inputs[y].Value;
+
+					std::string OutDefaultValue;
+					switch (node->Inputs[y].Type)
+					{
+					case PinType::Bool: {OutDefaultValue = funcVar.Bool ? "true" : "false"; break; }
+					case PinType::Int: {OutDefaultValue = std::to_string(funcVar.Int); break; }
+					case PinType::Float: {OutDefaultValue = std::to_string(funcVar.Float); break; }
+					case PinType::String: {OutDefaultValue = "\"" + funcVar.String + "\""; break; }
+					}
 
 					out += UnderscoreSpaces(/*"NodeInputReturnCalculationVariable_"*/"s_NodeEditorFunctionSave_" + node->Name + "_" + std::to_string(node->ID.Get())) + ".PinValues[" + std::to_string(y) + "]." + PinValueName + " = " + OutDefaultValue + ";\r";
 				}
@@ -1874,87 +1735,32 @@ void NodeEditorInternal::DuplicateNodes()
 
     ed::ClearSelection();
 
-    std::vector<ed::PinId> originalPins;
-    std::vector<ed::PinId> newPins;
-
 	for (int i = 0; i < selectedNodes.size(); i++)
 	{
 		for (int x = 0; x < m_Nodes.size(); x++)
 		{
 			if (selectedNodes[i] == m_Nodes[x].ID)
 			{
-				m_Nodes.emplace_back(m_Nodes[x]);
+				m_Nodes.push_back(m_Nodes[x]);
 
 				m_Nodes.back().ID = GetNextId();
-				for (int y = 0; y < m_Nodes.back().Inputs.size(); y++)
+				for (Pin pin : m_Nodes.back().Inputs)
 				{
-                    m_Nodes.back().Inputs[y].ID = GetNextId();
-                    m_Nodes.back().Inputs[y].Node = &m_Nodes.back();
-
-					originalPins.emplace_back(m_Nodes[x].Inputs[y].ID);
-					newPins.emplace_back(m_Nodes.back().Inputs[y].ID);
+					pin.ID = GetNextId();
 				}
-                for (int y = 0; y < m_Nodes.back().Outputs.size(); y++)
+				for (Pin pin : m_Nodes.back().Outputs)
 				{
-                    m_Nodes.back().Outputs[y].ID = GetNextId();
-                    m_Nodes.back().Outputs[y].Node = &m_Nodes.back();
-
-                    originalPins.emplace_back(m_Nodes[x].Outputs[y].ID);
-                    newPins.emplace_back(m_Nodes.back().Outputs[y].ID);
+					pin.ID = GetNextId();
 				}
 
 				ed::SetNodePosition(m_Nodes.back().ID, ed::GetNodePosition(m_Nodes[x].ID) + ImVec2(50, 50));
 
-				BuildNode(&m_Nodes[x]);
 				BuildNode(&m_Nodes.back());
 
-                ed::SelectNode(m_Nodes.back().ID, true);
+                ed::SelectNode(m_Nodes.back().ID);
 			}
 		}
 	}
-
-    for (int i = 0; i < m_Links.size(); i++)
-    {
-        int selectSuccess = 0;
-        for (int x = 0; x < selectedNodes.size(); x++)
-        {
-            auto selectedNodeTemp = FindNode(selectedNodes[x]);
-            for (int y = 0; y < selectedNodeTemp->Inputs.size(); y++)
-            {
-                if (selectedNodeTemp->Inputs[y].ID == m_Links[i].StartPinID || selectedNodeTemp->Inputs[y].ID == m_Links[i].EndPinID)
-                {
-                    selectSuccess++;
-                }
-            }
-            for (int y = 0; y < selectedNodeTemp->Outputs.size(); y++)
-            {
-				if (selectedNodeTemp->Outputs[y].ID == m_Links[i].StartPinID || selectedNodeTemp->Outputs[y].ID == m_Links[i].EndPinID)
-				{
-					selectSuccess++;
-				}
-            }
-        }
-        if (selectSuccess > 1)
-        {
-            ed::PinId newStartPin;
-            ed::PinId newEndPin;
-
-            for (int x = 0; x < originalPins.size(); x++)
-            {
-                if (originalPins[x] == m_Links[i].StartPinID)
-                {
-                    newStartPin = newPins[x];
-                }
-				if (originalPins[x] == m_Links[i].EndPinID)
-				{
-					newEndPin = newPins[x];
-				}
-            }
-
-            m_Links.emplace_back(GetNextLinkId(), newStartPin, newEndPin);
-            m_Links.back().Color = m_Links[i].Color;
-        }
-    }
 }
 
 void NodeEditorInternal::DeleteNodes()
@@ -2106,7 +1912,7 @@ Node* NodeEditorInternal::DisplaySearchData(SearchData* searchData, std::string 
             {   
                 if (DisplayResult(searchData->Results[i], searchBuffer))
                 {
-                    if (ImGui::MenuItem(searchData->Results[i].Name.c_str())) { returnNode = (this->*searchData->Results[i].Function)(searchData->Results[i].spawnStruct); }
+                    if (ImGui::MenuItem(searchData->Results[i].Name.c_str())) { returnNode = (this->*searchData->Results[i].Function)(); }
                     index++;
                 }
             }
@@ -2120,22 +1926,10 @@ Node* NodeEditorInternal::DisplaySearchData(SearchData* searchData, std::string 
 
 void NodeEditorInternal::InitSearchData()
 {
-    m_SearchData.Clear();
-
     m_SearchData.Name = "Dymatic Nodes";
     auto Event = m_SearchData.PushBackTree("Events");
         Event->PushBackResult("On Create", &NodeEditorInternal::SpawnOnCreateNode);
-        Event->PushBackResult("On Update", &NodeEditorInternal::SpawnOnUpdateNode);
-        auto CustomEvent = Event->PushBackTree("Custom Events");
-    auto Variable = m_SearchData.PushBackTree("Variables");
-        for (int i = 0; i < m_Variables.size(); i++)
-        {
-            SpawnNodeStruct newStruct = {};
-            newStruct.variableName = m_Variables[i].Name;
-            newStruct.variableType = m_Variables[i].Type;
-            Variable->PushBackResult("Get " + m_Variables[i].Name, &NodeEditorInternal::SpawnGetVariableNode, newStruct);
-            Variable->PushBackResult("Set " + m_Variables[i].Name, &NodeEditorInternal::SpawnSetVariableNode, newStruct);
-        }
+        Event->PushBackResult("On Update", &NodeEditorInternal::SpawnOnCreateNode);
     auto Math = m_SearchData.PushBackTree("Math");
         auto Boolean = Math->PushBackTree("Boolean");
             Boolean->PushBackResult("Make Literal Bool", &NodeEditorInternal::SpawnMakeLiteralBoolNode);
@@ -2179,16 +1973,18 @@ void NodeEditorInternal::InitSearchData()
         auto FlowControl = Utilities->PushBackTree("Flow Control");
             FlowControl->PushBackResult("Branch", &NodeEditorInternal::SpawnBranchNode);
             FlowControl->PushBackResult("Sequence", &NodeEditorInternal::SpawnSequenceNode);
+            FlowControl->PushBackResult("Reroute", &NodeEditorInternal::SpawnRerouteNode);
 }
 
 void NodeEditorInternal::Application_Initialize()
 {
+    InitSearchData();
 
     //ed::EnableShortcuts(true);
 
 	ed::Config config;
 
-	//config.SettingsFile = "Blueprints.json";
+	config.SettingsFile = "Blueprints.json";
 
 	//config.LoadNodeSettings = [](ed::NodeId nodeId, char* data, void* userPointer) -> size_t
 	//{
@@ -2218,26 +2014,26 @@ void NodeEditorInternal::Application_Initialize()
 	ed::SetCurrentEditor(m_Editor);
 
 	Node* node;
-    node = SpawnInputActionNode({});      ed::SetNodePosition(node->ID, ImVec2(-252, 220));
-    node = SpawnBranchNode({});           ed::SetNodePosition(node->ID, ImVec2(-300, 351));
-    node = SpawnDoNNode({});              ed::SetNodePosition(node->ID, ImVec2(-238, 504));
-    node = SpawnOutputActionNode({});     ed::SetNodePosition(node->ID, ImVec2(71, 80));
-    node = SpawnSetTimerNode({});         ed::SetNodePosition(node->ID, ImVec2(168, 316));
+	node = SpawnInputActionNode();      ed::SetNodePosition(node->ID, ImVec2(-252, 220));
+	node = SpawnBranchNode();           ed::SetNodePosition(node->ID, ImVec2(-300, 351));
+	node = SpawnDoNNode();              ed::SetNodePosition(node->ID, ImVec2(-238, 504));
+	node = SpawnOutputActionNode();     ed::SetNodePosition(node->ID, ImVec2(71, 80));
+	node = SpawnSetTimerNode();         ed::SetNodePosition(node->ID, ImVec2(168, 316));
     
-    node = SpawnTreeSequenceNode({});     ed::SetNodePosition(node->ID, ImVec2(1028, 329));
-    node = SpawnTreeTaskNode({});         ed::SetNodePosition(node->ID, ImVec2(1204, 458));
-    node = SpawnTreeTask2Node({});        ed::SetNodePosition(node->ID, ImVec2(868, 538));
+	node = SpawnTreeSequenceNode();     ed::SetNodePosition(node->ID, ImVec2(1028, 329));
+	node = SpawnTreeTaskNode();         ed::SetNodePosition(node->ID, ImVec2(1204, 458));
+	node = SpawnTreeTask2Node();        ed::SetNodePosition(node->ID, ImVec2(868, 538));
     
-	node = SpawnComment({});              ed::SetNodePosition(node->ID, ImVec2(112, 576));
-	node = SpawnComment({});              ed::SetNodePosition(node->ID, ImVec2(800, 224));
+	node = SpawnComment();              ed::SetNodePosition(node->ID, ImVec2(112, 576));
+	node = SpawnComment();              ed::SetNodePosition(node->ID, ImVec2(800, 224));
     
-    node = SpawnLessNode({});             ed::SetNodePosition(node->ID, ImVec2(366, 652));
-    node = SpawnWeirdNode({});            ed::SetNodePosition(node->ID, ImVec2(144, 652));
-    node = SpawnMessageNode({});          ed::SetNodePosition(node->ID, ImVec2(-348, 698));
-    node = SpawnPrintStringNode({});      ed::SetNodePosition(node->ID, ImVec2(-69, 652));
+	node = SpawnLessNode();             ed::SetNodePosition(node->ID, ImVec2(366, 652));
+	node = SpawnWeirdNode();            ed::SetNodePosition(node->ID, ImVec2(144, 652));
+	node = SpawnMessageNode();          ed::SetNodePosition(node->ID, ImVec2(-348, 698));
+	node = SpawnPrintStringNode();      ed::SetNodePosition(node->ID, ImVec2(-69, 652));
     
-    node = SpawnHoudiniTransformNode({}); ed::SetNodePosition(node->ID, ImVec2(500, -70));
-    node = SpawnHoudiniGroupNode({});     ed::SetNodePosition(node->ID, ImVec2(500, 42));
+	node = SpawnHoudiniTransformNode(); ed::SetNodePosition(node->ID, ImVec2(500, -70));
+	node = SpawnHoudiniGroupNode();     ed::SetNodePosition(node->ID, ImVec2(500, 42));
     
 	ed::NavigateToContent();
     
@@ -2247,13 +2043,6 @@ void NodeEditorInternal::Application_Initialize()
 	m_Links.push_back(Link(GetNextLinkId(), m_Nodes[5].Outputs[0].ID, m_Nodes[7].Inputs[0].ID));
     
 	m_Links.push_back(Link(GetNextLinkId(), m_Nodes[14].Outputs[0].ID, m_Nodes[15].Inputs[0].ID));
-
-    m_Variables.emplace_back(Variable(GetNextId(), "Test Bool", PinType::Bool));
-    m_Variables.back().Values.Bool = true;
-    m_Variables.emplace_back(Variable(GetNextId(), "Test Float", PinType::Float));
-    m_Variables.back().Values.Float = 5.423f;
-    m_Variables.emplace_back(Variable(GetNextId(), "Test Int", PinType::Int));
-    m_Variables.back().Values.Int = 12;
 
 	m_HeaderBackground = Dymatic::Texture2D::Create("src/Panels/NodeEditor/data/BlueprintBackground.png");
 	m_SaveIcon = Dymatic::Texture2D::Create("src/Panels/NodeEditor/data/ic_save_white_24dp.png");
@@ -2377,103 +2166,15 @@ void NodeEditorInternal::Application_Frame()
     static Pin* newNodeLinkPin = nullptr;
     static Pin* newLinkPin     = nullptr;
 
-    //static float panelA = ImGui::GetContentRegionAvail().x / 10 * 2;
-    //static float panelB = ImGui::GetContentRegionAvail().x / 10 * 6;
-    //static float panelC = ImGui::GetContentRegionAvail().x / 10 * 2;
-	static float panelA = 200.0f;
-	static float panelB = 800.0f;
-	static float panelC = 200.0f;
-    //Splitter(true, 4.0f, &panelA, &panelB, 50.0f, 50.0f);
-    //
-    //ShowLeftPane(panelA - 4.0f);
-    //
-    //ImGui::SameLine(0.0f, 12.0f);
+    static float leftPaneWidth  = 400.0f;
+    static float rightPaneWidth = 800.0f;
+    Splitter(true, 4.0f, &leftPaneWidth, &rightPaneWidth, 50.0f, 50.0f);
 
-	Splitter("##NodeOutlinerSplitEditor", true, 2.0f, &panelA, &panelB, 50.0f, 50.0f);
-
-	ImGui::BeginChild("Nodes Outliner", ImVec2(panelA - 10.0f, 0));
-    //ImGui::GetWindowDrawList()->AddRectFilled(ImGui::GetWindowPos(), ImGui::GetWindowPos() + ImGui::GetWindowSize() - ImVec2(0, 0), ImGui::ColorConvertFloat4ToU32(ImVec4(0.0f, 1.0f, 0.0f, 1.0f)));
-    for (int i = 0; i < m_Variables.size(); i++)
-    {
-		ImGuiTreeNodeFlags flags = ((m_Variables[i].ID == m_SelectedVariable) ? ImGuiTreeNodeFlags_Selected : 0) | ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_SpanAvailWidth;
-
-		char buffer[256];
-		memset(buffer, 0, sizeof(buffer));
-		std::strncpy(buffer, m_Variables[i].Name.c_str(), sizeof(buffer));
-        auto variableTreeNode = ImGui::TreeNodeInputEx(("##" + std::to_string(m_Variables[i].ID)).c_str(), m_Variables[i].Name.c_str(), flags, buffer, sizeof(buffer));
-        if (variableTreeNode.object) { ImGui::TreePop(); }
-        if (variableTreeNode.input) {  m_Variables[i].Name = std::string(buffer); }
-
-		if (ImGui::BeginPopupContextItem())
-		{
-            ImGuiID id = ImGui::GetCurrentWindow()->GetID("##VariableRename");
-            if (ImGui::MenuItem("Duplicate"))
-            { 
-                m_Variables.push_back(m_Variables[i]);
-                m_Variables.back().ID = GetNextId();
-
-                int index = 1;
-                std::string newName;
-                bool looking = true;
-                while (looking)
-                {
-                    std::string modName = m_Variables[i].Name;
-                    if (modName.find_last_of("_") != std::string::npos) { if (true) { modName = modName.substr(0, modName.find_last_of("_")); } }
-                    newName = modName + "_" + (index < 10 ? "0" : "") + std::to_string(index);
-                    looking = false;
-                    for (int y = 0; y < m_Variables.size(); y++)
-                    {
-                        if (m_Variables[y].Name == newName) { looking = true; }
-                    }
-                    index++;
-                }
-
-                m_Variables.back().Name = newName;
-            }
-            if (ImGui::MenuItem("Delete")) { m_Variables.erase(m_Variables.begin() + i); }
-
-			ImGui::EndPopup();
-		}
-
-    }
-
-    ImGui::Separator();
-
-    for (int i = 0; i < m_Nodes.size(); i++)
-    {
-        bool selected = false;
-        for (int x = 0; x < selectedNodes.size(); x++)
-        {
-            if (selectedNodes[x] == m_Nodes[i].ID) { selected = true; }
-        }
-
-		ImGuiTreeNodeFlags flags = ((selected) ? ImGuiTreeNodeFlags_Selected : 0) | ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_SpanAvailWidth;
-        if (ImGui::TreeNodeEx(std::to_string(m_Nodes[i].ID.Get()).c_str(), flags, m_Nodes[i].Name.c_str())) { ImGui::TreePop(); }
-
-        if (ImGui::IsItemClicked())
-        {
-            if (Dymatic::Input::IsKeyPressed(Dymatic::Key::LeftShift) || Dymatic::Input::IsKeyPressed(Dymatic::Key::LeftControl) || Dymatic::Input::IsKeyPressed(Dymatic::Key::RightShift) || Dymatic::Input::IsKeyPressed(Dymatic::Key::RightControl))
-            {
-                if (selected) { ed::DeselectNode(m_Nodes[i].ID); }
-                else { ed::SelectNode(m_Nodes[i].ID, true);}
-                
-            }
-            else
-            {
-                ed::SelectNode(m_Nodes[i].ID, false);
-            }
-        }
-    }
-
-	ImGui::EndChild();
+    ShowLeftPane(leftPaneWidth - 4.0f);
 
     ImGui::SameLine(0.0f, 12.0f);
 
-	float b = panelB;
-	float c = panelC;
-	Splitter("##NodeEditorSplitInfo", true, 2.0f, &panelB, &panelC, 50.0f, 50.0f);
-
-    ed::Begin("Node Editor Panel", ImVec2(panelB, 0));
+    ed::Begin("Node editor Pannel");
     {
         auto cursorTopLeft = ImGui::GetCursorScreenPos();
 
@@ -2633,7 +2334,6 @@ void NodeEditorInternal::Application_Frame()
                     if (newPin)
                     {
                         node.Outputs.emplace_back(GetNextId(), std::to_string((int)std::stof(node.Outputs[node.Outputs.size() - 1].Name) + 1).c_str(), PinType::Flow);
-                        node.Outputs.back().Kind = PinKind::Output;
                     }
 				}
 
@@ -3051,13 +2751,13 @@ void NodeEditorInternal::Application_Frame()
                         }
                         else if (endPin->Type != startPin->Type)
                         {
-                            Node* (NodeEditorInternal::*function)(SpawnNodeStruct) = ConversionAvalible(startPin, endPin).function;
+                            Node* (NodeEditorInternal::*function)() = ConversionAvalible(startPin, endPin).function;
                             if (function != nullptr)
                             {
 								showLabel("+ Create Conversion", ImColor(32, 45, 32, 180));
                                 if (ed::AcceptNewItem(ImColor(128, 206, 244), 4.0f))
                                 {
-                                    Node* node = (this->*function)({});
+                                    Node* node = (this->*function)();
                                     
                                     Node* startNode = startPin->Node;
                                     Node* endNode = endPin->Node;
@@ -3239,8 +2939,6 @@ void NodeEditorInternal::Application_Frame()
 
     if (ImGui::BeginPopup("Create New Node"))
     {
-        InitSearchData();
-
         auto newNodePostion = openPopupPosition;
         //ImGui::SetCursorScreenPos(ImGui::GetMousePosOnOpeningCurrentPopup());
 
@@ -3390,13 +3088,6 @@ void NodeEditorInternal::Application_Frame()
 */
 
     ed::End();
-
-	ImGui::SameLine(0.0f, 12.0f);
-
-
-	ImGui::BeginChild("Nodes Info", ImVec2(panelC, 0));
-    //ImGui::GetWindowDrawList()->AddRectFilled(ImGui::GetWindowPos(), ImGui::GetWindowPos() + ImGui::GetWindowSize(), ImGui::ColorConvertFloat4ToU32(ImVec4(1.0f, 0.0f, 0.0f, 1.0f)));
-	ImGui::EndChild();
 
 
     //ImGui::ShowTestWindow();

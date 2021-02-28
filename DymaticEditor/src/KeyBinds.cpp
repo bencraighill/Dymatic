@@ -38,8 +38,14 @@ namespace Dymatic {
 		else if (bindEvent == "Gizmo Translate") return GizmoTranslateBind;
 		else if (bindEvent == "Gizmo Rotate") return GizmoRotateBind;
 		else if (bindEvent == "Gizmo Scale") return GizmoScaleBind;
+		else if (bindEvent == "Shading Type Wireframe") return ShadingTypeWireframeBind;
+		else if (bindEvent == "Shading Type Unlit") return ShadingTypeUnlitBind;
+		else if (bindEvent == "Shading Type Solid") return ShadingTypeSolidBind;
+		else if (bindEvent == "Shading Type Rendered") return ShadingTypeRenderedBind;
+		else if (bindEvent == "Toggle Shading Type") return ToggleShadingTypeBind;
 		else if (bindEvent == "Duplicate") return DuplicateBind;
 		else if (bindEvent == "Rename") return RenameBind;
+		else if (bindEvent == "Close Popup") return ClosePopupBind;
 
 		else return INVALID_BIND;
 	}
@@ -56,8 +62,14 @@ namespace Dymatic {
 		else if (bindEvent == GizmoTranslateBind) return "Gizmo Translate";
 		else if (bindEvent == GizmoRotateBind) return "Gizmo Rotate";
 		else if (bindEvent == GizmoScaleBind) return "Gizmo Scale";
+		else if (bindEvent == ShadingTypeWireframeBind) return "Shading Type Wireframe";
+		else if (bindEvent == ShadingTypeUnlitBind) return "Shading Type Unlit";
+		else if (bindEvent == ShadingTypeSolidBind) return "Shading Type Solid";
+		else if (bindEvent == ShadingTypeRenderedBind) return "Shading Type Rendered";
+		else if (bindEvent == ToggleShadingTypeBind) return "Toggle Shading Type";
 		else if (bindEvent == DuplicateBind) return "Duplicate";
 		else if (bindEvent == RenameBind) return "Rename";
+		else if (bindEvent == ClosePopupBind) return "Close Popup";
 
 		else return "";
 	}

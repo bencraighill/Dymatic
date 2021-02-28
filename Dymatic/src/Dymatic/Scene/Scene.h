@@ -27,9 +27,6 @@ namespace Dymatic {
 		void OnUpdateEditor(Timestep ts, EditorCamera& camera);
 		void OnViewportResize(uint32_t width, uint32_t height);
 
-		void DrawIDBuffer(Ref<Framebuffer> target, EditorCamera& camera);
-		int Pixel(int x, int y);
-
 		Entity GetPrimaryCameraEntity();
 	private:
 		template<typename T>

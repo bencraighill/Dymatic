@@ -61,6 +61,11 @@ namespace Dymatic {
 		ImGui::End();
 	}
 
+	void SceneHierarchyPanel::SetSelectedEntity(Entity entity)
+	{
+		m_SelectionContext = entity;
+	}
+
 	void SceneHierarchyPanel::DrawEntityNode(Entity entity)
 	{
 		auto& tag = entity.GetComponent<TagComponent>().Tag;
@@ -378,45 +383,7 @@ namespace Dymatic {
 
 		DrawComponent<SpriteRendererComponent>("Sprite Renderer", entity, [](auto& component)
 		{
-			const char* spriteTypeStrings[] = { "Solid Color", "Texture" };
-			const char* currentSpriteTypeStrings = spriteTypeStrings[(int)!component.SolidColor];
-			if (ImGui::BeginCombo("Sprite Type", currentSpriteTypeStrings))
-			{
-				for (int i = 0; i < 2; i++)
-				{
-					bool isSelected = currentSpriteTypeStrings == spriteTypeStrings[i];
-					if (ImGui::Selectable(spriteTypeStrings[i], isSelected))
-					{
-						currentSpriteTypeStrings = spriteTypeStrings[i];
-						component.SolidColor = !(bool)i;
-					}
-
-					if (isSelected)
-						ImGui::SetItemDefaultFocus();
-				}
-
-				ImGui::EndCombo();
-			}
-
-			if (component.SolidColor)
-			{
-				ImGui::ColorEdit4("Color", glm::value_ptr(component.Color));
-			}
-			else
-			{
-				char* cstr = new char[(int)component.TexturePath.length() + (512)];
-				strcpy(cstr, component.TexturePath.c_str());
-
-				if (ImGui::InputTextWithHint("Texture Path", "Path:", cstr, component.TexturePath.length() + (512)))
-				{
-					std::string TexturePathString(cstr);
-					component.TexturePath = TexturePathString;
-				}
-
-
-				ImGui::DragFloat("Tiling Factor", &component.TilingFactor, 0.1f, 0.0f, 0.0f, "%.3f");
-				ImGui::ColorEdit4("Tint Color", glm::value_ptr(component.TintColor));
-			}
+			ImGui::ColorEdit4("Color", glm::value_ptr(component.Color));
 		});
 
 

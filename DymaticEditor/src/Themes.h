@@ -1,5 +1,7 @@
 #pragma once
 #include "imgui/imgui.h"
+#include <string>
+#include "Dymatic/Core/Base.h"
 
 namespace Dymatic {
 
@@ -11,6 +13,8 @@ namespace Dymatic {
 		TextSelectedBg,
 		//---//
 		MenuBarBg,
+		MenuBarGrip,
+		MenuBarGripBorder,
 		WindowBg,
 		Header,
 		HeaderHovered,
@@ -43,6 +47,11 @@ namespace Dymatic {
 		ScrollbarGrabHovered,
 		ScrollbarGrabActive,
 		ScrollbarDots,
+		//----
+		ProgressBarBg,
+		ProgressBarBorder,
+		ProgressBarFill,
+		//----
 		SliderGrab,
 		SliderGrabActive,
 		Separator,
@@ -79,10 +88,12 @@ namespace Dymatic {
 		DYMATIC_COLOR_SCHEME_SIZE
 	};
 
+	std::string GetStringFromTheme(ColorSchemeType theme);
+	ColorSchemeType GetThemeFromString(std::string string);
+
 	struct ColorScheme
 	{
 		ColorSchemeType colorSchemeType;
-		//ImVec4 ImGuiCustomColors[IMGUI_CUSTOM_COLOR_SIZE] = { ImVec4{1.0f, 1.0f, 1.0f, 1.0f} };
 		std::array<ImVec4, DYMATIC_COLOR_SCHEME_SIZE>&& colorSchemeValues = { ImVec4{1.0f, 1.0f, 1.0f, 1.0f}, ImVec4{1.0f, 1.0f, 1.0f, 1.0f}, ImVec4{1.0f, 1.0f, 1.0f, 1.0f}, ImVec4{1.0f, 1.0f, 1.0f, 1.0f}, ImVec4{1.0f, 1.0f, 1.0f, 1.0f}, ImVec4{1.0f, 1.0f, 1.0f, 1.0f}, ImVec4{1.0f, 1.0f, 1.0f, 1.0f}, ImVec4{1.0f, 1.0f, 1.0f, 1.0f}, ImVec4{1.0f, 1.0f, 1.0f, 1.0f}, ImVec4{1.0f, 1.0f, 1.0f, 1.0f}, ImVec4{1.0f, 1.0f, 1.0f, 1.0f}, ImVec4{1.0f, 1.0f, 1.0f, 1.0f}, ImVec4{1.0f, 1.0f, 1.0f, 1.0f}, ImVec4{1.0f, 1.0f, 1.0f, 1.0f}, ImVec4{1.0f, 1.0f, 1.0f, 1.0f}, ImVec4{1.0f, 1.0f, 1.0f, 1.0f}, ImVec4{1.0f, 1.0f, 1.0f, 1.0f}, ImVec4{1.0f, 1.0f, 1.0f, 1.0f},  ImVec4{1.0f, 1.0f, 1.0f, 1.0f},  ImVec4{1.0f, 1.0f, 1.0f, 1.0f},  ImVec4{1.0f, 1.0f, 1.0f, 1.0f}, ImVec4{1.0f, 1.0f, 1.0f, 1.0f}, 
 			ImVec4{1.0f, 1.0f, 1.0f, 1.0f}, ImVec4{1.0f, 1.0f, 1.0f, 1.0f}, ImVec4{1.0f, 1.0f, 1.0f, 1.0f}, ImVec4{1.0f, 1.0f, 1.0f, 1.0f}, ImVec4{1.0f, 1.0f, 1.0f, 1.0f}, ImVec4{1.0f, 1.0f, 1.0f, 1.0f}, ImVec4{1.0f, 1.0f, 1.0f, 1.0f}, ImVec4{1.0f, 1.0f, 1.0f, 1.0f}, ImVec4{1.0f, 1.0f, 1.0f, 1.0f}, ImVec4{1.0f, 1.0f, 1.0f, 1.0f}, ImVec4{1.0f, 1.0f, 1.0f, 1.0f}, ImVec4{1.0f, 1.0f, 1.0f, 1.0f}, ImVec4{1.0f, 1.0f, 1.0f, 1.0f}, ImVec4{1.0f, 1.0f, 1.0f, 1.0f}, ImVec4{1.0f, 1.0f, 1.0f, 1.0f}, ImVec4{1.0f, 1.0f, 1.0f, 1.0f}, ImVec4{1.0f, 1.0f, 1.0f, 1.0f}, ImVec4{1.0f, 1.0f, 1.0f, 1.0f}, ImVec4{1.0f, 1.0f, 1.0f, 1.0f}, ImVec4{1.0f, 1.0f, 1.0f, 1.0f}, ImVec4{1.0f, 1.0f, 1.0f, 1.0f}, ImVec4{1.0f, 1.0f, 1.0f, 1.0f}, ImVec4{1.0f, 1.0f, 1.0f, 1.0f}, ImVec4{1.0f, 1.0f, 1.0f, 1.0f},
 			ImVec4{1.0f, 1.0f, 1.0f, 1.0f} , ImVec4{1.0f, 1.0f, 1.0f, 1.0f} , ImVec4{1.0f, 1.0f, 1.0f, 1.0f} , ImVec4{1.0f, 1.0f, 1.0f, 1.0f} , ImVec4{1.0f, 1.0f, 1.0f, 1.0f} , ImVec4{1.0f, 1.0f, 1.0f, 1.0f} , ImVec4{1.0f, 1.0f, 1.0f, 1.0f} , ImVec4{1.0f, 1.0f, 1.0f, 1.0f} };

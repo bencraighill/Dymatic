@@ -2393,20 +2393,27 @@ void NodeEditorInternal::Application_Frame()
 
 	ImGui::BeginChild("Nodes Outliner", ImVec2(panelA - 10.0f, 0));
     //ImGui::GetWindowDrawList()->AddRectFilled(ImGui::GetWindowPos(), ImGui::GetWindowPos() + ImGui::GetWindowSize() - ImVec2(0, 0), ImGui::ColorConvertFloat4ToU32(ImVec4(0.0f, 1.0f, 0.0f, 1.0f)));
+    static int renameID = -1;
     for (int i = 0; i < m_Variables.size(); i++)
     {
+
 		ImGuiTreeNodeFlags flags = ((m_Variables[i].ID == m_SelectedVariable) ? ImGuiTreeNodeFlags_Selected : 0) | ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_SpanAvailWidth;
 
 		char buffer[256];
 		memset(buffer, 0, sizeof(buffer));
 		std::strncpy(buffer, m_Variables[i].Name.c_str(), sizeof(buffer));
-        auto variableTreeNode = ImGui::TreeNodeInputEx(("##" + std::to_string(m_Variables[i].ID)).c_str(), m_Variables[i].Name.c_str(), flags, buffer, sizeof(buffer));
+        auto variableTreeNode = ImGui::TreeNodeInputEx(("##" + std::to_string(m_Variables[i].ID)).c_str(), m_Variables[i].Name.c_str(), flags, buffer, sizeof(buffer), m_Variables[i].Name.c_str(), NULL, renameID == m_Variables[i].ID);
         if (variableTreeNode.object) { ImGui::TreePop(); }
-        if (variableTreeNode.input) {  m_Variables[i].Name = std::string(buffer); }
+        if (variableTreeNode.input)
+        {
+            m_Variables[i].Name = std::string(buffer);
+        }
+        if (renameID != -1) { renameID = -1; }
 
 		if (ImGui::BeginPopupContextItem())
 		{
             ImGuiID id = ImGui::GetCurrentWindow()->GetID("##VariableRename");
+            if (ImGui::MenuItem("Rename")) { renameID = m_Variables[i].ID; }
             if (ImGui::MenuItem("Duplicate"))
             { 
                 m_Variables.push_back(m_Variables[i]);
@@ -2434,7 +2441,6 @@ void NodeEditorInternal::Application_Frame()
 
 			ImGui::EndPopup();
 		}
-
     }
 
     ImGui::Separator();

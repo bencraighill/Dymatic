@@ -17,8 +17,8 @@ namespace Dymatic {
 
 		void OnImGuiRender();
 
-		void SetSelectedEntity(Entity entity) { m_SelectionContext = entity; }
 		Entity GetSelectedEntity() const { return m_SelectionContext; }
+		void SetSelectedEntity(Entity entity);
 
 	private:
 		void DrawEntityNode(Entity entity);

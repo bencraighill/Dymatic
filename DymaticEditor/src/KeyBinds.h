@@ -37,8 +37,14 @@ namespace Dymatic {
 		GizmoTranslateBind,
 		GizmoRotateBind,
 		GizmoScaleBind,
+		ShadingTypeWireframeBind,
+		ShadingTypeUnlitBind,
+		ShadingTypeSolidBind,
+		ShadingTypeRenderedBind,
+		ToggleShadingTypeBind,
 		DuplicateBind,
 		RenameBind,
+		ClosePopupBind,
 		KEY_BINDS_SIZE
 	};
 

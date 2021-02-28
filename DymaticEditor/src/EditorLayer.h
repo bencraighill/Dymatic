@@ -5,9 +5,7 @@
 #include "Panels/PopupsAndNotifications.h"
 #include "Panels/ContentBrowser.h"
 #include "Panels/PreferencesPanel.h"
-#include "Panels/NodeEditor.h"
 #include "Panels/NodeEditor/NodeProgram.h"
-
 
 #include "Dymatic/Renderer/EditorCamera.h"
 
@@ -45,7 +43,9 @@ namespace Dymatic {
 		void AddRecentFile(std::string filepath);
 		std::vector<std::string> GetRecentFiles();
 
-		bool ImageMenuItem(Ref<Texture2D> texture, std::string item, std::string shortcut, bool menu = false, ImVec2 imageSize = ImVec2{ 15, 15 });
+		void SetShadingIndex(int index);
+
+		bool ImageMenuItem(Ref<Texture2D> texture, std::string item, std::string shortcut, bool menu = false, bool enabled = true, ImVec2 imageSize = ImVec2{ 15, 15 });
 	private:
 		Dymatic::OrthographicCameraController m_CameraController;
 
@@ -135,13 +135,17 @@ namespace Dymatic {
 		float m_ProgramTime = 0;
 		float m_LastSaveTime = 0;
 
+		int m_ShadingIndex = 3;
+		int m_PreviousToggleIndex = 3;
+
+		std::string m_LayoutToLoad = "";
+
 		// Panels
 		PreferencesPannel m_PreferencesPannel;
 		SceneHierarchyPanel m_SceneHierarchyPanel;
 		PopupsAndNotifications m_PopupsAndNotifications = PopupsAndNotifications(&m_PreferencesPannel.GetPreferences());
 		ContentBrowser m_ContentBrowser = ContentBrowser(&m_PreferencesPannel.GetPreferences());
 		NodeEditorPannel m_NodeEditorPannel;
-		NodeEditor m_NodeEditor;
 
 		bool m_ShowSplash = m_PreferencesPannel.GetPreferences().m_PreferenceData.showSplash;
 	};

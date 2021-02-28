@@ -125,12 +125,12 @@ namespace Dymatic {
 			}
 			else if (m_CurrentCatagory == "Themes")
 			{
-				float widthAvalOver = ImGui::GetContentRegionAvail().x - 30;
+				float widthAvalOver = ImGui::GetContentRegionAvail().x - 40;
 
 				static const char* items[]{ "Dymatic Dark", "Dymatic Light", "Sunset Gold" };
 				static int selectedItem = 0;
 
-				ImGui::SetNextItemWidth(widthAvalOver / 6 * 3);
+				ImGui::SetNextItemWidth(widthAvalOver / 7 * 2.5f);
 				if (ImGui::Combo("##Preset", &selectedItem, items, IM_ARRAYSIZE(items)))
 				{
 					switch (selectedItem)
@@ -158,11 +158,13 @@ namespace Dymatic {
 				}
 
 				ImGui::SameLine();
-				if (ImGui::Button("Import", ImVec2{ widthAvalOver / 6, 23 })) { ImportTheme(); }
+				if (ImGui::Button("Import", ImVec2{ widthAvalOver / 7, 23 })) { ImportTheme(); }
 				ImGui::SameLine();
-				if (ImGui::Button("Export", ImVec2{ widthAvalOver / 6, 23 })) { ExportTheme(); }
+				if (ImGui::Button("Export", ImVec2{ widthAvalOver / 7, 23 })) { ExportTheme(); }
 				ImGui::SameLine();
-				if (ImGui::Button("Save Theme", ImVec2{widthAvalOver / 6, 23})) { SaveThemeByPath("saved/SavedTheme.dytheme"); }
+				if (ImGui::Button("Restore Theme", ImVec2{widthAvalOver / 7 * 1.5f, 23})) { OpenThemeByPath("saved/SavedTheme.dytheme"); }
+				ImGui::SameLine();
+				if (ImGui::Button("Save Theme", ImVec2{widthAvalOver / 7, 23})) { SaveThemeByPath("saved/SavedTheme.dytheme"); }
 
 				ImGui::BeginChild("##ThemePrefsChild");
 
@@ -176,8 +178,10 @@ namespace Dymatic {
 
 				if (ImGui::TreeNodeEx("Windows", treeNodeFlags))
 				{
-					EditThemeColor(MenuBarBg, "Main menu bar, located at the top of the main window.");
 					EditThemeColor(WindowBg, "Default background color for all windows.");
+					EditThemeColor(MenuBarBg, "Main menu bar, located at the top of the main window.");
+					EditThemeColor(MenuBarGrip);
+					EditThemeColor(MenuBarGripBorder);
 					ImGui::TreePop();
 				}
 
@@ -237,6 +241,14 @@ namespace Dymatic {
 					EditThemeColor(ScrollbarGrabHovered);
 					EditThemeColor(ScrollbarGrabActive);
 					EditThemeColor(ScrollbarDots);
+					ImGui::TreePop();
+				}
+
+				if (ImGui::TreeNodeEx("Progress Bars", treeNodeFlags))
+				{
+					EditThemeColor(ProgressBarBg);
+					EditThemeColor(ProgressBarBorder);
+					EditThemeColor(ProgressBarFill);
 					ImGui::TreePop();
 				}
 
@@ -346,14 +358,14 @@ namespace Dymatic {
 			}
 			else if (m_CurrentCatagory == "Keymap")
 			{
-			float widthAvalOver = ImGui::GetContentRegionAvail().x - 30;
+			float widthAvalOver = ImGui::GetContentRegionAvail().x - 40;
 
 			auto& keyBinds = GetPreferences().m_PreferenceData.keyBinds;
 
 				static const char* items[]{ "Dymatic Default" };
 				static int selectedItem = 0;
 
-				ImGui::SetNextItemWidth(widthAvalOver / 6 * 3);
+				ImGui::SetNextItemWidth(widthAvalOver / 7 * 2.5f);
 				if (ImGui::Combo("##PresetKeymap", &selectedItem, items, IM_ARRAYSIZE(items)))
 				{
 					switch (selectedItem)
@@ -369,11 +381,13 @@ namespace Dymatic {
 
 				ImGui::SameLine();
 
-				if (ImGui::Button("Import", ImVec2{ widthAvalOver / 6, 23})) { ImportKeyBinds(); }
+				if (ImGui::Button("Import", ImVec2{ widthAvalOver / 7, 23})) { ImportKeyBinds(); }
 				ImGui::SameLine();
-				if (ImGui::Button("Export", ImVec2{ widthAvalOver / 6, 23 })) { ExportKeyBinds(); }
+				if (ImGui::Button("Export", ImVec2{ widthAvalOver / 7, 23 })) { ExportKeyBinds(); }
 				ImGui::SameLine();
-				if (ImGui::Button("Save Binds", ImVec2{ widthAvalOver / 6, 23 })) { SaveKeyBindsByFilepath("saved/SavedKeyBinds.keybind"); }
+				if (ImGui::Button("Restore Binds", ImVec2{ widthAvalOver / 7 * 1.5f, 23 })) { OpenKeyBindsByFilepath("saved/SavedKeyBinds.keybind"); }
+				ImGui::SameLine();
+				if (ImGui::Button("Save Binds", ImVec2{ widthAvalOver / 7, 23 })) { SaveKeyBindsByFilepath("saved/SavedKeyBinds.keybind"); }
 
 				static int currentKeyBindSearchItem = 0;
 				const char* SearchTypes[2] = { "Name", "Key Binding"};
@@ -458,8 +472,28 @@ namespace Dymatic {
 					if (KeyBindInputButton(GizmoTranslateBind)) vis = true;
 					if (KeyBindInputButton(GizmoRotateBind)) vis = true;
 					if (KeyBindInputButton(GizmoScaleBind)) vis = true;
+					if (KeyBindInputButton(ShadingTypeWireframeBind)) vis = true;
+					if (KeyBindInputButton(ShadingTypeUnlitBind)) vis = true;
+					if (KeyBindInputButton(ShadingTypeSolidBind)) vis = true;
+					if (KeyBindInputButton(ShadingTypeRenderedBind)) vis = true;
+					if (KeyBindInputButton(ToggleShadingTypeBind)) vis = true;
 					if (KeyBindInputButton(DuplicateBind)) vis = true;
 					ThreeDViewBindPrefVis = vis;
+					if (KeyBindSearchBar == "") ImGui::TreePop();
+				}
+
+				bool InterfaceKeyBindPrefsOpen = true;
+				static bool InterfaceBindPrefVis = true;
+				if (KeyBindSearchBar == "")
+				{
+					InterfaceKeyBindPrefsOpen = ImGui::TreeNodeEx("Interface", treeNodeFlags); InterfaceBindPrefVis = false;
+				}
+				else if (InterfaceBindPrefVis) ImGui::Text("Interface");
+				if (InterfaceKeyBindPrefsOpen)
+				{
+					bool vis = false;
+					if (KeyBindInputButton(ClosePopupBind)) vis = true;
+					InterfaceBindPrefVis = vis;
 					if (KeyBindSearchBar == "") ImGui::TreePop();
 				}
 
@@ -485,6 +519,7 @@ namespace Dymatic {
 			}
 			else if (m_CurrentCatagory == "Save & Load")
 			{
+				ImGui::SliderInt("Recent Files", &m_Preferences.m_PreferenceData.recentFiles, 0, 30);
 				bool autosave = ImGui::TreeNodeEx("Auto Save", treeNodeFlags);
 				ImGui::SameLine();
 				ImGui::Custom::Checkbox("##AutosavePrefCheckbox", &m_Preferences.m_PreferenceData.autosaveEnabled);
@@ -505,84 +540,14 @@ namespace Dymatic {
 		}
 	}
 
-	std::string PreferencesPannel::ColorVariableToText(ColorSchemeType colorVariable)
-	{
-		switch (colorVariable)
-		{
-		case Text: {return "Text"; }
-		case TextDisabled: {return "Text Disabled"; }
-		case TextSelectedBg: {return "Text Selected Background"; }
-		case MenuBarBg: {return "Menu Bar Background"; }
-		case WindowBg: {return "Window Background"; }
-		case Header: {return "Header"; }
-		case HeaderHovered: {return "Header Hovered"; }
-		case HeaderActive: {return "Header Active"; }
-		case Tab: {return "Tab"; }
-		case TabHovered: {return "Tab Hovered"; }
-		case TabActive: {return "Tab Active"; }
-		case TabUnfocused: {return "Tab Unfocused"; }
-		case TabUnfocusedActive: {return "Tab Unfocused Active"; }
-		case TitleBg: {return "Title Background"; }
-		case TitleBgActive: {return "Title Background Active"; }
-		case TitleBgCollapsed: {return "Title Background Collapsed"; }
-		case Button: {return "Button"; }
-		case ButtonHovered: {return "Button Hovered"; }
-		case ButtonActive: {return "Button Active"; }
-		case ButtonToggled: {return "Button Toggled"; }
-		case ButtonToggledHovered: {return "Button Toggled & Hovered"; }
-		case PopupBg: {return "Popup Background"; }
-		case ModalWindowDimBg: {return "Modal Window Dim Background"; }
-		case Border: {return "Border"; }
-		case BorderShadow: {return "Border Shadow"; }
-		case FrameBg: {return "Frame Background"; }
-		case FrameBgHovered: {return "Frame Background Hovered"; }
-		case FrameBgActive: {return "Frame Background Active"; }
-		case ScrollbarBg: {return "Scroll Bar Background"; }
-		case ScrollbarGrab: {return "Scroll Bar Grab"; }
-		case ScrollbarGrabHovered: {return "Scroll Bar Grab Hovered"; }
-		case ScrollbarGrabActive: {return "Scroll Bar Grab Active"; }
-		case ScrollbarDots: {return "Scroll Bar Dots"; }
-		case SliderGrab: {return "Slider Grab"; }
-		case SliderGrabActive: {return "Slider Grab Active"; }
-		case Separator: {return "Separator"; }
-		case SeparatorHovered: {return "Separator Hovered"; }
-		case SeparatorActive: {return "Separator Active"; }
-		case ResizeGrip: {return "Resize Grip"; }
-		case ResizeGripHovered: {return "Resize Grip Hovered"; }
-		case ResizeGripActive: {return "Resize Grip Active"; }
-		case FileBackground: {return "File Background"; }
-		case FileIcon: {return "File Icon"; }
-		case FileHovered: {return "File Hovered"; }
-		case FileSelected: {return "File Selected"; }
-		case CheckMark: {return "Check Mark"; }
-		case Checkbox: {return "Checkbox"; }
-		case CheckboxHovered: {return "Checkbox Hovered"; }
-		case CheckboxActive: {return "Checkbox Active"; }
-		case CheckboxTicked: {return "Checkbox Ticked"; }
-		case CheckboxHoveredTicked: {return "Check Box Hovered Ticked"; }
-		case DockingPreview: {return "Docking Preview"; }
-		case DockingEmptyBg: {return "Docking Empty Background"; }
-		case PlotLines: {return "Plot Lines"; }
-		case PlotLinesHovered: {return "Plot Lines Hovered"; }
-		case PlotHistogram: {return "Plot Histogram"; }
-		case PlotHistogramHovered: {return "Plot Histogram Hovered"; }
-		case DragDropTarget: {return "Drag Drop Target"; }
-		case NavHighlight: {return "Nav Highlight"; }
-		case NavWindowingHighlight: {return "Nav Windowing Highlight"; }
-		case NavWindowingDimBg: {return "Nav Windowing Dim Background"; }
-		}
-		DY_CORE_ASSERT(false, "Theme color variable, does not exist");
-		return "";
-	}
-
 	void PreferencesPannel::EditThemeColor(ColorSchemeType colorSchemeType, std::string tooltip)
 	{
 		auto& values = GetPreferences().m_PreferenceData.colorScheme.colorSchemeValues;
-		if (ImGui::ColorEdit4(("##" + ColorVariableToText(colorSchemeType)).c_str(), (float*)&values[colorSchemeType])) { UpdateThemePreferences(); }
+		if (ImGui::ColorEdit4(("##" + GetStringFromTheme(colorSchemeType)).c_str(), (float*)&values[colorSchemeType])) { UpdateThemePreferences(); }
 
 		ImGui::SameLine();
 
-		std::string message = ColorVariableToText(colorSchemeType);
+		std::string message = GetStringFromTheme(colorSchemeType);
 		ImGui::Text(message.c_str());
 		
 		if (tooltip != "")
@@ -883,46 +848,98 @@ namespace Dymatic {
 				result = result.erase(result.find_first_of("\r"), 1);
 			}
 
-
-			while (result.find_first_of("<") != -1)
+			std::string editResultMain = result;
+			while (editResultMain.find_first_of("<") != -1)
 			{
-				std::string tempstring = result;
-				if (result.find_first_of(">") == -1 || (tempstring.erase(tempstring.find_first_of("<"), 1).find_first_of("<") < tempstring.find_first_of(">")))
+				std::string tempstring = editResultMain;
+				if (editResultMain.find_first_of(">") == -1 || (tempstring.erase(tempstring.find_first_of("<"), 1).find_first_of("<") < tempstring.find_first_of(">")))
 				{
 					fatalError = true;
 					m_PreferencesMessage.title = "Dytheme Read Error";
-					m_PreferencesMessage.message = "Dytheme file:\n" + filepath + "\nOpens comment (<), but never closes it, (>)\n";
+					m_PreferencesMessage.message = "Dytheme file:\n" + filepath + "\nOpens name \"<\", but never closes it, \">\"\n";
 					m_PreferencesMessage.buttons = { "Retry", "Ok" };
 					return;
 				}
-				result = result.erase(result.find_first_of("<"), result.find_first_of(">") + 1 - result.find_first_of("<"));
+				editResultMain = editResultMain.erase(editResultMain.find_first_of("<"), editResultMain.find_first_of(">") + 1 - editResultMain.find_first_of("<"));
 			}
 
-			for (int i = 0; i < result.length(); i++)
+			std::string editResult = result;
+			while (editResult.find_first_of("{") != -1)
 			{
-				std::string character = result.substr(i, 1);
-				if (!isdigit(character[0]) && character != "." && character != ",")
+				std::string tempstring = editResult;
+				if (editResult.find_first_of("}") == -1 || (tempstring.erase(tempstring.find_first_of("{"), 1).find_first_of("{") < tempstring.find_first_of("}")))
 				{
-					result = result.erase(i, 1);
-					i--;
+					fatalError = true;
+					m_PreferencesMessage.title = "Dytheme Read Error";
+					m_PreferencesMessage.message = "Dytheme file:\n" + filepath + "\nOpens value \"{\", but never closes it, \"}\"\n";
+					m_PreferencesMessage.buttons = { "Retry", "Ok" };
+					return;
 				}
+				editResult = editResult.erase(editResult.find_first_of("{"), editResult.find_first_of("}") + 1 - editResult.find_first_of("{"));
 			}
 
 			if (fatalError == false)
 			{
-				for (int i = 0; result.find_first_of(",") != std::string::npos; i++)
+				bool openValueName = false;
+				bool openValue = false;
+				std::string CurrentValueName = "";
+				std::string CurrentValue = "";
+				for (int i = 0; i < result.length(); i++)
 				{
-					theme[i].x = std::stof(result.substr(0, result.find_first_of(",")));
-					result = result.substr(result.find_first_of(",") + 1, result.length() - result.find_first_of(","));
-					theme[i].y = std::stof(result.substr(0, result.find_first_of(",")));
-					result = result.substr(result.find_first_of(",") + 1, result.length() - result.find_first_of(","));
-					theme[i].z = std::stof(result.substr(0, result.find_first_of(",")));
-					result = result.substr(result.find_first_of(",") + 1, result.length() - result.find_first_of(","));
-					theme[i].w = std::stof(result.substr(0, result.find_first_of(",")));
-					result = result.substr(result.find_first_of(",") + 1, result.length() - result.find_first_of(","));
+					std::string character = result.substr(i, 1);
 
+					if (character == ">") { openValueName = false; }
+					if (openValueName) { CurrentValueName = CurrentValueName + character; }
+					if (character == "<") { openValueName = true; CurrentValueName = ""; }
+
+					if (character == "}") { openValue = false; }
+					if (openValue) { CurrentValue = CurrentValue + character; }
+					if (character == "{") { openValue = true; CurrentValue = ""; }
+
+					auto& prefs = GetPreferences().m_PreferenceData;
+					if (character == "}" && CurrentValue != "")
+					{
+						float x, y, z, w;
+
+						for (int y = 0; y < CurrentValue.length(); y++)
+						{
+							if (CurrentValue[y] == " "[0])
+							{
+								CurrentValue = CurrentValue.erase(y, 1);
+							}
+						}
+
+						if (CurrentValue.find_first_of(",") != std::string::npos)
+						{
+							x = std::stof(CurrentValue.substr(0, CurrentValue.find_first_of(",")));
+							CurrentValue = CurrentValue.erase(0, CurrentValue.find_first_of(",") + 1);
+						}
+						else { x = theme[GetThemeFromString(CurrentValueName)].x; }
+
+						if (CurrentValue.find_first_of(",") != std::string::npos)
+						{
+							y = std::stof(CurrentValue.substr(0, CurrentValue.find_first_of(",")));  
+							CurrentValue = CurrentValue.erase(0, CurrentValue.find_first_of(",") + 1);
+						}
+						else { y = theme[GetThemeFromString(CurrentValueName)].y; }
+
+						if (CurrentValue.find_first_of(",") != std::string::npos)
+						{
+							z = std::stof(CurrentValue.substr(0, CurrentValue.find_first_of(",")));
+							CurrentValue = CurrentValue.erase(0, CurrentValue.find_first_of(",") + 1);
+						}
+						else { z = theme[GetThemeFromString(CurrentValueName)].z; }
+
+						if (CurrentValue.find_first_of(",") != std::string::npos)
+						{
+							w = std::stof(CurrentValue.substr(0, CurrentValue.find_first_of(",")));
+							CurrentValue = CurrentValue.erase(0, CurrentValue.find_first_of(",") + 1);
+						}
+						else { w = theme[GetThemeFromString(CurrentValueName)].w; }
+
+						theme[GetThemeFromString(CurrentValueName)] = ImVec4(x, y, z, w);
+					}
 				}
-
 				UpdateThemePreferences();
 			}
 		}
@@ -948,8 +965,8 @@ namespace Dymatic {
 		std::string out = "";
 		for (int i = 0; i < theme.size(); i++)
 		{
-			out = out + "< " + ColorVariableToText(static_cast<ColorSchemeType>(i)) + " >\r";
-			out = out + RoundFloatString(std::to_string(theme[i].x)) + "," + RoundFloatString(std::to_string(theme[i].y)) + "," + RoundFloatString(std::to_string(theme[i].z)) + "," + RoundFloatString(std::to_string(theme[i].w)) + ",\r\r";
+			out = out + "<" + GetStringFromTheme(static_cast<ColorSchemeType>(i)) + "> ";
+			out = out + "{" + RoundFloatString(std::to_string(theme[i].x)) + ", " + RoundFloatString(std::to_string(theme[i].y)) + ", " + RoundFloatString(std::to_string(theme[i].z)) + ", " + RoundFloatString(std::to_string(theme[i].w)) + ",}\r\r";
 		}
 
 
@@ -974,8 +991,10 @@ namespace Dymatic {
 		colors[ImGuiCol_TextSelectedBg] = theme[TextSelectedBg];
 
 		//Window
-		colors[ImGuiCol_MenuBarBg] = theme[MenuBarBg];
 		colors[ImGuiCol_WindowBg] = theme[WindowBg];
+		colors[ImGuiCol_MenuBarBg] = theme[MenuBarBg];
+		colors[ImGuiCol_MenuBarGrip] = theme[MenuBarGrip];
+		colors[ImGuiCol_MenuBarGripBorder] = theme[MenuBarGripBorder];
 
 		// Headers
 		colors[ImGuiCol_Header] = theme[Header];
@@ -1020,6 +1039,11 @@ namespace Dymatic {
 		colors[ImGuiCol_ScrollbarGrabHovered] = theme[ScrollbarGrabHovered];
 		colors[ImGuiCol_ScrollbarGrabActive] = theme[ScrollbarGrabActive];
 		colors[ImGuiCol_ScrollbarDots] = theme[ScrollbarDots];
+
+		//Progress Bar
+		colors[ImGuiCol_ProgressBarBg] = theme[ProgressBarBg];
+		colors[ImGuiCol_ProgressBarBorder] = theme[ProgressBarBorder];
+		colors[ImGuiCol_ProgressBarFill] = theme[ProgressBarFill];
 		
 		//Slider
 		colors[ImGuiCol_SliderGrab] = theme[SliderGrab];
@@ -1265,6 +1289,7 @@ namespace Dymatic {
 				if (CurrentValueName == "AutosavePreferences") { prefs.autosavePreferences = CurrentValue == "true" ? true : false; }
 				if (CurrentValueName == "AutosaveEnabled") { prefs.autosaveEnabled = CurrentValue == "true" ? true : false; }
 				else if (CurrentValueName == "AutosaveTime") { prefs.autosaveTime = std::stof(CurrentValue); }
+				else if (CurrentValueName == "RecentFiles") { prefs.recentFiles = std::stof(CurrentValue); }
 				else if (CurrentValueName == "ShowSplash") { prefs.showSplash = CurrentValue == "true" ? true : false; }
 				else if (CurrentValueName == "FileColors") { SetFileColorsFromString(CurrentValue); }
 				else if (CurrentValueName == "DoubleClickSpeed") { prefs.doubleClickSpeed = std::stof(CurrentValue); }
@@ -1285,6 +1310,7 @@ namespace Dymatic {
 		out = out + "<AutosavePreferences> {" + (prefs.autosavePreferences ? "true" : "false") + "}\r";
 		out = out + "<AutosaveEnabled> {" + (prefs.autosaveEnabled ? "true" : "false") + "}\r";
 		out = out + "<AutosaveTime> {" + (std::to_string(prefs.autosaveTime)) + "}\r";
+		out = out + "<RecentFiles> {" + (std::to_string(prefs.recentFiles)) + "}\r";
 		out = out + "<ShowSplash> {" + (prefs.showSplash ? "true" : "false") + "}\r";
 
 		std::string FileColorString = "";

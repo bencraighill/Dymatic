@@ -145,10 +145,6 @@ namespace Dymatic {
 
 			auto& spriteRendererComponent = entity.GetComponent<SpriteRendererComponent>();
 			out << YAML::Key << "Color" << YAML::Value << spriteRendererComponent.Color;
-			out << YAML::Key << "SolidColor" << YAML::Value << spriteRendererComponent.SolidColor;
-			out << YAML::Key << "TexturePath" << YAML::Value << spriteRendererComponent.TexturePath;
-			out << YAML::Key << "TilingFactor" << YAML::Value << spriteRendererComponent.TilingFactor;
-			out << YAML::Key << "TintColor" << YAML::Value << spriteRendererComponent.TintColor;
 
 			out << YAML::EndMap; // SpriteRendererComponent
 		}
@@ -243,10 +239,6 @@ namespace Dymatic {
 				{
 					auto& src = deserializedEntity.AddComponent<SpriteRendererComponent>();
 					src.Color = spriteRendererComponent["Color"].as<glm::vec4>();
-					src.SolidColor = spriteRendererComponent["SolidColor"].as<bool>();
-					src.TexturePath = spriteRendererComponent["TexturePath"].as<std::string>();
-					src.TilingFactor = spriteRendererComponent["TilingFactor"].as<float>();
-					src.TintColor = spriteRendererComponent["TintColor"].as<glm::vec4>();
 				}
 			}
 		}

@@ -14,6 +14,8 @@ namespace Dymatic {
 		std::string title, message;
 		std::vector<std::string> buttons;
 		int buttonClicked = -1;
+		int id = -1;
+		bool loading = false;
 	};
 
 	struct NotificationData
@@ -37,9 +39,13 @@ namespace Dymatic {
 		PopupsAndNotifications(Preferences* preferencesRef);
 
 
-		void Popup(PopupData popupData);
-		void Popup(std::string title, std::string message, std::vector<std::string> buttons);
+		PopupData Popup(PopupData popupData);
+		PopupData Popup(std::string title, std::string message, std::vector<std::string> buttons, bool loading = false);
+
+		void RemoveTopmostPopup();
+
 		PopupData PopupUpdate();
+
 
 		void Notification(std::string identifier, int notificationIndex, std::string title, std::string message, std::vector<std::string> buttons, bool loading, float displayTime = 0.0f);
 		NotificationData NotificationUpdate(float programTime);

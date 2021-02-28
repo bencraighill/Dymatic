@@ -1,6 +1,9 @@
 #pragma once
-
+#include <string>
+#include <vector>
+#include "Dymatic/Core/Base.h"
 #include "Dymatic/Math/Math.h"
+#include "Dymatic/Core/Application.h"
 
 struct PinValueData
 {
@@ -18,10 +21,8 @@ struct FunctionIn
 
 struct FunctionReturn
 {
-	int Executable = 0;
+	std::vector<int> Executable = {0};
 	std::vector<PinValueData> PinValues;
-
-	bool cacheData = false;
 };
 
 FunctionReturn On_Create(FunctionReturn functionIn)
@@ -29,9 +30,18 @@ FunctionReturn On_Create(FunctionReturn functionIn)
 	return {};
 }
 
+FunctionReturn On_Update(FunctionReturn functionIn)
+{
+	FunctionReturn returnVal;
+	returnVal.PinValues.push_back({});
+	returnVal.PinValues.push_back({});
+	returnVal.PinValues[1].Float = Dymatic::Application::Get().GetTimestep().GetSeconds();
+	return returnVal;
+}
+
 FunctionReturn Print_String(FunctionReturn functionIn)
 {
-	DY_CORE_INFO(functionIn.PinValues[1].String);
+	DY_TRACE(functionIn.PinValues[1].String);
 	return {};
 }
 
@@ -136,9 +146,41 @@ FunctionReturn Clamp_Float(FunctionReturn functionIn)
 	return returnVal;
 }
 
+FunctionReturn Normalize_Angle(FunctionReturn functionIn)
+{
+	FunctionReturn returnVal;
+	returnVal.PinValues.push_back({});
+	returnVal.PinValues[0].Float = Dymatic::Math::NormalizeAngle(functionIn.PinValues[0].Float, -180.0f, 360.0f);
+	return returnVal;
+}
+
+FunctionReturn Lerp_Angle(FunctionReturn functionIn)
+{
+	FunctionReturn returnVal;
+	returnVal.PinValues.push_back({});
+	returnVal.PinValues[0].Float = Dymatic::Math::LerpAngle(functionIn.PinValues[0].Float, functionIn.PinValues[1].Float, functionIn.PinValues[2].Float);
+	return returnVal;
+}
+
+FunctionReturn Equal_Float(FunctionReturn functionIn)
+{
+	FunctionReturn returnVal;
+	returnVal.PinValues.push_back({});
+	returnVal.PinValues[0].Bool = functionIn.PinValues[0].Float == functionIn.PinValues[1].Float;
+	return returnVal;
+}
+
+FunctionReturn Exp_Float(FunctionReturn functionIn)
+{
+	FunctionReturn returnVal;
+	returnVal.PinValues.push_back({});
+	returnVal.PinValues[0].Float = std::exp(functionIn.PinValues[0].Float);
+	return returnVal;
+}
+
 //Make Literal Nodes
 
-FunctionReturn Make_Bool(FunctionReturn functionIn)
+FunctionReturn Make_Literal_Bool(FunctionReturn functionIn)
 {
 	FunctionReturn returnVal;
 	returnVal.PinValues.push_back({});
@@ -146,7 +188,7 @@ FunctionReturn Make_Bool(FunctionReturn functionIn)
 	return returnVal;
 }
 
-FunctionReturn Make_Int(FunctionReturn functionIn)
+FunctionReturn Make_Literal_Int(FunctionReturn functionIn)
 {
 	FunctionReturn returnVal;
 	returnVal.PinValues.push_back({});
@@ -154,7 +196,7 @@ FunctionReturn Make_Int(FunctionReturn functionIn)
 	return returnVal;
 }
 
-FunctionReturn Make_Float(FunctionReturn functionIn)
+FunctionReturn Make_Literal_Float(FunctionReturn functionIn)
 {
 	FunctionReturn returnVal;
 	returnVal.PinValues.push_back({});
@@ -162,7 +204,7 @@ FunctionReturn Make_Float(FunctionReturn functionIn)
 	return returnVal;
 }
 
-FunctionReturn Make_String(FunctionReturn functionIn)
+FunctionReturn Make_Literal_String(FunctionReturn functionIn)
 {
 	FunctionReturn returnVal;
 	returnVal.PinValues.push_back({});
@@ -175,7 +217,18 @@ FunctionReturn Make_String(FunctionReturn functionIn)
 FunctionReturn Branch(FunctionReturn functionIn)
 {
 	FunctionReturn returnVal;
-	returnVal.Executable = functionIn.PinValues[1].Bool ? 0 : 1;
+	returnVal.Executable[0] = functionIn.PinValues[1].Bool ? 0 : 1;
+	return returnVal;
+}
+
+FunctionReturn Sequence(FunctionReturn functionIn)
+{
+	FunctionReturn returnVal;
+	for (int i = 1; i < functionIn.PinValues[1].Int + 1; i++)
+	{
+		returnVal.Executable.push_back(i);
+	}
+
 	return returnVal;
 }
 

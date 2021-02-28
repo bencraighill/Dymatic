@@ -26,6 +26,7 @@ namespace Dymatic {
 	{
 	}
 
+
 	void EditorLayer::OnAttach()
 	{
 		DY_PROFILE_FUNCTION();
@@ -39,7 +40,6 @@ namespace Dymatic {
 
 
 		FramebufferSpecification fbSpec;
-		fbSpec.Attachments = { FramebufferTextureFormat::RGBA8, FramebufferTextureFormat::RED_INTEGER, FramebufferTextureFormat::Depth };
 		fbSpec.Width = 1600;
 		fbSpec.Height = 900;
 		m_Framebuffer = Framebuffer::Create(fbSpec);
@@ -138,17 +138,6 @@ namespace Dymatic {
 			SaveAndExit();
 		}
 
-		if (m_LayoutToLoad != "")
-		{
-			ImGui::LoadIniSettingsFromDisk(m_LayoutToLoad.c_str());
-			m_LayoutToLoad = "";
-		}
-
-		if (ImGui::IsMouseClicked(2))
-		{
-			
-		}
-
 		if (m_PreferencesPannel.GetPreferences().m_PreferenceData.autosaveEnabled)
 		{
 			//AutoSave
@@ -193,27 +182,24 @@ namespace Dymatic {
 		//RenderCommand::SetClearColor({ 0.1f, 0.1f, 0.1f, 1 });
 		RenderCommand::SetClearColor({ 0.28f, 0.28f, 0.28f, 1.0f });
 		RenderCommand::Clear();
-
-		//Clear entity ID attachment to -1
-		m_Framebuffer->ClearAttachment(1, -1);
+		m_Framebuffer->Bind();
 
 		// Update scene
 		m_ActiveScene->OnUpdateEditor(ts, m_EditorCamera);
-		//TODO: Runtime update SHOULD NOT BE HERE!
-		m_ActiveScene->OnUpdateRuntime(ts);	
+		m_ActiveScene->OnUpdateRuntime(ts);
 
 		auto [mx, my] = ImGui::GetMousePos();
 		mx -= m_ViewportBounds[0].x;
 		my -= m_ViewportBounds[0].y;
-		glm::vec2 viewportSize = m_ViewportBounds[1] - m_ViewportBounds[0];
-		my = viewportSize.y - my;
+		auto viewportWidth = m_ViewportBounds[1].x - m_ViewportBounds[0].x;
+		auto viewportHeight = m_ViewportBounds[1].y - m_ViewportBounds[0].y;
+		my = viewportHeight - my;
 		int mouseX = (int)mx;
 		int mouseY = (int)my;
-
-		if (mouseX >= 0 && mouseY >= 0 && mouseX < (int)viewportSize.x && mouseY < (int)viewportSize.y)
+		if (mouseX >= 0 && mouseY >= 0 && mouseX < viewportWidth && mouseY < viewportHeight)
 		{
-			int pixelData = m_Framebuffer->ReadPixel(1, mouseX, mouseY);
-			m_HoveredEntity = pixelData == -1 ? Entity() : Entity((entt::entity)pixelData, m_ActiveScene.get());
+			int pixel = m_ActiveScene->Pixel(mx, my);
+			m_HoveredEntity = pixel == -1 ? Entity() : Entity((entt::entity)pixel, m_ActiveScene.get());
 		}
 
 		m_Framebuffer->Unbind();
@@ -384,6 +370,7 @@ namespace Dymatic {
 				prevMousePos = ImGui::GetMousePos();
 				prevWindowWidth = window.GetWidth();
 				prevWindowHeight = window.GetHeight();
+				DY_CORE_INFO("Hovered");
 			}
 			else
 			{
@@ -415,8 +402,8 @@ namespace Dymatic {
 
 			if (window.GetWidth() > 700)
 			{
-				ImGui::GetWindowDrawList()->AddConvexPolyFilled(points, sizeof(points), ImGui::GetColorU32(ImGuiCol_MenuBarGrip));
-				ImGui::GetWindowDrawList()->AddPolyline(points, sizeof(points), ImGui::GetColorU32(ImGuiCol_MenuBarGripBorder), true, 2.0f);
+				ImGui::GetWindowDrawList()->AddConvexPolyFilled(points, sizeof(points), ImGui::ColorConvertFloat4ToU32(ImVec4{ 0.15f, 0.15f, 0.15f, 1.0f }));
+				ImGui::GetWindowDrawList()->AddPolyline(points, sizeof(points), ImGui::ColorConvertFloat4ToU32(ImVec4{ 0.35f, 0.35f, 0.35f, 1.0f }), true, 2.0f);
 			}
 
 			if (ImGui::ImageButton(reinterpret_cast<void*>(m_DymaticLogo->GetRendererID()), ImVec2{ 20, 20 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 }))
@@ -445,7 +432,7 @@ namespace Dymatic {
 				//ImGui::MenuItem("Fullscreen", NULL, &opt_fullscreen_persistant);1
 				if (ImageMenuItem(m_IconSystemNew, "New", "Ctrl+N")) NewScene();
 				if (ImageMenuItem(m_IconSystemOpen, "Open...", "Ctrl+O")) OpenScene();
-				if (ImageMenuItem(m_IconSystemRecent, "Open Recent", "", true, !GetRecentFiles().empty()))
+				if (ImageMenuItem(m_IconSystemRecent, "Open Recent", "", true))
 				{
 					std::vector<std::string> recentFiles = GetRecentFiles();
 					if (!recentFiles.empty())
@@ -502,6 +489,8 @@ namespace Dymatic {
 				}
 				ImGui::EndMenu();
 			}
+
+			DY_CORE_INFO("Position: {0}, {1} - Size: {2}, {3}", Application::Get().GetWindow().GetPositionX(), Application::Get().GetWindow().GetPositionY(), Application::Get().GetWindow().GetWidth(), Application::Get().GetWindow().GetHeight());
 
 			ImVec4 WindowOperatorButtonCol = ImVec4{1.0f, 1.0f, 1.0f, 1.0f};
 			ImVec4 WindowOperatorCircleCol = ImVec4{ 0.5f, 0.5f, 0.5f, 0.0f };
@@ -692,13 +681,9 @@ namespace Dymatic {
 		}
 
 		ImGui::Begin("Info", NULL, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
-		std::string filename = m_CurrentFilepath;
-		ImGui::TextDisabled((filename != "" ? (filename.find_last_of("\\") != std::string::npos ? (filename.erase(0, filename.find_last_of("\\") + 1)) : (filename.find_last_of("/") != std::string::npos ? (filename.erase(0, filename.find_last_of("/") + 1)) : filename)) : "Unsaved Dymatic Document").c_str());
+		ImGui::Dummy(ImVec2{ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize("V1.2.1").x - 5, 0});
 		ImGui::SameLine();
-		std::string text = "1.2.1 - (Development)";
-		ImGui::Dummy(ImVec2{ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize(text.c_str()).x - 5, 0});
-		ImGui::SameLine();
-		ImGui::TextDisabled(text.c_str());
+		ImGui::TextDisabled("V1.2.1");
 		ImGui::End();
 
 		{
@@ -833,11 +818,7 @@ namespace Dymatic {
 
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{ 0, 0 });
 		ImGui::Begin("Viewport");
-		auto viewportMinRegion = ImGui::GetWindowContentRegionMin();
-		auto viewportMaxRegion = ImGui::GetWindowContentRegionMax();
-		auto viewportOffset = ImGui::GetWindowPos();
-		m_ViewportBounds[0] = { viewportMinRegion.x + viewportOffset.x, viewportMinRegion.y + viewportOffset.y };
-		m_ViewportBounds[1] = { viewportMaxRegion.x + viewportOffset.x, viewportMaxRegion.y + viewportOffset.y };
+		auto viewportOffset = ImGui::GetCursorPos(); // includes tab bar
 
 		m_ViewportFocused = ImGui::IsWindowFocused();
 		m_ViewportHovered = ImGui::IsWindowHovered();
@@ -852,12 +833,27 @@ namespace Dymatic {
 		//ImGui::Image(reinterpret_cast<void*>(textureID), ImVec2{ m_ViewportSize.x, m_ViewportSize.y }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
 		ImGui::GetWindowDrawList()->AddImage(reinterpret_cast<void*>(textureID), ImGui::GetWindowPos(), ImVec2{ ImGui::GetWindowPos().x + m_ViewportSize.x, ImGui::GetWindowPos().y + m_ViewportSize.y }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
 
+		auto windowSize = ImGui::GetWindowSize();
+		ImVec2 minBound = ImGui::GetWindowPos();
+		minBound.x += viewportOffset.x;
+		minBound.y += viewportOffset.y;
+
+		ImVec2 maxBound = { minBound.x + windowSize.x, minBound.y + windowSize.y };
+		m_ViewportBounds[0] = { minBound.x, minBound.y };
+		m_ViewportBounds[1] = { maxBound.x, maxBound.y };
+
 		//Viewport View Settings
 		ImGui::Dummy(ImVec2{ImGui::GetContentRegionAvail().x - 95, 0});
 		ImGui::SameLine();
+		static int currentKeyBindSearchItem = 3;
 		ImTextureID shaderButtonTypes[4] = { reinterpret_cast<void*>(m_IconShaderWireframe->GetRendererID()), reinterpret_cast<void*>(m_IconShaderUnlit->GetRendererID()), reinterpret_cast<void*>(m_IconShaderSolid->GetRendererID()), reinterpret_cast<void*>(m_IconShaderRendered->GetRendererID()) };
-		int shaderButtonIndex = ImGui::SwitchImageButtonEx("ShaderTypeButtonSwicth", shaderButtonTypes, 4, ImVec2{ 20, 20 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 }, m_ShadingIndex, ImVec2{ 85, 25 });
-		if (shaderButtonIndex != -1) { SetShadingIndex(shaderButtonIndex); }
+		switch (ImGui::SwitchImageButtonEx("ShaderTypeButtonSwicth", shaderButtonTypes, 4, ImVec2{20, 20}, ImVec2{ 0, 1 }, ImVec2{ 1, 0 }, currentKeyBindSearchItem, ImVec2{ 85, 25 }))
+		{
+		case 0: {currentKeyBindSearchItem = 0; break; }
+		case 1: {currentKeyBindSearchItem = 1; break; }
+		case 2: {currentKeyBindSearchItem = 2; break; }
+		case 3: {currentKeyBindSearchItem = 3; break; }
+		}
 
 		//Scene View Gizmo
 		{
@@ -1082,7 +1078,9 @@ namespace Dymatic {
 			ImGuizmo::SetOrthographic(false);
 			ImGuizmo::SetDrawlist();
 
-			ImGuizmo::SetRect(m_ViewportBounds[0].x, m_ViewportBounds[0].y, m_ViewportBounds[1].x - m_ViewportBounds[0].x, m_ViewportBounds[1].y - m_ViewportBounds[0].y);
+			float windowWidth = (float)ImGui::GetWindowWidth();
+			float windowHeight = (float)ImGui::GetWindowHeight();
+			ImGuizmo::SetRect(ImGui::GetWindowPos().x, ImGui::GetWindowPos().y, windowWidth, windowHeight);
 			
 
 			// Camera
@@ -1147,23 +1145,19 @@ namespace Dymatic {
 			ImGui::TextDisabled("New File");
 			ImGui::Image(reinterpret_cast<void*>(m_IconSystemNew->GetRendererID()), ImVec2{ 15, 15 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
 			ImGui::SameLine();
-			if (ImGui::Selectable("General Workspace")) { focused = false; m_LayoutToLoad = "saved/presets/layouts/GeneralWorkspace.ini"; OpenSceneByFilepath("saved/presets/scenes/DefaultCubeScene.dymatic"); }
+			if (ImGui::Selectable("General Workspace")) { focused = false; }
 			if (ImGui::IsItemFocused()) { focused = true; }
 			ImGui::Image(reinterpret_cast<void*>(m_IconSystemNew->GetRendererID()), ImVec2{ 15, 15 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
 			ImGui::SameLine();
-			if (ImGui::Selectable("Scripting Workspace")) { focused = false; m_LayoutToLoad = "saved/presets/layouts/ScriptingWorkspace.ini"; OpenSceneByFilepath("saved/presets/scenes/DefaultCubeScene.dymatic"); }
+			if (ImGui::Selectable("Scultping Environment")) { focused = false; }
 			if (ImGui::IsItemFocused()) { focused = true; }
 			ImGui::Image(reinterpret_cast<void*>(m_IconSystemNew->GetRendererID()), ImVec2{ 15, 15 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
 			ImGui::SameLine();
-			if (ImGui::Selectable("Environment Design Workspace")) { focused = false; m_LayoutToLoad = "saved/presets/layouts/EnvironmentDesignWorkspace.ini"; OpenSceneByFilepath("saved/presets/scenes/DefaultCubeScene.dymatic"); }
+			if (ImGui::Selectable("Animation Workspace")) { focused = false; }
 			if (ImGui::IsItemFocused()) { focused = true; }
 			ImGui::Image(reinterpret_cast<void*>(m_IconSystemNew->GetRendererID()), ImVec2{ 15, 15 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
 			ImGui::SameLine();
-			if (ImGui::Selectable("Animation Workspace")) { focused = false; m_LayoutToLoad = "saved/presets/layouts/AnimationWorkspace.ini"; }
-			if (ImGui::IsItemFocused()) { focused = true; }
-			ImGui::Image(reinterpret_cast<void*>(m_IconSystemNew->GetRendererID()), ImVec2{ 15, 15 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
-			ImGui::SameLine();
-			if (ImGui::Selectable("VFX Workspace")) { focused = false; m_LayoutToLoad = "saved/presets/layouts/VFXWorkspace.ini"; }
+			if (ImGui::Selectable("VFX Workspace")) { focused = false; }
 			if (ImGui::IsItemFocused()) { focused = true; }
 			ImGui::NextColumn();
 			ImGui::TextDisabled("Recent Files");
@@ -1218,6 +1212,8 @@ namespace Dymatic {
 
 		EventDispatcher dispatcher(e);
 
+		m_KeyPressed.GetKeyCode();
+
 		dispatcher.Dispatch<KeyPressedEvent>(DY_BIND_EVENT_FN(EditorLayer::OnKeyPressed));
 		dispatcher.Dispatch<MouseButtonPressedEvent>(DY_BIND_EVENT_FN(EditorLayer::OnMouseButtonPressed));
 	}
@@ -1232,24 +1228,19 @@ namespace Dymatic {
 
 		auto& keyBinds = m_PreferencesPannel.GetPreferences().m_PreferenceData.keyBinds;
 
-		if (keyBinds.IsKey(NewSceneBind, m_KeyPressed.GetKeyCode(), m_MouseButtonPressed.GetMouseButton(), bindCatagory, control, shift, alt, repeats))						{ NewScene(); }
-		else if (keyBinds.IsKey(OpenSceneBind, m_KeyPressed.GetKeyCode(), m_MouseButtonPressed.GetMouseButton(), bindCatagory, control, shift, alt, repeats))				{ OpenScene(); }
-		else if (keyBinds.IsKey(SaveSceneBind, m_KeyPressed.GetKeyCode(), m_MouseButtonPressed.GetMouseButton(), bindCatagory, control, shift, alt, repeats))				{ SaveScene(); }
-		else if (keyBinds.IsKey(SaveSceneAsBind, m_KeyPressed.GetKeyCode(), m_MouseButtonPressed.GetMouseButton(), bindCatagory, control, shift, alt, repeats))				{ SaveSceneAs(); }
-		else if (keyBinds.IsKey(QuitBind, m_KeyPressed.GetKeyCode(), m_MouseButtonPressed.GetMouseButton(), bindCatagory, control, shift, alt, repeats))					{ SaveAndExit(); }
-		else if (keyBinds.IsKey(SelectObjectBind, m_KeyPressed.GetKeyCode(), m_MouseButtonPressed.GetMouseButton(), bindCatagory, control, shift, alt, repeats))			{ if (m_ViewportHovered && !ImGuizmo::IsUsing() && !ImGuizmo::IsOver() && !Input::IsKeyPressed(Key::LeftAlt)) m_SceneHierarchyPanel.SetSelectedEntity(m_HoveredEntity); }
-		else if (keyBinds.IsKey(GizmoNoneBind, m_KeyPressed.GetKeyCode(), m_MouseButtonPressed.GetMouseButton(), bindCatagory, control, shift, alt, repeats))				{ if (!ImGuizmo::IsUsing()) { m_GizmoType = -1; } }
-		else if (keyBinds.IsKey(GizmoTranslateBind, m_KeyPressed.GetKeyCode(), m_MouseButtonPressed.GetMouseButton(), bindCatagory, control, shift, alt, repeats))			{ if (!ImGuizmo::IsUsing()) { m_GizmoType = ImGuizmo::OPERATION::TRANSLATE; } }
-		else if (keyBinds.IsKey(GizmoRotateBind, m_KeyPressed.GetKeyCode(), m_MouseButtonPressed.GetMouseButton(), bindCatagory, control, shift, alt, repeats))				{ if (!ImGuizmo::IsUsing()) { m_GizmoType = ImGuizmo::OPERATION::ROTATE; } }
-		else if (keyBinds.IsKey(GizmoScaleBind, m_KeyPressed.GetKeyCode(), m_MouseButtonPressed.GetMouseButton(), bindCatagory, control, shift, alt, repeats))				{ if (!ImGuizmo::IsUsing()) { m_GizmoType = ImGuizmo::OPERATION::SCALE; } }
-		else if (keyBinds.IsKey(ShadingTypeWireframeBind, m_KeyPressed.GetKeyCode(), m_MouseButtonPressed.GetMouseButton(), bindCatagory, control, shift, alt, repeats))	{ SetShadingIndex(0); }
-		else if (keyBinds.IsKey(ShadingTypeUnlitBind, m_KeyPressed.GetKeyCode(), m_MouseButtonPressed.GetMouseButton(), bindCatagory, control, shift, alt, repeats))		{ SetShadingIndex(1); }
-		else if (keyBinds.IsKey(ShadingTypeSolidBind, m_KeyPressed.GetKeyCode(), m_MouseButtonPressed.GetMouseButton(), bindCatagory, control, shift, alt, repeats))		{ SetShadingIndex(2); }
-		else if (keyBinds.IsKey(ShadingTypeRenderedBind, m_KeyPressed.GetKeyCode(), m_MouseButtonPressed.GetMouseButton(), bindCatagory, control, shift, alt, repeats))		{ SetShadingIndex(3); }
-		else if (keyBinds.IsKey(ToggleShadingTypeBind, m_KeyPressed.GetKeyCode(), m_MouseButtonPressed.GetMouseButton(), bindCatagory, control, shift, alt, repeats))		{ SetShadingIndex(m_ShadingIndex == 0 ? m_PreviousToggleIndex : 0); }
-		else if (keyBinds.IsKey(DuplicateBind, m_KeyPressed.GetKeyCode(), m_MouseButtonPressed.GetMouseButton(), bindCatagory, control, shift, alt, repeats))				{ if (m_SceneHierarchyPanel.GetSelectedEntity()) { m_SceneHierarchyPanel.SetSelectedEntity(m_ActiveScene->DuplicateEntity(m_SceneHierarchyPanel.GetSelectedEntity())); } m_NodeEditorPannel.DuplicateNodes(); }
-		else if (keyBinds.IsKey(RenameBind, m_KeyPressed.GetKeyCode(), m_MouseButtonPressed.GetMouseButton(), bindCatagory, control, shift, alt, repeats))					{ if (m_ContentBrowser.GetSelectedFile().filename != "") m_ContentBrowser.OpenRenamePopup(m_ContentBrowser.GetSelectedFile()); }
-		else if (keyBinds.IsKey(ClosePopupBind, m_KeyPressed.GetKeyCode(), m_MouseButtonPressed.GetMouseButton(), bindCatagory, control, shift, alt, repeats))				{ m_PopupsAndNotifications.RemoveTopmostPopup(); }
+		if (keyBinds.IsKey(NewSceneBind, m_KeyPressed.GetKeyCode(), m_MouseButtonPressed.GetMouseButton(), bindCatagory, control, shift, alt, repeats))				{ NewScene(); }
+		else if (keyBinds.IsKey(OpenSceneBind, m_KeyPressed.GetKeyCode(), m_MouseButtonPressed.GetMouseButton(), bindCatagory, control, shift, alt, repeats))		{ OpenScene(); }
+		else if (keyBinds.IsKey(SaveSceneBind, m_KeyPressed.GetKeyCode(), m_MouseButtonPressed.GetMouseButton(), bindCatagory, control, shift, alt, repeats))		{ SaveScene(); }
+		else if (keyBinds.IsKey(SaveSceneAsBind, m_KeyPressed.GetKeyCode(), m_MouseButtonPressed.GetMouseButton(), bindCatagory, control, shift, alt, repeats))		{ SaveSceneAs(); }
+		else if (keyBinds.IsKey(QuitBind, m_KeyPressed.GetKeyCode(), m_MouseButtonPressed.GetMouseButton(), bindCatagory, control, shift, alt, repeats))				{ SaveAndExit(); }
+		else if (keyBinds.IsKey(SelectObjectBind, m_KeyPressed.GetKeyCode(), m_MouseButtonPressed.GetMouseButton(), bindCatagory, control, shift, alt, repeats))		{ if (!ImGuizmo::IsUsing() && !ImGuizmo::IsOver() && !Input::IsKeyPressed(Key::LeftAlt)) m_SceneHierarchyPanel.SetSelectedEntity(m_HoveredEntity); }
+		else if (keyBinds.IsKey(GizmoNoneBind, m_KeyPressed.GetKeyCode(), m_MouseButtonPressed.GetMouseButton(), bindCatagory, control, shift, alt, repeats))		{ m_GizmoType = -1; }
+		else if (keyBinds.IsKey(GizmoTranslateBind, m_KeyPressed.GetKeyCode(), m_MouseButtonPressed.GetMouseButton(), bindCatagory, control, shift, alt, repeats))	{ m_GizmoType = ImGuizmo::OPERATION::TRANSLATE; }
+		else if (keyBinds.IsKey(GizmoRotateBind, m_KeyPressed.GetKeyCode(), m_MouseButtonPressed.GetMouseButton(), bindCatagory, control, shift, alt, repeats))		{ m_GizmoType = ImGuizmo::OPERATION::ROTATE; }
+		else if (keyBinds.IsKey(GizmoScaleBind, m_KeyPressed.GetKeyCode(), m_MouseButtonPressed.GetMouseButton(), bindCatagory, control, shift, alt, repeats))		{ m_GizmoType = ImGuizmo::OPERATION::SCALE; }
+		else if (keyBinds.IsKey(DuplicateBind, m_KeyPressed.GetKeyCode(), m_MouseButtonPressed.GetMouseButton(), bindCatagory, control, shift, alt, repeats))		{ if (m_SceneHierarchyPanel.GetSelectedEntity()) m_SceneHierarchyPanel.SetSelectedEntity(m_ActiveScene->DuplicateEntity(m_SceneHierarchyPanel.GetSelectedEntity())); }
+		else if (keyBinds.IsKey(RenameBind, m_KeyPressed.GetKeyCode(), m_MouseButtonPressed.GetMouseButton(), bindCatagory, control, shift, alt, repeats))			{ if (m_ContentBrowser.GetSelectedFile().filename != "") m_ContentBrowser.OpenRenamePopup(m_ContentBrowser.GetSelectedFile()); }
+		else if (keyBinds.IsKey(ClosePopupBind, m_KeyPressed.GetKeyCode(), m_MouseButtonPressed.GetMouseButton(), bindCatagory, control, shift, alt, repeats))			{ m_PopupsAndNotifications.RemoveTopmostPopup(); }
 	}
 
 	bool EditorLayer::OnKeyPressed(KeyPressedEvent& e)
@@ -1437,27 +1428,8 @@ namespace Dymatic {
 			fileStr = fileStr.erase(fileStr.find(filepath + "\r"), filepath.length() + 1);
 		}
 
-		fileStr = filepath + "\r" + fileStr;
-
-		int numberOfSaves = 0;
-		for (int i = 0; i < fileStr.length(); i++)
-		{
-			if (fileStr[i] == "\r"[0]) { numberOfSaves++; }
-		}
-
-		if (m_PreferencesPannel.GetPreferences().m_PreferenceData.recentFiles < 1) { fileStr.clear(); }
-		else
-		{
-			while (numberOfSaves > m_PreferencesPannel.GetPreferences().m_PreferenceData.recentFiles)
-			{
-				int secondLastIndex = fileStr.erase(fileStr.find_last_of("\r"), 1).find_last_of("\r");
-				fileStr = fileStr.erase(secondLastIndex, fileStr.find_last_of("\r") - secondLastIndex);
-				numberOfSaves--;
-			}
-		}
-
 		std::ofstream fout("saved/RecentPaths.txt");
-		fout << (fileStr).c_str();
+		fout << (filepath + "\r" + fileStr).c_str();
 	}
 
 	
@@ -1497,31 +1469,18 @@ namespace Dymatic {
 		return recentFiles;
 	}
 
-	void EditorLayer::SetShadingIndex(int index)
-	{
-		m_ShadingIndex = index;
-		if (index != 0) { m_PreviousToggleIndex = m_ShadingIndex; }
-		switch (m_ShadingIndex)
-		{
-		case 0: { RenderCommand::SetWireframe(true); break; }
-		case 1: { RenderCommand::SetWireframe(false); break; }
-		case 2: { RenderCommand::SetWireframe(false); break; }
-		case 3: { RenderCommand::SetWireframe(false); break; }
-		}
-	}
-
 	//ImGui Menu Item with Dymatic Image
-	bool EditorLayer::ImageMenuItem(Ref<Texture2D> texture, std::string item, std::string shortcut, bool menu, bool enabled, ImVec2 imageSize)
+	bool EditorLayer::ImageMenuItem(Ref<Texture2D> texture, std::string item, std::string shortcut, bool menu, ImVec2 imageSize)
 	{
 		ImGui::Image(reinterpret_cast<void*>(texture->GetRendererID()), imageSize, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
 		ImGui::SameLine();
 		if (menu)
 		{
-			return (ImGui::BeginMenu(item.c_str(), enabled));
+			return (ImGui::BeginMenu(item.c_str()));
 		}
 		else
 		{
-			return (ImGui::MenuItem(item.c_str(), shortcut.c_str(), false, enabled));
+			return (ImGui::MenuItem(item.c_str(), shortcut.c_str()));
 		}
 	}
 

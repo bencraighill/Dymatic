@@ -22,6 +22,11 @@ namespace Dymatic {
 			s_RendererAPI->SetClearColor(color);
 		}
 
+		static void SetWireframe(const bool wireframe)
+		{
+			s_RendererAPI->SetWireframe(wireframe);
+		}
+
 		static void Clear()
 		{
 			s_RendererAPI->Clear();

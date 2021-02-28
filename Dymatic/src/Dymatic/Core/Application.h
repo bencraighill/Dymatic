@@ -26,6 +26,8 @@ namespace Dymatic {
 		void PushLayer(Layer* layer);
 		void PushOverlay(Layer* layer);
 
+		Timestep GetTimestep() { return m_Timestep; }
+
 		bool GetCloseWindowButtonPressed() { return m_CloseWindowCallback == 2; }
 		void SetCloseWindowCallback(bool enabled) { m_CloseCallbackEnabled = enabled; }
 
@@ -47,6 +49,7 @@ namespace Dymatic {
 		bool m_Minimized = false;
 		LayerStack m_LayerStack;
 		float m_LastFrameTime = 0.0f;
+		Timestep m_Timestep = 0.0f;
 		// Editor layer uses events to detect when trying to close window
 		bool m_CloseCallbackEnabled = false;
 		int m_CloseWindowCallback = 0;

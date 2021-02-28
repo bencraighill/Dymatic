@@ -14,7 +14,6 @@ namespace Dymatic {
 		PreferencesPannel();
 		void OnImGuiRender();
 
-		std::string ColorVariableToText(ColorSchemeType colorVariable);
 		void EditThemeColor(ColorSchemeType colorSchemeType, std::string tooltip = "");
 		bool KeyBindInputButton(KeyBindEvent keyBindEvent);
 		void NotificationEdit(std::string NotificationName, int varIndex, bool enabled = true);

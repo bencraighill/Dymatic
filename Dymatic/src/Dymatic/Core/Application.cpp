@@ -89,7 +89,7 @@ namespace Dymatic {
 			DY_PROFILE_SCOPE("RunLoop");
 
 			float time = (float)glfwGetTime();
-			Timestep timestep = time - m_LastFrameTime;
+			m_Timestep = time - m_LastFrameTime;
 			m_LastFrameTime = time;
 
 			if (!m_Minimized)
@@ -98,7 +98,7 @@ namespace Dymatic {
 					DY_PROFILE_SCOPE("LayerStack OnUpdate");
 
 					for (Layer* layer : m_LayerStack)
-						layer->OnUpdate(timestep);
+						layer->OnUpdate(m_Timestep);
 				}
 
 			}

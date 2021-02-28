@@ -15,22 +15,29 @@ namespace Dymatic {
 	{
 	public:
 		NodeEditorPannel();
-	
+
 		void OnEvent(Event& e);
+
+		bool OnKeyPressed(KeyPressedEvent& e);
 
 		void Application_Initialize();
 		void Application_Finalize();
-	
+
 		void CompileNodes();
-	
+
 		void CopyNodes();
 		void PasteNodes();
 		void DuplicateNodes();
 		void DeleteNodes();
-	
+
 		void Application_Frame();
 	private:
-		int stackIndex;
+		std::string CallNode(int* inNode, bool declaration = true);
+		std::string RetrievePin(int* inPin);
+		
+		NodeCompilerLoopBackOutput CreateLoopBackVariables(int* inNode);
+
+		bool ResetSearchArea = false;
 	};
 
 }

@@ -19,17 +19,19 @@ namespace Dymatic {
 	{
 		ColorScheme colorScheme;
 		KeyBinds keyBinds;
-		//Autosave
 
 		int doubleClickSpeed = 350;
 
 		bool autosavePreferences = true;
 		bool autosaveEnabled = true;
+
 		int autosaveTime = 5;
+		int recentFiles = 10;
 
 		std::vector<FileColor> fileColors;
 
 		bool showSplash = true;
+
 
 		int NotificationPreset = 0;
 		std::array<int, 2>&& NotificationToastEnabled = {};

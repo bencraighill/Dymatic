@@ -575,11 +575,10 @@ namespace ImGui
     struct ObjectWInputReturn
     {
         bool object;
-        bool clicked;
         bool input;
     };
 
-    IMGUI_API ObjectWInputReturn          TreeNodeInputEx(const char* str_id, const char* label, ImGuiTreeNodeFlags flags, char* buf, size_t buf_size);
+    IMGUI_API ObjectWInputReturn          TreeNodeInputEx(const char* id, const char* label, ImGuiTreeNodeFlags flags, char* buf, size_t buf_size, const char* fmt, ...);
     //------------//
     IMGUI_API bool          TreeNodeEx(const void* ptr_id, ImGuiTreeNodeFlags flags, const char* fmt, ...) IM_FMTARGS(3);
     IMGUI_API bool          TreeNodeExV(const char* str_id, ImGuiTreeNodeFlags flags, const char* fmt, va_list args) IM_FMTLIST(3);
@@ -1292,11 +1291,6 @@ enum ImGuiCol_
     ImGuiCol_ScrollbarDots,
     ImGuiCol_ButtonToggled,
     ImGuiCol_ButtonToggledHovered,
-    ImGuiCol_ProgressBarBg,
-    ImGuiCol_ProgressBarBorder,
-    ImGuiCol_ProgressBarFill,
-    ImGuiCol_MenuBarGrip,
-    ImGuiCol_MenuBarGripBorder,
     //-----------//
     ImGuiCol_COUNT
 
