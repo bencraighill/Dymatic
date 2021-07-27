@@ -1,0 +1,6 @@
+Add custom presets here:
+You may use relative or full paths, in the format "Preset_Name - Preset_Path"
+
+//Default Presets:
+<Dymatic Default> {saved/presets/keybinds/DymaticDefault.keybind}
+<Blender> {saved/presets/keybinds/Blender.keybind}

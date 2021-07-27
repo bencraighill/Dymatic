@@ -39,6 +39,9 @@ namespace Dymatic {
 		void SetInitialMousePosition(glm::vec2 initialMousePosition) { m_InitialMousePosition = initialMousePosition; }
 		void SetYaw(float yaw) { m_Yaw = yaw; }
 		void SetPitch(float pitch) { m_Pitch = pitch; }
+
+		int GetProjectionType() { return m_ProjectionType; }
+		void SetProjectionType(int type) { m_ProjectionType = type; UpdateProjection(); }
 	private:
 		void UpdateProjection();
 		void UpdateView();
@@ -69,6 +72,8 @@ namespace Dymatic {
 		float m_ViewportWidth = 1280, m_ViewportHeight = 720;
 
 		bool m_FreePan = true;
+
+		int m_ProjectionType = 0;
 	};
 
 }

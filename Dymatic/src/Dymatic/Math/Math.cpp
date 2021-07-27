@@ -83,15 +83,6 @@ namespace Dymatic::Math {
 		return true;
 	}
 
-	std::string FloatToString(float Float)
-	{
-		std::string text = std::to_string(Float);
-		int check = text.find_last_not_of("0");
-		int checkStop = text.find_first_of(".");
-		int finalCheck = check <= checkStop ? check : check + 1;
-		return (text.substr(0, finalCheck));
-	}
-
 	unsigned int GetRandomInRange(int min, int max)
 	{
 		return ((rand() * std::time(nullptr)) % max + min);

@@ -15,10 +15,22 @@ int main(int argc, char** argv);
 
 namespace Dymatic {
 
+	struct ApplicationCommandLineArgs
+	{
+		int Count = 0;
+		char** Args = nullptr;
+
+		const char* operator[](int index) const
+		{
+			DY_CORE_ASSERT(index < Count);
+			return Args[index];
+		}
+	};
+
 	class Application
 	{
 	public:
-		Application(const std::string& name = "Dymatic Engine");
+		Application(const std::string& name = "Dymatic Engine", ApplicationCommandLineArgs args = ApplicationCommandLineArgs());
 		virtual ~Application();
 
 		void OnEvent(Event& e);
@@ -28,9 +40,6 @@ namespace Dymatic {
 
 		Timestep GetTimestep() { return m_Timestep; }
 
-		bool GetCloseWindowButtonPressed() { return m_CloseWindowCallback == 2; }
-		void SetCloseWindowCallback(bool enabled) { m_CloseCallbackEnabled = enabled; }
-
 		Window& GetWindow() { return *m_Window; }
 
 		void Close();
@@ -38,11 +47,14 @@ namespace Dymatic {
 		ImGuiLayer* GetImGuiLayer() { return m_ImGuiLayer; }
 
 		static Application& Get() { return *s_Instance; }
+
+		ApplicationCommandLineArgs GetCommandLineArgs() const { return m_CommandLineArgs; }
 	private:
 		void Run();
 		bool OnWindowClose(WindowCloseEvent& e);
 		bool OnWindowResize(WindowResizeEvent& e);
 	private:
+		ApplicationCommandLineArgs m_CommandLineArgs;
 		Scope<Window> m_Window;
 		ImGuiLayer* m_ImGuiLayer;
 		bool m_Running = true;
@@ -50,15 +62,12 @@ namespace Dymatic {
 		LayerStack m_LayerStack;
 		float m_LastFrameTime = 0.0f;
 		Timestep m_Timestep = 0.0f;
-		// Editor layer uses events to detect when trying to close window
-		bool m_CloseCallbackEnabled = false;
-		int m_CloseWindowCallback = 0;
 	private:
 		static Application* s_Instance;
 		friend int ::main(int argc, char** argv);
 	};
 
 	// To be defined in CLIENT
-	Application* CreateApplication();
+	Application* CreateApplication(ApplicationCommandLineArgs args);
 
 }

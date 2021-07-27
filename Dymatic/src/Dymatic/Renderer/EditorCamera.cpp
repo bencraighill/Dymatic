@@ -20,18 +20,48 @@ namespace Dymatic {
 
 	void EditorCamera::UpdateProjection()
 	{
-		m_AspectRatio = m_ViewportWidth / m_ViewportHeight;
-		m_Projection = glm::perspective(glm::radians(m_FOV), m_AspectRatio, m_NearClip, m_FarClip);
+		if (m_ProjectionType == 0)
+		{
+			m_AspectRatio = m_ViewportWidth / m_ViewportHeight;
+			m_Projection = glm::perspective(glm::radians(m_FOV), m_AspectRatio, m_NearClip, m_FarClip);
+		}
+		else if (m_ProjectionType == 1)
+		{
+			float m_OrthographicSize = m_Distance * 0.5f;
+
+			float orthoLeft = -m_OrthographicSize * m_AspectRatio * 0.5f;
+			float orthoRight = m_OrthographicSize * m_AspectRatio * 0.5f;
+			float orthoBottom = -m_OrthographicSize * 0.5f;
+			float orthoTop = m_OrthographicSize * 0.5f;
+
+			m_Projection = glm::ortho(orthoLeft, orthoRight,
+				orthoBottom, orthoTop, -m_FarClip, m_FarClip);
+		}
 	}
 	
 	void EditorCamera::UpdateView()
 	{
-		// m_Yaw = m_Pitch = 0.0f; //Lock the camera's rotation
-		m_Position = CalculatePosition();
+		//m_Yaw = m_Pitch = 0.0f; //Lock the camera's rotation
+		{
+			m_Position = CalculatePosition();
 
-		glm::quat orientation = GetOrientation();
-		m_ViewMatrix = glm::translate(glm::mat4(1.0f), m_Position) * glm::toMat4(orientation);
-		m_ViewMatrix = glm::inverse(m_ViewMatrix);
+			glm::quat orientation = GetOrientation();
+			m_ViewMatrix = glm::translate(glm::mat4(1.0f), m_Position) * glm::toMat4(orientation);
+			m_ViewMatrix = glm::inverse(m_ViewMatrix);
+		}
+		if (m_ProjectionType == 1)
+		{
+
+			float m_OrthographicSize = m_Distance * 0.5f;
+
+			float orthoLeft = -m_OrthographicSize * m_AspectRatio * 0.5f;
+			float orthoRight = m_OrthographicSize * m_AspectRatio * 0.5f;
+			float orthoBottom = -m_OrthographicSize * 0.5f;
+			float orthoTop = m_OrthographicSize * 0.5f;
+
+			m_Projection = glm::ortho(orthoLeft, orthoRight,
+				orthoBottom, orthoTop, -m_FarClip, m_FarClip);
+		}
 	}
 
 	std::pair<float, float> EditorCamera::PanSpeed() const

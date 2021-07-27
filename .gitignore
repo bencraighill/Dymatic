@@ -1,14 +1,18 @@
 # Binaries
 **/bin/
-!vendor/premake/bin/
 bin-int/
 
-
-# Hazel files
+# Dymatic files
 *.log
+
 # Visual Studio files and folder
 .vs/
 **.sln
 **.vcxproj
 **.vcxproj.filters
 **.vcxproj.user
+
+# Directories
+Dymatic/vendor/VulkanSDK
+DymaticEditor/assets/cache
+scripts/__pycache__

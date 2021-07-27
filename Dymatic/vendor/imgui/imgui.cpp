@@ -6755,6 +6755,17 @@ void ImGui::End()
         SetCurrentViewport(g.CurrentWindow, g.CurrentWindow->Viewport);
 }
 
+
+bool ImGui::BeginDockable(const char* name, bool* p_open, ImGuiWindowFlags flags, ImGuiWindowFlags dockspace_flags)
+{
+    bool begin = Begin(name, p_open, flags);
+    PushID(name);
+    ImGuiID dockspace_id_area = GetID("Window_Dockspace");
+    DockSpace(dockspace_id_area, ImVec2(0.0f, 0.0f), dockspace_flags);
+    PopID();
+    return begin;
+}
+
 void ImGui::BringWindowToFocusFront(ImGuiWindow* window)
 {
     ImGuiContext& g = *GImGui;

@@ -21,6 +21,7 @@ namespace Dymatic {
 		KeyBinds keyBinds;
 
 		int doubleClickSpeed = 350;
+		bool emulateNumpad = false;
 
 		bool autosavePreferences = true;
 		bool autosaveEnabled = true;

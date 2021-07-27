@@ -84,6 +84,21 @@ namespace Dymatic {
 		NavHighlight,
 		NavWindowingHighlight,
 		NavWindowingDimBg,
+		//---
+		TextEditorDefault,
+		TextEditorKeyword,
+		TextEditorNumber,
+		TextEditorString,
+		TextEditorCharLiteral,
+		TextEditorPunctuation,
+		TextEditorPreprocessor,
+		TextEditorIdentifier,
+		TextEditorComment,
+		TextEditorMultiLineComment,
+		TextEditorLineNumber,
+		TextEditorCurrentLineFill,
+		TextEditorCurrentLineFillInactive,
+		TextEditorCurrentLineEdge,
 		//-------//
 		DYMATIC_COLOR_SCHEME_SIZE
 	};

@@ -1,4 +1,6 @@
-﻿# define IMGUI_DEFINE_MATH_OPERATORS
+﻿#include "dypch.h"
+
+# define IMGUI_DEFINE_MATH_OPERATORS
 # include "imgui_canvas.h"
 # include <type_traits>
 

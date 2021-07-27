@@ -1,0 +1,22 @@
+Scene: Untitled
+Entities:
+  - Entity: 12837192831273
+    TagComponent:
+      Tag: Empty Entity
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    ParticleSystemComponent:
+      Offset: [0, 0, 0]
+      Velocity: [0, 0, 0]
+      VelocityVariation: [0.75, 0.75, 0.75]
+      ColorBegin: [9.99999997e-07, 0, 0, 1]
+      ColorEnd: [9.99999997e-07, 0, 0, 1]
+      SizeBegin: 0.0500000007
+      SizeEnd: 0.0250000004
+      SizeVariation: 0.100000001
+      LifeTime: 10
+      EmissionNumber: 1
+      Active: true
+      FaceCamera: true

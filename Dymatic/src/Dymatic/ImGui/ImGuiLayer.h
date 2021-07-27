@@ -8,12 +8,6 @@
 
 namespace Dymatic {
 
-	enum EngineColorScheme
-	{
-		Light = 0,
-		Dark = 1
-	};
-
 	class ImGuiLayer : public Layer
 	{
 	public:
@@ -29,13 +23,9 @@ namespace Dymatic {
 
 		void BlockEvents(bool block) { m_BlockEvents = block; }
 
-		void SetColorScheme(EngineColorScheme colorScheme);
+		void AddIconFont(const char* path, float size, int min_range, int max_range);
 	private:
 		bool m_BlockEvents = true;
-		float m_Time = 0.0f;
-
-		//Custom Code
-		EngineColorScheme m_ColorScheme;
 	};
 
 }

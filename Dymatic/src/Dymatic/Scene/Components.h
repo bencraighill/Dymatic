@@ -9,6 +9,14 @@
 #include "SceneCamera.h"
 #include "ScriptableEntity.h"
 
+//----Particles------//
+#include <glm/gtc/constants.hpp>
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/compatibility.hpp>
+
+#include <random>
+//-------------------//
+
 namespace Dymatic {
 
 	struct TagComponent
@@ -50,6 +58,159 @@ namespace Dymatic {
 		SpriteRendererComponent(const SpriteRendererComponent&) = default;
 		SpriteRendererComponent(const glm::vec4 & color)
 			: Color(color) {}
+	};
+
+	struct ParticleSystem
+	{
+	public:
+		ParticleSystem::ParticleSystem(uint32_t maxParticles = 100000)
+			: m_PoolIndex(maxParticles - 1)
+		{
+			m_ParticlePool.resize(maxParticles);
+		}
+
+		struct ColorPoint
+		{
+			unsigned int id = 0;
+			float point = 1.0f;
+			glm::vec4 color = glm::vec4(1.0f);
+
+			unsigned int GetId() { return id; }
+
+			ColorPoint(unsigned int id)
+				: id(id)
+			{
+			}
+
+			ColorPoint(unsigned int id, float point, glm::vec4 color)
+				: id(id), point(point), color(color)
+			{
+			}
+		};
+	
+		struct Particle
+		{
+			glm::vec3 Position;
+			glm::vec3 Velocity;
+			glm::vec4 ColorBegin, ColorEnd, ColorConstant;
+			float Rotation = 0.0f;
+			float SizeBegin, SizeEnd;
+
+			std::vector<ColorPoint> ColorPoints;
+	
+			float LifeTime = 1.0f;
+			float LifeRemaining = 0.0f;
+	
+			bool Active = false;
+		};
+	
+		void ParticleSystem::OnUpdate(Dymatic::Timestep ts)
+		{
+			for (auto& particle : m_ParticlePool)
+			{
+				if (!particle.Active)
+					continue;
+	
+				if (particle.LifeRemaining <= 0.0f)
+				{
+					particle.Active = false;
+					continue;
+				}
+	
+				particle.LifeRemaining -= ts;
+				
+				particle.Velocity += Gravity * (float)ts;
+
+				particle.Position += particle.Velocity * (float)ts;
+				particle.Rotation += 0.01f * ts;
+			}
+		}
+	
+		void Emit()
+		{
+			if (Active)
+			{
+				for (int i = 0; i < EmissionNumber; i++)
+				{
+					Particle& particle = m_ParticlePool[m_PoolIndex];
+					particle.Active = true;
+					particle.Position = Position;
+					particle.Rotation = RandomFloat(0, 1) * 2.0f * glm::pi<float>();
+
+					// Velocity
+					particle.Velocity = Velocity;
+					particle.Velocity.x += VelocityVariation.x * (RandomFloat(0, 1) - 0.5f);
+					particle.Velocity.y += VelocityVariation.y * (RandomFloat(0, 1) - 0.5f);
+					particle.Velocity.z += VelocityVariation.z * (RandomFloat(0, 1) - 0.5f);
+
+					// Color
+					particle.ColorBegin = ColorBegin;
+					particle.ColorEnd = ColorEnd;
+
+					particle.ColorConstant = ColorConstant;
+
+					particle.ColorPoints = ColorPoints;
+
+					particle.LifeTime = LifeTime;
+					particle.LifeRemaining = LifeTime;
+					particle.SizeBegin = SizeBegin + SizeVariation * (RandomFloat(0, 1) - 0.5f);
+					particle.SizeEnd = SizeEnd;
+
+					m_PoolIndex = --m_PoolIndex % m_ParticlePool.size();
+				}
+			}
+		}
+
+		void DuplicateColorPoint(int index) { ColorPoints.insert(ColorPoints.begin() + index, ColorPoints[index]); ColorPoints[index].id = GetNextColorPointId(); }
+
+		struct ColorPointOrderKey
+		{
+			inline bool operator() (const ColorPoint& colorPoint1, const ColorPoint& colorPoint2)
+			{
+				return (colorPoint1.point < colorPoint2.point);
+			}
+		};
+
+		void RecalculateColorPointOrder()
+		{
+			std::sort(ColorPoints.begin(), ColorPoints.end(), ColorPointOrderKey());
+		}
+
+		glm::vec3 Offset = glm::vec3(0.0f, 0.0f, 0.0f);
+		glm::vec3 Position = glm::vec3(0.0f, 0.0f, 0.0f);
+		glm::vec3 Velocity = glm::vec3(0.0f, 0.0f, 0.0f);
+		glm::vec3 VelocityVariation = glm::vec3(0.0f, 0.0f, 0.0f);
+		glm::vec3 Gravity = glm::vec3(0.0f, -9.8f, 0.0f);
+		glm::vec4 ColorBegin = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+		glm::vec4 ColorEnd = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+		glm::vec4 ColorConstant = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+		float SizeBegin = 1.0f;
+		float SizeEnd = 1.0f;
+		float SizeVariation = 0.0f;
+		float LifeTime = 1.0f;
+		int EmissionNumber = 10;
+		bool Active = true;
+		bool FaceCamera = true;
+
+		int ColorMethod = 0;
+		unsigned int nextColorPointId = 1;
+		unsigned int GetNextColorPointId() { nextColorPointId++; return nextColorPointId; }
+		std::vector<ColorPoint> ColorPoints;
+		
+		std::vector<Particle> &GetParticlePool() { return m_ParticlePool; }
+		void ClearParticlePool() { std::fill(m_ParticlePool.begin(), m_ParticlePool.end(), Particle()); }
+	
+	private:
+	
+		float RandomFloat(float a, float b) {
+			float random = ((float)rand()) / (float)RAND_MAX;
+			float diff = b - a;
+			float r = random * diff;
+			return a + r;
+		}
+	
+		std::vector<Particle> m_ParticlePool;
+		uint32_t m_PoolIndex;
 	};
 
 	struct CameraComponent

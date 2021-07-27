@@ -293,6 +293,9 @@ namespace ImGui
     IMGUI_API bool          Begin(const char* name, bool* p_open = NULL, ImGuiWindowFlags flags = 0);
     IMGUI_API void          End();
 
+    //IMGUI CUSTOM:
+    IMGUI_API bool          BeginDockable(const char* name, bool* p_open = NULL, ImGuiWindowFlags flags = 0, ImGuiWindowFlags dockspace_flags = 0);
+    //----------//
     // Child Windows
     // - Use child windows to begin into a self-contained independent scrolling/clipping regions within a host window. Child windows can embed their own child.
     // - For each independent axis of 'size': ==0.0f: use remaining host window size / >0.0f: fixed size / <0.0f: use remaining window size minus abs(size) / Each axis can use a different mode, e.g. ImVec2(0,400).
@@ -392,6 +395,9 @@ namespace ImGui
     //    Window-local coordinates:   SameLine(), GetCursorPos(), SetCursorPos(), GetCursorStartPos(), GetContentRegionMax(), GetWindowContentRegion*(), PushTextWrapPos()
     //    Absolute coordinate:        GetCursorScreenPos(), SetCursorScreenPos(), all ImDrawList:: functions.
     IMGUI_API void          Separator();                                                    // separator, generally horizontal. inside a menu bar or in horizontal layout mode, this becomes a vertical separator.
+    //IMGUI CUSTOM:
+    IMGUI_API bool          Splitter(const char* label, bool split_vertically, float thickness, float* size1, float* size2, float min_size1, float min_size2, float splitter_long_axis_size = -1.0f);
+    //-----------//
     IMGUI_API void          SameLine(float offset_from_start_x=0.0f, float spacing=-1.0f);  // call between widgets or groups to layout them horizontally. X position given in window coordinates.
     IMGUI_API void          NewLine();                                                      // undo a SameLine() or force a new line when in an horizontal-layout context.
     IMGUI_API void          Spacing();                                                      // add vertical spacing.
@@ -1297,6 +1303,21 @@ enum ImGuiCol_
     ImGuiCol_ProgressBarFill,
     ImGuiCol_MenuBarGrip,
     ImGuiCol_MenuBarGripBorder,
+    // Text Editor
+    ImGuiCol_TextEditorDefault,
+    ImGuiCol_TextEditorKeyword,
+    ImGuiCol_TextEditorNumber,
+    ImGuiCol_TextEditorString,
+    ImGuiCol_TextEditorCharLiteral,
+    ImGuiCol_TextEditorPunctuation,
+    ImGuiCol_TextEditorPreprocessor,
+    ImGuiCol_TextEditorIdentifier,
+    ImGuiCol_TextEditorComment,
+    ImGuiCol_TextEditorMultiLineComment,
+    ImGuiCol_TextEditorLineNumber,
+    ImGuiCol_TextEditorCurrentLineFill,
+    ImGuiCol_TextEditorCurrentLineFillInactive,
+    ImGuiCol_TextEditorCurrentLineEdge,
     //-----------//
     ImGuiCol_COUNT
 

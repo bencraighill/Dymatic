@@ -7,6 +7,8 @@
 //
 // CREDITS
 //   Written by Michal Cichon
+#include "dypch.h"
+
 # include "crude_json.h"
 # include <iomanip>
 # include <limits>

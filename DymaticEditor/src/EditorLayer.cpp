@@ -1,6 +1,9 @@
 #include "EditorLayer.h"
+
 #include <imgui/imgui.h>
 #include <imgui/imgui_internal.h>
+#include "ImGuizmo.h"
+
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -8,14 +11,19 @@
 #include "Dymatic/Scene/SceneSerializer.h"
 
 #include "Dymatic/Utils/PlatformUtils.h"
-
-#include "ImGuizmo.h"
-
 #include "Dymatic/Math/Math.h"
+#include "Dymatic/Math/StringUtils.h"
 
 #include "stb_image/stb_image.h"
 
 #include <cmath>
+
+#include "TextSymbols.h"
+
+//#include "Panels/ExampleProj/ThumbnailToolbar.h"
+
+//-URL OPENER-//
+#include <shellapi.h>
 
 namespace Dymatic {
 
@@ -37,6 +45,9 @@ namespace Dymatic {
 
 		m_CheckerboardTexture = Texture2D::Create("assets/textures/Checkerboard.png");
 
+		Application::Get().GetImGuiLayer()->AddIconFont("assets/fonts/IconsFont.ttf", 25.0f, 0x700, 0x70F);	// Window Icons
+		Application::Get().GetImGuiLayer()->AddIconFont("assets/fonts/IconsFont.ttf", 12.0f, 0x710, 0x71E); // Viewport Shading Icons
+		Application::Get().GetImGuiLayer()->AddIconFont("assets/fonts/IconsFont.ttf", 25.0f, 0x71F, 0x72B); // Icons
 
 		FramebufferSpecification fbSpec;
 		fbSpec.Attachments = { FramebufferTextureFormat::RGBA8, FramebufferTextureFormat::RED_INTEGER, FramebufferTextureFormat::Depth };
@@ -46,9 +57,15 @@ namespace Dymatic {
 
 		m_ActiveScene = CreateRef<Scene>();
 
-		m_EditorCamera = EditorCamera(30.0f, 1.778f, 0.1f, 1000.0f);
+		auto commandLineArgs = Application::Get().GetCommandLineArgs();
+		if (commandLineArgs.Count > 1)
+		{
+			auto sceneFilePath = commandLineArgs[1];
+			SceneSerializer serializer(m_ActiveScene);
+			serializer.Deserialize(sceneFilePath);
+		}
 
-		Application::Get().SetCloseWindowCallback(true);
+		m_EditorCamera = EditorCamera(30.0f, 1.778f, 0.1f, 1000.0f);
 
 #if 0
 		// Entity
@@ -133,11 +150,6 @@ namespace Dymatic {
 			m_LastSaveTime += ts;
 		}
 
-		if (Application::Get().GetCloseWindowButtonPressed())
-		{
-			SaveAndExit();
-		}
-
 		if (m_LayoutToLoad != "")
 		{
 			ImGui::LoadIniSettingsFromDisk(m_LayoutToLoad.c_str());
@@ -158,14 +170,14 @@ namespace Dymatic {
 				DY_CORE_INFO("Autosave Complete: Program Time - {0}", m_ProgramTime);
 				//Add Autosave Complete Notification
 				{
-					m_PopupsAndNotifications.Notification("##AutosaveComplete", 1, "Autosave Completed", ("Autosaved current scene at program time: \n" + std::to_string((int)m_ProgramTime)), {"Dismiss"}, false);
+					m_PopupsAndNotifications.Notification(1, "Autosave Completed", ("Autosaved current scene at program time: \n" + std::to_string((int)m_ProgramTime)), { { m_PopupsAndNotifications.GetNextNotificationId(), "Dismiss", [](){} } });
 				}
 			}
 
 			//Warning of autosave
 			if (m_LastSaveTime >= (m_PreferencesPannel.GetPreferences().m_PreferenceData.autosaveTime * 60.0f) - 10 && m_LastSaveTime <= (m_PreferencesPannel.GetPreferences().m_PreferenceData.autosaveTime * 60.0f) - 10 + ts && m_CurrentFilepath != "")
 			{
-				m_PopupsAndNotifications.Notification("##AutosavePending", 0, "Autosave pending...", "Autosave of current scene will commence\n in 10 seconds.", {"Cancel", "Save Now"}, false, 10.0f);
+				m_PopupsAndNotifications.Notification(0, "Autosave pending...", "Autosave of current scene will commence\n in 10 seconds.", { { m_PopupsAndNotifications.GetNextNotificationId(), "Cancel", [&]() { m_LastSaveTime = 1.0f; } }, { m_PopupsAndNotifications.GetNextNotificationId(), "Save Now", [&]() { m_LastSaveTime = m_PreferencesPannel.GetPreferences().m_PreferenceData.autosaveTime * 60; } } }, false, 10.0f);
 			}
 		}
 
@@ -199,8 +211,6 @@ namespace Dymatic {
 
 		// Update scene
 		m_ActiveScene->OnUpdateEditor(ts, m_EditorCamera);
-		//TODO: Runtime update SHOULD NOT BE HERE!
-		m_ActiveScene->OnUpdateRuntime(ts);	
 
 		auto [mx, my] = ImGui::GetMousePos();
 		mx -= m_ViewportBounds[0].x;
@@ -213,6 +223,7 @@ namespace Dymatic {
 		if (mouseX >= 0 && mouseY >= 0 && mouseX < (int)viewportSize.x && mouseY < (int)viewportSize.y)
 		{
 			int pixelData = m_Framebuffer->ReadPixel(1, mouseX, mouseY);
+			m_HoveredPixelID = pixelData;
 			m_HoveredEntity = pixelData == -1 ? Entity() : Entity((entt::entity)pixelData, m_ActiveScene.get());
 		}
 
@@ -262,25 +273,6 @@ namespace Dymatic {
 
 		if (opt_fullscreen)
 			ImGui::PopStyleVar(2);
-
-		//ImRect bb{ ImGui::GetWindowPos(), ImVec2{ImGui::GetWindowPos().x, ImGui::GetWindowPos().y + ImGui::GetWindowSize().y} };
-		//const ImGuiID id = ImGui::GetCurrentWindow()->GetID("##LeftSplitter");
-		//
-		//float differenceX = 0.0f;
-		//float differenceY = 10.0f;
-		//
-		//bool split_vertically = true;
-		//float splitter_long_axis_size = ImGui::GetWindowSize().y;
-		//float thickness = 10.0f;
-		//
-		//bb.Min = ImVec2{ ImGui::GetCurrentWindow()->DC.CursorPos.x + (split_vertically ? ImVec2(differenceX, 0.0f) : ImVec2(0.0f, differenceX)).x, ImGui::GetCurrentWindow()->DC.CursorPos.y + (split_vertically ? ImVec2(differenceX, 0.0f) : ImVec2(0.0f, differenceX)).y };
-		//bb.Max = ImVec2{ bb.Min.x + ImGui::CalcItemSize(split_vertically ? ImVec2(thickness, splitter_long_axis_size) : ImVec2(splitter_long_axis_size, thickness), 0.0f, 0.0f).x, bb.Min.y + ImGui::CalcItemSize(split_vertically ? ImVec2(10.0f, splitter_long_axis_size) : ImVec2(splitter_long_axis_size, thickness), 0.0f, 0.0f).y };
-		//
-		//if (ImGui::SplitterBehavior(bb, id, ImGuiAxis_X, &differenceX, &differenceY, -10.0f, 10.0f))
-		//{
-		//	auto& window = Application::Get().GetWindow();
-		//	window.SetSize(window.GetWidth() + differenceX, window.GetHeight());
-		//}
 
 		static bool windowResizeHeld = false;
 		static bool windowMoveHeld = false;
@@ -391,7 +383,6 @@ namespace Dymatic {
 			}
 		}
 
-
 		// DockSpace
 		ImGuiIO& io = ImGui::GetIO();
 		ImGuiStyle& style = ImGui::GetStyle();
@@ -419,33 +410,30 @@ namespace Dymatic {
 				ImGui::GetWindowDrawList()->AddPolyline(points, sizeof(points), ImGui::GetColorU32(ImGuiCol_MenuBarGripBorder), true, 2.0f);
 			}
 
-			if (ImGui::ImageButton(reinterpret_cast<void*>(m_DymaticLogo->GetRendererID()), ImVec2{ 20, 20 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 }))
-			{
-				ImGui::OpenPopup("##MenuBarDymatic");
-			}
-			if (ImGui::BeginPopup("##MenuBarDymatic", ImGuiWindowFlags_NoMove))
+			if (ImGui::BeginMenu(CHARACTER_ICON_DYMATIC))
 			{
 				if (ImGui::MenuItem("Splash Screen")) { m_ShowSplash = true; }
-				if (ImGui::MenuItem("About Dymatic")) { m_PopupsAndNotifications.Popup("About Engine", "Dymatic Engine\nV1.2.1 (Development)\n\n\nDate: 2020 / 12 / 27\nHash: #O53X5g00PQ\nBranch: dev (repository up to date)\n\n\n Dymatic Engine is a free, open source software developed by BAS Solutions.\nView source files for licenses from vendor libraries.\nFor commercial projects a Dypermite License must be requested.", { "Learn More", "Ok" }); }
+				if (ImGui::MenuItem("About Dymatic")) { m_PopupsAndNotifications.Popup("Engine Information", "Dymatic Engine\nV1.2.2 (Development)\n\n\nDate: 2021 / 07 / 25\nHash: #D65Y4h11QR\nBranch: Development\n\n\n Dymatic Engine is a free, open source software developed by BAS Solutions.\nView source files for licenses from vendor libraries.", { "Learn More", "Ok" }); }
 				ImGui::Separator();
-				if (ImGui::MenuItem("Github")) {}
-				if (ImGui::MenuItem("Uninstall")) {}
+				if (ImGui::MenuItem("Github")) { ShellExecute(0, 0, L"https://github.com/benc25/dymatic", 0, 0 , SW_SHOW ); }
+				if (ImGui::MenuItem("Uninstall")) { m_PopupsAndNotifications.Popup("Uninstall Message", "Current Version:\nV1.2.2 (Development)\n\n\nUnfortunately Dymatic doesn't currently have an uninstaller.\nAll files must be deleted manually from the root directory.", { "Ok" }); }
 				ImGui::Separator();
 				if (ImGui::BeginMenu("System"))
 				{
-					if (ImGui::MenuItem("View System Status")) {}
+					ImGui::MenuItem("Performance Analyser", "", &m_PerformanceAnalyser.GetPerformanceAnalyserVisible());
 					ImGui::EndMenu();
 				}
-				ImGui::EndPopup();
+				ImGui::EndMenu();
 			}
+
 			if (ImGui::BeginMenu("File"))
 			{
 				// Disabling fullscreen would allow the window to be moved to the front of other windows, 
 				// which we can't undo at the moment without finer window depth/z control.
 				//ImGui::MenuItem("Fullscreen", NULL, &opt_fullscreen_persistant);1
-				if (ImageMenuItem(m_IconSystemNew, "New", "Ctrl+N")) NewScene();
-				if (ImageMenuItem(m_IconSystemOpen, "Open...", "Ctrl+O")) OpenScene();
-				if (ImageMenuItem(m_IconSystemRecent, "Open Recent", "", true, !GetRecentFiles().empty()))
+				if (ImGui::MenuItem((std::string(CHARACTER_SYSTEM_ICON_NEW_FILE) + " New").c_str(), GetBindAsString(NewSceneBind).c_str())) NewScene();
+				if (ImGui::MenuItem((std::string(CHARACTER_SYSTEM_ICON_OPEN_FILE) + " Open...").c_str(), GetBindAsString(OpenSceneBind).c_str())) OpenScene();
+				if (ImGui::BeginMenu((std::string(CHARACTER_SYSTEM_ICON_RECENT) + " Open Recent").c_str(), !GetRecentFiles().empty()))
 				{
 					std::vector<std::string> recentFiles = GetRecentFiles();
 					if (!recentFiles.empty())
@@ -463,43 +451,80 @@ namespace Dymatic {
 
 				ImGui::Separator();
 
-				if (ImageMenuItem(m_IconSystemSave, "Save", "Ctrl+S")) SaveScene();
-				if (ImageMenuItem(m_IconSystemSaveAs, "Save As...", "Ctrl+Shift+S")) SaveSceneAs();
+				if (ImGui::MenuItem((std::string(CHARACTER_SYSTEM_ICON_SAVE) + " Save").c_str(), GetBindAsString(SaveSceneBind).c_str())) SaveScene();
+				if (ImGui::MenuItem((std::string(CHARACTER_SYSTEM_ICON_SAVE_AS) + " Save As...").c_str(), GetBindAsString(SaveSceneAsBind).c_str())) SaveSceneAs();
 
 				ImGui::Separator();
 
-				if (ImageMenuItem(m_IconSystemImport, "Import", "", true))
+				if (ImGui::BeginMenu((std::string(CHARACTER_SYSTEM_ICON_IMPORT) + " Import").c_str()))
 				{
 					ImGui::MenuItem("FBX", "(.fbx)"); ImGui::MenuItem("Wavefront", "(.obj"); ImGui::MenuItem("Theme", "(.dytheme)");
 					ImGui::EndMenu();
 				}
-				if (ImageMenuItem(m_IconSystemExport, "Export", "", true))
+				if (ImGui::BeginMenu((std::string(CHARACTER_SYSTEM_ICON_EXPORT) + " Export").c_str()))
 				{
 					ImGui::MenuItem("FBX", "(.fbx)"); ImGui::MenuItem("Wavefront", "(.obj"); ImGui::MenuItem("Theme", "(.dytheme)");
 					ImGui::EndMenu();
 				}
 
+				if (ImGui::MenuItem((std::string(CHARACTER_SYSTEM_ICON_APPEND) + " Append...").c_str(), "")) AppendScene();
+
 				ImGui::Separator();
 
-				if (ImageMenuItem(m_IconSystemQuit, "Exit", "Ctrl+Q")) SaveAndExit();
+				if (ImGui::MenuItem((std::string(CHARACTER_SYSTEM_ICON_QUIT) + " Quit").c_str(), GetBindAsString(QuitBind).c_str())) SaveAndExit();
 				ImGui::EndMenu();
 			}
 
 			if (ImGui::BeginMenu("Edit"))
 			{
-				if (ImageMenuItem(m_IconSystemPreferences, "Preferences", "")) m_PreferencesPannel.SetShowWindow(true);
+				if (ImGui::MenuItem((std::string(CHARACTER_WINDOW_ICON_PREFERENCES) + " Preferences").c_str(), "")) m_PreferencesPannel.GetPreferencesPanelVisible() = true;
 				ImGui::EndMenu();
 			}
 
 			if (ImGui::BeginMenu("Window"))
 			{
-				if (ImageMenuItem(m_IconSystemConsoleWindow, "Toggle System Console", ""))
+				ImGui::MenuItem(		(std::string(CHARACTER_WINDOW_ICON_VIEWPORT)			+ " Viewport").c_str(), "",				&m_ViewportVisible);
+				ImGui::MenuItem(		(std::string(CHARACTER_WINDOW_ICON_TOOLBAR)				+ " Toolbar").c_str(), "",				&m_ToolbarVisible);
+				ImGui::MenuItem(		(std::string(CHARACTER_WINDOW_ICON_STATS)				+ " Stats").c_str(), "",				&m_StatsVisible);
+				ImGui::MenuItem(		(std::string(CHARACTER_WINDOW_ICON_INFO)				+ " Info").c_str(), "",					&m_InfoVisible);
+				ImGui::MenuItem(		(std::string(CHARACTER_WINDOW_ICON_MEMORY_EDITOR)		+ " Memory").c_str(), "",				&m_MemoryEditorVisible);
+				ImGui::MenuItem(		(std::string(CHARACTER_WINDOW_ICON_NODE_EDITOR)			+ " Node Editor").c_str(), "",			&m_NodeEditorVisible);
+				ImGui::MenuItem(		(std::string(CHARACTER_WINDOW_ICON_SCENE_HIERARCHY)		+ " Scene Hierarchy").c_str(), "",		&m_SceneHierarchyPanel.GetSceneHierarchyVisible());
+				ImGui::MenuItem(		(std::string(CHARACTER_WINDOW_ICON_PROPERTIES)			+ " Properties").c_str(), "",			&m_SceneHierarchyPanel.GetPropertiesVisible());
+				ImGui::MenuItem(		(std::string(CHARACTER_WINDOW_ICON_NOTIFICATIONS)		+ " Notifications").c_str(), "",		&m_PopupsAndNotifications.GetNotificationsVisible());
+				ImGui::MenuItem(		(std::string(CHARACTER_WINDOW_ICON_CONTENT_BROWSER)		+ " Content Browser").c_str(), "",		&m_ContentBrowser.GetContentBrowserVisible());
+				ImGui::MenuItem(		(std::string(CHARACTER_WINDOW_ICON_TEXT_EDITOR)			+ " Text Editor").c_str(), "",			&m_TextEditor.GetTextEditorVisible());
+				ImGui::MenuItem(		(std::string(CHARACTER_WINDOW_ICON_CURVE_EDITOR)		+ " Curve Editor").c_str(), "",			&m_CurveEditor.GetCurveEditorVisible());
+				ImGui::MenuItem(		(std::string(CHARACTER_WINDOW_ICON_IMAGE_EDITOR)		+ " Image Editor").c_str(), "",			&m_ImageEditor.GetImageEditorVisible());
+				ImGui::MenuItem(		(std::string(CHARACTER_WINDOW_ICON_CONSOLE)				+ " Console").c_str(), "",				&m_ConsoleWindow.GetConsoleWindowVisible());
+
+				ImGui::Separator();
+
+				if (ImGui::MenuItem((std::string(CHARACTER_WINDOW_ICON_SYSTEM_CONSOLE) + " Toggle System Console").c_str(), ""))
 				{
 					if (Log::IsConsoleVisible())
 						Log::HideConsole();
 					else
 						Log::ShowConsole();
 				}
+				ImGui::EndMenu();
+			}
+
+			if (ImGui::BeginMenu("View"))
+			{
+				if (ImGui::MenuItem("Perspective/Orthographic", GetBindAsString(ViewProjectionBind).c_str())) { m_ProjectionToggled = !m_EditorCamera.GetProjectionType(); m_EditorCamera.SetProjectionType(m_ProjectionToggled); }
+
+				if (ImGui::BeginMenu("Set Perspective"))
+				{
+					if (ImGui::MenuItem("Front", GetBindAsString(ViewFrontBind).c_str())) { m_YawUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360; m_PitchUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360; m_UpdateAngles = true; m_EditorCamera.SetProjectionType(1); }
+					if (ImGui::MenuItem("Side", GetBindAsString(ViewSideBind).c_str())) { m_YawUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360 - 90.0f; m_PitchUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360; m_UpdateAngles = true; m_EditorCamera.SetProjectionType(1); }
+					if (ImGui::MenuItem("Top", GetBindAsString(ViewTopBind).c_str())) { m_YawUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360; m_PitchUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360 + 90; m_UpdateAngles = true; m_EditorCamera.SetProjectionType(1); }
+					ImGui::Separator();
+					if (ImGui::MenuItem("Flip", GetBindAsString(ViewFlipBind).c_str())) { m_YawUpdate = glm::degrees(m_EditorCamera.GetYaw()) + 180.0f; m_PitchUpdate = glm::degrees(m_EditorCamera.GetPitch()); m_UpdateAngles = true; m_EditorCamera.SetProjectionType(1); }
+
+					ImGui::EndMenu();
+				}
+
 				ImGui::EndMenu();
 			}
 
@@ -563,7 +588,6 @@ namespace Dymatic {
 				previousMousePos = ImGui::GetMousePos();
 
 				window.SetPosition(ImGui::GetMousePos().x - offset.x, ImGui::GetMousePos().y - offset.y);
-				//window.SetPosition(window.GetPositionX() + (ImGui::GetMousePos().x - previousMousePos.x), window.GetPositionY() + (ImGui::GetMousePos().y - previousMousePos.y));
 			}
 			else
 			{
@@ -573,78 +597,81 @@ namespace Dymatic {
 			ImGui::EndMenuBar();
 		}
 
+		//ImGui::BeginDockable("Docking Test", NULL, NULL, dockspace_flags);
+		//ImGui::End();
+
 		//Toolbar Window
+		if (m_ToolbarVisible)
 		{
-			ImGui::Begin("Toolbar", NULL, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+			ImGui::Begin((std::string(CHARACTER_WINDOW_ICON_TOOLBAR) + " Toolbar").c_str(), &m_ToolbarVisible, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
 
-			float buttonHeight = 30;
-			float buttonWidth = 30;
-			float sideOffset = 450;
-			ImGui::Dummy(ImVec2{ ImGui::GetContentRegionAvail().x / 2, (ImGui::GetContentRegionAvail().y / 2) - (buttonHeight)});
-			ImGui::Spacing();
+			ImGui::Dummy(ImVec2{ 0, ((ImGui::GetContentRegionAvail().y - 30) / 2) });
+			ImGui::Dummy(ImVec2{ ImGui::GetContentRegionAvail().x - 370, 0 });
+			ImGui::SameLine();
 
-			//Gizmo type buttons
-			ImGui::SameLine(ImGui::GetContentRegionAvail().x - sideOffset + buttonWidth * 1);
-			if (ImGui::ImageButton(reinterpret_cast<void*>((m_GizmoType == ImGuizmo::OPERATION::TRANSLATE ? m_IconTranslationActive : m_IconTranslation)->GetRendererID()), ImVec2{ buttonWidth, buttonHeight }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 }, 0))
-				m_GizmoType = ImGuizmo::OPERATION::TRANSLATE;
-			ImGui::SameLine(ImGui::GetContentRegionAvail().x - sideOffset + buttonWidth * 2);
-			if (ImGui::ImageButton(reinterpret_cast<void*>((m_GizmoType == ImGuizmo::OPERATION::ROTATE ? m_IconRotationActive : m_IconRotation)->GetRendererID()), ImVec2{ buttonWidth, buttonHeight }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 }, 0))
-				m_GizmoType = ImGuizmo::OPERATION::ROTATE;
-			ImGui::SameLine(ImGui::GetContentRegionAvail().x - sideOffset + buttonWidth * 3);
-			if (ImGui::ImageButton(reinterpret_cast<void*>((m_GizmoType == ImGuizmo::OPERATION::SCALE ? m_IconScaleActive : m_IconScale)->GetRendererID()), ImVec2{ buttonWidth, buttonHeight }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 }, 0))
-				m_GizmoType = ImGuizmo::OPERATION::SCALE;
+			const char* gizmo_type_items[4] = { CHARACTER_VIEWPORT_ICON_GIZMO_CURSOR, CHARACTER_VIEWPORT_ICON_GIZMO_TRANSLATE, CHARACTER_VIEWPORT_ICON_GIZMO_ROTATE, CHARACTER_VIEWPORT_ICON_GIZMO_SCALE };
+			int currentValue = (int)(m_GizmoType) + 1;
+			if (ImGui::SwitchButtonEx("##GizmoTypeSwitch", gizmo_type_items, 4, &currentValue, ImVec2(120, 30)))
+				m_GizmoType = currentValue - 1;
 
-			//Gizmo space button
-			ImGui::SameLine(ImGui::GetContentRegionAvail().x - sideOffset + buttonWidth * 4.5);
-			if (ImGui::ImageButton(reinterpret_cast<void*>((m_GizmoSpace == ImGuizmo::MODE::LOCAL ? m_IconSpaceLocal : m_IconSpaceWorld)->GetRendererID()), ImVec2{ buttonWidth, buttonHeight }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 }, 0))
+			ImGui::SameLine();
+
+			if (ImGui::Button(m_GizmoSpace == 0 ? CHARACTER_VIEWPORT_ICON_SPACE_LOCAL : CHARACTER_VIEWPORT_ICON_SPACE_WORLD, ImVec2(30, 30)))
+				m_GizmoSpace = !m_GizmoSpace;
+
+			ImGui::SameLine();
+
 			{
-				m_GizmoSpace = m_GizmoSpace == ImGuizmo::MODE::LOCAL ? ImGuizmo::MODE::WORLD : ImGuizmo::MODE::LOCAL;
+				std::string number = String::FloatToString(m_TranslationSnapValue);
+				const char* pchar = number.c_str();
+				DY_CORE_INFO(pchar);
+				const char** items = new const char* [2]{ CHARACTER_VIEWPORT_ICON_SNAP_TRANSLATION, pchar };
+				int currentTranslationValue = m_TranslationSnap ? 0 : -1;
+				if (ImGui::SwitchButtonEx("##TranslationSnapEnabledSwitch", items, 2, &currentTranslationValue, ImVec2(60, 30)))
+				{
+					if (currentTranslationValue == 1)
+						ImGui::OpenPopup("TranslationSnapLevel");
+					else if (currentTranslationValue == 0)
+						m_TranslationSnap = !m_TranslationSnap;
+				}
+				delete[] items;
 			}
-			
-			//Translation Snap Caller
-			ImGui::SameLine(ImGui::GetContentRegionAvail().x - sideOffset + buttonWidth * 6);
-			if (ImGui::ImageButton(reinterpret_cast<void*>((m_TranslationSnap ? m_IconTranslationSnapActive : m_IconTranslationSnap)->GetRendererID()), ImVec2{ buttonWidth, buttonHeight }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 }, 0))
-				m_TranslationSnap = !m_TranslationSnap;
-			ImGui::SameLine(ImGui::GetContentRegionAvail().x - sideOffset + buttonWidth * 7);
-			ImGui::PushID("TranslationID");
-			bool openTranslationPopup =  (ImGui::ImageButton(reinterpret_cast<void*>(m_IconSnapDropdown->GetRendererID()), ImVec2{ 45, buttonHeight }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 }, 0));
-			ImGui::PopID();
-			if (openTranslationPopup)
-			{
-				ImGui::OpenPopup("TranslationSnapLevel");
-			}
-			ImGui::SameLine(ImGui::GetContentRegionAvail().x - sideOffset + buttonWidth * 7 + (45 / 2) - (ImGui::CalcTextSize(Math::FloatToString(m_TranslationSnapValue).c_str()).x / 2));
-			ImGui::Text(Math::FloatToString(m_TranslationSnapValue).c_str());
 
-			//Rotation Snap Caller
-			ImGui::SameLine(ImGui::GetContentRegionAvail().x - sideOffset + buttonWidth * 9);
-			if (ImGui::ImageButton(reinterpret_cast<void*>((m_RotationSnap ? m_IconRotationSnapActive : m_IconRotationSnap)->GetRendererID()), ImVec2{ buttonWidth, buttonHeight }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 }, 0))
-				m_RotationSnap = !m_RotationSnap;
-			ImGui::SameLine(ImGui::GetContentRegionAvail().x - sideOffset + buttonWidth * 10);
-			ImGui::PushID("RotationID");
-			bool openRotationPopup(ImGui::ImageButton(reinterpret_cast<void*>(m_IconSnapDropdown->GetRendererID()), ImVec2{ 45, buttonHeight }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 }, 0));
-			ImGui::PopID();
-			if (openRotationPopup)
-			{
-				ImGui::OpenPopup("RotationSnapLevel");
-			}
-			ImGui::SameLine(ImGui::GetContentRegionAvail().x - sideOffset + buttonWidth * 10 + (45 / 2) - (ImGui::CalcTextSize(Math::FloatToString(m_RotationSnapValue).c_str()).x / 2));
-			ImGui::Text(Math::FloatToString(m_RotationSnapValue).c_str());
+			ImGui::SameLine();
 
-			//Scale Snap Caller
-			ImGui::SameLine(ImGui::GetContentRegionAvail().x - sideOffset + buttonWidth * 12);
-			if (ImGui::ImageButton(reinterpret_cast<void*>((m_ScaleSnap ? m_IconScaleSnapActive : m_IconScaleSnap)->GetRendererID()), ImVec2{ buttonWidth, buttonHeight }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 }, 0))
-				m_ScaleSnap = !m_ScaleSnap;
-			ImGui::SameLine(ImGui::GetContentRegionAvail().x - sideOffset + buttonWidth * 13);
-			ImGui::PushID("ScaleID");
-			bool openScalePopup (ImGui::ImageButton(reinterpret_cast<void*>(m_IconSnapDropdown->GetRendererID()), ImVec2{ 45, buttonHeight }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 }, 0));
-			ImGui::PopID();
-			if (openScalePopup)
 			{
-				ImGui::OpenPopup("ScaleSnapLevel");
+				std::string number = String::FloatToString(m_RotationSnapValue) + std::string(CHARACTER_SYMBOL_DEGREE);
+				const char* pchar = number.c_str();
+				DY_CORE_INFO(pchar);
+				const char** items = new const char* [2]{ CHARACTER_VIEWPORT_ICON_SNAP_ROTATION, pchar };
+				int currentRotationValue = m_RotationSnap ? 0 : -1;
+				if (ImGui::SwitchButtonEx("##RotationSnapEnabledSwitch", items, 2, &currentRotationValue, ImVec2(60, 30)))
+				{
+					if (currentRotationValue == 1)
+						ImGui::OpenPopup("RotationSnapLevel");
+					else if (currentRotationValue == 0)
+						m_RotationSnap = !m_RotationSnap;
+				}
+				delete[] items;
 			}
-			ImGui::SameLine(ImGui::GetContentRegionAvail().x - sideOffset + buttonWidth * 13 + (45 / 2) - (ImGui::CalcTextSize(Math::FloatToString(m_ScaleSnapValue).c_str()).x / 2));
-			ImGui::Text(Math::FloatToString(m_ScaleSnapValue).c_str());
+
+			ImGui::SameLine();
+
+			{
+				std::string number = String::FloatToString(m_ScaleSnapValue);
+				const char* pchar = number.c_str();
+				DY_CORE_INFO(pchar);
+				const char** items = new const char* [2]{ CHARACTER_VIEWPORT_ICON_SNAP_SCALING, pchar };
+				int currentScalingValue = m_ScaleSnap ? 0 : -1;
+				if (ImGui::SwitchButtonEx("##ScalingSnapEnabledSwitch", items, 2, &currentScalingValue, ImVec2(60, 30)))
+				{
+					if (currentScalingValue == 1)
+						ImGui::OpenPopup("ScaleSnapLevel");
+					else if (currentScalingValue == 0)
+						m_ScaleSnap = !m_ScaleSnap;
+				}
+				delete[] items;
+			}
 
 			//Snapping Setter Events
 			{
@@ -653,7 +680,7 @@ namespace Dymatic {
 					float snapOptions[9] = { 0.01f, 0.05f, 0.1f, 0.5f, 1.0f, 5.0f, 10.0f, 50.0f, 100.0f };
 					for (int i = 0; i < 9; i++)
 					{
-						if (ImGui::MenuItem((Math::FloatToString(snapOptions[i])).c_str()))
+						if (ImGui::MenuItem((String::FloatToString(snapOptions[i])).c_str()))
 						{
 							m_TranslationSnapValue = snapOptions[i];
 						}
@@ -666,7 +693,7 @@ namespace Dymatic {
 					float snapOptions[9] = { 5.0f, 10.0f, 15.0f, 30.0f, 45.0f, 60.0f, 90.0f, 120.0f, 180.0f };
 					for (int i = 0; i < 9; i++)
 					{
-						if (ImGui::MenuItem(((Math::FloatToString(snapOptions[i])) + " degrees").c_str()))
+						if (ImGui::MenuItem(((String::FloatToString(snapOptions[i])) + std::string(CHARACTER_SYMBOL_DEGREE)).c_str()))
 						{
 							m_RotationSnapValue = snapOptions[i];
 						}
@@ -679,7 +706,7 @@ namespace Dymatic {
 					float snapOptions[6] = { 0.1f, 0.25f, 0.5f, 1.0f, 5.0f, 10.0f };
 					for (int i = 0; i < 6; i++)
 					{
-						if (ImGui::MenuItem((Math::FloatToString(snapOptions[i])).c_str()))
+						if (ImGui::MenuItem((String::FloatToString(snapOptions[i])).c_str()))
 						{
 							m_ScaleSnapValue = snapOptions[i];
 						}
@@ -691,15 +718,17 @@ namespace Dymatic {
 			ImGui::End();
 		}
 
-		ImGui::Begin("Info", NULL, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
-		std::string filename = m_CurrentFilepath;
-		ImGui::TextDisabled((filename != "" ? (filename.find_last_of("\\") != std::string::npos ? (filename.erase(0, filename.find_last_of("\\") + 1)) : (filename.find_last_of("/") != std::string::npos ? (filename.erase(0, filename.find_last_of("/") + 1)) : filename)) : "Unsaved Dymatic Document").c_str());
-		ImGui::SameLine();
-		std::string text = "1.2.1 - (Development)";
-		ImGui::Dummy(ImVec2{ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize(text.c_str()).x - 5, 0});
-		ImGui::SameLine();
-		ImGui::TextDisabled(text.c_str());
-		ImGui::End();
+		if (m_InfoVisible)
+		{
+			ImGui::Begin((std::string(CHARACTER_WINDOW_ICON_INFO) + " Info").c_str(), &m_InfoVisible, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+			ImGui::TextDisabled(GetCurrentFileName().c_str());
+			ImGui::SameLine();
+			std::string text = "1.2.2 - (Development)";
+			ImGui::Dummy(ImVec2{ ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize(text.c_str()).x - 5, 0 });
+			ImGui::SameLine();
+			ImGui::TextDisabled(text.c_str());
+			ImGui::End();
+		}
 
 		{
 		//Preferences Pannel
@@ -725,43 +754,51 @@ namespace Dymatic {
 		//Scene Hierarchy and properties pannel
 		m_SceneHierarchyPanel.OnImGuiRender();
 
-		ImGui::Begin("Editor Window");
-		m_NodeEditorPannel.Application_Frame();
-		ImGui::End();
+		m_PerformanceAnalyser.OnImGuiRender(m_DeltaTime);
+
+		m_CurveEditor.OnImGuiRender();
+		m_ImageEditor.OnImGuiRender();
+		//m_ImageEditorNew.OnImGuiRender();
+
+		if (m_MemoryEditorVisible)
+		{
+			//Memory Editor
+			static char buffer[2000];
+			SIZE_T NumberRead;
+			SIZE_T NumberWritten;
+
+			auto baseAddress = m_MemoryEditor.GetProcessBaseAddress(GetCurrentProcessId());
+			ReadProcessMemory(GetCurrentProcess(), (LPCVOID)baseAddress, &buffer, 2000, &NumberRead);
+			m_MemoryEditor.DrawWindow((std::string(CHARACTER_WINDOW_ICON_MEMORY_EDITOR) + " Memory").c_str(), &m_MemoryEditorVisible, &buffer, NumberRead, (int)baseAddress);
+			WriteProcessMemory(GetCurrentProcess(), (LPVOID)baseAddress, &buffer, 2000, &NumberWritten);
+			//---------------------//
+		}
+
+		m_ConsoleWindow.OnImGuiRender(m_DeltaTime);
+
+		//m_FilePrompt.OnImGuiRender(m_DeltaTime);
+
+		//m_AgentSimulation.Update(m_DeltaTime);
+		//m_MandelbrotSet.OnImGuiRender();
+		//m_SandSimulation.OnImGuiRender();
+		
+		m_TextEditor.OnImGuiRender();
+
+		if (m_NodeEditorVisible)
+		{
+			ImGui::Begin((std::string(CHARACTER_WINDOW_ICON_NODE_EDITOR) + " Node Editor").c_str(), &m_NodeEditorVisible);
+			m_NodeEditorPannel.Application_Frame();
+			ImGui::End();
+		}
 
 		static int abc = 0;
 		abc++;
 		if (abc == 200)
 		{
-			m_PopupsAndNotifications.Popup("Operation Manager", "Dymatic Operation In Progress...", { "Cancel" }, true);
+			//m_PopupsAndNotifications.Popup("Operation Manager", "Dymatic Operation In Progress...", { "Cancel" }, true);
 		}
 
-		//static int abc = 0;
-		//abc++;
-		//if (abc > 200)
-		//{
-		//	ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 5.0f);
-		//	ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);
-		//	ImGui::OpenPopup("Dymatic Operation");
-		//	if (ImGui::BeginPopupModal("Dymatic Operation", NULL, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove))
-		//	{
-		//		ImGui::SetWindowSize(ImVec2(300, 50));
-		//		ImGui::SetWindowPos(ImVec2((((io.DisplaySize.x * 0.5f) - (ImGui::GetWindowSize().x / 2)) + Application::Get().GetWindow().GetPositionX()), (((io.DisplaySize.y * 0.5f) - (ImGui::GetWindowSize().y / 2)) + Application::Get().GetWindow().GetPositionY())));
-		//		const char* text = "Dymatic Operation In Progress...";
-		//		ImGui::Dummy(ImVec2(ImGui::GetWindowSize().x / 2 - ImGui::CalcTextSize(text).x * 0.55, 0));
-		//		ImGui::SameLine();
-		//		ImGui::Text(text);
-		//		float barThickness = 15.0f;
-		//		ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(ImGui::GetWindowPos().x + 5.0f, ImGui::GetWindowPos().y + ImGui::GetWindowSize().y - barThickness), ImVec2(ImGui::GetWindowPos().x + ImGui::GetWindowSize().x - 5.0f, ImGui::GetWindowPos().y + ImGui::GetWindowSize().y - 5.0f), ImGui::ColorConvertFloat4ToU32(ImVec4(0.5f, 0.5f, 0.5f, 1.0f)));
-		//		ImGui::GetWindowDrawList()->AddRect(ImVec2(ImGui::GetWindowPos().x + 5.0f, ImGui::GetWindowPos().y + ImGui::GetWindowSize().y - barThickness), ImVec2(ImGui::GetWindowPos().x + ImGui::GetWindowSize().x - 5.0f, ImGui::GetWindowPos().y + ImGui::GetWindowSize().y - 5.0f), ImGui::ColorConvertFloat4ToU32(ImVec4(0.8f, 0.8f, 0.8f, 1.0f)));
-		//		double time = (ImGui::GetTime() - std::floor(ImGui::GetTime()));
-		//		float size = 100.0f;
-		//		ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(ImGui::GetWindowPos().x - size + 5.0f + (ImGui::GetWindowSize().x + size) * (time), ImGui::GetWindowPos().y + ImGui::GetWindowSize().y - barThickness), ImVec2(ImGui::GetWindowPos().x - size - 5.0f + (ImGui::GetWindowSize().x + size) * (time)+size, ImGui::GetWindowPos().y + ImGui::GetWindowSize().y - 5.0f), ImGui::ColorConvertFloat4ToU32(ImVec4(0.8f, 0.8f, 0.8f, 1.0f)));
-		//		DY_CORE_TRACE(time);
-		//		ImGui::EndPopup();
-		//	}
-		//	ImGui::PopStyleVar(2);
-		//}
+		m_PopupsAndNotifications.NotificationUpdate(m_ProgramTime);
 
 		//Notifications Pannel Event Check
 		auto popupData = m_PopupsAndNotifications.PopupUpdate();
@@ -796,337 +833,354 @@ namespace Dymatic {
 			case 1: { m_PreferencesPannel.RetryDythemeFile(); break; }
 			}
 		}
-		if (popupName == "About Engine")
+		if (popupName == "Engine Information")
 		{
 			switch (popupButton)
 			{
-			case 0: { break; }
+			case 0: { ShellExecute(0, 0, L"https://github.com/benc25/dymatic", 0, 0, SW_SHOW); break; }
 			}
 		}
 
-		NotificationData NotificationReturn = m_PopupsAndNotifications.NotificationUpdate(m_ProgramTime);
-		if (NotificationReturn.nameID != "")
+
+		if (m_StatsVisible)
 		{
-			if (NotificationReturn.nameID == "##AutosavePending")
-				switch (NotificationReturn.buttonClicked)
-				{
-				case 0: { m_LastSaveTime = 1.0f; break; }
-				case 1: { m_LastSaveTime = m_PreferencesPannel.GetPreferences().m_PreferenceData.autosaveTime * 60; break; }
-				}
+			ImGui::Begin((std::string(CHARACTER_WINDOW_ICON_STATS) + " Stats").c_str(), &m_StatsVisible);
+
+			ImGui::Text("Frames Per Second: %d", (int)(1.0f / m_DeltaTime));
+			ImGui::Text("Delta Time: %f ms", m_DeltaTime * 1000);
+
+			ImGui::Separator();
+
+			auto stats = Renderer2D::GetStats();
+			ImGui::Text("Renderer2D Stats:");
+			ImGui::Text("Draw Calls: %d", stats.DrawCalls);
+			ImGui::Text("Quads: %d", stats.QuadCount);
+			ImGui::Text("Vertices: %d", stats.GetTotalVertexCount());
+			ImGui::Text("Indices: %d", stats.GetTotalIndexCount());
+
+			ImGui::Separator();
+
+			std::string name = "Null";
+			if ((entt::entity)m_HoveredEntity != entt::null)
+				name = m_HoveredEntity.GetComponent<TagComponent>().Tag;
+			ImGui::Text("Hovered Entity: %s", name.c_str());
+
+			ImGui::End();
 		}
 
-		ImGui::Begin("Stats");
 
-		auto stats = Renderer2D::GetStats();
-		ImGui::Text("Renderer2D Stats:");
-		ImGui::Text("Draw Calls: %d", stats.DrawCalls);
-		ImGui::Text("Quads: %d", stats.QuadCount);
-		ImGui::Text("Vertices: %d", stats.GetTotalVertexCount());
-		ImGui::Text("Indices: %d", stats.GetTotalIndexCount());
-
-		std::string name = "Null";
-		if ((entt::entity)m_HoveredEntity != entt::null)
-			name = m_HoveredEntity.GetComponent<TagComponent>().Tag;
-		ImGui::Text("Hovered Entity: %s", name.c_str());
-
-		ImGui::End();
-
-		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{ 0, 0 });
-		ImGui::Begin("Viewport");
-		auto viewportMinRegion = ImGui::GetWindowContentRegionMin();
-		auto viewportMaxRegion = ImGui::GetWindowContentRegionMax();
-		auto viewportOffset = ImGui::GetWindowPos();
-		m_ViewportBounds[0] = { viewportMinRegion.x + viewportOffset.x, viewportMinRegion.y + viewportOffset.y };
-		m_ViewportBounds[1] = { viewportMaxRegion.x + viewportOffset.x, viewportMaxRegion.y + viewportOffset.y };
-
-		m_ViewportFocused = ImGui::IsWindowFocused();
-		m_ViewportHovered = ImGui::IsWindowHovered();
-		//TODO: fix the whole viewport hovered situation
-		//Application::Get().GetImGuiLayer()->BlockEvents(!m_ViewportFocused && !m_ViewportHovered);
-		Application::Get().GetImGuiLayer()->BlockEvents(false);
-
-		ImVec2 viewportPanelSize = ImGui::GetContentRegionAvail();
-		m_ViewportSize = { viewportPanelSize.x, viewportPanelSize.y };
-
-		uint64_t textureID = m_Framebuffer->GetColorAttachmentRendererID();
-		//ImGui::Image(reinterpret_cast<void*>(textureID), ImVec2{ m_ViewportSize.x, m_ViewportSize.y }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
-		ImGui::GetWindowDrawList()->AddImage(reinterpret_cast<void*>(textureID), ImGui::GetWindowPos(), ImVec2{ ImGui::GetWindowPos().x + m_ViewportSize.x, ImGui::GetWindowPos().y + m_ViewportSize.y }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
-
-		//Viewport View Settings
-		ImGui::Dummy(ImVec2{ImGui::GetContentRegionAvail().x - 95, 0});
-		ImGui::SameLine();
-		ImTextureID shaderButtonTypes[4] = { reinterpret_cast<void*>(m_IconShaderWireframe->GetRendererID()), reinterpret_cast<void*>(m_IconShaderUnlit->GetRendererID()), reinterpret_cast<void*>(m_IconShaderSolid->GetRendererID()), reinterpret_cast<void*>(m_IconShaderRendered->GetRendererID()) };
-		int shaderButtonIndex = ImGui::SwitchImageButtonEx("ShaderTypeButtonSwicth", shaderButtonTypes, 4, ImVec2{ 20, 20 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 }, m_ShadingIndex, ImVec2{ 85, 25 });
-		if (shaderButtonIndex != -1) { SetShadingIndex(shaderButtonIndex); }
-
-		//Scene View Gizmo
+		if (m_ViewportVisible)
 		{
+			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{ 0, 0 });
+			ImGui::Begin((std::string(CHARACTER_WINDOW_ICON_VIEWPORT) + " Viewport").c_str(), &m_ViewportVisible);
+			auto viewportMinRegion = ImGui::GetWindowContentRegionMin();
+			auto viewportMaxRegion = ImGui::GetWindowContentRegionMax();
+			auto viewportOffset = ImGui::GetWindowPos();
+			m_ViewportBounds[0] = { viewportMinRegion.x + viewportOffset.x, viewportMinRegion.y + viewportOffset.y };
+			m_ViewportBounds[1] = { viewportMaxRegion.x + viewportOffset.x, viewportMaxRegion.y + viewportOffset.y };
 
-			auto camYAngle = Math::NormalizeAngle(glm::degrees(m_EditorCamera.GetPitch()), -180) * -1;
-			auto camXAngle = Math::NormalizeAngle(glm::degrees(m_EditorCamera.GetYaw()), -180);
+			m_ViewportFocused = ImGui::IsWindowFocused();
+			m_ViewportHovered = ImGui::IsWindowHovered();
+			//TODO: fix the whole viewport hovered situation
+			//Application::Get().GetImGuiLayer()->BlockEvents(!m_ViewportFocused && !m_ViewportHovered);
+			Application::Get().GetImGuiLayer()->BlockEvents(false);
 
-			ImU32 hoveredColor = ImGui::ColorConvertFloat4ToU32(ImVec4{ 1.0f, 1.0f, 1.0f, 1.0f });
-			ImU32 fontColor = ImGui::ColorConvertFloat4ToU32(ImVec4{ 0.0f, 0.0f, 0.0f, 1.0f });
-			ImU32 xCol = ImGui::ColorConvertFloat4ToU32(ImVec4{ 1.0f, 0.21f, 0.33f, 1.0f });
-			ImU32 xColDisabled = ImGui::ColorConvertFloat4ToU32(ImVec4{ 0.6f, 0.22f, 0.28f, 1.0f });
-			ImU32 yCol = ImGui::ColorConvertFloat4ToU32(ImVec4{ 0.17f, 0.56f, 1.0f, 1.0f });
-			ImU32 yColDisabled = ImGui::ColorConvertFloat4ToU32(ImVec4{ 0.2f, 0.39f, 0.6f, 1.0f });
-			ImU32 zCol = ImGui::ColorConvertFloat4ToU32(ImVec4{ 0.54f, 0.86f, 0.0f, 1.0f });
-			ImU32 zColDisabled = ImGui::ColorConvertFloat4ToU32(ImVec4{ 0.38f, 0.54f, 0.13f, 1.0f });
-			float thicknessVal = 2.0f;
-			float armLength = 40.0f;
-			float circleRadius = 9.0f;
-			ImVec2 pos = ImVec2(ImGui::GetWindowPos().x + (float)ImGui::GetWindowWidth() - (armLength + circleRadius) * 1.1f, ImGui::GetWindowPos().y + (armLength + circleRadius) * 1.1f + 30);
+			ImVec2 viewportPanelSize = ImGui::GetContentRegionAvail();
+			m_ViewportSize = { viewportPanelSize.x, viewportPanelSize.y };
 
-			ImVec2 xPos = pos;
-			ImVec2 yPos = pos;
-			ImVec2 zPos = pos;
+			uint64_t textureID = m_Framebuffer->GetColorAttachmentRendererID();
+			//ImGui::Image(reinterpret_cast<void*>(textureID), ImVec2{ m_ViewportSize.x, m_ViewportSize.y }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
+			ImGui::GetWindowDrawList()->AddImage(reinterpret_cast<void*>(textureID), ImGui::GetWindowPos(), ImVec2{ ImGui::GetWindowPos().x + m_ViewportSize.x, ImGui::GetWindowPos().y + m_ViewportSize.y }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
 
-			static float yawUpdate;
-			static float pitchUpdate;
-			static bool updateAngles = false;
-
-			if (updateAngles) { m_EditorCamera.SetYaw(glm::radians(Math::LerpAngle(glm::degrees(m_EditorCamera.GetYaw()), yawUpdate, 0.3f))); m_EditorCamera.SetPitch(glm::radians(Math::LerpAngle(glm::degrees(m_EditorCamera.GetPitch()), pitchUpdate, 0.3f))); if (Math::FloatDistance(Math::NormalizeAngle(yawUpdate, -180), glm::degrees(m_EditorCamera.GetYaw())) < 0.1f && Math::FloatDistance(Math::NormalizeAngle(pitchUpdate, -180), glm::degrees(m_EditorCamera.GetPitch())) < 0.1f) { updateAngles = false; } }
-
-			if (camXAngle >= 0) { xPos = ImVec2{ pos.x + (armLength * ((camXAngle - 90) / 90)), pos.y + (armLength * (((camXAngle < 90 ? (camXAngle) : ((camXAngle - 90) * -1 + 90)) / 90) * (camYAngle > 0 ? (camYAngle < 90 ? (camYAngle / 90 * -1) : (((camYAngle - 90) * -1 + 90) * -1 / 90)) : (camYAngle > -90 ? (camYAngle * -1 / 90) : ((((camYAngle + 90) * -1 - 90) * -1) / 90))))) }; }
-			else if (camXAngle < 0) { xPos = ImVec2{ pos.x + (armLength * ((camXAngle * -1 - 90) / 90)), pos.y + (armLength * (((camXAngle > -90 ? (camXAngle) : ((camXAngle + 90) * -1 - 90)) / 90) * (camYAngle > 0 ? (camYAngle < 90 ? (camYAngle / 90 * -1) : (((camYAngle - 90) * -1 + 90) * -1 / 90)) : (camYAngle > -90 ? (camYAngle * -1 / 90) : ((((camYAngle + 90) * -1 - 90) * -1) / 90))))) }; }
-
-			if (camXAngle >= 0) { yPos = ImVec2{ pos.x + (armLength * ((camXAngle > 90 ? ((camXAngle - 90) * -1 + 90) : (camXAngle)) / 90)), pos.y + (armLength * (((camXAngle - 90) / 90 * -1) * (camYAngle > 0 ? (camYAngle < 90 ? (camYAngle / 90 * -1) : (((camYAngle - 90) * -1 + 90) * -1 / 90)) : (camYAngle > -90 ? (camYAngle * -1 / 90) : ((((camYAngle + 90) * -1 - 90) * -1) / 90))))) }; }
-			else if (camXAngle < 0) { yPos = ImVec2{ pos.x + (armLength * ((camXAngle < -90 ? ((camXAngle + 90) * -1 - 90) : (camXAngle)) / 90)), pos.y + (armLength * (((camXAngle + 90) * -1 / 90 * -1) * (camYAngle > 0 ? (camYAngle < 90 ? (camYAngle / 90 * -1) : (((camYAngle - 90) * -1 + 90) * -1 / 90)) : (camYAngle > -90 ? (camYAngle * -1 / 90) : ((((camYAngle + 90) * -1 - 90) * -1) / 90))))) }; }
-
-			zPos = ImVec2{ zPos.x, pos.y + (armLength * (camYAngle > 0 ? ((camYAngle - 90) / 90) : ((camYAngle + 90) * -1 / 90))) };
-
-			//ImGui Draw
-
-			static bool activeCirclePress = false;
-			static bool activeCircleHovered = false;
-
-			ImGui::GetWindowDrawList()->AddCircleFilled(pos, armLength + circleRadius, activeCircleHovered ? ImGui::ColorConvertFloat4ToU32(ImVec4{ 0.5f, 0.5f, 0.5f, 0.5f }) : ImGui::ColorConvertFloat4ToU32(ImVec4{ 0.5f, 0.5f, 0.5f, 0.0f }));
-			if (sqrt(pow(ImGui::GetMousePos().y - pos.y, 2) + pow(ImGui::GetMousePos().x - pos.x, 2)) < (armLength + circleRadius) && !activeCirclePress)
+			//Viewport View Settings
+			ImGui::Dummy(ImVec2{ ImGui::GetContentRegionAvail().x - 110, 0 });
+			ImGui::SameLine();
+			const char* shaderButtonTypes[4] = { CHARACTER_VIEWPORT_ICON_SHADING_WIREFRAME, CHARACTER_VIEWPORT_ICON_SHADING_UNLIT, CHARACTER_VIEWPORT_ICON_SHADING_SOLID, CHARACTER_VIEWPORT_ICON_SHADING_RENDERED };
+			int index = m_ShadingIndex;
+			if (ImGui::SwitchButtonEx("##ShaderTypeButtonSwitch", shaderButtonTypes, 4, &index, ImVec2{ 95, 25 }))
 			{
-				activeCircleHovered = true;
-				if (Input::IsMouseButtonPressed(Mouse::ButtonLeft)) { m_EditorCamera.SetFreePan(true); m_EditorCamera.SetInitialMousePosition(Input::GetMousePosition()); activeCirclePress = true; }
-			}
-			else
-			{
-				activeCircleHovered = false;
+				SetShadingIndex(index);
 			}
 
-			if (activeCirclePress) { activeCircleHovered = true; }
-
-			if (!Input::IsMouseButtonPressed(Mouse::ButtonLeft)) { m_EditorCamera.SetFreePan(false); activeCirclePress = false; }
-
-			ImVec2 xPosAlt = xPos;
-			ImVec2 yPosAlt = yPos;
-			ImVec2 zPosAlt = zPos;
-
-			auto ang = camXAngle < 0 ? (camXAngle * -1) : (camXAngle);
-
-			float a[6] = { Math::NormalizeAngle(camXAngle + 90, -180), Math::NormalizeAngle(camXAngle - 90, -180), Math::NormalizeAngle(camXAngle + 180, -180), Math::NormalizeAngle(camXAngle - 0, -180), Math::NormalizeAngle((camYAngle + 90), -180) < 20 && Math::NormalizeAngle((camYAngle + 90), -180) > -20 ? (0) : (Math::NormalizeAngle((camYAngle + 90), -180)),  Math::NormalizeAngle((camYAngle - 90), -180) };
-
-			bool circleOverlayCheck = true;
-			while (circleOverlayCheck)
+			//Scene View Gizmo
 			{
-				int highestValueIndex = 0;
-				for (int i = 0; i < sizeof(a) / sizeof(a[0]); i++)
+
+				auto camYAngle = Math::NormalizeAngle(glm::degrees(m_EditorCamera.GetPitch()), -180) * -1;
+				auto camXAngle = Math::NormalizeAngle(glm::degrees(m_EditorCamera.GetYaw()), -180);
+
+				ImU32 hoveredColor = ImGui::ColorConvertFloat4ToU32(ImVec4{ 1.0f, 1.0f, 1.0f, 1.0f });
+				ImU32 fontColor = ImGui::ColorConvertFloat4ToU32(ImVec4{ 0.0f, 0.0f, 0.0f, 1.0f });
+				ImU32 xCol = ImGui::ColorConvertFloat4ToU32(ImVec4{ 1.0f, 0.21f, 0.33f, 1.0f });
+				ImU32 xColDisabled = ImGui::ColorConvertFloat4ToU32(ImVec4{ 0.6f, 0.22f, 0.28f, 1.0f });
+				ImU32 yCol = ImGui::ColorConvertFloat4ToU32(ImVec4{ 0.17f, 0.56f, 1.0f, 1.0f });
+				ImU32 yColDisabled = ImGui::ColorConvertFloat4ToU32(ImVec4{ 0.2f, 0.39f, 0.6f, 1.0f });
+				ImU32 zCol = ImGui::ColorConvertFloat4ToU32(ImVec4{ 0.54f, 0.86f, 0.0f, 1.0f });
+				ImU32 zColDisabled = ImGui::ColorConvertFloat4ToU32(ImVec4{ 0.38f, 0.54f, 0.13f, 1.0f });
+				float thicknessVal = 2.0f;
+				float armLength = 40.0f;
+				float circleRadius = 9.0f;
+				ImVec2 pos = ImVec2(ImGui::GetWindowPos().x + (float)ImGui::GetWindowWidth() - (armLength + circleRadius) * 1.1f, ImGui::GetWindowPos().y + (armLength + circleRadius) * 1.1f + 30);
+
+				ImVec2 xPos = pos;
+				ImVec2 yPos = pos;
+				ImVec2 zPos = pos;
+
+				if (m_UpdateAngles) { m_EditorCamera.SetYaw(glm::radians(Math::LerpAngle(glm::degrees(m_EditorCamera.GetYaw()), m_YawUpdate, 0.3f))); m_EditorCamera.SetPitch(glm::radians(Math::LerpAngle(glm::degrees(m_EditorCamera.GetPitch()), m_PitchUpdate, 0.3f))); if (Math::FloatDistance(Math::NormalizeAngle(m_YawUpdate, -180), glm::degrees(m_EditorCamera.GetYaw())) < 0.1f && Math::FloatDistance(Math::NormalizeAngle(m_PitchUpdate, -180), glm::degrees(m_EditorCamera.GetPitch())) < 0.1f) { m_UpdateAngles = false; } }
+
+				if (camXAngle >= 0) { xPos = ImVec2{ pos.x + (armLength * ((camXAngle - 90) / 90)), pos.y + (armLength * (((camXAngle < 90 ? (camXAngle) : ((camXAngle - 90) * -1 + 90)) / 90) * (camYAngle > 0 ? (camYAngle < 90 ? (camYAngle / 90 * -1) : (((camYAngle - 90) * -1 + 90) * -1 / 90)) : (camYAngle > -90 ? (camYAngle * -1 / 90) : ((((camYAngle + 90) * -1 - 90) * -1) / 90))))) }; }
+				else if (camXAngle < 0) { xPos = ImVec2{ pos.x + (armLength * ((camXAngle * -1 - 90) / 90)), pos.y + (armLength * (((camXAngle > -90 ? (camXAngle) : ((camXAngle + 90) * -1 - 90)) / 90) * (camYAngle > 0 ? (camYAngle < 90 ? (camYAngle / 90 * -1) : (((camYAngle - 90) * -1 + 90) * -1 / 90)) : (camYAngle > -90 ? (camYAngle * -1 / 90) : ((((camYAngle + 90) * -1 - 90) * -1) / 90))))) }; }
+
+				if (camXAngle >= 0) { yPos = ImVec2{ pos.x + (armLength * ((camXAngle > 90 ? ((camXAngle - 90) * -1 + 90) : (camXAngle)) / 90)), pos.y + (armLength * (((camXAngle - 90) / 90 * -1) * (camYAngle > 0 ? (camYAngle < 90 ? (camYAngle / 90 * -1) : (((camYAngle - 90) * -1 + 90) * -1 / 90)) : (camYAngle > -90 ? (camYAngle * -1 / 90) : ((((camYAngle + 90) * -1 - 90) * -1) / 90))))) }; }
+				else if (camXAngle < 0) { yPos = ImVec2{ pos.x + (armLength * ((camXAngle < -90 ? ((camXAngle + 90) * -1 - 90) : (camXAngle)) / 90)), pos.y + (armLength * (((camXAngle + 90) * -1 / 90 * -1) * (camYAngle > 0 ? (camYAngle < 90 ? (camYAngle / 90 * -1) : (((camYAngle - 90) * -1 + 90) * -1 / 90)) : (camYAngle > -90 ? (camYAngle * -1 / 90) : ((((camYAngle + 90) * -1 - 90) * -1) / 90))))) }; }
+
+				zPos = ImVec2{ zPos.x, pos.y + (armLength * (camYAngle > 0 ? ((camYAngle - 90) / 90) : ((camYAngle + 90) * -1 / 90))) };
+
+				//ImGui Draw
+
+				static bool activeCirclePress = false;
+				static bool activeCircleHovered = false;
+
+				ImGui::GetWindowDrawList()->AddCircleFilled(pos, armLength + circleRadius, activeCircleHovered ? ImGui::ColorConvertFloat4ToU32(ImVec4{ 0.5f, 0.5f, 0.5f, 0.5f }) : ImGui::ColorConvertFloat4ToU32(ImVec4{ 0.5f, 0.5f, 0.5f, 0.0f }));
+				static bool hovered, held, hoveredB0, hoveredB1, hoveredB2, hoveredB3, hoveredB4, hoveredB5;
+				if (sqrt(pow(ImGui::GetMousePos().y - pos.y, 2) + pow(ImGui::GetMousePos().x - pos.x, 2)) < (armLength + circleRadius) && !activeCirclePress && (hovered || hoveredB0 || hoveredB1 || hoveredB2 || hoveredB3 || hoveredB4 || hoveredB5))
 				{
-					if (a[i] == -1000.0f) { if (i == highestValueIndex) { highestValueIndex++; } }
-					else if ((a[i] < 0 ? (a[i] * -1) : (a[i])) > (a[highestValueIndex] < 0 ? (a[highestValueIndex] * -1) : (a[highestValueIndex]))) { highestValueIndex = i; }
+					activeCircleHovered = true;
+					if (Input::IsMouseButtonPressed(Mouse::ButtonLeft)) { m_EditorCamera.SetFreePan(true); m_EditorCamera.SetInitialMousePosition(Input::GetMousePosition()); activeCirclePress = true; }
+				}
+				else
+				{
+					activeCircleHovered = false;
 				}
 
-				a[highestValueIndex] = -1000.0f;
+				if (activeCirclePress) { activeCircleHovered = true; }
 
-				bool inFront = false;
-				if (highestValueIndex == 0 && a[1] == -1000.0f) { inFront = true; }
-				else if (highestValueIndex == 1 && a[0] == -1000.0f) { inFront = true; }
-				else if (highestValueIndex == 2 && a[3] == -1000.0f) { inFront = true; }
-				else if (highestValueIndex == 3 && a[2] == -1000.0f) { inFront = true; }
-				else if (highestValueIndex == 4 && a[5] == -1000.0f) { inFront = true; }
-				else if (highestValueIndex == 5 && a[4] == -1000.0f) { inFront = true; }
+				if (!Input::IsMouseButtonPressed(Mouse::ButtonLeft)) { m_EditorCamera.SetFreePan(false); activeCirclePress = false; }
 
+				ImVec2 xPosAlt = xPos;
+				ImVec2 yPosAlt = yPos;
+				ImVec2 zPosAlt = zPos;
 
-				if (highestValueIndex == 0)
+				auto ang = camXAngle < 0 ? (camXAngle * -1) : (camXAngle);
+
+				float a[6] = { Math::NormalizeAngle(camXAngle + 90, -180), Math::NormalizeAngle(camXAngle - 90, -180), Math::NormalizeAngle(camXAngle + 180, -180), Math::NormalizeAngle(camXAngle - 0, -180), Math::NormalizeAngle((camYAngle + 90), -180) < 20 && Math::NormalizeAngle((camYAngle + 90), -180) > -20 ? (0) : (Math::NormalizeAngle((camYAngle + 90), -180)),  Math::NormalizeAngle((camYAngle - 90), -180) };
+
+				bool circleOverlayCheck = true;
+				while (circleOverlayCheck)
 				{
-					xPos = ImVec2{ (xPos.x - pos.x) * -1 + pos.x, (xPos.y - pos.y) * -1 + pos.y };
-
-					ImRect bb(ImVec2{ xPos.x - circleRadius, xPos.y - circleRadius }, ImVec2{ xPos.x + circleRadius, xPos.y + circleRadius });
-					ImGuiID id = ImGui::GetCurrentWindow()->GetID("IdsMainX");
-					bool hovered, held;
-					bool pressed = ImGui::ButtonBehavior(bb, id, &hovered, &held);
-
-					if (pressed)
+					int highestValueIndex = 0;
+					for (int i = 0; i < sizeof(a) / sizeof(a[0]); i++)
 					{
-						yawUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360 - 90.0f;
-						pitchUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360;
-						updateAngles = true;
+						if (a[i] == -1000.0f) { if (i == highestValueIndex) { highestValueIndex++; } }
+						else if ((a[i] < 0 ? (a[i] * -1) : (a[i])) > (a[highestValueIndex] < 0 ? (a[highestValueIndex] * -1) : (a[highestValueIndex]))) { highestValueIndex = i; }
 					}
 
-					ImGui::GetWindowDrawList()->AddLine(pos, xPos, hovered ? hoveredColor : (inFront ? xCol : xColDisabled), thicknessVal);
-					ImGui::GetWindowDrawList()->AddCircleFilled(xPos, circleRadius, hovered ? hoveredColor : (inFront ? xCol : xColDisabled));
-					ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[0]);
-					ImGui::GetWindowDrawList()->AddText(ImVec2{ xPos.x - ImGui::CalcTextSize("W").x * 0.33f, xPos.y - ImGui::CalcTextSize("W").y / 2 }, fontColor, "X");
-					ImGui::PopFont();
-				}
+					a[highestValueIndex] = -1000.0f;
 
-				if (highestValueIndex == 1)
-				{
-					ImRect bb(ImVec2{ xPosAlt.x - circleRadius, xPosAlt.y - circleRadius }, ImVec2{ xPosAlt.x + circleRadius, xPosAlt.y + circleRadius });
-					ImGuiID id = ImGui::GetCurrentWindow()->GetID("IdsSecondaryX");
-					bool hovered, held;
-					bool pressed = ImGui::ButtonBehavior(bb, id, &hovered, &held);
+					bool inFront = false;
+					if (highestValueIndex == 0 && a[1] == -1000.0f) { inFront = true; }
+					else if (highestValueIndex == 1 && a[0] == -1000.0f) { inFront = true; }
+					else if (highestValueIndex == 2 && a[3] == -1000.0f) { inFront = true; }
+					else if (highestValueIndex == 3 && a[2] == -1000.0f) { inFront = true; }
+					else if (highestValueIndex == 4 && a[5] == -1000.0f) { inFront = true; }
+					else if (highestValueIndex == 5 && a[4] == -1000.0f) { inFront = true; }
 
-					if (pressed)
+
+					if (highestValueIndex == 0)
 					{
-						yawUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360 + 90.0f;
-						pitchUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360;
-						updateAngles = true;
+						xPos = ImVec2{ (xPos.x - pos.x) * -1 + pos.x, (xPos.y - pos.y) * -1 + pos.y };
+
+						ImRect bb(ImVec2{ xPos.x - circleRadius, xPos.y - circleRadius }, ImVec2{ xPos.x + circleRadius, xPos.y + circleRadius });
+						ImGuiID id = ImGui::GetCurrentWindow()->GetID("IdsMainX");
+						bool held;
+						bool pressed = ImGui::ButtonBehavior(bb, id, &hoveredB0, &held);
+
+						if (pressed)
+						{
+							m_YawUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360 - 90.0f;
+							m_PitchUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360;
+							m_UpdateAngles = true;
+						}
+
+						ImGui::GetWindowDrawList()->AddLine(pos, xPos, hoveredB0 ? hoveredColor : (inFront ? xCol : xColDisabled), thicknessVal);
+						ImGui::GetWindowDrawList()->AddCircleFilled(xPos, circleRadius, hoveredB0 ? hoveredColor : (inFront ? xCol : xColDisabled));
+						ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[0]);
+						ImGui::GetWindowDrawList()->AddText(ImVec2{ xPos.x - ImGui::CalcTextSize("W").x * 0.33f, xPos.y - ImGui::CalcTextSize("W").y / 2 }, fontColor, "X");
+						ImGui::PopFont();
 					}
 
-					ImGui::GetWindowDrawList()->AddCircleFilled(xPosAlt, circleRadius, hovered ? hoveredColor : (inFront ? xCol : xColDisabled));
-				}
-
-				if (highestValueIndex == 2)
-				{
-					yPos = ImVec2{ (yPos.x - pos.x) * -1 + pos.x, (yPos.y - pos.y) * -1 + pos.y };
-
-					ImRect bb(ImVec2{ yPos.x - circleRadius, yPos.y - circleRadius }, ImVec2{ yPos.x + circleRadius, yPos.y + circleRadius });
-					ImGuiID id = ImGui::GetCurrentWindow()->GetID("IdsMainY");
-					bool hovered, held;
-					bool pressed = ImGui::ButtonBehavior(bb, id, &hovered, &held);
-
-					if (pressed)
+					if (highestValueIndex == 1)
 					{
-						yawUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360 + 180.0f;
-						pitchUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360;
-						updateAngles = true;
+						ImRect bb(ImVec2{ xPosAlt.x - circleRadius, xPosAlt.y - circleRadius }, ImVec2{ xPosAlt.x + circleRadius, xPosAlt.y + circleRadius });
+						ImGuiID id = ImGui::GetCurrentWindow()->GetID("IdsSecondaryX");
+						bool held;
+						bool pressed = ImGui::ButtonBehavior(bb, id, &hoveredB1, &held);
+
+						if (pressed)
+						{
+							m_YawUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360 + 90.0f;
+							m_PitchUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360;
+							m_UpdateAngles = true;
+						}
+
+						ImGui::GetWindowDrawList()->AddCircleFilled(xPosAlt, circleRadius, hoveredB1 ? hoveredColor : (inFront ? xCol : xColDisabled));
 					}
 
-					ImGui::GetWindowDrawList()->AddLine(pos, yPos, hovered ? hoveredColor : (inFront ? yCol : yColDisabled), thicknessVal);
-					ImGui::GetWindowDrawList()->AddCircleFilled(yPos, circleRadius, hovered ? hoveredColor : (inFront ? yCol : yColDisabled));
-					ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[0]);
-					ImGui::GetWindowDrawList()->AddText(ImVec2{ yPos.x - ImGui::CalcTextSize("W").x * 0.33f, yPos.y - ImGui::CalcTextSize("W").y / 2 }, fontColor, "Z");
-					ImGui::PopFont();
-				}
-
-				if (highestValueIndex == 3)
-				{
-					ImRect bb(ImVec2{ yPosAlt.x - circleRadius, yPosAlt.y - circleRadius }, ImVec2{ yPosAlt.x + circleRadius, yPosAlt.y + circleRadius });
-					ImGuiID id = ImGui::GetCurrentWindow()->GetID("IdsSecondaryY");
-					bool hovered, held;
-					bool pressed = ImGui::ButtonBehavior(bb, id, &hovered, &held);
-
-					if (pressed)
+					if (highestValueIndex == 2)
 					{
-						yawUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360;
-						pitchUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360;
-						updateAngles = true;
-					}
-					ImGui::GetWindowDrawList()->AddCircleFilled(yPosAlt, circleRadius, hovered ? hoveredColor : (inFront ? yCol : yColDisabled));
-				}
+						yPos = ImVec2{ (yPos.x - pos.x) * -1 + pos.x, (yPos.y - pos.y) * -1 + pos.y };
 
-				if (highestValueIndex == 4)
-				{
-					ImRect bb(ImVec2{ zPos.x - circleRadius, zPos.y - circleRadius }, ImVec2{ zPos.x + circleRadius, zPos.y + circleRadius });
-					ImGuiID id = ImGui::GetCurrentWindow()->GetID("IdsMainZ");
-					bool hovered, held;
-					bool pressed = ImGui::ButtonBehavior(bb, id, &hovered, &held);
+						ImRect bb(ImVec2{ yPos.x - circleRadius, yPos.y - circleRadius }, ImVec2{ yPos.x + circleRadius, yPos.y + circleRadius });
+						ImGuiID id = ImGui::GetCurrentWindow()->GetID("IdsMainY");
+						bool held;
+						bool pressed = ImGui::ButtonBehavior(bb, id, &hoveredB2, &held);
 
-					if (pressed)
-					{
-						yawUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360;
-						pitchUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360 + 90;
-						updateAngles = true;
+						if (pressed)
+						{
+							m_YawUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360 + 180.0f;
+							m_PitchUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360;
+							m_UpdateAngles = true;
+						}
+
+						ImGui::GetWindowDrawList()->AddLine(pos, yPos, hoveredB2 ? hoveredColor : (inFront ? yCol : yColDisabled), thicknessVal);
+						ImGui::GetWindowDrawList()->AddCircleFilled(yPos, circleRadius, hoveredB2 ? hoveredColor : (inFront ? yCol : yColDisabled));
+						ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[0]);
+						ImGui::GetWindowDrawList()->AddText(ImVec2{ yPos.x - ImGui::CalcTextSize("W").x * 0.33f, yPos.y - ImGui::CalcTextSize("W").y / 2 }, fontColor, "Z");
+						ImGui::PopFont();
 					}
 
-					ImGui::GetWindowDrawList()->AddLine(pos, zPos, hovered ? hoveredColor : (inFront ? zCol : zColDisabled), thicknessVal);
-					ImGui::GetWindowDrawList()->AddCircleFilled(zPos, circleRadius, hovered ? hoveredColor : (inFront ? zCol : zColDisabled));
-					ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[0]);
-					ImGui::GetWindowDrawList()->AddText(ImVec2{ zPos.x - ImGui::CalcTextSize("W").x * 0.33f, zPos.y - ImGui::CalcTextSize("W").y / 2 }, fontColor, "Y");
-					ImGui::PopFont();
-				}
-
-				if (highestValueIndex == 5)
-				{
-					zPosAlt = ImVec2{ (zPosAlt.x - pos.x) * -1 + pos.x, (zPosAlt.y - pos.y) * -1 + pos.y };
-
-					ImRect bb(ImVec2{ zPosAlt.x - circleRadius, zPosAlt.y - circleRadius }, ImVec2{ zPosAlt.x + circleRadius, zPosAlt.y + circleRadius });
-					ImGuiID id = ImGui::GetCurrentWindow()->GetID("IdsSecondaryZ");
-					bool hovered, held;
-					bool pressed = ImGui::ButtonBehavior(bb, id, &hovered, &held);
-
-					if (pressed)
+					if (highestValueIndex == 3)
 					{
-						yawUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360;
-						pitchUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360 - 90;
-						updateAngles = true;
+						ImRect bb(ImVec2{ yPosAlt.x - circleRadius, yPosAlt.y - circleRadius }, ImVec2{ yPosAlt.x + circleRadius, yPosAlt.y + circleRadius });
+						ImGuiID id = ImGui::GetCurrentWindow()->GetID("IdsSecondaryY");
+						bool held;
+						bool pressed = ImGui::ButtonBehavior(bb, id, &hoveredB3, &held);
+
+						if (pressed)
+						{
+							m_YawUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360;
+							m_PitchUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360;
+							m_UpdateAngles = true;
+						}
+						ImGui::GetWindowDrawList()->AddCircleFilled(yPosAlt, circleRadius, hoveredB3 ? hoveredColor : (inFront ? yCol : yColDisabled));
 					}
 
-					ImGui::GetWindowDrawList()->AddCircleFilled(zPosAlt, circleRadius, hovered ? hoveredColor : (inFront ? zCol : zColDisabled));
-				}
+					if (highestValueIndex == 4)
+					{
+						ImRect bb(ImVec2{ zPos.x - circleRadius, zPos.y - circleRadius }, ImVec2{ zPos.x + circleRadius, zPos.y + circleRadius });
+						ImGuiID id = ImGui::GetCurrentWindow()->GetID("IdsMainZ");
+						bool held;
+						bool pressed = ImGui::ButtonBehavior(bb, id, &hoveredB4, &held);
 
-				bool checkValSuccess = false;
-				for (int checkVal : a)
-				{
-					if (checkVal != -1000.0f) { checkValSuccess = true; }
+						if (pressed)
+						{
+							m_YawUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360;
+							m_PitchUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360 + 90;
+							m_UpdateAngles = true;
+						}
+
+						ImGui::GetWindowDrawList()->AddLine(pos, zPos, hoveredB4 ? hoveredColor : (inFront ? zCol : zColDisabled), thicknessVal);
+						ImGui::GetWindowDrawList()->AddCircleFilled(zPos, circleRadius, hoveredB4 ? hoveredColor : (inFront ? zCol : zColDisabled));
+						ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[0]);
+						ImGui::GetWindowDrawList()->AddText(ImVec2{ zPos.x - ImGui::CalcTextSize("W").x * 0.33f, zPos.y - ImGui::CalcTextSize("W").y / 2 }, fontColor, "Y");
+						ImGui::PopFont();
+					}
+
+					if (highestValueIndex == 5)
+					{
+						zPosAlt = ImVec2{ (zPosAlt.x - pos.x) * -1 + pos.x, (zPosAlt.y - pos.y) * -1 + pos.y };
+
+						ImRect bb(ImVec2{ zPosAlt.x - circleRadius, zPosAlt.y - circleRadius }, ImVec2{ zPosAlt.x + circleRadius, zPosAlt.y + circleRadius });
+						ImGuiID id = ImGui::GetCurrentWindow()->GetID("IdsSecondaryZ");
+						bool held;
+						bool pressed = ImGui::ButtonBehavior(bb, id, &hoveredB5, &held);
+
+						if (pressed)
+						{
+							m_YawUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360;
+							m_PitchUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360 - 90;
+							m_UpdateAngles = true;
+						}
+
+						ImGui::GetWindowDrawList()->AddCircleFilled(zPosAlt, circleRadius, hoveredB5 ? hoveredColor : (inFront ? zCol : zColDisabled));
+					}
+
+					bool checkValSuccess = false;
+					for (int checkVal : a)
+					{
+						if (checkVal != -1000.0f) { checkValSuccess = true; }
+					}
+					if (!checkValSuccess) { circleOverlayCheck = false; break; }
+
 				}
-				if (!checkValSuccess) { circleOverlayCheck = false; break; }
+				ImRect bb = ImRect(ImVec2(pos.x - (armLength + circleRadius), pos.y - (armLength + circleRadius)), ImVec2(pos.x + (armLength + circleRadius), pos.y + (armLength + circleRadius)));
+				ImGuiID id = ImGui::GetID("##ViewGizmoHoverButtonID");
+				ImGui::ButtonBehavior(bb, id, &hovered, &held);
+				ImGui::ItemSize(ImVec2((armLength + circleRadius) * 2, (armLength + circleRadius) * 2), style.FramePadding.y);
 			}
+
+			ImGui::Dummy(ImVec2{ ImGui::GetContentRegionAvail().x - 45, 0 });
+			ImGui::SameLine();
+			if (ImGui::Button(std::string((bool)m_EditorCamera.GetProjectionType() ? CHARACTER_VIEWPORT_ICON_PROJECTION_ORTHOGRAPHIC : CHARACTER_VIEWPORT_ICON_PROJECTION_PERSPECTIVE).c_str(), ImVec2(30, 30)))
+			{
+				m_ProjectionToggled = !m_EditorCamera.GetProjectionType();
+				m_EditorCamera.SetProjectionType(m_ProjectionToggled);
+			}
+
+
+			// Gizmos
+			Entity selectedEntity = m_SceneHierarchyPanel.GetSelectedEntity();
+
+			if (selectedEntity && m_GizmoType != -1)
+			{
+				ImGuizmo::SetOrthographic(false);
+				ImGuizmo::SetDrawlist();
+
+				ImGuizmo::SetRect(m_ViewportBounds[0].x, m_ViewportBounds[0].y, m_ViewportBounds[1].x - m_ViewportBounds[0].x, m_ViewportBounds[1].y - m_ViewportBounds[0].y);
+
+
+				// Camera
+				//Runtime camera from entity
+				//auto cameraEntity = m_ActiveScene->GetPrimaryCameraEntity();
+				//const auto& camera = cameraEntity.GetComponent<CameraComponent>().Camera;
+				//const glm::mat4& cameraProjection = camera.GetProjection();
+				//glm::mat4 cameraView = glm::inverse(cameraEntity.GetComponent<TransformComponent>().GetTransform());
+
+				//Editor camera
+				const glm::mat4& cameraProjection = m_EditorCamera.GetProjection();
+				glm::mat4 cameraView = m_EditorCamera.GetViewMatrix();
+
+				// Entity Transform
+				auto& tc = selectedEntity.GetComponent<TransformComponent>();
+				glm::mat4 transform = tc.GetTransform();
+
+				//Snapping
+				bool snap = m_GizmoType == ImGuizmo::OPERATION::TRANSLATE ? m_TranslationSnap : m_GizmoType == ImGuizmo::OPERATION::ROTATE ? m_RotationSnap : m_ScaleSnap;
+				float snapValue = m_GizmoType == ImGuizmo::OPERATION::TRANSLATE ? m_TranslationSnapValue : m_GizmoType == ImGuizmo::OPERATION::ROTATE ? m_RotationSnapValue : m_ScaleSnapValue;
+
+				float snapValues[3] = { snapValue, snapValue, snapValue };
+
+
+				ImGuizmo::Manipulate(glm::value_ptr(cameraView), glm::value_ptr(cameraProjection),
+					(ImGuizmo::OPERATION)m_GizmoType, (ImGuizmo::MODE)m_GizmoSpace, glm::value_ptr(transform),
+					nullptr, ((Input::IsKeyPressed(Key::LeftControl) ? !snap : snap) ? snapValues : nullptr));
+
+				if (ImGuizmo::IsUsing())
+				{
+					glm::vec3 translation, rotation, scale;
+					Math::DecomposeTransform(transform, translation, rotation, scale);
+
+					glm::vec3 deltaRotation = rotation - tc.Rotation;
+					tc.Translation = translation;
+					tc.Rotation += deltaRotation;
+					tc.Scale = scale;
+
+				}
+
+			}
+
+			ImGui::End();
+			ImGui::PopStyleVar();
 		}
-
-
-		// Gizmos
-		Entity selectedEntity = m_SceneHierarchyPanel.GetSelectedEntity();
-
-		if (selectedEntity && m_GizmoType != -1)
-		{
-			ImGuizmo::SetOrthographic(false);
-			ImGuizmo::SetDrawlist();
-
-			ImGuizmo::SetRect(m_ViewportBounds[0].x, m_ViewportBounds[0].y, m_ViewportBounds[1].x - m_ViewportBounds[0].x, m_ViewportBounds[1].y - m_ViewportBounds[0].y);
-			
-
-			// Camera
-			//Runtime camera from entity
-			//auto cameraEntity = m_ActiveScene->GetPrimaryCameraEntity();
-			//const auto& camera = cameraEntity.GetComponent<CameraComponent>().Camera;
-			//const glm::mat4& cameraProjection = camera.GetProjection();
-			//glm::mat4 cameraView = glm::inverse(cameraEntity.GetComponent<TransformComponent>().GetTransform());
-
-			//Editor camera
-			const glm::mat4& cameraProjection = m_EditorCamera.GetProjection();
-			glm::mat4 cameraView = m_EditorCamera.GetViewMatrix();
-			
-			// Entity Transform
-			auto& tc = selectedEntity.GetComponent<TransformComponent>();
-			glm::mat4 transform = tc.GetTransform();
-
-			//Snapping
-			bool snap = m_GizmoType == ImGuizmo::OPERATION::TRANSLATE ? m_TranslationSnap : m_GizmoType == ImGuizmo::OPERATION::ROTATE ? m_RotationSnap : m_ScaleSnap;
-			float snapValue = m_GizmoType == ImGuizmo::OPERATION::TRANSLATE ? m_TranslationSnapValue : m_GizmoType == ImGuizmo::OPERATION::ROTATE ? m_RotationSnapValue : m_ScaleSnapValue;
-
-			float snapValues[3] = { snapValue, snapValue, snapValue };
-
-
-			ImGuizmo::Manipulate(glm::value_ptr(cameraView), glm::value_ptr(cameraProjection),
-				(ImGuizmo::OPERATION)m_GizmoType, (ImGuizmo::MODE)m_GizmoSpace, glm::value_ptr(transform),
-				nullptr, ((Input::IsKeyPressed(Key::LeftControl) ? !snap : snap) ? snapValues : nullptr));
-
-			if (ImGuizmo::IsUsing())
-			{
-				glm::vec3 translation, rotation, scale;
-				Math::DecomposeTransform(transform, translation, rotation, scale);
-
-				glm::vec3 deltaRotation = rotation - tc.Rotation;
-				tc.Translation = translation;
-				tc.Rotation += deltaRotation;
-				tc.Scale = scale;
-
-			}
-
-		}
-
-		ImGui::End();
-		ImGui::PopStyleVar();
 
 		if (m_ShowSplash)
 		{
@@ -1140,30 +1194,20 @@ namespace Dymatic {
 			ImGui::SameLine();
 			ImGui::Dummy(ImVec2{ 0, 40 - (ImGui::CalcTextSize("W").y / 2) });
 			ImGui::SameLine();
-			std::string versionName = "V1.2.1";
+			std::string versionName = "V1.2.2";
 			ImGui::SameLine( 488 -ImGui::CalcTextSize(versionName.c_str()).x);
 			ImGui::Text(versionName.c_str());
 			ImGui::Columns(2);
 			ImGui::TextDisabled("New File");
-			ImGui::Image(reinterpret_cast<void*>(m_IconSystemNew->GetRendererID()), ImVec2{ 15, 15 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
-			ImGui::SameLine();
-			if (ImGui::Selectable("General Workspace")) { focused = false; m_LayoutToLoad = "saved/presets/layouts/GeneralWorkspace.ini"; OpenSceneByFilepath("saved/presets/scenes/DefaultCubeScene.dymatic"); }
+			if (ImGui::Selectable((std::string(CHARACTER_SYSTEM_ICON_NEW_FILE) + "General Workspace").c_str())) { focused = false; m_LayoutToLoad = "saved/presets/layouts/GeneralWorkspace.ini"; NewScene(); AppendSceneByFilepath("saved/presets/scenes/DefaultCubeScene.dymatic"); }
 			if (ImGui::IsItemFocused()) { focused = true; }
-			ImGui::Image(reinterpret_cast<void*>(m_IconSystemNew->GetRendererID()), ImVec2{ 15, 15 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
-			ImGui::SameLine();
-			if (ImGui::Selectable("Scripting Workspace")) { focused = false; m_LayoutToLoad = "saved/presets/layouts/ScriptingWorkspace.ini"; OpenSceneByFilepath("saved/presets/scenes/DefaultCubeScene.dymatic"); }
+			if (ImGui::Selectable((std::string(CHARACTER_SYSTEM_ICON_NEW_FILE) + "Scripting Workspace").c_str())) { focused = false; m_LayoutToLoad = "saved/presets/layouts/ScriptingWorkspace.ini"; NewScene(); AppendSceneByFilepath("saved/presets/scenes/DefaultCubeScene.dymatic"); }
 			if (ImGui::IsItemFocused()) { focused = true; }
-			ImGui::Image(reinterpret_cast<void*>(m_IconSystemNew->GetRendererID()), ImVec2{ 15, 15 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
-			ImGui::SameLine();
-			if (ImGui::Selectable("Environment Design Workspace")) { focused = false; m_LayoutToLoad = "saved/presets/layouts/EnvironmentDesignWorkspace.ini"; OpenSceneByFilepath("saved/presets/scenes/DefaultCubeScene.dymatic"); }
+			if (ImGui::Selectable((std::string(CHARACTER_SYSTEM_ICON_NEW_FILE) + "Environment Design Workspace").c_str())) { focused = false; m_LayoutToLoad = "saved/presets/layouts/EnvironmentDesignWorkspace.ini"; NewScene(); AppendSceneByFilepath("saved/presets/scenes/DefaultCubeScene.dymatic"); }
 			if (ImGui::IsItemFocused()) { focused = true; }
-			ImGui::Image(reinterpret_cast<void*>(m_IconSystemNew->GetRendererID()), ImVec2{ 15, 15 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
-			ImGui::SameLine();
-			if (ImGui::Selectable("Animation Workspace")) { focused = false; m_LayoutToLoad = "saved/presets/layouts/AnimationWorkspace.ini"; }
+			if (ImGui::Selectable((std::string(CHARACTER_SYSTEM_ICON_NEW_FILE) + "Animation Workspace").c_str())) { focused = false; m_LayoutToLoad = "saved/presets/layouts/AnimationWorkspace.ini"; }
 			if (ImGui::IsItemFocused()) { focused = true; }
-			ImGui::Image(reinterpret_cast<void*>(m_IconSystemNew->GetRendererID()), ImVec2{ 15, 15 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
-			ImGui::SameLine();
-			if (ImGui::Selectable("VFX Workspace")) { focused = false; m_LayoutToLoad = "saved/presets/layouts/VFXWorkspace.ini"; }
+			if (ImGui::Selectable((std::string(CHARACTER_SYSTEM_ICON_NEW_FILE) + "VFX Workspace").c_str())) { focused = false; m_LayoutToLoad = "saved/presets/layouts/VFXWorkspace.ini"; }
 			if (ImGui::IsItemFocused()) { focused = true; }
 			ImGui::NextColumn();
 			ImGui::TextDisabled("Recent Files");
@@ -1175,9 +1219,7 @@ namespace Dymatic {
 			{
 				for (int i = 0; i < recentFiles.size(); i++)
 				{
-					ImGui::Image(reinterpret_cast<void*>(m_DymaticLogo->GetRendererID()), ImVec2{ 15, 15 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
-					ImGui::SameLine();
-					if (ImGui::Selectable(m_ContentBrowser.GetFullFileNameFromPath(m_ContentBrowser.SwapStringSlashesDouble(recentFiles[i])).c_str()))
+					if (ImGui::Selectable((std::string(CHARACTER_SYSTEM_ICON_NEW_FILE) + m_ContentBrowser.GetFullFileNameFromPath(m_ContentBrowser.SwapStringSlashesDouble(recentFiles[i]))).c_str()))
 					{
 						focused = false;
 						OpenSceneByFilepath(recentFiles[i]);
@@ -1215,6 +1257,10 @@ namespace Dymatic {
 		m_CameraController.OnEvent(e);
 		m_EditorCamera.OnEvent(e);
 		m_NodeEditorPannel.OnEvent(e);
+		m_CurveEditor.OnEvent(e);
+		m_ConsoleWindow.OnEvent(e);
+		m_ImageEditor.OnEvent(e);
+		m_ImageEditorNew.OnEvent(e);
 
 		EventDispatcher dispatcher(e);
 
@@ -1224,32 +1270,36 @@ namespace Dymatic {
 
 	void EditorLayer::UpdateKeys(BindCatagory bindCatagory)
 	{
-		bool control = Input::IsKeyPressed(Key::LeftControl) || Input::IsKeyPressed(Key::RightControl);
-		bool shift = Input::IsKeyPressed(Key::LeftShift) || Input::IsKeyPressed(Key::RightShift);
-		bool alt = Input::IsKeyPressed(Key::LeftAlt) || Input::IsKeyPressed(Key::RightAlt);
-
-		auto repeats = m_KeyPressed.GetRepeatCount();
-
-		auto& keyBinds = m_PreferencesPannel.GetPreferences().m_PreferenceData.keyBinds;
-
-		if (keyBinds.IsKey(NewSceneBind, m_KeyPressed.GetKeyCode(), m_MouseButtonPressed.GetMouseButton(), bindCatagory, control, shift, alt, repeats))						{ NewScene(); }
-		else if (keyBinds.IsKey(OpenSceneBind, m_KeyPressed.GetKeyCode(), m_MouseButtonPressed.GetMouseButton(), bindCatagory, control, shift, alt, repeats))				{ OpenScene(); }
-		else if (keyBinds.IsKey(SaveSceneBind, m_KeyPressed.GetKeyCode(), m_MouseButtonPressed.GetMouseButton(), bindCatagory, control, shift, alt, repeats))				{ SaveScene(); }
-		else if (keyBinds.IsKey(SaveSceneAsBind, m_KeyPressed.GetKeyCode(), m_MouseButtonPressed.GetMouseButton(), bindCatagory, control, shift, alt, repeats))				{ SaveSceneAs(); }
-		else if (keyBinds.IsKey(QuitBind, m_KeyPressed.GetKeyCode(), m_MouseButtonPressed.GetMouseButton(), bindCatagory, control, shift, alt, repeats))					{ SaveAndExit(); }
-		else if (keyBinds.IsKey(SelectObjectBind, m_KeyPressed.GetKeyCode(), m_MouseButtonPressed.GetMouseButton(), bindCatagory, control, shift, alt, repeats))			{ if (m_ViewportHovered && !ImGuizmo::IsUsing() && !ImGuizmo::IsOver() && !Input::IsKeyPressed(Key::LeftAlt)) m_SceneHierarchyPanel.SetSelectedEntity(m_HoveredEntity); }
-		else if (keyBinds.IsKey(GizmoNoneBind, m_KeyPressed.GetKeyCode(), m_MouseButtonPressed.GetMouseButton(), bindCatagory, control, shift, alt, repeats))				{ if (!ImGuizmo::IsUsing()) { m_GizmoType = -1; } }
-		else if (keyBinds.IsKey(GizmoTranslateBind, m_KeyPressed.GetKeyCode(), m_MouseButtonPressed.GetMouseButton(), bindCatagory, control, shift, alt, repeats))			{ if (!ImGuizmo::IsUsing()) { m_GizmoType = ImGuizmo::OPERATION::TRANSLATE; } }
-		else if (keyBinds.IsKey(GizmoRotateBind, m_KeyPressed.GetKeyCode(), m_MouseButtonPressed.GetMouseButton(), bindCatagory, control, shift, alt, repeats))				{ if (!ImGuizmo::IsUsing()) { m_GizmoType = ImGuizmo::OPERATION::ROTATE; } }
-		else if (keyBinds.IsKey(GizmoScaleBind, m_KeyPressed.GetKeyCode(), m_MouseButtonPressed.GetMouseButton(), bindCatagory, control, shift, alt, repeats))				{ if (!ImGuizmo::IsUsing()) { m_GizmoType = ImGuizmo::OPERATION::SCALE; } }
-		else if (keyBinds.IsKey(ShadingTypeWireframeBind, m_KeyPressed.GetKeyCode(), m_MouseButtonPressed.GetMouseButton(), bindCatagory, control, shift, alt, repeats))	{ SetShadingIndex(0); }
-		else if (keyBinds.IsKey(ShadingTypeUnlitBind, m_KeyPressed.GetKeyCode(), m_MouseButtonPressed.GetMouseButton(), bindCatagory, control, shift, alt, repeats))		{ SetShadingIndex(1); }
-		else if (keyBinds.IsKey(ShadingTypeSolidBind, m_KeyPressed.GetKeyCode(), m_MouseButtonPressed.GetMouseButton(), bindCatagory, control, shift, alt, repeats))		{ SetShadingIndex(2); }
-		else if (keyBinds.IsKey(ShadingTypeRenderedBind, m_KeyPressed.GetKeyCode(), m_MouseButtonPressed.GetMouseButton(), bindCatagory, control, shift, alt, repeats))		{ SetShadingIndex(3); }
-		else if (keyBinds.IsKey(ToggleShadingTypeBind, m_KeyPressed.GetKeyCode(), m_MouseButtonPressed.GetMouseButton(), bindCatagory, control, shift, alt, repeats))		{ SetShadingIndex(m_ShadingIndex == 0 ? m_PreviousToggleIndex : 0); }
-		else if (keyBinds.IsKey(DuplicateBind, m_KeyPressed.GetKeyCode(), m_MouseButtonPressed.GetMouseButton(), bindCatagory, control, shift, alt, repeats))				{ if (m_SceneHierarchyPanel.GetSelectedEntity()) { m_SceneHierarchyPanel.SetSelectedEntity(m_ActiveScene->DuplicateEntity(m_SceneHierarchyPanel.GetSelectedEntity())); } m_NodeEditorPannel.DuplicateNodes(); }
-		else if (keyBinds.IsKey(RenameBind, m_KeyPressed.GetKeyCode(), m_MouseButtonPressed.GetMouseButton(), bindCatagory, control, shift, alt, repeats))					{ if (m_ContentBrowser.GetSelectedFile().filename != "") m_ContentBrowser.OpenRenamePopup(m_ContentBrowser.GetSelectedFile()); }
-		else if (keyBinds.IsKey(ClosePopupBind, m_KeyPressed.GetKeyCode(), m_MouseButtonPressed.GetMouseButton(), bindCatagory, control, shift, alt, repeats))				{ m_PopupsAndNotifications.RemoveTopmostPopup(); }
+		if (KeyBindCheck(NewSceneBind, bindCatagory))					{ NewScene(); }
+		else if (KeyBindCheck(OpenSceneBind, bindCatagory))				{ OpenScene(); }
+		else if (KeyBindCheck(SaveSceneBind, bindCatagory))				{ SaveScene(); }
+		else if (KeyBindCheck(SaveSceneAsBind, bindCatagory))			{ SaveSceneAs(); }
+		else if (KeyBindCheck(QuitBind, bindCatagory))					{ SaveAndExit(); }
+		else if (KeyBindCheck(SelectObjectBind, bindCatagory))			{ if (m_ViewportHovered && !ImGuizmo::IsUsing() && !ImGuizmo::IsOver() && !Input::IsKeyPressed(Key::LeftAlt)) m_SceneHierarchyPanel.SetSelectedEntity(m_HoveredEntity); }
+		else if (KeyBindCheck(GizmoNoneBind, bindCatagory))				{ if (ViewportKeyAllowed() && !ImGuizmo::IsUsing()) { m_GizmoType = -1; } }
+		else if (KeyBindCheck(GizmoTranslateBind, bindCatagory))		{ if (ViewportKeyAllowed() && !ImGuizmo::IsUsing()) { m_GizmoType = ImGuizmo::OPERATION::TRANSLATE; } }
+		else if (KeyBindCheck(GizmoRotateBind, bindCatagory))			{ if (ViewportKeyAllowed() && !ImGuizmo::IsUsing()) { m_GizmoType = ImGuizmo::OPERATION::ROTATE; } }
+		else if (KeyBindCheck(GizmoScaleBind, bindCatagory))			{ if (ViewportKeyAllowed() && !ImGuizmo::IsUsing()) { m_GizmoType = ImGuizmo::OPERATION::SCALE; } }
+		else if (KeyBindCheck(ShadingTypeWireframeBind, bindCatagory))	{ if (ViewportKeyAllowed()) SetShadingIndex(0); }
+		else if (KeyBindCheck(ShadingTypeUnlitBind, bindCatagory))		{ if (ViewportKeyAllowed()) SetShadingIndex(1); }
+		else if (KeyBindCheck(ShadingTypeSolidBind, bindCatagory))		{ if (ViewportKeyAllowed()) SetShadingIndex(2); }
+		else if (KeyBindCheck(ShadingTypeRenderedBind, bindCatagory))	{ if (ViewportKeyAllowed()) SetShadingIndex(3); }
+		else if (KeyBindCheck(ToggleShadingTypeBind, bindCatagory))		{ if (ViewportKeyAllowed()) SetShadingIndex(m_ShadingIndex == 0 ? m_PreviousToggleIndex : 0); }
+		else if (KeyBindCheck(ViewFrontBind, bindCatagory))				{ if (ViewportKeyAllowed()) { m_YawUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360; m_PitchUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360; m_UpdateAngles = true; m_EditorCamera.SetProjectionType(1); } }
+		else if (KeyBindCheck(ViewSideBind, bindCatagory))				{ if (ViewportKeyAllowed()) { m_YawUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360 - 90.0f; m_PitchUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360; m_UpdateAngles = true; m_EditorCamera.SetProjectionType(1); } }
+		else if (KeyBindCheck(ViewTopBind, bindCatagory))				{ if (ViewportKeyAllowed()) { m_YawUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360; m_PitchUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360 + 90; m_UpdateAngles = true; m_EditorCamera.SetProjectionType(1); } }
+		else if (KeyBindCheck(ViewFlipBind, bindCatagory))				{ if (ViewportKeyAllowed()) { m_YawUpdate = glm::degrees(m_EditorCamera.GetYaw()) + 180.0f; m_PitchUpdate = glm::degrees(m_EditorCamera.GetPitch()); m_UpdateAngles = true; m_EditorCamera.SetProjectionType(1); } }
+		else if (KeyBindCheck(ViewProjectionBind, bindCatagory))		{ if (ViewportKeyAllowed()) { m_ProjectionToggled = !m_EditorCamera.GetProjectionType(); m_EditorCamera.SetProjectionType(m_ProjectionToggled); } }
+		else if (KeyBindCheck(DuplicateBind, bindCatagory))				{ if (ViewportKeyAllowed() && m_SceneHierarchyPanel.GetSelectedEntity()) { m_SceneHierarchyPanel.SetSelectedEntity(m_ActiveScene->DuplicateEntity(m_SceneHierarchyPanel.GetSelectedEntity())); } m_NodeEditorPannel.DuplicateNodes(); }
+		else if (KeyBindCheck(RenameBind, bindCatagory))				{ if (m_ContentBrowser.GetSelectedFile().filename != "") m_ContentBrowser.OpenRenamePopup(m_ContentBrowser.GetSelectedFile()); }
+		else if (KeyBindCheck(ClosePopupBind, bindCatagory))			{ m_PopupsAndNotifications.RemoveTopmostPopup(); }
+		// Text Editor Keybinds
+		else if (KeyBindCheck(TextEditorDuplicate, bindCatagory))		{ m_TextEditor.Duplicate(); }
+		else if (KeyBindCheck(TextEditorSwapLineUp, bindCatagory))		{ m_TextEditor.SwapLineUp(); }
+		else if (KeyBindCheck(TextEditorSwapLineDown, bindCatagory))	{ m_TextEditor.SwapLineDown(); }
+		else if (KeyBindCheck(TextEditorSwitchHeader, bindCatagory))	{ m_TextEditor.SwitchCStyleHeader(); }
+	
+		else if (Input::IsMouseButtonPressed(Mouse::ButtonLeft) && Input::IsKeyPressed(Key::LeftAlt)) { if (m_ProjectionToggled != m_EditorCamera.GetProjectionType()) { m_EditorCamera.SetProjectionType(m_ProjectionToggled); } }
 	}
 
 	bool EditorLayer::OnKeyPressed(KeyPressedEvent& e)
@@ -1352,23 +1402,37 @@ namespace Dymatic {
 		m_PopupsAndNotifications.ClearNotificationList();
 	}
 
-	void EditorLayer::OpenScene()
+	void EditorLayer::AppendScene()
 	{
-		std::optional<std::string> filepath = FileDialogs::OpenFile("Dymatic Scene (*.dymatic)\0*.dymatic\0");
-		if (filepath)
+		std::string filepath = FileDialogs::OpenFile("Dymatic Scene (*.dymatic)\0*.dymatic\0");
+		if (!filepath.empty())
 		{
-			OpenSceneByFilepath(*filepath);
+			AppendSceneByFilepath(filepath);
 		}
 	}
 
-	void EditorLayer::OpenSceneByFilepath(const std::string& filepath)
+	void EditorLayer::AppendSceneByFilepath(const std::string filepath)
+	{
+		SceneSerializer serializer(m_ActiveScene);
+		serializer.Deserialize(filepath);
+	}
+
+	void EditorLayer::OpenScene()
+	{
+		std::string filepath = FileDialogs::OpenFile("Dymatic Scene (*.dymatic)\0*.dymatic\0");
+		if (!filepath.empty())
+		{
+			OpenSceneByFilepath(filepath);
+		}
+	}
+
+	void EditorLayer::OpenSceneByFilepath(const std::string filepath)
 	{
 		m_ActiveScene = CreateRef<Scene>();
 		m_ActiveScene->OnViewportResize((uint32_t)m_ViewportSize.x, (uint32_t)m_ViewportSize.y);
 		m_SceneHierarchyPanel.SetContext(m_ActiveScene);
 
-		SceneSerializer serializer(m_ActiveScene);
-		serializer.Deserialize(filepath);
+		AppendSceneByFilepath(filepath);
 		m_CurrentFilepath = filepath;
 
 		AddRecentFile(filepath);
@@ -1379,7 +1443,7 @@ namespace Dymatic {
 		m_PopupsAndNotifications.ClearNotificationList();
 	}
 
-	void EditorLayer::SaveSceneToFilepath(const std::string& filepath)
+	void EditorLayer::SaveSceneToFilepath(const std::string filepath)
 	{
 		SceneSerializer serializer(m_ActiveScene);
 		serializer.Serialize(filepath);
@@ -1401,11 +1465,11 @@ namespace Dymatic {
 
 	bool EditorLayer::SaveSceneAs()
 	{
-		std::optional<std::string> filepath = FileDialogs::SaveFile("Dymatic Scene (*.dymatic)\0*.dymatic\0");
-		if (filepath)
+		std::string filepath = FileDialogs::SaveFile("Dymatic Scene (*.dymatic)\0*.dymatic\0");
+		if (!filepath.empty())
 		{
-			SaveSceneToFilepath(*filepath);
-			AddRecentFile(*filepath);
+			SaveSceneToFilepath(filepath);
+			AddRecentFile(filepath);
 			return true;
 		}
 		return false;
@@ -1413,7 +1477,7 @@ namespace Dymatic {
 
 	void EditorLayer::SaveAndExit()
 	{
-		m_PopupsAndNotifications.Popup("Unsaved Changes", "Would you like to save changes before exiting?\nWARNING: Any unsaved changes will be lost!\n", { "Cancel", "Discard", "Save" });
+		m_PopupsAndNotifications.Popup("Unsaved Changes", "Save changes before closing?\nDocument: " + GetCurrentFileName() + "\n", { "Cancel", "Discard", "Save" });
 	}
 
 	void EditorLayer::CloseProgramWindow()
@@ -1510,19 +1574,28 @@ namespace Dymatic {
 		}
 	}
 
-	//ImGui Menu Item with Dymatic Image
-	bool EditorLayer::ImageMenuItem(Ref<Texture2D> texture, std::string item, std::string shortcut, bool menu, bool enabled, ImVec2 imageSize)
+	bool EditorLayer::KeyBindCheck(KeyBindEvent bindEvent, BindCatagory bindCatagory)
 	{
-		ImGui::Image(reinterpret_cast<void*>(texture->GetRendererID()), imageSize, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
-		ImGui::SameLine();
-		if (menu)
-		{
-			return (ImGui::BeginMenu(item.c_str(), enabled));
-		}
-		else
-		{
-			return (ImGui::MenuItem(item.c_str(), shortcut.c_str(), false, enabled));
-		}
+			bool control = Input::IsKeyPressed(Key::LeftControl) || Input::IsKeyPressed(Key::RightControl);
+			bool shift = Input::IsKeyPressed(Key::LeftShift) || Input::IsKeyPressed(Key::RightShift);
+			bool alt = Input::IsKeyPressed(Key::LeftAlt) || Input::IsKeyPressed(Key::RightAlt);
+
+			auto repeats = m_KeyPressed.GetRepeatCount();
+
+			auto& prefs = m_PreferencesPannel.GetPreferences().m_PreferenceData;
+
+			return (prefs.keyBinds.IsKey(bindEvent, m_KeyPressed.GetKeyCode(), m_MouseButtonPressed.GetMouseButton(), bindCatagory, control, shift, alt, repeats, prefs.emulateNumpad));
+	}
+
+	std::string EditorLayer::GetBindAsString(KeyBindEvent bindEvent)
+	{
+		return m_PreferencesPannel.GetPreferences().m_PreferenceData.keyBinds.GetBindAsString(bindEvent);
+	}
+
+	std::string EditorLayer::GetCurrentFileName()
+	{
+		std::string filename = m_CurrentFilepath;
+		return(filename != "" ? (filename.find_last_of("\\") != std::string::npos ? (filename.erase(0, filename.find_last_of("\\") + 1)) : (filename.find_last_of("/") != std::string::npos ? (filename.erase(0, filename.find_last_of("/") + 1)) : filename)) : "Unsaved Dymatic Document");
 	}
 
 }

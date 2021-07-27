@@ -30,6 +30,8 @@ namespace Dymatic {
 	
 		void Application_Frame();
 	private:
+		
+
 		int stackIndex;
 	};
 

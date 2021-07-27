@@ -8,6 +8,8 @@
 #include "Dymatic/Scene/Components.h"
 #include <cstring>
 
+#include "../TextSymbols.h"
+
 /* The Microsoft C++ compiler is non-compliant with the C++ standard and needs
  * the following definition to disable a security warning on std::strncpy().
  */
@@ -30,35 +32,41 @@ namespace Dymatic {
 
 	void SceneHierarchyPanel::OnImGuiRender()
 	{
-		ImGui::Begin("Scene Hierarchy");
-
-		m_Context->m_Registry.each([&](auto entityID)
+		if (m_SceneHierarchyVisible)
 		{
-			Entity entity{ entityID , m_Context.get() };
-			DrawEntityNode(entity);
-		});
+			ImGui::Begin((std::string(CHARACTER_WINDOW_ICON_SCENE_HIERARCHY) + " Scene Hierarchy").c_str(), &m_SceneHierarchyVisible);
 
-		if (ImGui::IsMouseDown(0) && ImGui::IsWindowHovered())
-			m_SelectionContext = {};
+			m_Context->m_Registry.each([&](auto entityID)
+			{
+				Entity entity{ entityID , m_Context.get() };
+				DrawEntityNode(entity);
+			});
 
-		// Right-click on blank space
-		if (ImGui::BeginPopupContextWindow(0, 1, false))
-		{
-			if (ImGui::MenuItem("Create Empty Entity"))
-				m_Context->CreateEntity("Empty Entity");
+			if (ImGui::IsMouseDown(0) && ImGui::IsWindowHovered())
+				m_SelectionContext = {};
 
-			ImGui::EndPopup();
+			// Right-click on blank space
+			if (ImGui::BeginPopupContextWindow(0, 1, false))
+			{
+				if (ImGui::MenuItem("Create Empty Entity"))
+					m_Context->CreateEntity("Empty Entity");
+
+				ImGui::EndPopup();
+			}
+
+			ImGui::End();
 		}
 
-		ImGui::End();
-
-		ImGui::Begin("Properties");
-		if (m_SelectionContext)
+		if (m_PropertiesVisible)
 		{
-			DrawComponents(m_SelectionContext);
-		}
+			ImGui::Begin((std::string(CHARACTER_WINDOW_ICON_PROPERTIES) + " Properties").c_str(), &m_PropertiesVisible);
+			if (m_SelectionContext)
+			{
+				DrawComponents(m_SelectionContext);
+			}
 
-		ImGui::End();
+			ImGui::End();
+		}
 	}
 
 	void SceneHierarchyPanel::SetSelectedEntity(Entity entity)
@@ -83,9 +91,9 @@ namespace Dymatic {
 		bool entityDeleted = false;
 		if (ImGui::BeginPopupContextItem())
 		{
-			if (ImGui::MenuItem("Delete"))
+			if (ImGui::MenuItem((std::string(CHARACTER_PROPERTIES_ICON_DELETE) + " Delete").c_str()))
 				entityDeleted = true;
-			if (ImGui::MenuItem("Duplicate"))
+			if (ImGui::MenuItem((std::string(CHARACTER_PROPERTIES_ICON_DUPLICATE) + " Duplicate").c_str()))
 			{
 				m_Context->DuplicateEntity(entity);
 			}
@@ -104,13 +112,14 @@ namespace Dymatic {
 			std::vector<std::string> ComponentName;
 			//if (entity.HasComponent<TransformComponent>()) { ComponentName.push_back("Transform"); }
 			if (entity.HasComponent<SpriteRendererComponent>()) { ComponentName.push_back("Sprite Renderer"); }
+			if (entity.HasComponent<ParticleSystem>()) { ComponentName.push_back("Particle System"); }
 			if (entity.HasComponent<CameraComponent>()) { ComponentName.push_back("Camera"); }
 
 			for (int i = 0; i < ComponentName.size(); i++)
 			{
 				ImVec2 valPos = ImGui::GetCursorScreenPos();
 				bool opened = ImGui::TreeNodeEx((void*)9817239, flags, ComponentName[i].c_str());
-				ImGui::GetWindowDrawList()->AddImage(reinterpret_cast<void*>((ComponentName[i] == "Transform" ? m_IconTransformComponent : ComponentName[i] == "Sprite Renderer" ? m_IconSpriteRendererComponent : m_IconCameraComponent)->GetRendererID()), valPos, ImVec2{ valPos.x + 16, valPos.y + 16 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 }, ImGui::ColorConvertFloat4ToU32(ImVec4{0.34f, 0.69f, 0.55f, 1.0f}));
+				ImGui::GetWindowDrawList()->AddImage(reinterpret_cast<void*>((ComponentName[i] == "Transform" ? m_IconTransformComponent : ComponentName[i] == "Sprite Renderer" ? m_IconSpriteRendererComponent : ComponentName[i] == "Particle System" ? m_IconParticleSystemComponent : m_IconCameraComponent)->GetRendererID()), valPos, ImVec2{ valPos.x + 16, valPos.y + 16 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 }, ImGui::ColorConvertFloat4ToU32(ImVec4{0.34f, 0.69f, 0.55f, 1.0f}));
 				if (opened)
 				{
 					ImGui::TreePop();
@@ -124,14 +133,12 @@ namespace Dymatic {
 				bool entityDeleted = false;
 				if (ImGui::BeginPopupContextItem(("##ComponentHeirachyPopup" + ComponentName[i]).c_str()))
 				{
-					if (ImGui::MenuItem("Delete"))
+					if (ImGui::MenuItem((std::string(CHARACTER_PROPERTIES_ICON_DELETE) + " Remove Component").c_str()))
 					{
 						if (ComponentName[i] == "Transform") { entity.RemoveComponent<TransformComponent>(); }
 						if (ComponentName[i] == "Sprite Renderer") { entity.RemoveComponent<SpriteRendererComponent>(); }
+						if (ComponentName[i] == "Particle System") { entity.RemoveComponent<ParticleSystem>(); }
 						if (ComponentName[i] == "Camera") { entity.RemoveComponent<Camera>(); }
-					}
-					if (ImGui::MenuItem("Duplicate"))
-					{
 					}
 
 					ImGui::EndPopup();
@@ -149,7 +156,7 @@ namespace Dymatic {
 		}
 	}
 
-	static void DrawVec3Control(const std::string& label, glm::vec3& values, float resetValue = 0.0f, float columnWidth = 100.0f)
+	static void DrawVec3Control(const std::string& label, glm::vec3& values, glm::vec3 resetValue = glm::vec3(0.0f), float columnWidth = 100.0f)
 	{
 		ImGuiIO& io = ImGui::GetIO();
 		auto boldFont = io.Fonts->Fonts[0];
@@ -172,7 +179,7 @@ namespace Dymatic {
 		ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4{ 0.8f, 0.1f, 0.15f, 1.0f });
 		ImGui::PushFont(boldFont);
 		if (ImGui::Button("X", buttonSize))
-			values.x = resetValue;
+			values.x = resetValue.x;
 		ImGui::PopFont();
 		ImGui::PopStyleColor(3);
 
@@ -186,7 +193,7 @@ namespace Dymatic {
 		ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4{ 0.2f, 0.7f, 0.2f, 1.0f });
 		ImGui::PushFont(boldFont);
 		if (ImGui::Button("Y", buttonSize))
-			values.y = resetValue;
+			values.y = resetValue.y;
 		ImGui::PopFont();
 		ImGui::PopStyleColor(3);
 
@@ -200,7 +207,7 @@ namespace Dymatic {
 		ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4{ 0.1f, 0.25f, 0.8f, 1.0f });
 		ImGui::PushFont(boldFont);
 		if (ImGui::Button("Z", buttonSize))
-			values.z = resetValue;
+			values.z = resetValue.z;
 		ImGui::PopFont();
 		ImGui::PopStyleColor(3);
 
@@ -277,16 +284,26 @@ namespace Dymatic {
 		ImGui::PushItemWidth(-1);
 
 		//if (ImGui::Button("Add Component"))
-		if (ImGui::ImageButton(reinterpret_cast<void*>(m_IconAddComponent->GetRendererID()), ImVec2{ 18, 18}, ImVec2{ 0, 1 }, ImVec2{ 1, 0 }))
+		if (ImGui::Button(std::string(CHARACTER_PROPERTIES_ICON_ADD).c_str(), ImVec2{ 31.0f, 24.0f }))
 			ImGui::OpenPopup("AddComponent");
-
 		ImGui::SameLine();
-		if (ImGui::ImageButton(reinterpret_cast<void*>(m_IconDuplicate->GetRendererID()), ImVec2{ 18, 18 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 }))
+		if (ImGui::Button(std::string(CHARACTER_PROPERTIES_ICON_DUPLICATE).c_str(), ImVec2{ 31.0f, 24.0f }))
 			m_SelectionContext = m_Context->DuplicateEntity(m_SelectionContext);
-
 		ImGui::SameLine();
-		if (ImGui::ImageButton(reinterpret_cast<void*>(m_IconDelete->GetRendererID()), ImVec2{ 18, 18 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 }))
+		if (ImGui::Button(std::string(CHARACTER_PROPERTIES_ICON_DELETE).c_str(), ImVec2{ 31.0f, 24.0f }))
 			entityDeleted = true;
+
+		// Original Image Button Version
+		//if (ImGui::ImageButton(reinterpret_cast<void*>(m_IconAddComponent->GetRendererID()), ImVec2{ 18, 18}, ImVec2{ 0, 1 }, ImVec2{ 1, 0 }))
+		//	ImGui::OpenPopup("AddComponent");
+		//
+		//ImGui::SameLine();
+		//if (ImGui::ImageButton(reinterpret_cast<void*>(m_IconDuplicate->GetRendererID()), ImVec2{ 18, 18 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 }))
+		//	m_SelectionContext = m_Context->DuplicateEntity(m_SelectionContext);
+		//
+		//ImGui::SameLine();
+		//if (ImGui::ImageButton(reinterpret_cast<void*>(m_IconDelete->GetRendererID()), ImVec2{ 18, 18 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 }))
+		//	entityDeleted = true;
 
 		if (ImGui::BeginPopup("AddComponent"))
 		{
@@ -308,6 +325,15 @@ namespace Dymatic {
 				ImGui::CloseCurrentPopup();
 			}
 
+			if (ImGui::MenuItem("Particle System"))
+			{
+				if (!m_SelectionContext.HasComponent<ParticleSystem>())
+					m_SelectionContext.AddComponent<ParticleSystem>();
+				else
+					DY_CORE_WARN("This entity already has the Particle System Component!");
+				ImGui::CloseCurrentPopup();
+			}
+
 			ImGui::EndPopup();
 		}
 
@@ -319,7 +345,7 @@ namespace Dymatic {
 			glm::vec3 rotation = glm::degrees(component.Rotation);
 			DrawVec3Control("Rotation", rotation);
 			component.Rotation = glm::radians(rotation);
-			DrawVec3Control("Scale", component.Scale, 1.0f);
+			DrawVec3Control("Scale", component.Scale, glm::vec3(1.0f));
 		});
 
 		DrawComponent<CameraComponent>("Camera", entity, [](auto& component)
@@ -386,6 +412,107 @@ namespace Dymatic {
 			ImGui::ColorEdit4("Color", glm::value_ptr(component.Color));
 		});
 
+		DrawComponent<ParticleSystem>("Particle System", entity, [](auto& component)
+		{
+			DrawVec3Control("Offset", component.Offset);
+
+			DrawVec3Control("Velocity", component.Velocity);
+			DrawVec3Control("Velocity Variation", component.VelocityVariation);
+			DrawVec3Control("Gravity (m/s)", component.Gravity, glm::vec3(0.0f, -9.8f, 0.0f));
+
+			const char* colorMethodStrings[] = { "Linear", "Constant", "Points" };
+			const char* currentColorMethodString = colorMethodStrings[(int)component.ColorMethod];
+			if (ImGui::BeginCombo("Color Method", currentColorMethodString))
+			{
+				for (int i = 0; i < 3; i++)
+				{
+					bool isSelected = currentColorMethodString == colorMethodStrings[i];
+					if (ImGui::Selectable(colorMethodStrings[i], isSelected))
+					{
+						currentColorMethodString = colorMethodStrings[i];
+						component.ColorMethod = i;
+					}
+
+					if (isSelected)
+						ImGui::SetItemDefaultFocus();
+				}
+
+				ImGui::EndCombo();
+			}
+
+			if (component.ColorMethod == 0)
+			{
+				ImGui::ColorEdit4("Color Begin", glm::value_ptr(component.ColorBegin));
+				ImGui::ColorEdit4("Color End", glm::value_ptr(component.ColorEnd));
+			}
+			else if (component.ColorMethod == 1)
+			{
+				ImGui::ColorEdit4("Color", glm::value_ptr(component.ColorConstant));
+			}
+			else if (component.ColorMethod == 2)
+			{
+				ImVec2 contentRegionAvailable = ImGui::GetContentRegionAvail();
+				ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2{ 4, 4 });
+				bool open = (ImGui::TreeNodeEx("Color Points", ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_AllowItemOverlap | ImGuiTreeNodeFlags_FramePadding));
+
+				float lineHeight = GImGui->Font->FontSize + GImGui->Style.FramePadding.y * 2.0f;
+				ImGui::SameLine(contentRegionAvailable.x + lineHeight * 0.35f);
+				if (ImGui::Button(std::string("+##AddColorPoint").c_str(), ImVec2{ lineHeight, lineHeight }))
+				{
+					component.ColorPoints.push_back({ component.GetNextColorPointId() });
+				}
+				ImGui::PopStyleVar();
+				if (open)
+				{
+					for (int i = 0; i < component.ColorPoints.size(); i++)
+					{
+						bool removeIndex = false;
+						DY_CORE_WARN(component.ColorPoints[i].GetId());
+
+						ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x / 6);
+						if (ImGui::DragFloat((std::string("##ColorPoint-Point-") + std::to_string(component.ColorPoints[i].GetId())).c_str(), &component.ColorPoints[i].point, 0.001f, 0.0f, 1.0f)) { component.RecalculateColorPointOrder(); }
+						ImGui::PopItemWidth();
+
+						//Remove Context
+						if (ImGui::BeginPopupContextItem((std::string("##RemoveColorPoint-") + std::to_string(component.ColorPoints[i].GetId())).c_str()))
+						{
+							if (ImGui::MenuItem("Remove Color Point"))
+								removeIndex = true;
+							if (ImGui::MenuItem("Duplicate Color Point"))
+								component.DuplicateColorPoint(i);
+
+							ImGui::EndPopup();
+						}
+
+						ImGui::SameLine();
+						ImGui::ColorEdit4((std::string("##ColorPoint-Color-") + std::to_string(component.ColorPoints[i].id)).c_str(), glm::value_ptr(component.ColorPoints[i].color));
+
+						if (removeIndex) { component.ColorPoints.erase(component.ColorPoints.begin() + i); }
+					}
+					ImGui::TreePop();
+				}
+			}
+
+			ImGui::DragFloat("Size Begin", &component.SizeBegin);
+			ImGui::DragFloat("Size End", &component.SizeEnd);
+			ImGui::DragFloat("Size Variation", &component.SizeVariation);
+
+			ImGui::DragFloat("Life Time", &component.LifeTime);
+			ImGui::DragInt("Emission Number", &component.EmissionNumber);
+
+			ImGui::Checkbox("Active", &component.Active);
+			ImGui::Checkbox("Face Camera", &component.FaceCamera);
+
+			if (ImGui::Button("Emit", ImVec2(ImGui::GetContentRegionAvail().x, 0)))
+			{
+				component.Emit();
+			}
+
+			if (ImGui::Button("Reset", ImVec2(ImGui::GetContentRegionAvail().x, 0)))
+			{
+				component.ClearParticlePool();
+			}
+		});
 
 		if (entityDeleted)
 		{

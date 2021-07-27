@@ -3477,8 +3477,17 @@ void ImGui::RenderArrowPointingAt(ImDrawList* draw_list, ImVec2 pos, ImVec2 half
 // and because the saved space means that the left-most tab label can stay at exactly the same position as the label of a loose window.
 void ImGui::RenderArrowDockMenu(ImDrawList* draw_list, ImVec2 p_min, float sz, ImU32 col)
 {
-    draw_list->AddRectFilled(p_min + ImVec2(sz * 0.10f, sz * 0.15f), p_min + ImVec2(sz * 0.70f, sz * 0.30f), col);
-    RenderArrowPointingAt(draw_list, p_min + ImVec2(sz * 0.40f, sz * 0.85f), ImVec2(sz * 0.30f, sz * 0.40f), ImGuiDir_Down, col);
+    //IMGUI CUSTOM
+    // ImGui Window Dock Options
+
+    //Original
+    //draw_list->AddRectFilled(p_min + ImVec2(sz * 0.10f, sz * 0.15f), p_min + ImVec2(sz * 0.70f, sz * 0.30f), col);
+    //RenderArrowPointingAt(draw_list, p_min + ImVec2(sz * 0.40f, sz * 0.85f), ImVec2(sz * 0.30f, sz * 0.40f), ImGuiDir_Down, col);
+
+    draw_list->AddRectFilled(p_min + ImVec2(sz * 0.10f, sz * 0.20f ), p_min + ImVec2(sz * 0.70f, sz * 0.30f ), col);
+    draw_list->AddRectFilled(p_min + ImVec2(sz * 0.10f, sz * 0.425f), p_min + ImVec2(sz * 0.70f, sz * 0.525f), col);
+    draw_list->AddRectFilled(p_min + ImVec2(sz * 0.10f, sz * 0.65f ), p_min + ImVec2(sz * 0.70f, sz * 0.75f ), col);
+    //------------------//
 }
 
 static inline float ImAcos01(float x)

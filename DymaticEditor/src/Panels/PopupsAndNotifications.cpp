@@ -1,21 +1,21 @@
 #include "PopupsAndNotifications.h"
 
+#define IMGUI_DEFINE_MATH_OPERATORS
 #include <imgui/imgui.h>
 #include <imgui/imgui_internal.h>
 
 #include <glm/gtc/type_ptr.hpp>
 #include "Dymatic/Math/Math.h"
 
-#include "../WinToast/WinToastHandler.h"
 #include "../Preferences.h"
 
 #include <string>
 #include <sstream>
 #include <ctime>
 
-namespace Dymatic {
+#include "../TextSymbols.h"
 
-	WinToastLib::Toast m_ToastHandle;
+namespace Dymatic {
 
 	PopupsAndNotifications::PopupsAndNotifications(Preferences* preferencesRef)
 	{
@@ -167,32 +167,21 @@ namespace Dymatic {
 		return {};
 	}
 
-	void PopupsAndNotifications::Notification(std::string identifier, int notificationIndex, std::string title, std::string message, std::vector<std::string> buttons, bool loading, float displayTime)
+	void PopupsAndNotifications::Notification(int notificationIndex, std::string title, std::string message, std::vector<ButtonData> buttons, bool loading, float displayTime)
 	{
 		if (m_PreferencesReference->m_PreferenceData.NotificationEnabled[notificationIndex])
 		{
-
 			NotificationData data;
 			data.title = title;
 			data.message = message;
-			for (int i = 0; i < 10; i++)
-			{
-				if (i < buttons.size())
-					data.buttons[i] = buttons[i];
-				else
-					data.buttons[i] = "";
-			}
-
-			int numButtons = buttons.size();
-			if (numButtons > 10)
-				numButtons = 10;
-			data.numberOfButtons = numButtons;
+			data.buttons = buttons;
 			data.loading = loading;
 
-			data.identifier = Math::GetRandomInRange(1, 9999999);
+			data.id = GetNextNotificationId();
 			data.time = m_ProgramTime;
 			data.displayTime = displayTime;
 
+			//Calculate Time Executed
 			time_t tt;
 			time(&tt);
 			tm TM = *localtime(&tt);
@@ -210,20 +199,105 @@ namespace Dymatic {
 
 			data.executedTime = ("{ " + Hours_S + " : " + Minutes_S + " : " + Seconds_S + " }");
 
-			data.nameID = identifier;
-
-			std::string linelessMessage = message;
-			//linelessMessage.erase(std::remove(linelessMessage.begin(), linelessMessage.end(), 'a'), linelessMessage.end());
-
-			if (m_PreferencesReference->m_PreferenceData.NotificationPreset == 3 ? (m_PreferencesReference->m_PreferenceData.NotificationToastEnabled[notificationIndex] == 2 || (m_PreferencesReference->m_PreferenceData.NotificationToastEnabled[notificationIndex] == 1 && !IsForegroundProcess(GetCurrentProcessId()))) : m_PreferencesReference->m_PreferenceData.NotificationPreset)
-				data.toastID = m_ToastHandle.ShowToast(identifier, title, linelessMessage, buttons, (displayTime == 0 ? 1000 : displayTime));
-
 			m_NotificationList.push_back(data);
 		}
 	}
 
-	NotificationData PopupsAndNotifications::NotificationUpdate(float programTime)
+	void PopupsAndNotifications::NotificationUpdate(float programTime)
 	{
+		// Show Notification Popups
+		bool visible = !ImGui::GetTopMostPopupModal();
+		{
+			for (int i = (int)m_NotificationList.size() - 1; i >= 0; i--)
+			{
+				auto titleSize = ImGui::CalcTextSize(m_NotificationList[i].title.c_str());
+				auto messageSize = ImGui::CalcTextSize(m_NotificationList[i].message.c_str());
+				auto buttonSize = 100.0f; for (auto button : m_NotificationList[i].buttons) { buttonSize += ImGui::CalcTextSize(button.name.c_str()).x + 5.0f; }
+				auto maxTextWidth = (titleSize.x > messageSize.x) ? (titleSize.x) : (messageSize.x); if (buttonSize > maxTextWidth) { maxTextWidth = buttonSize; }
+				auto WindowPosMax = ImVec2(ImGui::GetWindowPos().x + ImGui::GetContentRegionMax().x - 10.0f, ImGui::GetWindowPos().y + ImGui::GetContentRegionMax().y - 10);
+				auto yMin = ImGui::GetWindowPos().y + ImGui::GetContentRegionMax().y - messageSize.y - titleSize.y * 2 - 20.0f - (m_NotificationList[i].buttons.size() > 0 ? 40.0f : 0.0f);
+				yMin = (WindowPosMax.y - std::max(WindowPosMax.y - yMin, 100.0f));
+				auto WindowPosMin = ImVec2(ImGui::GetWindowPos().x + ImGui::GetContentRegionMax().x - 120.0f -  maxTextWidth, yMin);
+
+				m_NotificationList[i].height = WindowPosMax.y - WindowPosMin.y;
+				for (int n = i + 1; n < m_NotificationList.size(); n++)
+				{
+					if (m_NotificationList[n].id != m_NotificationList[i].id) { WindowPosMin = ImVec2(WindowPosMin.x, WindowPosMin.y - m_NotificationList[n].height - 10.0f); WindowPosMax = ImVec2(WindowPosMax.x, WindowPosMax.y - m_NotificationList[n].height - 10.0f); }
+				}
+
+				//Lerping Between Positions
+				m_NotificationList[i].offsetMin = glm::lerp(m_NotificationList[i].offsetMin, ImGui::GetWindowPos().y + ImGui::GetWindowSize().y - WindowPosMin.y, 0.1f);
+				m_NotificationList[i].offsetMax = m_NotificationList[i].offsetMin - (WindowPosMax.y - WindowPosMin.y);
+				
+				WindowPosMin = ImVec2(WindowPosMin.x, ImGui::GetWindowPos().y + ImGui::GetWindowSize().y - m_NotificationList[i].offsetMin);
+				WindowPosMax = ImVec2(WindowPosMax.x, ImGui::GetWindowPos().y + ImGui::GetWindowSize().y - m_NotificationList[i].offsetMax);
+
+				//Setting Colors
+				auto& OverallOpacity = m_NotificationList[i].currentOpacity;
+				if (m_NotificationList[i].fadeIn) { OverallOpacity += 0.0375f; if (OverallOpacity >= 1.0f) { m_NotificationList[i].fadeIn = false; } }
+				else if (m_NotificationList[i].fadeOut) { OverallOpacity -= 0.0375f; }
+				else { OverallOpacity = glm::lerp(OverallOpacity, ((i > (int)m_NotificationList.size() - 6)? 1.0f : 0.0f), 0.15f); }
+				auto textCol = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+				auto popupBgCol = ImGui::GetStyleColorVec4(ImGuiCol_PopupBg);
+				auto borderCol = ImGui::GetStyleColorVec4(ImGuiCol_Border);
+				textCol.w *= OverallOpacity; popupBgCol.w *= OverallOpacity; borderCol.w *= OverallOpacity;
+				auto popupOpacity = 1.0f - ImGui::GetStyleColorVec4(ImGuiCol_ModalWindowDimBg).w;
+				if (!visible) { textCol.w *= popupOpacity; popupBgCol.w *= popupOpacity; borderCol.w *= popupOpacity; }
+
+				//Drawing Elements
+				{
+					ImGui::GetForegroundDrawList()->AddRectFilled(WindowPosMin, WindowPosMax, ImGui::ColorConvertFloat4ToU32(popupBgCol), 5.0f);
+					ImGui::GetForegroundDrawList()->AddRect(WindowPosMin, WindowPosMax, ImGui::ColorConvertFloat4ToU32(borderCol), 5.0f, 15, 3.0f);
+					auto imageAndCirclePos = ImVec2((WindowPosMin.x + 50.0f), ((WindowPosMin.y + 30.0f) + (WindowPosMax.y - 30.0f)) / 2.0f);
+					float imageWidth = 30.0f;
+					ImGui::GetForegroundDrawList()->AddImage(reinterpret_cast<void*>(m_DymaticLogo->GetRendererID()), ImVec2(imageAndCirclePos.x - imageWidth, imageAndCirclePos.y - imageWidth), ImVec2(imageAndCirclePos.x + imageWidth, imageAndCirclePos.y + imageWidth), ImVec2{ 0, 1 }, ImVec2{ 1, 0 }, ImGui::ColorConvertFloat4ToU32(textCol));
+					float circleRadius = 40.0f * (((std::sin(ImGui::GetTime() * 5.0f) + 1.0f) / 2.0f) * 0.25f + 0.8f);
+					ImGui::GetForegroundDrawList()->AddCircle(imageAndCirclePos, circleRadius, ImGui::ColorConvertFloat4ToU32(textCol), (int)circleRadius - 1);
+
+					auto textPos = ImVec2(WindowPosMin.x + 100.0f, WindowPosMin.y + 10.0f);
+					ImGui::GetForegroundDrawList()->AddText(ImGui::GetIO().Fonts->Fonts[0], 18, textPos, ImGui::ColorConvertFloat4ToU32(textCol), m_NotificationList[i].title.c_str());
+					ImGui::GetForegroundDrawList()->AddText(ImVec2(textPos.x, textPos.y + 22.0f), ImGui::ColorConvertFloat4ToU32(textCol), m_NotificationList[i].message.c_str());
+
+					
+					ImGuiContext& g = *GImGui;
+					bool windowHovered = true;
+					// Filter by viewport
+					if (ImGui::GetCurrentWindow()->Viewport != g.MouseViewport)
+						if (g.MovingWindow == NULL || ImGui::GetCurrentWindow()->RootWindow != g.MovingWindow->RootWindow)
+							windowHovered = false;
+
+					float currentXPos = 100.0f;
+					for (int b = 0; b < m_NotificationList[i].buttons.size(); b++)
+					{
+						auto& button = m_NotificationList[i].buttons[b];
+
+						float textLength = ImGui::CalcTextSize(button.name.c_str()).x + 5.0f;
+
+						const ImRect bb = ImRect(ImVec2(WindowPosMin.x + currentXPos, WindowPosMax.y - 35.0f), ImVec2(WindowPosMin.x + currentXPos + textLength, WindowPosMax.y - 15.0f));
+						currentXPos += textLength + 5.0f;
+
+						auto offsetMousePos = ImGui::GetMousePos();
+						bool hovered = windowHovered && ImGui::GetWindowViewport() && (offsetMousePos.x > bb.Min.x && offsetMousePos.y > bb.Min.y && offsetMousePos.x < bb.Max.x&& offsetMousePos.y < bb.Max.y);
+						bool held = hovered && Input::IsMouseButtonPressed(Mouse::ButtonLeft);
+						bool pressed = hovered && ImGui::IsMouseReleased(ImGuiMouseButton_Left);
+
+						ImVec4 buttonColor = ImGui::GetStyleColorVec4((held && hovered) ? ImGuiCol_ButtonActive : hovered ? ImGuiCol_ButtonHovered : ImGuiCol_Button);
+						buttonColor.w *= OverallOpacity;
+						if (!visible) { buttonColor.w *= popupOpacity; }
+
+						ImGui::GetForegroundDrawList()->AddRectFilled(bb.Min, bb.Max, ImGui::ColorConvertFloat4ToU32(buttonColor), 3.0f);
+						ImGui::GetForegroundDrawList()->AddText(ImVec2(bb.Min.x + 2.5f, bb.Min.y), ImGui::ColorConvertFloat4ToU32(textCol), button.name.c_str());
+						if (pressed)
+						{
+							// Button Pressed Code
+							m_NotificationList[i].fadeOut = true;
+							button.func();
+						}
+					}
+				}
+			}
+		}
+
 		//Update Popup Stuff
 		if (m_PreviousPopupOpen == false)
 			m_PopupOpen = false;
@@ -232,131 +306,87 @@ namespace Dymatic {
 		io = ImGui::GetIO();
 		dockspaceWindowPosition = ImGui::GetWindowPos();
 		m_ProgramTime = programTime;
-		int m_ListSize = m_NotificationList.size() - 0;
-		if (m_ListSize < 0)
-			m_ListSize = 0;
-		std::string Number = "Number: " + std::to_string(m_ListSize);
 
+		unsigned int count = 0;
 		for (int i = 0; i < m_NotificationList.size(); i++)
 		{
 			if (((m_ProgramTime - m_NotificationList[i].time) > m_NotificationList[i].displayTime) && (m_NotificationList[i].displayTime != 0))
 			{
-				if (m_NotificationList[i].toastID != -1)
+				m_NotificationList[i].fadeOut = true;
+			}
+			if (m_NotificationList[i].fadeOut)
+			{
+				if (m_NotificationList[i].currentOpacity <= 0.1f)
 				{
-					m_ToastHandle.HideToast(m_NotificationList[i].toastID);
+					m_NotificationList.erase(m_NotificationList.begin() + i);
+					i--;
 				}
-				m_NotificationList.erase(m_NotificationList.begin() + i);
 			}
+			else { count++; }
 		}
 
-		ImGui::Begin("Notifications");
-		ImGui::Text(Number.c_str());
-
-
-		ImGui::SameLine(ImGui::GetContentRegionAvailWidth() - ImGui::CalcTextSize("Clear").x - 5);
-		if (ImGui::Button("Clear"))
+		if (m_NotificationsVisible)
 		{
-			ClearNotificationList();
-		}
+			ImGui::Begin((std::string(CHARACTER_WINDOW_ICON_NOTIFICATIONS) + " Notifications").c_str(), &m_NotificationsVisible);
+			ImGui::Text("Number: %d", count);
 
-		for (int i = m_NotificationList.size()-1; i >= 0 ; i = i-1)
-		{
 
-			const ImGuiTreeNodeFlags treeNodeFlags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_AllowItemOverlap | ImGuiTreeNodeFlags_FramePadding;
-			ImVec2 contentRegionAvailable = ImGui::GetContentRegionAvail();
-			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2{ 4, 4 });
-			float lineHeight = GImGui->Font->FontSize + GImGui->Style.FramePadding.y * 2.0f;
-			ImGui::Spacing();
-			bool open = ImGui::TreeNodeEx((void*)(m_NotificationList[i].identifier), treeNodeFlags, (m_NotificationList[i].executedTime + "  -  " + m_NotificationList[i].title).c_str());
-			ImGui::PopStyleVar();
-
-			bool removeNotification = false;
-			int buttonPressedOverride = -1;
-
-			if (m_ToastHandle.GetToastClicked(m_NotificationList[i].toastID))
+			ImGui::SameLine(ImGui::GetContentRegionAvailWidth() - ImGui::CalcTextSize("Clear").x - 5);
+			if (ImGui::Button("Clear"))
 			{
-
+				ClearNotificationList();
 			}
 
-			if (m_ToastHandle.GetToastButtonPressed(m_NotificationList[i].toastID) != -1)
+			for (int i = m_NotificationList.size() - 1; i >= 0; i = i - 1)
 			{
-				buttonPressedOverride = m_ToastHandle.GetToastButtonPressed(m_NotificationList[i].toastID);
-			}
-
-			ImGui::SameLine(contentRegionAvailable.x - lineHeight * 0.5f);
-			std::string line = "X##" + std::to_string(m_NotificationList[i].identifier);
-			if (ImGui::Button(line.c_str(), ImVec2{ lineHeight, lineHeight })/* || removeNotification*/)
-			{
-				m_ToastHandle.HideToast(m_NotificationList[i].toastID);
-				m_NotificationList.erase(m_NotificationList.begin() + i);
-				if (open)
-					ImGui::TreePop();
-				ImGui::End();
-				return {};
-			}
-			int buttonPressed = -1;
-			if (open)
-			{
-				ImGui::Dummy(ImVec2{ 0, 5 });
-				ImGui::Text(m_NotificationList[i].message.c_str());
-				ImGui::Dummy(ImVec2{ 0, 2 });
-				for (int b = 0; b < m_NotificationList[i].numberOfButtons; b++)
+				if (!m_NotificationList[i].fadeOut)
 				{
-					if (m_NotificationList[i].buttons[b] != "")
+					ImGui::PushID(m_NotificationList[i].id);
+					const ImGuiTreeNodeFlags treeNodeFlags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_AllowItemOverlap | ImGuiTreeNodeFlags_FramePadding;
+					ImVec2 contentRegionAvailable = ImGui::GetContentRegionAvail();
+					ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2{ 4, 4 });
+					float lineHeight = GImGui->Font->FontSize + GImGui->Style.FramePadding.y * 2.0f;
+					ImGui::Spacing();
+					bool open = ImGui::TreeNodeEx((void*)(m_NotificationList[i].id), treeNodeFlags, (m_NotificationList[i].executedTime + "  -  " + m_NotificationList[i].title).c_str());
+					ImGui::PopStyleVar();
+
+					ImGui::SameLine(contentRegionAvailable.x - lineHeight * 0.5f);
+					if (ImGui::Button("X", ImVec2{ lineHeight, lineHeight })/* || removeNotification*/)
 					{
-						std::string buttonLine = (m_NotificationList[i].buttons[b]) + "##" + std::to_string(m_NotificationList[i].identifier);
-						ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);
-						if (ImGui::Button(buttonLine.c_str()))
-						{
-							//ImGui::PopStyleVar();
-							//ImGui::TreePop();
-							buttonPressed = b;
-						}
-						ImGui::SameLine();
-						ImGui::PopStyleVar();
+						m_NotificationList[i].fadeOut = true;
 					}
+					if (open)
+					{
+						ImGui::Dummy(ImVec2{ 0, 5 });
+						ImGui::Text(m_NotificationList[i].message.c_str());
+						ImGui::Dummy(ImVec2{ 0, 2 });
+						for (int b = 0; b < m_NotificationList[i].buttons.size(); b++)
+						{
+							ImGui::PushID(m_NotificationList[i].buttons[b].id);
+							ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);
+							if (ImGui::Button(m_NotificationList[i].buttons[b].name.c_str()))
+							{
+								// Button Pressed Code
+								m_NotificationList[i].fadeOut = true;
+								m_NotificationList[i].buttons[b].func();
+							}
+							ImGui::SameLine();
+							ImGui::PopStyleVar();
+							ImGui::PopID();
+						}
+						ImGui::Dummy(ImVec2{ 0, 5 });
+						ImGui::TreePop();
+					}
+					ImGui::PopID();
 				}
-				ImGui::Dummy(ImVec2{ 0, 5 });
-				ImGui::TreePop();
 			}
-			if (buttonPressed != -1 || buttonPressedOverride != -1)
-			{
-				m_NotificationList[i].buttonClicked = buttonPressedOverride != -1 ? buttonPressedOverride : buttonPressed;
-				NotificationData finalData = m_NotificationList[i];
-
-				//Toast Handling
-				m_ToastHandle.HideToast(m_NotificationList[i].toastID);
-
-				m_NotificationList.erase(m_NotificationList.begin() + i);
-
-				ImGui::End();
-
-				return finalData;
-			}
+			ImGui::End();
 		}
-		ImGui::End();
-		return {};
 	}
 
 	void PopupsAndNotifications::ClearNotificationList()
 	{
-		for (NotificationData data : m_NotificationList)
-		{
-			if (data.toastID != -1)
-				m_ToastHandle.HideToast(data.toastID);
-		}
-		m_NotificationList.clear();
-	}
-
-	bool PopupsAndNotifications::IsForegroundProcess(DWORD pid)
-	{
-		HWND hwnd = GetForegroundWindow();
-		if (hwnd == NULL) return false;
-
-		DWORD foregroundPid;
-		if (GetWindowThreadProcessId(hwnd, &foregroundPid) == 0) return false;
-
-		return (foregroundPid == pid);
+		for (auto& notification : m_NotificationList) { notification.fadeOut = true; }
 	}
 
 }

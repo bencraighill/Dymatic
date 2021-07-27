@@ -20,10 +20,15 @@ namespace Dymatic {
 		Entity GetSelectedEntity() const { return m_SelectionContext; }
 		void SetSelectedEntity(Entity entity);
 
+		bool& GetSceneHierarchyVisible() { return m_SceneHierarchyVisible; }
+		bool& GetPropertiesVisible() { return m_PropertiesVisible; }
 	private:
 		void DrawEntityNode(Entity entity);
 		void DrawComponents(Entity entity);
 	private:
+		bool m_SceneHierarchyVisible = true;
+		bool m_PropertiesVisible = true;
+
 		Ref<Scene> m_Context;
 		Entity m_SelectionContext;
 
@@ -34,6 +39,7 @@ namespace Dymatic {
 		Ref<Texture2D> m_IconEmptyEntity = Texture2D::Create("assets/icons/Properties/ComponentIcons/SceneIconEmptyEntity.png");
 		Ref<Texture2D> m_IconTransformComponent = Texture2D::Create("assets/icons/Properties/ComponentIcons/SceneIconTransformComponent.png");
 		Ref<Texture2D> m_IconSpriteRendererComponent = Texture2D::Create("assets/icons/Properties/ComponentIcons/SceneIconSpriteRendererComponent.png");
+		Ref<Texture2D> m_IconParticleSystemComponent = Texture2D::Create("assets/icons/Properties/ComponentIcons/SceneIconParticleComponent.png");
 		Ref<Texture2D> m_IconCameraComponent = Texture2D::Create("assets/icons/Properties/ComponentIcons/SceneIconCameraComponent.png");
 	};
 

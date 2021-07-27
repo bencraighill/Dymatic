@@ -1,11 +1,9 @@
 #pragma once
 
-#include <imgui/imgui.h>
-#include <imgui/imgui_internal.h>
-
 #include "../Preferences.h"
 
 #include "Dymatic/Core/Base.h"
+#include <functional>
 
 namespace Dymatic {
 
@@ -18,19 +16,32 @@ namespace Dymatic {
 		bool loading = false;
 	};
 
+	struct ButtonData
+	{
+		unsigned int id;
+		std::string name;
+		std::function<void()> func;
+		ButtonData(unsigned int id, std::string name, std::function<void()> func)
+			: id(id), name(name), func(func)
+		{
+		}
+	};
+
 	struct NotificationData
 	{
-		std::string nameID, title, message;
-		std::string buttons[10];
-		std::string buttonReturnEvents[10];
-		int numberOfButtons;
-		bool loading;
-		int identifier;
+		unsigned int id;
+		std::string title, message;
+		std::vector<ButtonData> buttons;
 		float time;
 		float displayTime;
+		bool loading;
 		std::string executedTime;
-		INT64 toastID = -1;
-		int buttonClicked = -1;
+		float height = 0.0f;
+		float offsetMin = 0.0f;
+		float offsetMax = 0.0f;
+		bool fadeOut = false;
+		bool fadeIn = true;
+		float currentOpacity = 0.0f;
 	};
 
 	class PopupsAndNotifications
@@ -47,18 +58,27 @@ namespace Dymatic {
 		PopupData PopupUpdate();
 
 
-		void Notification(std::string identifier, int notificationIndex, std::string title, std::string message, std::vector<std::string> buttons, bool loading, float displayTime = 0.0f);
-		NotificationData NotificationUpdate(float programTime);
+		void Notification(int notificationIndex, std::string title, std::string message, std::vector<ButtonData> buttons = {}, bool loading = false, float displayTime = 0.0f);
+		void NotificationUpdate(float programTime);
 		void ClearNotificationList();
 		bool GetPopupOpen() { return m_PopupOpen; }
 
-		bool IsForegroundProcess(DWORD pid);
+		bool& GetNotificationsVisible() { return m_NotificationsVisible; }
+
+		unsigned int GetNextNotificationId() { m_NextNotificationId++; return m_NextNotificationId; }
 	private:
+	private:
+		bool m_NotificationsVisible = false;
+
+		Ref<Texture2D> m_DymaticLogo = Texture2D::Create("assets/icons/DymaticLogoTransparent.png");
+
+		unsigned int m_NextNotificationId = 0;
+
 		std::string m_CurrentTitle = "";
 		ImGuiIO& io = ImGui::GetIO();
 		ImVec2 dockspaceWindowPosition;
 		std::vector<NotificationData> m_NotificationList;
-		float m_ProgramTime;
+		float m_ProgramTime = 0.0f;
 
 		std::vector<PopupData> m_PopupList;
 

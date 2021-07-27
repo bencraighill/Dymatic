@@ -2324,8 +2324,9 @@ namespace ImGui
     IMGUI_API void          TextEx(const char* text, const char* text_end = NULL, ImGuiTextFlags flags = 0);
     IMGUI_API bool          ButtonEx(const char* label, const ImVec2& size_arg = ImVec2(0, 0), ImGuiButtonFlags flags = 0);
     //IMGUI CUSTOM:
-    IMGUI_API bool          ToggleButtonEx(const char* label, bool* v, const ImVec2& size_arg = ImVec2(0, 0), ImGuiButtonFlags flags = 0);
-    IMGUI_API int          SwitchButtonEx(const char* ids, const char* const items[], int size, int currentItem, const ImVec2& size_arg = ImVec2(0, 0), ImGuiButtonFlags flags = 0);
+    IMGUI_API bool         ButtonStackEx(const char* ids, const char* const items[], int size, int* currentItem, const ImVec2& size_arg = ImVec2(0, 0), float rounding = 0.0f, ImGuiButtonFlags flags = 0);
+    IMGUI_API bool         ToggleButtonEx(const char* label, bool* v, const ImVec2& size_arg = ImVec2(0, 0), ImGuiButtonFlags flags = 0);
+    IMGUI_API bool         SwitchButtonEx(const char* ids, const char* const items[], int size, int* currentItem, const ImVec2& size_arg = ImVec2(0, 0), ImGuiButtonFlags flags = 0);
     IMGUI_API int          SwitchImageButtonEx(const char* ids, ImTextureID images[], int size, ImVec2 imageSize, ImVec2 uvMin, ImVec2 uvMax, int currentItem, const ImVec2& size_arg = ImVec2(0, 0), ImGuiButtonFlags flags = 0);
     //-----------//
     IMGUI_API bool          CloseButton(ImGuiID id, const ImVec2& pos);

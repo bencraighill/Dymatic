@@ -20,10 +20,27 @@ namespace Dymatic {
 		bind.bindCatagory = bindCatagory;
 	}
 
-	bool KeyBinds::IsKey(KeyBindEvent bindEvent, KeyCode keyCode, MouseCode mouseCode, BindCatagory bindCatagory, bool Ctrl, bool Shift, bool Alt, int repeatCount)
+	bool KeyBinds::IsKey(KeyBindEvent bindEvent, KeyCode keyCode, MouseCode mouseCode, BindCatagory bindCatagory, bool Ctrl, bool Shift, bool Alt, int repeatCount, bool emulateNumpad)
 	{
+		if (emulateNumpad) { keyCode = ConvertStandardToNumpad(keyCode); }
 		return ((m_KeyBindValues[bindEvent].bindCatagory == Keyboard && bindCatagory == Keyboard ? m_KeyBindValues[bindEvent].keyCode == keyCode : m_KeyBindValues[bindEvent].bindCatagory == MouseButton && bindCatagory == MouseButton ? m_KeyBindValues[bindEvent].mouseCode == mouseCode : false) && m_KeyBindValues[bindEvent].Ctrl == Ctrl && m_KeyBindValues[bindEvent].Shift == Shift && m_KeyBindValues[bindEvent].Alt == Alt
 			&& (bindCatagory == Keyboard ? (repeatCount > 0 ? (m_KeyBindValues[bindEvent].repeats) : true) : true) && m_KeyBindValues[bindEvent].enabled);
+	}
+
+	std::string KeyBinds::GetBindAsString(KeyBindEvent event)
+	{
+		std::string String = "";
+		auto bind = m_KeyBindValues[event];
+		if (bind.enabled)
+		{
+			bool Additive = false;
+			if (bind.Ctrl)							{ if (Additive){String += "+"; } String += "Ctrl"; Additive = true; }
+			if (bind.Shift)							{ if (Additive){String += "+"; } String += "Shift"; Additive = true; }
+			if (bind.Alt)							{ if (Additive){String += "+"; } String += "Alt"; Additive = true; }
+			if (bind.bindCatagory == Keyboard)		{ if (Additive){String += "+"; } String += GetStringFromKey(bind.keyCode); Additive = true; }
+			if (bind.bindCatagory == MouseButton)	{ if (Additive){String += "+"; } String += GetStringFromMouseButton(bind.mouseCode); Additive = true; }
+		}
+		return String;
 	}
 
 	Dymatic::KeyBindEvent KeyBinds::GetEventFromString(std::string bindEvent)
@@ -43,9 +60,18 @@ namespace Dymatic {
 		else if (bindEvent == "Shading Type Solid") return ShadingTypeSolidBind;
 		else if (bindEvent == "Shading Type Rendered") return ShadingTypeRenderedBind;
 		else if (bindEvent == "Toggle Shading Type") return ToggleShadingTypeBind;
+		else if (bindEvent == "View Front") return ViewFrontBind;
+		else if (bindEvent == "View Side") return ViewSideBind;
+		else if (bindEvent == "View Top") return ViewTopBind;
+		else if (bindEvent == "View Flip") return ViewFlipBind;
+		else if (bindEvent == "View Projection") return ViewProjectionBind;
 		else if (bindEvent == "Duplicate") return DuplicateBind;
 		else if (bindEvent == "Rename") return RenameBind;
 		else if (bindEvent == "Close Popup") return ClosePopupBind;
+		else if (bindEvent == "Text Editor Duplicate") return TextEditorDuplicate;
+		else if (bindEvent == "Text Editor Swap Line Up") return TextEditorSwapLineUp;
+		else if (bindEvent == "Text Editor Swap Line Down") return TextEditorSwapLineDown;
+		else if (bindEvent == "Text Editor Switch Header") return TextEditorSwitchHeader;
 
 		else return INVALID_BIND;
 	}
@@ -67,9 +93,18 @@ namespace Dymatic {
 		else if (bindEvent == ShadingTypeSolidBind) return "Shading Type Solid";
 		else if (bindEvent == ShadingTypeRenderedBind) return "Shading Type Rendered";
 		else if (bindEvent == ToggleShadingTypeBind) return "Toggle Shading Type";
+		else if (bindEvent == ViewFrontBind) return "View Front";
+		else if (bindEvent == ViewSideBind) return "View Side";
+		else if (bindEvent == ViewTopBind) return "View Top";
+		else if (bindEvent == ViewFlipBind) return "View Flip";
+		else if (bindEvent == ViewProjectionBind) return "View Projection";
 		else if (bindEvent == DuplicateBind) return "Duplicate";
 		else if (bindEvent == RenameBind) return "Rename";
 		else if (bindEvent == ClosePopupBind) return "Close Popup";
+		else if (bindEvent == TextEditorDuplicate) return "Text Editor Duplicate";
+		else if (bindEvent == TextEditorSwapLineUp) return "Text Editor Swap Line Up";
+		else if (bindEvent == TextEditorSwapLineDown) return "Text Editor Swap Line Down";
+		else if (bindEvent == TextEditorSwitchHeader) return "Text Editor Switch Header";
 
 		else return "";
 	}
@@ -398,6 +433,20 @@ namespace Dymatic {
 		else if (bindCatagory == MouseButton) return "Mouse Button";
 
 		else return "";
+	}
+
+	Dymatic::KeyCode KeyBinds::ConvertStandardToNumpad(KeyCode keyCode)
+	{
+		if (keyCode == Key::D0) return Key::KP0;
+		else if (keyCode == Key::D1) return Key::KP1;
+		else if (keyCode == Key::D2) return Key::KP2;
+		else if (keyCode == Key::D3) return Key::KP3;
+		else if (keyCode == Key::D4) return Key::KP4;
+		else if (keyCode == Key::D5) return Key::KP5;
+		else if (keyCode == Key::D6) return Key::KP6;
+		else if (keyCode == Key::D7) return Key::KP7;
+		else if (keyCode == Key::D8) return Key::KP8;
+		else if (keyCode == Key::D9) return Key::KP9;
 	}
 
 	void KeyBinds::SetKeyStrings(std::string name, std::string valueName, std::string value)

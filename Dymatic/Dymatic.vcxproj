@@ -77,11 +77,11 @@
       <PrecompiledHeaderFile>dypch.h</PrecompiledHeaderFile>
       <WarningLevel>Level3</WarningLevel>
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;GLFW_INCLUDE_NONE;DY_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>src;vendor\spdlog\include;vendor\GLFW\include;vendor\Glad\include;vendor\imgui;vendor\ImGuiNode;vendor\glm;vendor\stb_image;vendor\CSplash;vendor\WinToast;vendor\entt\include;vendor\yaml-cpp\include;vendor\ImGuizmo;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>src;vendor\spdlog\include;vendor\GLFW\include;vendor\Glad\include;vendor\ImGui;vendor\ImGuiNode;vendor\glm;vendor\stb_image;vendor\CSplash;.;vendor\entt\include;vendor\yaml-cpp\include;vendor\ImGuizmo;C:\VulkanSDK\1.2.170.0\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
       <MinimalRebuild>false</MinimalRebuild>
-      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
@@ -90,7 +90,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <Lib>
-      <AdditionalDependencies>opengl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>opengl32.lib;vendor\VulkanSDK\Lib\shaderc_sharedd.lib;vendor\VulkanSDK\Lib\spirv-cross-cored.lib;vendor\VulkanSDK\Lib\spirv-cross-glsld.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -99,13 +99,13 @@
       <PrecompiledHeaderFile>dypch.h</PrecompiledHeaderFile>
       <WarningLevel>Level3</WarningLevel>
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;GLFW_INCLUDE_NONE;DY_RELEASE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>src;vendor\spdlog\include;vendor\GLFW\include;vendor\Glad\include;vendor\imgui;vendor\ImGuiNode;vendor\glm;vendor\stb_image;vendor\CSplash;vendor\WinToast;vendor\entt\include;vendor\yaml-cpp\include;vendor\ImGuizmo;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>src;vendor\spdlog\include;vendor\GLFW\include;vendor\Glad\include;vendor\ImGui;vendor\ImGuiNode;vendor\glm;vendor\stb_image;vendor\CSplash;.;vendor\entt\include;vendor\yaml-cpp\include;vendor\ImGuizmo;C:\VulkanSDK\1.2.170.0\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <Optimization>Full</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <MinimalRebuild>false</MinimalRebuild>
       <StringPooling>true</StringPooling>
-      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
@@ -115,7 +115,7 @@
       <OptimizeReferences>true</OptimizeReferences>
     </Link>
     <Lib>
-      <AdditionalDependencies>opengl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>opengl32.lib;C:\VulkanSDK\1.2.170.0\Lib\shaderc_shared.lib;C:\VulkanSDK\1.2.170.0\Lib\spirv-cross-core.lib;C:\VulkanSDK\1.2.170.0\Lib\spirv-cross-glsl.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Dist|x64'">
@@ -124,13 +124,13 @@
       <PrecompiledHeaderFile>dypch.h</PrecompiledHeaderFile>
       <WarningLevel>Level3</WarningLevel>
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;GLFW_INCLUDE_NONE;DY_DIST;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>src;vendor\spdlog\include;vendor\GLFW\include;vendor\Glad\include;vendor\imgui;vendor\ImGuiNode;vendor\glm;vendor\stb_image;vendor\CSplash;vendor\WinToast;vendor\entt\include;vendor\yaml-cpp\include;vendor\ImGuizmo;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>src;vendor\spdlog\include;vendor\GLFW\include;vendor\Glad\include;vendor\ImGui;vendor\ImGuiNode;vendor\glm;vendor\stb_image;vendor\CSplash;.;vendor\entt\include;vendor\yaml-cpp\include;vendor\ImGuizmo;C:\VulkanSDK\1.2.170.0\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <Optimization>Full</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <MinimalRebuild>false</MinimalRebuild>
       <StringPooling>true</StringPooling>
-      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
@@ -140,7 +140,7 @@
       <OptimizeReferences>true</OptimizeReferences>
     </Link>
     <Lib>
-      <AdditionalDependencies>opengl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>opengl32.lib;C:\VulkanSDK\1.2.170.0\Lib\shaderc_shared.lib;C:\VulkanSDK\1.2.170.0\Lib\spirv-cross-core.lib;C:\VulkanSDK\1.2.170.0\Lib\spirv-cross-glsl.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -156,6 +156,7 @@
     <ClInclude Include="src\Dymatic\Core\Log.h" />
     <ClInclude Include="src\Dymatic\Core\MouseCodes.h" />
     <ClInclude Include="src\Dymatic\Core\PlatformDetection.h" />
+    <ClInclude Include="src\Dymatic\Core\Timer.h" />
     <ClInclude Include="src\Dymatic\Core\Timestep.h" />
     <ClInclude Include="src\Dymatic\Core\Window.h" />
     <ClInclude Include="src\Dymatic\Debug\Instrumentor.h" />
@@ -165,6 +166,7 @@
     <ClInclude Include="src\Dymatic\Events\MouseEvent.h" />
     <ClInclude Include="src\Dymatic\ImGui\ImGuiLayer.h" />
     <ClInclude Include="src\Dymatic\Math\Math.h" />
+    <ClInclude Include="src\Dymatic\Math\StringUtils.h" />
     <ClInclude Include="src\Dymatic\Renderer\Buffer.h" />
     <ClInclude Include="src\Dymatic\Renderer\Camera.h" />
     <ClInclude Include="src\Dymatic\Renderer\EditorCamera.h" />
@@ -179,6 +181,7 @@
     <ClInclude Include="src\Dymatic\Renderer\Shader.h" />
     <ClInclude Include="src\Dymatic\Renderer\SubTexture2D.h" />
     <ClInclude Include="src\Dymatic\Renderer\Texture.h" />
+    <ClInclude Include="src\Dymatic\Renderer\UniformBuffer.h" />
     <ClInclude Include="src\Dymatic\Renderer\VertexArray.h" />
     <ClInclude Include="src\Dymatic\Scene\Components.h" />
     <ClInclude Include="src\Dymatic\Scene\Entity.h" />
@@ -193,20 +196,21 @@
     <ClInclude Include="src\Platform\OpenGL\OpenGLRendererAPI.h" />
     <ClInclude Include="src\Platform\OpenGL\OpenGLShader.h" />
     <ClInclude Include="src\Platform\OpenGL\OpenGLTexture.h" />
+    <ClInclude Include="src\Platform\OpenGL\OpenGLUniformBuffer.h" />
     <ClInclude Include="src\Platform\OpenGL\OpenGLVertexArray.h" />
     <ClInclude Include="src\Platform\Windows\WindowsWindow.h" />
     <ClInclude Include="src\dypch.h" />
     <ClInclude Include="vendor\CSplash\Splash.h" />
     <ClInclude Include="vendor\CSplash\StdAfx.h" />
-    <ClInclude Include="vendor\ImGuiNode\ScopeGuard.h" />
+    <ClInclude Include="vendor\debug_draw.hpp" />
     <ClInclude Include="vendor\ImGuiNode\crude_json.h" />
     <ClInclude Include="vendor\ImGuiNode\imgui_bezier_math.h" />
     <ClInclude Include="vendor\ImGuiNode\imgui_canvas.h" />
     <ClInclude Include="vendor\ImGuiNode\imgui_extra_math.h" />
     <ClInclude Include="vendor\ImGuiNode\imgui_node_editor.h" />
     <ClInclude Include="vendor\ImGuiNode\imgui_node_editor_internal.h" />
+    <ClInclude Include="vendor\ImGuiNode\ScopeGuard.h" />
     <ClInclude Include="vendor\ImGuizmo\ImGuizmo.h" />
-    <ClInclude Include="vendor\WinToast\wintoastlib.h" />
     <ClInclude Include="vendor\glm\glm\common.hpp" />
     <ClInclude Include="vendor\glm\glm\detail\_features.hpp" />
     <ClInclude Include="vendor\glm\glm\detail\_fixes.hpp" />
@@ -616,6 +620,7 @@
     <ClInclude Include="vendor\glm\glm\vec4.hpp" />
     <ClInclude Include="vendor\glm\glm\vector_relational.hpp" />
     <ClInclude Include="vendor\stb_image\stb_image.h" />
+    <ClInclude Include="vendor\WinToast\wintoastlib.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Dymatic\Core\Application.cpp" />
@@ -626,6 +631,7 @@
     <ClCompile Include="src\Dymatic\ImGui\ImGuiBuild.cpp" />
     <ClCompile Include="src\Dymatic\ImGui\ImGuiLayer.cpp" />
     <ClCompile Include="src\Dymatic\Math\Math.cpp" />
+    <ClCompile Include="src\Dymatic\Math\StringUtils.cpp" />
     <ClCompile Include="src\Dymatic\Renderer\Buffer.cpp" />
     <ClCompile Include="src\Dymatic\Renderer\EditorCamera.cpp" />
     <ClCompile Include="src\Dymatic\Renderer\Framebuffer.cpp" />
@@ -639,6 +645,7 @@
     <ClCompile Include="src\Dymatic\Renderer\Shader.cpp" />
     <ClCompile Include="src\Dymatic\Renderer\SubTexture2D.cpp" />
     <ClCompile Include="src\Dymatic\Renderer\Texture.cpp" />
+    <ClCompile Include="src\Dymatic\Renderer\UniformBuffer.cpp" />
     <ClCompile Include="src\Dymatic\Renderer\VertexArray.cpp" />
     <ClCompile Include="src\Dymatic\Scene\Entity.cpp" />
     <ClCompile Include="src\Dymatic\Scene\Scene.cpp" />
@@ -650,6 +657,7 @@
     <ClCompile Include="src\Platform\OpenGL\OpenGLRendererAPI.cpp" />
     <ClCompile Include="src\Platform\OpenGL\OpenGLShader.cpp" />
     <ClCompile Include="src\Platform\OpenGL\OpenGLTexture.cpp" />
+    <ClCompile Include="src\Platform\OpenGL\OpenGLUniformBuffer.cpp" />
     <ClCompile Include="src\Platform\OpenGL\OpenGLVertexArray.cpp" />
     <ClCompile Include="src\Platform\Windows\WindowsInput.cpp" />
     <ClCompile Include="src\Platform\Windows\WindowsPlatformUtils.cpp" />
@@ -660,25 +668,15 @@
     <ClCompile Include="vendor\CSplash\Splash.cpp" />
     <ClCompile Include="vendor\CSplash\SplashClient.cpp" />
     <ClCompile Include="vendor\CSplash\StdAfx.cpp" />
-    <ClCompile Include="vendor\ImGuiNode\crude_json.cpp">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="vendor\ImGuiNode\imgui_canvas.cpp">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="vendor\ImGuiNode\imgui_node_editor.cpp">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="vendor\ImGuiNode\imgui_node_editor_api.cpp">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
+    <ClCompile Include="vendor\ImGuiNode\crude_json.cpp" />
+    <ClCompile Include="vendor\ImGuiNode\imgui_canvas.cpp" />
+    <ClCompile Include="vendor\ImGuiNode\imgui_node_editor.cpp" />
+    <ClCompile Include="vendor\ImGuiNode\imgui_node_editor_api.cpp" />
     <ClCompile Include="vendor\ImGuizmo\ImGuizmo.cpp">
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="vendor\WinToast\wintoastlib.cpp">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
     <ClCompile Include="vendor\stb_image\stb_image.cpp" />
+    <ClCompile Include="vendor\WinToast\wintoastlib.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="vendor\GLFW\GLFW.vcxproj">
@@ -693,6 +691,11 @@
     <ProjectReference Include="vendor\yaml-cpp\yaml-cpp.vcxproj">
       <Project>{88F1A057-74BE-FB62-9DD7-E90A890331F1}</Project>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="vendor\ImGuiNode\imgui_bezier_math.inl" />
+    <None Include="vendor\ImGuiNode\imgui_extra_math.inl" />
+    <None Include="vendor\ImGuiNode\imgui_node_editor_internal.inl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

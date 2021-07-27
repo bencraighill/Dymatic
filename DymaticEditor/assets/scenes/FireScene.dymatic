@@ -1,0 +1,168 @@
+Scene: Untitled
+Entities:
+  - Entity: 12837192831273
+    TagComponent:
+      Tag: Centre
+    TransformComponent:
+      Translation: [0, 5, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    ParticleSystemComponent:
+      Offset: [0, 0, 0]
+      Velocity: [0, 0, 0]
+      VelocityVariation: [2.5, 2.5, 2.5]
+      Gravity: [0, 0, 0]
+      ColorMethod: 2
+      ColorBegin: [1, 0.637281418, 0.299578071, 1]
+      ColorEnd: [1, 0.843137264, 0.352941185, 0]
+      ColorConstant: [1, 1, 1, 1]
+      ColorPoints:
+        - Point: 0
+          Color: [1, 0.509854198, 0.320675135, 1]
+        - Point: 0.800000012
+          Color: [1, 0.788235307, 0.380392164, 1]
+        - Point: 0.949999988
+          Color: [1, 1, 1, 0]
+      SizeBegin: 0.0500000007
+      SizeEnd: 0.0250000004
+      SizeVariation: 0.100000001
+      LifeTime: 1
+      EmissionNumber: 10
+      Active: true
+      FaceCamera: true
+  - Entity: 12837192831273
+    TagComponent:
+      Tag: FireOuter
+    TransformComponent:
+      Translation: [-3.7252903e-09, 10, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    ParticleSystemComponent:
+      Offset: [0, 0, 0]
+      Velocity: [0, 0, 0]
+      VelocityVariation: [0.5, 0.75, 0.5]
+      Gravity: [0, -9.80000019, 0]
+      ColorMethod: 2
+      ColorBegin: [0, 0.468821466, 0.772151887, 1]
+      ColorEnd: [0.261603355, 0.60003984, 1, 1]
+      ColorConstant: [1, 1, 1, 1]
+      ColorPoints:
+        - Point: 0
+          Color: [0.772549033, 0, 0, 1]
+        - Point: 0.368999988
+          Color: [0.780590713, 0.728059411, 0.319482267, 1]
+        - Point: 0.5
+          Color: [0.784810126, 0.34438926, 0.34438926, 1]
+        - Point: 0.800000012
+          Color: [1, 0.617374063, 0.262745142, 1]
+        - Point: 0.800000012
+          Color: [0.999989986, 0.999994576, 1, 0]
+      SizeBegin: 0.0500000007
+      SizeEnd: 0.0250000004
+      SizeVariation: 0.100000001
+      LifeTime: 1
+      EmissionNumber: 10
+      Active: true
+      FaceCamera: true
+  - Entity: 12837192831273
+    TagComponent:
+      Tag: FireInner
+    TransformComponent:
+      Translation: [-3.7252903e-09, 10, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    ParticleSystemComponent:
+      Offset: [0, 0, 0]
+      Velocity: [0, 0, 0]
+      VelocityVariation: [0, 0, 0]
+      Gravity: [0, -0.100000001, 0]
+      ColorMethod: 0
+      ColorBegin: [1, 0.891897678, 0.2236287, 1]
+      ColorEnd: [1, 0.468354344, 0.172995806, 1]
+      ColorConstant: [1, 1, 1, 1]
+      ColorPoints:
+        - Point: 0
+          Color: [0.772549033, 0, 0, 1]
+        - Point: 0.368999988
+          Color: [0.780590713, 0.728059411, 0.319482267, 1]
+        - Point: 0.5
+          Color: [0.784810126, 0.34438926, 0.34438926, 1]
+        - Point: 0.800000012
+          Color: [1, 0.617374063, 0.262745142, 1]
+        - Point: 0.800000012
+          Color: [0.999989986, 0.999994576, 1, 0]
+      SizeBegin: 0.075000003
+      SizeEnd: 0.0500000007
+      SizeVariation: 0.200000003
+      LifeTime: 10
+      EmissionNumber: 1
+      Active: true
+      FaceCamera: true
+  - Entity: 12837192831273
+    TagComponent:
+      Tag: FireOuter.001
+    TransformComponent:
+      Translation: [-3.7252903e-09, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    ParticleSystemComponent:
+      Offset: [0, 0, 0]
+      Velocity: [0, 0, 0]
+      VelocityVariation: [0.5, 0.75, 0.5]
+      Gravity: [0, 9.80000019, 0]
+      ColorMethod: 2
+      ColorBegin: [0, 0.468821466, 0.772151887, 1]
+      ColorEnd: [0.261603355, 0.60003984, 1, 1]
+      ColorConstant: [1, 1, 1, 1]
+      ColorPoints:
+        - Point: 0
+          Color: [0.772549033, 0, 0, 1]
+        - Point: 0.368999988
+          Color: [0.780590713, 0.728059411, 0.319482267, 1]
+        - Point: 0.5
+          Color: [0.784810126, 0.34438926, 0.34438926, 1]
+        - Point: 0.800000012
+          Color: [1, 0.617374063, 0.262745142, 1]
+        - Point: 0.800000012
+          Color: [0.999989986, 0.999994576, 1, 0]
+      SizeBegin: 0.0500000007
+      SizeEnd: 0.0250000004
+      SizeVariation: 0.100000001
+      LifeTime: 1
+      EmissionNumber: 10
+      Active: true
+      FaceCamera: true
+  - Entity: 12837192831273
+    TagComponent:
+      Tag: FireInner.001
+    TransformComponent:
+      Translation: [-3.7252903e-09, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    ParticleSystemComponent:
+      Offset: [0, 0, 0]
+      Velocity: [0, 0, 0]
+      VelocityVariation: [0, 0, 0]
+      Gravity: [0, 0.100000001, 0]
+      ColorMethod: 0
+      ColorBegin: [1, 0.891897678, 0.2236287, 1]
+      ColorEnd: [1, 0.468354344, 0.172995806, 1]
+      ColorConstant: [1, 1, 1, 1]
+      ColorPoints:
+        - Point: 0
+          Color: [0.772549033, 0, 0, 1]
+        - Point: 0.368999988
+          Color: [0.780590713, 0.728059411, 0.319482267, 1]
+        - Point: 0.5
+          Color: [0.784810126, 0.34438926, 0.34438926, 1]
+        - Point: 0.800000012
+          Color: [1, 0.617374063, 0.262745142, 1]
+        - Point: 0.800000012
+          Color: [0.999989986, 0.999994576, 1, 0]
+      SizeBegin: 0.075000003
+      SizeEnd: 0.0500000007
+      SizeVariation: 0.200000003
+      LifeTime: 10
+      EmissionNumber: 1
+      Active: true
+      FaceCamera: true

@@ -6,6 +6,17 @@
 #include "Panels/ContentBrowser.h"
 #include "Panels/PreferencesPanel.h"
 #include "Panels/NodeEditor/NodeProgram.h"
+#include "Panels/TextEditor.h"
+#include "Panels/FilePrompt.h"
+#include "Panels/CurveEditor.h"
+#include "Panels/ImageEditor.h"
+#include "Panels/MemoryEditor.h"
+#include "Panels/ConsoleWindow.h"
+#include "Panels/PerformanceAnalyser.h"
+
+#include "Panels/ImageEditorNew.h"
+
+#include "Panels/SandboxArea.h"
 
 #include "Dymatic/Renderer/EditorCamera.h"
 
@@ -28,12 +39,17 @@ namespace Dymatic {
 		bool OnKeyPressed(KeyPressedEvent& e);
 		bool OnMouseButtonPressed(MouseButtonPressedEvent& e);
 
+		bool ViewportKeyAllowed() { return m_ViewportHovered || m_ViewportFocused; }
+
 		void NewScene();
+
+		void AppendScene();
+		void AppendSceneByFilepath(const std::string filepath);
+
 		void OpenScene();
+		void OpenSceneByFilepath(const std::string filepath);
 
-		void OpenSceneByFilepath(const std::string& filepath);
-		void SaveSceneToFilepath(const std::string& filepath);
-
+		void SaveSceneToFilepath(const std::string filepath);
 		bool SaveScene();
 		bool SaveSceneAs();
 
@@ -45,7 +61,18 @@ namespace Dymatic {
 
 		void SetShadingIndex(int index);
 
-		bool ImageMenuItem(Ref<Texture2D> texture, std::string item, std::string shortcut, bool menu = false, bool enabled = true, ImVec2 imageSize = ImVec2{ 15, 15 });
+		bool KeyBindCheck(KeyBindEvent bindEvent, BindCatagory bindCatagory);
+		std::string GetBindAsString(KeyBindEvent bindEvent);
+
+		std::string GetCurrentFileName();
+
+	public:
+		bool m_ViewportVisible = true;
+		bool m_ToolbarVisible = true;
+		bool m_InfoVisible = true;
+		bool m_StatsVisible = false;
+		bool m_MemoryEditorVisible = false;
+		bool m_NodeEditorVisible = false;
 	private:
 		Dymatic::OrthographicCameraController m_CameraController;
 
@@ -65,6 +92,9 @@ namespace Dymatic {
 		Entity m_SecondCamera;
 
 		Entity m_HoveredEntity;
+		//TODO: REMOVE
+		int m_HoveredPixelID;
+		//--------//
 
 		bool m_PrimaryCamera = true;
 
@@ -77,36 +107,6 @@ namespace Dymatic {
 
 		Ref<Texture2D> m_DymaticLogo = Texture2D::Create("assets/icons/DymaticLogoTransparent.png");
 		Ref<Texture2D> m_DymaticSplash = Texture2D::Create("assets/icons/DymaticSplash.bmp");
-
-		//Gizmos
-		Ref<Texture2D> m_IconTranslation = Texture2D::Create("assets/icons/ViewportTools/ControlTranslation.png");
-		Ref<Texture2D> m_IconTranslationActive = Texture2D::Create("assets/icons/ViewportTools/ControlTranslationActive.png");
-		Ref<Texture2D> m_IconRotation = Texture2D::Create("assets/icons/ViewportTools/ControlRotation.png");
-		Ref<Texture2D> m_IconRotationActive = Texture2D::Create("assets/icons/ViewportTools/ControlRotationActive.png");
-		Ref<Texture2D> m_IconScale = Texture2D::Create("assets/icons/ViewportTools/ControlScale.png");
-		Ref<Texture2D> m_IconScaleActive = Texture2D::Create("assets/icons/ViewportTools/ControlScaleActive.png");
-		//Snaping
-		Ref<Texture2D> m_IconTranslationSnap = Texture2D::Create("assets/icons/ViewportTools/ControlSnapTranslation.png");
-		Ref<Texture2D> m_IconTranslationSnapActive = Texture2D::Create("assets/icons/ViewportTools/ControlSnapTranslationActive.png");
-		Ref<Texture2D> m_IconRotationSnap = Texture2D::Create("assets/icons/ViewportTools/ControlSnapRotation.png");
-		Ref<Texture2D> m_IconRotationSnapActive = Texture2D::Create("assets/icons/ViewportTools/ControlSnapRotationActive.png");
-		Ref<Texture2D> m_IconScaleSnap = Texture2D::Create("assets/icons/ViewportTools/ControlSnapScale.png");
-		Ref<Texture2D> m_IconScaleSnapActive = Texture2D::Create("assets/icons/ViewportTools/ControlSnapScaleActive.png");
-		Ref<Texture2D> m_IconSnapDropdown = Texture2D::Create("assets/icons/ViewportTools/ControlSnapDropdown.png");
-		//Space
-		Ref<Texture2D> m_IconSpaceLocal = Texture2D::Create("assets/icons/ViewportTools/ControlSpaceLocal.png");
-		Ref<Texture2D> m_IconSpaceWorld = Texture2D::Create("assets/icons/ViewportTools/ControlSpaceWorld.png");
-		//System Icons
-		Ref<Texture2D> m_IconSystemNew = Texture2D::Create("assets/icons/SystemIcons/NewIcon.png");
-		Ref<Texture2D> m_IconSystemOpen = Texture2D::Create("assets/icons/SystemIcons/OpenIcon.png");
-		Ref<Texture2D> m_IconSystemRecent = Texture2D::Create("assets/icons/SystemIcons/RecentIcon.png");
-		Ref<Texture2D> m_IconSystemSave = Texture2D::Create("assets/icons/SystemIcons/SaveIcon.png");
-		Ref<Texture2D> m_IconSystemSaveAs = Texture2D::Create("assets/icons/SystemIcons/SaveAsIcon.png");
-		Ref<Texture2D> m_IconSystemImport = Texture2D::Create("assets/icons/SystemIcons/ImportIcon.png");
-		Ref<Texture2D> m_IconSystemExport = Texture2D::Create("assets/icons/SystemIcons/ExportIcon.png");
-		Ref<Texture2D> m_IconSystemQuit = Texture2D::Create("assets/icons/SystemIcons/QuitIcon.png");
-		Ref<Texture2D> m_IconSystemPreferences = Texture2D::Create("assets/icons/SystemIcons/SettingsIcon.png");
-		Ref<Texture2D> m_IconSystemConsoleWindow = Texture2D::Create("assets/icons/SystemIcons/ConsoleWindowIcon.png");
 
 		//Shader Icons
 		Ref<Texture2D> m_IconShaderWireframe = Texture2D::Create("assets/icons/Viewport/ShaderIconWireframe.png");
@@ -138,14 +138,36 @@ namespace Dymatic {
 		int m_ShadingIndex = 3;
 		int m_PreviousToggleIndex = 3;
 
+		// Scene View Gizmo
+		float m_YawUpdate;
+		float m_PitchUpdate;
+		bool m_UpdateAngles = false;
+
+		bool m_ProjectionToggled = 0;
+		glm::mat4 m_PreviousCameraProjection;
+
 		std::string m_LayoutToLoad = "";
 
 		// Panels
 		PreferencesPannel m_PreferencesPannel;
 		SceneHierarchyPanel m_SceneHierarchyPanel;
 		PopupsAndNotifications m_PopupsAndNotifications = PopupsAndNotifications(&m_PreferencesPannel.GetPreferences());
-		ContentBrowser m_ContentBrowser = ContentBrowser(&m_PreferencesPannel.GetPreferences());
+		ContentBrowser m_ContentBrowser = ContentBrowser(&m_PreferencesPannel.GetPreferences(), &m_TextEditor);
 		NodeEditorPannel m_NodeEditorPannel;
+		TextEditorPannel m_TextEditor;
+		CurveEditor m_CurveEditor;
+		ImageEditor m_ImageEditor;
+		MemoryEditor m_MemoryEditor;
+		ConsoleWindow m_ConsoleWindow;
+		FilePrompt m_FilePrompt = FilePrompt(&m_PreferencesPannel.GetPreferences());
+		PerformanceAnalyser m_PerformanceAnalyser;
+
+		ImageEditorNew m_ImageEditorNew;
+
+		//Sandbox::AgentSimulation m_AgentSimulation;
+		//Sandbox::MandelbrotSet m_MandelbrotSet;
+		//Sandbox::SandSimulation m_SandSimulation;
+
 
 		bool m_ShowSplash = m_PreferencesPannel.GetPreferences().m_PreferenceData.showSplash;
 	};

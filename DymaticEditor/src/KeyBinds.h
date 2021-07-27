@@ -42,9 +42,18 @@ namespace Dymatic {
 		ShadingTypeSolidBind,
 		ShadingTypeRenderedBind,
 		ToggleShadingTypeBind,
+		ViewFrontBind,
+		ViewSideBind,
+		ViewTopBind,
+		ViewFlipBind,
+		ViewProjectionBind,
 		DuplicateBind,
 		RenameBind,
 		ClosePopupBind,
+		TextEditorDuplicate,
+		TextEditorSwapLineUp,
+		TextEditorSwapLineDown,
+		TextEditorSwitchHeader,
 		KEY_BINDS_SIZE
 	};
 
@@ -55,7 +64,8 @@ namespace Dymatic {
 		KeyBindData& GetKeyBind(KeyBindEvent bindEvent) { return m_KeyBindValues[bindEvent]; }
 		std::array<KeyBindData, KEY_BINDS_SIZE>& GetAllKeyBinds() { return m_KeyBindValues; }
 		void SetKeyBind(KeyBindEvent bindEvent, KeyCode keyCode, MouseCode mouseCode, BindCatagory bindCatagory, bool Ctrl = false, bool Shift = false, bool Alt = false);
-		bool IsKey(KeyBindEvent bindEvent, KeyCode keyCode, MouseCode mouseCode, BindCatagory bindCatagory, bool Ctrl, bool Shift, bool Alt, int repeatCount);
+		bool IsKey(KeyBindEvent bindEvent, KeyCode keyCode, MouseCode mouseCode, BindCatagory bindCatagory, bool Ctrl, bool Shift, bool Alt, int repeatCount, bool emulateNumpad);
+		std::string GetBindAsString(KeyBindEvent event);
 
 		KeyBindEvent GetEventFromString(std::string bindEvent);
 		std::string GetStringFromEvent(KeyBindEvent bindEvent);
@@ -68,6 +78,8 @@ namespace Dymatic {
 
 		BindCatagory GetBindCatagoryFromString(std::string bindCatagory);
 		std::string GetStringFromBindCatagory(BindCatagory bindCatagory);
+
+		KeyCode ConvertStandardToNumpad(KeyCode keyCode);
 
 		void SetKeyStrings(std::string name, std::string valueName, std::string value);
 		std::vector<KeyCode> GetAllKeys() { return m_AllKeys; }

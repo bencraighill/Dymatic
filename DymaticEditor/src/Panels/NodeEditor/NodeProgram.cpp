@@ -4,7 +4,7 @@
 #include "utilities/builders.h"
 #include "utilities/widgets.h"
 
-#include <imgui_node_editor.h>
+#include <ImGuiNode/imgui_node_editor.h>
 
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include <imgui/imgui_internal.h>
@@ -318,7 +318,6 @@ public:
     ConversionReturn NodeEditorInternal::ConversionAvalible(Pin* A, Pin* B);
     void BuildNodes();
     const char* Application_GetName();
-    bool Splitter(const char* label, bool split_vertically, float thickness, float* size1, float* size2, float min_size1, float min_size2, float splitter_long_axis_size = -1.0f);
     ImColor GetIconColor(PinType type);
     void DrawPinIcon(const Pin& pin, bool connected, int alpha);
 
@@ -1221,20 +1220,6 @@ void NodeEditorInternal::BuildNodes()
 const char* NodeEditorInternal::Application_GetName()
 {
     return "Blueprints";
-}
-
-//Original Init and deint location
-
-bool NodeEditorInternal::Splitter(const char* label, bool split_vertically, float thickness, float* size1, float* size2, float min_size1, float min_size2, float splitter_long_axis_size)
-{
-    using namespace ImGui;
-    ImGuiContext& g = *GImGui;
-    ImGuiWindow* window = g.CurrentWindow;
-    ImGuiID id = window->GetID(label);
-    ImRect bb;
-    bb.Min = window->DC.CursorPos + (split_vertically ? ImVec2(*size1, 0.0f) : ImVec2(0.0f, *size1));
-    bb.Max = bb.Min + CalcItemSize(split_vertically ? ImVec2(thickness, splitter_long_axis_size) : ImVec2(splitter_long_axis_size, thickness), 0.0f, 0.0f);
-    return SplitterBehavior(bb, id, split_vertically ? ImGuiAxis_X : ImGuiAxis_Y, size1, size2, min_size1, min_size2, 0.0f);
 }
 
 ImColor NodeEditorInternal::GetIconColor(PinType type)
@@ -2377,19 +2362,11 @@ void NodeEditorInternal::Application_Frame()
     static Pin* newNodeLinkPin = nullptr;
     static Pin* newLinkPin     = nullptr;
 
-    //static float panelA = ImGui::GetContentRegionAvail().x / 10 * 2;
-    //static float panelB = ImGui::GetContentRegionAvail().x / 10 * 6;
-    //static float panelC = ImGui::GetContentRegionAvail().x / 10 * 2;
-	static float panelA = 200.0f;
-	static float panelB = 800.0f;
-	static float panelC = 200.0f;
-    //Splitter(true, 4.0f, &panelA, &panelB, 50.0f, 50.0f);
-    //
-    //ShowLeftPane(panelA - 4.0f);
-    //
-    //ImGui::SameLine(0.0f, 12.0f);
+    static float panelA = ImGui::GetContentRegionAvail().x / 12 * 2;
+    static float panelB = ImGui::GetContentRegionAvail().x / 12 * 8;
+    static float panelC = ImGui::GetContentRegionAvail().x / 12 * 2;
 
-	Splitter("##NodeOutlinerSplitEditor", true, 2.0f, &panelA, &panelB, 50.0f, 50.0f);
+	ImGui::Splitter("##NodeOutlinerSplitEditor", true, 2.0f, &panelA, &panelB, 50.0f, 50.0f);
 
 	ImGui::BeginChild("Nodes Outliner", ImVec2(panelA - 10.0f, 0));
     //ImGui::GetWindowDrawList()->AddRectFilled(ImGui::GetWindowPos(), ImGui::GetWindowPos() + ImGui::GetWindowSize() - ImVec2(0, 0), ImGui::ColorConvertFloat4ToU32(ImVec4(0.0f, 1.0f, 0.0f, 1.0f)));
@@ -2469,9 +2446,7 @@ void NodeEditorInternal::Application_Frame()
 
     ImGui::SameLine(0.0f, 12.0f);
 
-	float b = panelB;
-	float c = panelC;
-	Splitter("##NodeEditorSplitInfo", true, 2.0f, &panelB, &panelC, 50.0f, 50.0f);
+	ImGui::Splitter("##NodeEditorSplitInfo", true, 2.0f, &panelB, &panelC, 50.0f, 50.0f);
 
     ed::Begin("Node Editor Panel", ImVec2(panelB, 0));
     {

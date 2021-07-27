@@ -43,17 +43,8 @@
     <Filter Include="vendor">
       <UniqueIdentifier>{B3738122-9F15-ACF8-88D0-BF4C74113349}</UniqueIdentifier>
     </Filter>
-    <Filter Include="vendor\CSplash">
-      <UniqueIdentifier>{F03B9FBC-DC09-93C2-C59D-03E9B10A6F27}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="vendor\ImGuiNode">
-      <UniqueIdentifier>{A3945FDC-8F8D-7E2E-B8BF-63B3A4175E3A}</UniqueIdentifier>
-    </Filter>
     <Filter Include="vendor\ImGuizmo">
       <UniqueIdentifier>{73BF7F4C-DF4A-ED10-E85B-700554664911}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="vendor\WinToast">
-      <UniqueIdentifier>{5B59D75C-C7E4-4421-D0F5-C7153C00A121}</UniqueIdentifier>
     </Filter>
     <Filter Include="vendor\glm">
       <UniqueIdentifier>{829FC5A8-6E57-07F6-D75E-E051C335A2E6}</UniqueIdentifier>
@@ -114,6 +105,9 @@
     <ClInclude Include="src\Dymatic\Core\PlatformDetection.h">
       <Filter>src\Dymatic\Core</Filter>
     </ClInclude>
+    <ClInclude Include="src\Dymatic\Core\Timer.h">
+      <Filter>src\Dymatic\Core</Filter>
+    </ClInclude>
     <ClInclude Include="src\Dymatic\Core\Timestep.h">
       <Filter>src\Dymatic\Core</Filter>
     </ClInclude>
@@ -139,6 +133,9 @@
       <Filter>src\Dymatic\ImGui</Filter>
     </ClInclude>
     <ClInclude Include="src\Dymatic\Math\Math.h">
+      <Filter>src\Dymatic\Math</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Dymatic\Math\StringUtils.h">
       <Filter>src\Dymatic\Math</Filter>
     </ClInclude>
     <ClInclude Include="src\Dymatic\Renderer\Buffer.h">
@@ -183,6 +180,9 @@
     <ClInclude Include="src\Dymatic\Renderer\Texture.h">
       <Filter>src\Dymatic\Renderer</Filter>
     </ClInclude>
+    <ClInclude Include="src\Dymatic\Renderer\UniformBuffer.h">
+      <Filter>src\Dymatic\Renderer</Filter>
+    </ClInclude>
     <ClInclude Include="src\Dymatic\Renderer\VertexArray.h">
       <Filter>src\Dymatic\Renderer</Filter>
     </ClInclude>
@@ -225,6 +225,9 @@
     <ClInclude Include="src\Platform\OpenGL\OpenGLTexture.h">
       <Filter>src\Platform\OpenGL</Filter>
     </ClInclude>
+    <ClInclude Include="src\Platform\OpenGL\OpenGLUniformBuffer.h">
+      <Filter>src\Platform\OpenGL</Filter>
+    </ClInclude>
     <ClInclude Include="src\Platform\OpenGL\OpenGLVertexArray.h">
       <Filter>src\Platform\OpenGL</Filter>
     </ClInclude>
@@ -234,38 +237,8 @@
     <ClInclude Include="src\dypch.h">
       <Filter>src</Filter>
     </ClInclude>
-    <ClInclude Include="vendor\CSplash\Splash.h">
-      <Filter>vendor\CSplash</Filter>
-    </ClInclude>
-    <ClInclude Include="vendor\CSplash\StdAfx.h">
-      <Filter>vendor\CSplash</Filter>
-    </ClInclude>
-    <ClInclude Include="vendor\ImGuiNode\ScopeGuard.h">
-      <Filter>vendor\ImGuiNode</Filter>
-    </ClInclude>
-    <ClInclude Include="vendor\ImGuiNode\crude_json.h">
-      <Filter>vendor\ImGuiNode</Filter>
-    </ClInclude>
-    <ClInclude Include="vendor\ImGuiNode\imgui_bezier_math.h">
-      <Filter>vendor\ImGuiNode</Filter>
-    </ClInclude>
-    <ClInclude Include="vendor\ImGuiNode\imgui_canvas.h">
-      <Filter>vendor\ImGuiNode</Filter>
-    </ClInclude>
-    <ClInclude Include="vendor\ImGuiNode\imgui_extra_math.h">
-      <Filter>vendor\ImGuiNode</Filter>
-    </ClInclude>
-    <ClInclude Include="vendor\ImGuiNode\imgui_node_editor.h">
-      <Filter>vendor\ImGuiNode</Filter>
-    </ClInclude>
-    <ClInclude Include="vendor\ImGuiNode\imgui_node_editor_internal.h">
-      <Filter>vendor\ImGuiNode</Filter>
-    </ClInclude>
     <ClInclude Include="vendor\ImGuizmo\ImGuizmo.h">
       <Filter>vendor\ImGuizmo</Filter>
-    </ClInclude>
-    <ClInclude Include="vendor\WinToast\wintoastlib.h">
-      <Filter>vendor\WinToast</Filter>
     </ClInclude>
     <ClInclude Include="vendor\glm\glm\common.hpp">
       <Filter>vendor\glm\glm</Filter>
@@ -1494,6 +1467,17 @@
     <ClInclude Include="vendor\stb_image\stb_image.h">
       <Filter>vendor\stb_image</Filter>
     </ClInclude>
+    <ClInclude Include="vendor\ImGuiNode\imgui_bezier_math.h" />
+    <ClInclude Include="vendor\ImGuiNode\imgui_canvas.h" />
+    <ClInclude Include="vendor\ImGuiNode\imgui_extra_math.h" />
+    <ClInclude Include="vendor\ImGuiNode\imgui_node_editor.h" />
+    <ClInclude Include="vendor\ImGuiNode\imgui_node_editor_internal.h" />
+    <ClInclude Include="vendor\ImGuiNode\ScopeGuard.h" />
+    <ClInclude Include="vendor\CSplash\Splash.h" />
+    <ClInclude Include="vendor\CSplash\StdAfx.h" />
+    <ClInclude Include="vendor\ImGuiNode\crude_json.h" />
+    <ClInclude Include="vendor\WinToast\wintoastlib.h" />
+    <ClInclude Include="vendor\debug_draw.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Dymatic\Core\Application.cpp">
@@ -1518,6 +1502,9 @@
       <Filter>src\Dymatic\ImGui</Filter>
     </ClCompile>
     <ClCompile Include="src\Dymatic\Math\Math.cpp">
+      <Filter>src\Dymatic\Math</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Dymatic\Math\StringUtils.cpp">
       <Filter>src\Dymatic\Math</Filter>
     </ClCompile>
     <ClCompile Include="src\Dymatic\Renderer\Buffer.cpp">
@@ -1559,6 +1546,9 @@
     <ClCompile Include="src\Dymatic\Renderer\Texture.cpp">
       <Filter>src\Dymatic\Renderer</Filter>
     </ClCompile>
+    <ClCompile Include="src\Dymatic\Renderer\UniformBuffer.cpp">
+      <Filter>src\Dymatic\Renderer</Filter>
+    </ClCompile>
     <ClCompile Include="src\Dymatic\Renderer\VertexArray.cpp">
       <Filter>src\Dymatic\Renderer</Filter>
     </ClCompile>
@@ -1592,6 +1582,9 @@
     <ClCompile Include="src\Platform\OpenGL\OpenGLTexture.cpp">
       <Filter>src\Platform\OpenGL</Filter>
     </ClCompile>
+    <ClCompile Include="src\Platform\OpenGL\OpenGLUniformBuffer.cpp">
+      <Filter>src\Platform\OpenGL</Filter>
+    </ClCompile>
     <ClCompile Include="src\Platform\OpenGL\OpenGLVertexArray.cpp">
       <Filter>src\Platform\OpenGL</Filter>
     </ClCompile>
@@ -1607,35 +1600,24 @@
     <ClCompile Include="src\dypch.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="vendor\CSplash\Splash.cpp">
-      <Filter>vendor\CSplash</Filter>
-    </ClCompile>
-    <ClCompile Include="vendor\CSplash\SplashClient.cpp">
-      <Filter>vendor\CSplash</Filter>
-    </ClCompile>
-    <ClCompile Include="vendor\CSplash\StdAfx.cpp">
-      <Filter>vendor\CSplash</Filter>
-    </ClCompile>
-    <ClCompile Include="vendor\ImGuiNode\crude_json.cpp">
-      <Filter>vendor\ImGuiNode</Filter>
-    </ClCompile>
-    <ClCompile Include="vendor\ImGuiNode\imgui_canvas.cpp">
-      <Filter>vendor\ImGuiNode</Filter>
-    </ClCompile>
-    <ClCompile Include="vendor\ImGuiNode\imgui_node_editor.cpp">
-      <Filter>vendor\ImGuiNode</Filter>
-    </ClCompile>
-    <ClCompile Include="vendor\ImGuiNode\imgui_node_editor_api.cpp">
-      <Filter>vendor\ImGuiNode</Filter>
-    </ClCompile>
     <ClCompile Include="vendor\ImGuizmo\ImGuizmo.cpp">
       <Filter>vendor\ImGuizmo</Filter>
-    </ClCompile>
-    <ClCompile Include="vendor\WinToast\wintoastlib.cpp">
-      <Filter>vendor\WinToast</Filter>
     </ClCompile>
     <ClCompile Include="vendor\stb_image\stb_image.cpp">
       <Filter>vendor\stb_image</Filter>
     </ClCompile>
+    <ClCompile Include="vendor\ImGuiNode\imgui_canvas.cpp" />
+    <ClCompile Include="vendor\ImGuiNode\imgui_node_editor.cpp" />
+    <ClCompile Include="vendor\ImGuiNode\imgui_node_editor_api.cpp" />
+    <ClCompile Include="vendor\CSplash\Splash.cpp" />
+    <ClCompile Include="vendor\CSplash\SplashClient.cpp" />
+    <ClCompile Include="vendor\CSplash\StdAfx.cpp" />
+    <ClCompile Include="vendor\ImGuiNode\crude_json.cpp" />
+    <ClCompile Include="vendor\WinToast\wintoastlib.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="vendor\ImGuiNode\imgui_bezier_math.inl" />
+    <None Include="vendor\ImGuiNode\imgui_extra_math.inl" />
+    <None Include="vendor\ImGuiNode\imgui_node_editor_internal.inl" />
   </ItemGroup>
 </Project>

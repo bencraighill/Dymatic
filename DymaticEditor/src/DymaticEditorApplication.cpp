@@ -8,8 +8,8 @@ namespace Dymatic {
 	class DymaticEditor : public Application
 	{
 	public:
-		DymaticEditor()
-			: Application("Dymatic Editor - V1.2.1")
+		DymaticEditor(ApplicationCommandLineArgs args)
+			: Application("Dymatic Editor", args)
 		{
 			PushLayer(new EditorLayer());
 		}
@@ -19,9 +19,9 @@ namespace Dymatic {
 		}
 	};
 
-	Application* CreateApplication()
+	Application* CreateApplication(ApplicationCommandLineArgs args)
 	{
-		return new DymaticEditor();
+		return new DymaticEditor(args);
 	}
 
 }

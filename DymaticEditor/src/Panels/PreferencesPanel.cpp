@@ -6,6 +6,11 @@
 
 #include <glm/gtc/type_ptr.hpp>
 
+#include "../TextSymbols.h"
+
+//Opening Files
+#include "Dymatic/Utils/PlatformUtils.h"
+
 namespace Dymatic {
 
 
@@ -21,22 +26,23 @@ namespace Dymatic {
 		OpenKeyBindsByFilepath("saved/presets/keybinds/DymaticDefault.keybind");
 		OpenKeyBindsByFilepath("saved/SavedKeyBinds.keybind");
 
+		LoadPresetLayout();
 	}
 
 	void PreferencesPannel::OnImGuiRender()
 	{
-		static bool previousPreferencesShowWindow = m_ShowWindow;
+		static bool previousPreferencesShowWindow = m_PreferencesPanelVisible;
 
-		if ((previousPreferencesShowWindow && !m_ShowWindow) && GetPreferences().m_PreferenceData.autosavePreferences)
+		if ((previousPreferencesShowWindow && !m_PreferencesPanelVisible) && GetPreferences().m_PreferenceData.autosavePreferences)
 		{
 			SavePreferencesByFilepath("saved/SavedPreferences.prefs");
 		}
 
-		previousPreferencesShowWindow = m_ShowWindow;
+		previousPreferencesShowWindow = m_PreferencesPanelVisible;
 
-		if (m_ShowWindow)
+		if (m_PreferencesPanelVisible)
 		{
-			ImGui::Begin("Preferences", &m_ShowWindow);
+			ImGui::Begin((std::string(CHARACTER_WINDOW_ICON_PREFERENCES) + " Preferences").c_str(), &m_PreferencesPanelVisible);
 
 			float h = ImGui::GetContentRegionAvail().y;
 			float minSize = 20.0f;
@@ -47,16 +53,34 @@ namespace Dymatic {
 			variation1 = (ImGui::GetContentRegionAvail().x / 4) - sz1;
 			variation2 = (ImGui::GetContentRegionAvail().x / 4 * 3) - sz2;
 
-			ImGui::BeginChild("##Tabs", ImVec2(sz1, h), false);
+			ImGui::BeginChild("##Tabs", ImVec2(sz1, h), false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
 
-			std::string clickedCatagory = (DrawRoundedButtonStack({ "System", "Save & Load", "File Paths" }) +
-				DrawRoundedButtonStack({ "Input", "Navigation", "Keymap" }) +
-				DrawRoundedButtonStack({ "Plugins" }) +
-				DrawRoundedButtonStack({ "Interface", "Themes", "Viewport", "Editing" }));
-
-			if (clickedCatagory != m_CurrentCatagory && clickedCatagory != "")
+			const char* categoriesA[4] = { "Interface", "Themes", "Viewport", "Editing" };
+			const char* categoriesB[3] = { "Input", "Navigation", "Keymap" };
+			const char* categoriesC[1] = { "Plugins" };
+			const char* categoriesD[3] = { "System", "Save & Load", "File Paths" };
+			int currentValueA = (int)(m_CurrentCategory) - 0;
+			int currentValueB = (int)(m_CurrentCategory) - 4;
+			int currentValueC = (int)(m_CurrentCategory) - 7;
+			int currentValueD = (int)(m_CurrentCategory) - 8;
+			if (ImGui::ButtonStackEx("##PreferencesCategoryStackA", categoriesA, 4, &currentValueA, ImVec2(ImGui::GetContentRegionAvail().x - 5.0f, 120.0f), 5.0f))
 			{
-				m_CurrentCatagory = clickedCatagory;
+				m_CurrentCategory = (PreferencesCategory)(currentValueA + 0);
+			}
+			ImGui::Dummy(ImVec2(0.0f, 2.5f));
+			if (ImGui::ButtonStackEx("##PreferencesCategoryStackB", categoriesB, 3, &currentValueB, ImVec2(ImGui::GetContentRegionAvail().x - 5.0f, 90.0f), 5.0f))
+			{
+				m_CurrentCategory = (PreferencesCategory)(currentValueB + 4);
+			}
+			ImGui::Dummy(ImVec2(0.0f, 2.5f));
+			if (ImGui::ButtonStackEx("##PreferencesCategoryStackC", categoriesC, 1, &currentValueC, ImVec2(ImGui::GetContentRegionAvail().x - 5.0f, 30.0f), 5.0f))
+			{
+				m_CurrentCategory = (PreferencesCategory)(currentValueC + 7);
+			}
+			ImGui::Dummy(ImVec2(0.0f, 2.5f));
+			if (ImGui::ButtonStackEx("##PreferencesCategoryStackD", categoriesD, 3, &currentValueD, ImVec2(ImGui::GetContentRegionAvail().x - 5.0f, 90.0f), 5.0f))
+			{
+				m_CurrentCategory = (PreferencesCategory)(currentValueD + 8);
 			}
 
 			ImGui::Dummy(ImVec2{ 0, ImGui::GetContentRegionAvail().y - 25 });
@@ -86,7 +110,7 @@ namespace Dymatic {
 			const ImGuiTreeNodeFlags treeNodeFlags = ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_AllowItemOverlap | ImGuiTreeNodeFlags_FramePadding;
 			auto& preferencesData = GetPreferences().m_PreferenceData;
 			auto& values = preferencesData.colorScheme.colorSchemeValues;
-			if (m_CurrentCatagory == "Interface")
+			if (m_CurrentCategory == Interface)
 			{
 				if (ImGui::TreeNodeEx("Display", treeNodeFlags | ImGuiTreeNodeFlags_DefaultOpen))
 				{
@@ -123,38 +147,31 @@ namespace Dymatic {
 					ImGui::TreePop();
 				}
 			}
-			else if (m_CurrentCatagory == "Themes")
+			else if (m_CurrentCategory == Themes)
 			{
 				float widthAvalOver = ImGui::GetContentRegionAvail().x - 40;
 
-				static const char* items[]{ "Dymatic Dark", "Dymatic Light", "Sunset Gold" };
-				static int selectedItem = 0;
+				static int selectedIndex = 0;
 
 				ImGui::SetNextItemWidth(widthAvalOver / 7 * 2.5f);
-				if (ImGui::Combo("##Preset", &selectedItem, items, IM_ARRAYSIZE(items)))
+				if (ImGui::BeginCombo("##ThemeSelectCombo", m_SelectableThemeNames.empty() ? "Unknown Value" : m_SelectableThemeNames[selectedIndex].c_str()))
 				{
-					switch (selectedItem)
+					if (selectedIndex > m_SelectableThemeNames.size() - 1)
 					{
-
-					case 0:
+						selectedIndex = 0;
+					}
+					if (!m_SelectableThemeNames.empty())
 					{
-						OpenThemeByPath("saved/presets/themes/DymaticDark.dytheme");
-						break;
+						for (int i = 0; i < m_SelectableThemeNames.size(); i++)
+						{
+							if (ImGui::Selectable(m_SelectableThemeNames[i].c_str()))
+							{
+								selectedIndex = i;
+								OpenThemeByPath(m_SelectableThemePaths[i]);
+							}
+						}
 					}
-
-					case 1:
-					{
-						OpenThemeByPath("saved/presets/themes/DymaticLight.dytheme");
-						break;
-					}
-
-					case 2:
-					{
-						OpenThemeByPath("saved/presets/themes/SunsetGold.dytheme");
-						break;
-					}
-
-					}
+					ImGui::EndCombo();
 				}
 
 				ImGui::SameLine();
@@ -284,6 +301,25 @@ namespace Dymatic {
 					ImGui::TreePop();
 				}
 
+				if (ImGui::TreeNodeEx("Text Editor", treeNodeFlags))
+				{
+					EditThemeColor(TextEditorDefault);
+					EditThemeColor(TextEditorKeyword);
+					EditThemeColor(TextEditorNumber);
+					EditThemeColor(TextEditorString);
+					EditThemeColor(TextEditorCharLiteral);
+					EditThemeColor(TextEditorPunctuation);
+					EditThemeColor(TextEditorPreprocessor);
+					EditThemeColor(TextEditorIdentifier);
+					EditThemeColor(TextEditorComment);
+					EditThemeColor(TextEditorMultiLineComment);
+					EditThemeColor(TextEditorLineNumber);
+					EditThemeColor(TextEditorCurrentLineFill);
+					EditThemeColor(TextEditorCurrentLineFillInactive);
+					EditThemeColor(TextEditorCurrentLineEdge);
+					ImGui::TreePop();
+				}
+
 				if (ImGui::TreeNodeEx("Checkboxes", treeNodeFlags))
 				{
 					EditThemeColor(CheckMark);
@@ -330,20 +366,27 @@ namespace Dymatic {
 
 				ImGui::EndChild();
 			}
-			else if (m_CurrentCatagory == "Viewport")
+			else if (m_CurrentCategory == Viewport)
 			{
 
 			}
-			else if (m_CurrentCatagory == "Editing")
+			else if (m_CurrentCategory == Editing)
 			{
 
 			}
-			else if (m_CurrentCatagory == "Plugins")
+			else if (m_CurrentCategory == Plugins)
 			{
 
 			}
-			else if (m_CurrentCatagory == "Input")
+			else if (m_CurrentCategory == Input)
 			{
+				if (ImGui::TreeNodeEx("Keyboard", treeNodeFlags | ImGuiTreeNodeFlags_DefaultOpen))
+				{
+					ImGui::Text("Emulate Numpad");
+					ImGui::SameLine();
+					ImGui::Custom::Checkbox("##KeyboardEmulateNumpadCheckbox", &GetPreferences().m_PreferenceData.emulateNumpad);
+					ImGui::TreePop();
+				}
 				if (ImGui::TreeNodeEx("Mouse", treeNodeFlags | ImGuiTreeNodeFlags_DefaultOpen))
 				{
 					ImGui::Text("Double Click Speed");
@@ -352,36 +395,42 @@ namespace Dymatic {
 					ImGui::TreePop();
 				}
 			}
-			else if (m_CurrentCatagory == "Navigation")
+			else if (m_CurrentCategory == Navigation)
 			{
-				//Emulate numpad
+
 			}
-			else if (m_CurrentCatagory == "Keymap")
+			else if (m_CurrentCategory == Keymap)
 			{
-			float widthAvalOver = ImGui::GetContentRegionAvail().x - 40;
+				float widthAvalOver = ImGui::GetContentRegionAvail().x - 40;
 
-			auto& keyBinds = GetPreferences().m_PreferenceData.keyBinds;
+				auto& keyBinds = GetPreferences().m_PreferenceData.keyBinds;
 
-				static const char* items[]{ "Dymatic Default" };
-				static int selectedItem = 0;
+				static int selectedIndex = 0;
 
 				ImGui::SetNextItemWidth(widthAvalOver / 7 * 2.5f);
-				if (ImGui::Combo("##PresetKeymap", &selectedItem, items, IM_ARRAYSIZE(items)))
+				if (ImGui::BeginCombo("##ThemeSelectCombo", m_SelectableKeybindNames.empty() ? "Unknown Value" : m_SelectableKeybindNames[selectedIndex].c_str()))
 				{
-					switch (selectedItem)
+					if (selectedIndex > m_SelectableKeybindNames.size() - 1)
 					{
-
-					case 0:
+						selectedIndex = 0;
+					}
+					if (!m_SelectableKeybindNames.empty())
 					{
-						OpenKeyBindsByFilepath("saved/presets/keybinds/DymaticDefault.keybind");
-						break;
+						for (int i = 0; i < m_SelectableKeybindNames.size(); i++)
+						{
+							if (ImGui::Selectable(m_SelectableKeybindNames[i].c_str()))
+							{
+								selectedIndex = i;
+								OpenKeyBindsByFilepath(m_SelectableKeybindPaths[i]);
+							}
+						}
 					}
-					}
+					ImGui::EndCombo();
 				}
 
 				ImGui::SameLine();
 
-				if (ImGui::Button("Import", ImVec2{ widthAvalOver / 7, 23})) { ImportKeyBinds(); }
+				if (ImGui::Button("Import", ImVec2{ widthAvalOver / 7, 23 })) { ImportKeyBinds(); }
 				ImGui::SameLine();
 				if (ImGui::Button("Export", ImVec2{ widthAvalOver / 7, 23 })) { ExportKeyBinds(); }
 				ImGui::SameLine();
@@ -390,15 +439,14 @@ namespace Dymatic {
 				if (ImGui::Button("Save Binds", ImVec2{ widthAvalOver / 7, 23 })) { SaveKeyBindsByFilepath("saved/SavedKeyBinds.keybind"); }
 
 				static int currentKeyBindSearchItem = 0;
-				const char* SearchTypes[2] = { "Name", "Key Binding"};
-				switch (ImGui::SwitchButtonEx("KeyBindsSearchBarButtonSwitch", SearchTypes, 2, currentKeyBindSearchItem, ImVec2{ 200, 23 }))
+				const char* SearchTypes[2] = { "Name", "Key Binding" };
+				if (ImGui::SwitchButtonEx("KeyBindsSearchBarButtonSwitch", SearchTypes, 2, &currentKeyBindSearchItem, ImVec2{ 200, 23 }))
 				{
-				case 0: {currentKeyBindSearchItem = 0; SearchByNameKey = true; break; }
-				case 1: {currentKeyBindSearchItem = 1; SearchByNameKey = false; break; }
+					SearchByNameKey = !(bool)(currentKeyBindSearchItem);
 				}
 
 				ImGui::SameLine();
-				
+
 				static char KeybindsSearchBuffer[200] = {};
 
 				ImGui::PushID("KeyBindsSearchBar");
@@ -425,10 +473,14 @@ namespace Dymatic {
 				{
 					static const char* b[2] = { "Mouse Left", "Mouse Right" };
 					ImGui::PushID("SwitchButton");
-					switch (ImGui::SwitchButtonEx("Switch1", b, 2, keyBinds.GetKeyBind(SelectObjectBind).mouseCode == Mouse::ButtonRight ? 1 : 0, ImVec2{ ImGui::GetContentRegionAvail().x, 23 }))
+					int selectedValue = keyBinds.GetKeyBind(SelectObjectBind).mouseCode == Mouse::ButtonRight ? 1 : 0;
+					if (ImGui::SwitchButtonEx("Switch1", b, 2, &selectedValue, ImVec2{ ImGui::GetContentRegionAvail().x, 23 }))
 					{
-					case 0: {keyBinds.GetKeyBind(SelectObjectBind).mouseCode = Mouse::ButtonLeft;  keyBinds.GetKeyBind(SelectObjectBind).bindCatagory = MouseButton; break; }
-					case 1: {keyBinds.GetKeyBind(SelectObjectBind).mouseCode = Mouse::ButtonRight; keyBinds.GetKeyBind(SelectObjectBind).bindCatagory = MouseButton; break; }
+						switch (selectedValue)
+						{
+						case 0: {keyBinds.GetKeyBind(SelectObjectBind).mouseCode = Mouse::ButtonLeft;  keyBinds.GetKeyBind(SelectObjectBind).bindCatagory = MouseButton; break; }
+						case 1: {keyBinds.GetKeyBind(SelectObjectBind).mouseCode = Mouse::ButtonRight; keyBinds.GetKeyBind(SelectObjectBind).bindCatagory = MouseButton; break; }
+						}
 					}
 					ImGui::PopID();
 					ImGui::TreePop();
@@ -437,69 +489,100 @@ namespace Dymatic {
 
 				ImGui::Dummy(ImVec2{ 0, 30 });
 
-				bool WindowKeyBindPrefsOpen = true;
-				static bool WindowBindPrefVis = true;
-				if (KeyBindSearchBar == "")
 				{
-					WindowKeyBindPrefsOpen = ImGui::TreeNodeEx("Window", treeNodeFlags); WindowBindPrefVis = false;
-				}
-				else if (WindowBindPrefVis) ImGui::Text("Window");
-				if (WindowKeyBindPrefsOpen)
-				{
-					bool vis = false;
-					if (KeyBindInputButton(NewSceneBind)) vis = true;
-					if (KeyBindInputButton(OpenSceneBind)) vis = true;
-					if (KeyBindInputButton(SaveSceneBind)) vis = true;
-					if (KeyBindInputButton(SaveSceneAsBind)) vis = true;
-					if (KeyBindInputButton(QuitBind)) vis = true;
-					if (KeyBindInputButton(RenameBind)) vis = true;
-					WindowBindPrefVis = vis;
-					if (KeyBindSearchBar == "") ImGui::TreePop();
-				}
-
-				bool ThreeDViewKeyBindPrefsOpen = true;
-				static bool ThreeDViewBindPrefVis = true;
-				if (KeyBindSearchBar == "")
-				{
-					ThreeDViewKeyBindPrefsOpen = ImGui::TreeNodeEx("3D View", treeNodeFlags); ThreeDViewBindPrefVis = false;
-				}
-				else if (ThreeDViewBindPrefVis) ImGui::Text("3D View");
-				if (ThreeDViewKeyBindPrefsOpen)
-				{
-					bool vis = false;
-					if (KeyBindInputButton(SelectObjectBind)) vis = true;
-					if (KeyBindInputButton(GizmoNoneBind)) vis = true;
-					if (KeyBindInputButton(GizmoTranslateBind)) vis = true;
-					if (KeyBindInputButton(GizmoRotateBind)) vis = true;
-					if (KeyBindInputButton(GizmoScaleBind)) vis = true;
-					if (KeyBindInputButton(ShadingTypeWireframeBind)) vis = true;
-					if (KeyBindInputButton(ShadingTypeUnlitBind)) vis = true;
-					if (KeyBindInputButton(ShadingTypeSolidBind)) vis = true;
-					if (KeyBindInputButton(ShadingTypeRenderedBind)) vis = true;
-					if (KeyBindInputButton(ToggleShadingTypeBind)) vis = true;
-					if (KeyBindInputButton(DuplicateBind)) vis = true;
-					ThreeDViewBindPrefVis = vis;
-					if (KeyBindSearchBar == "") ImGui::TreePop();
+					bool open = true;
+					static bool vis = true;
+					if (KeyBindSearchBar == "")
+					{
+						open = ImGui::TreeNodeEx("Window", treeNodeFlags); vis = false;
+					}
+					else if (vis) ImGui::Text("Window");
+					if (open)
+					{
+						bool visible = false;
+						if (KeyBindInputButton(NewSceneBind)) visible = true;
+						if (KeyBindInputButton(OpenSceneBind)) visible = true;
+						if (KeyBindInputButton(SaveSceneBind)) visible = true;
+						if (KeyBindInputButton(SaveSceneAsBind)) visible = true;
+						if (KeyBindInputButton(QuitBind)) visible = true;
+						if (KeyBindInputButton(RenameBind)) visible = true;
+						vis = visible;
+						if (KeyBindSearchBar == "") ImGui::TreePop();
+					}
 				}
 
-				bool InterfaceKeyBindPrefsOpen = true;
-				static bool InterfaceBindPrefVis = true;
-				if (KeyBindSearchBar == "")
 				{
-					InterfaceKeyBindPrefsOpen = ImGui::TreeNodeEx("Interface", treeNodeFlags); InterfaceBindPrefVis = false;
+					bool open = true;
+					static bool vis = true;
+					if (KeyBindSearchBar == "")
+					{
+						open = ImGui::TreeNodeEx("3D View", treeNodeFlags); vis = false;
+					}
+					else if (vis) ImGui::Text("3D View");
+					if (open)
+					{
+						bool visible = false;
+						if (KeyBindInputButton(SelectObjectBind)) visible = true;
+						if (KeyBindInputButton(GizmoNoneBind)) visible = true;
+						if (KeyBindInputButton(GizmoTranslateBind)) visible = true;
+						if (KeyBindInputButton(GizmoRotateBind)) visible = true;
+						if (KeyBindInputButton(GizmoScaleBind)) visible = true;
+						if (KeyBindInputButton(ShadingTypeWireframeBind)) visible = true;
+						if (KeyBindInputButton(ShadingTypeUnlitBind)) visible = true;
+						if (KeyBindInputButton(ShadingTypeSolidBind)) visible = true;
+						if (KeyBindInputButton(ShadingTypeRenderedBind)) visible = true;
+						if (KeyBindInputButton(ToggleShadingTypeBind)) visible = true;
+						if (KeyBindInputButton(ViewFrontBind)) visible = true;
+						if (KeyBindInputButton(ViewSideBind)) visible = true;
+						if (KeyBindInputButton(ViewTopBind)) visible = true;
+						if (KeyBindInputButton(ViewFlipBind)) visible = true;
+						if (KeyBindInputButton(ViewProjectionBind)) visible = true;
+						if (KeyBindInputButton(DuplicateBind)) visible = true;
+						vis = visible;
+						if (KeyBindSearchBar == "") ImGui::TreePop();
+					}
 				}
-				else if (InterfaceBindPrefVis) ImGui::Text("Interface");
-				if (InterfaceKeyBindPrefsOpen)
+
 				{
-					bool vis = false;
-					if (KeyBindInputButton(ClosePopupBind)) vis = true;
-					InterfaceBindPrefVis = vis;
-					if (KeyBindSearchBar == "") ImGui::TreePop();
+					bool open = true;
+					static bool vis = true;
+					if (KeyBindSearchBar == "")
+					{
+						open = ImGui::TreeNodeEx("Text Editor", treeNodeFlags); vis = false;
+					}
+					else if (vis) ImGui::Text("Text Editor");
+					if (open)
+					{
+						bool visible = false;
+						if (KeyBindInputButton(TextEditorDuplicate)) visible = true;
+						if (KeyBindInputButton(TextEditorSwapLineUp)) visible = true;
+						if (KeyBindInputButton(TextEditorSwapLineDown)) visible = true;
+						if (KeyBindInputButton(TextEditorSwitchHeader)) visible = true;
+						vis = visible;
+						if (KeyBindSearchBar == "") ImGui::TreePop();
+					}
+				}
+
+				{
+					bool open = true;
+					static bool vis = true;
+					if (KeyBindSearchBar == "")
+					{
+						open = ImGui::TreeNodeEx("Interface", treeNodeFlags); vis = false;
+					}
+					else if (vis) ImGui::Text("Interface");
+					if (open)
+					{
+						bool visible = false;
+						if (KeyBindInputButton(ClosePopupBind)) visible = true;
+						vis = visible;
+						if (KeyBindSearchBar == "") ImGui::TreePop();
+					}
 				}
 
 				ImGui::EndChild();
 			}
-			else if (m_CurrentCatagory == "System")
+			else if (m_CurrentCategory == System)
 			{
 				if (ImGui::TreeNodeEx("Notifications", treeNodeFlags | ImGuiTreeNodeFlags_DefaultOpen))
 				{
@@ -517,7 +600,7 @@ namespace Dymatic {
 					ImGui::TreePop();
 				}
 			}
-			else if (m_CurrentCatagory == "Save & Load")
+			else if (m_CurrentCategory == SaveLoad)
 			{
 				ImGui::SliderInt("Recent Files", &m_Preferences.m_PreferenceData.recentFiles, 0, 30);
 				bool autosave = ImGui::TreeNodeEx("Auto Save", treeNodeFlags);
@@ -529,7 +612,7 @@ namespace Dymatic {
 					ImGui::TreePop();
 				}
 			}
-			else if (m_CurrentCatagory == "File Paths")
+			else if (m_CurrentCategory == FilePaths)
 			{
 
 			}
@@ -756,32 +839,30 @@ namespace Dymatic {
 
 		ImGui::PushID(("NotificationPreferenceSwitchButton" + NotificationName).c_str());
 		ImGui::PushItemFlag(ImGuiItemFlags_Disabled, !enabled);
-		auto switchValue = ImGui::SwitchButtonEx(("NotificationPreferenceToastSwitch" + NotificationName).c_str(), b, 3, prefs.NotificationToastEnabled[varIndex], ImVec2{ switchValueLength, 23 });
+		ImGui::SwitchButtonEx(("NotificationPreferenceToastSwitch" + NotificationName).c_str(), b, 3, &prefs.NotificationToastEnabled[varIndex], ImVec2{ switchValueLength, 23 });
 		ImGui::PopItemFlag();
 		ImGui::PopID();
 		if (!enabled)
 			ImGui::GetWindowDrawList()->AddRectFilled(prePos, ImVec2{ prePos.x + switchValueLength, prePos.y + 23 }, ImGui::ColorConvertFloat4ToU32(ImVec4{ 0.0f, 0.0f, 0.0f, 0.7f }), GImGui->Style.FrameRounding);
-		if (switchValue != -1)
-			prefs.NotificationToastEnabled[varIndex] = switchValue;
 	}
 
 	//Import and Export with Dialogue versions
 
 	void PreferencesPannel::ImportTheme()
 	{
-		std::optional<std::string> filepath = FileDialogs::OpenFile("Dymatic Theme (*.dytheme)\0*.dytheme\0");
-		if (filepath)
+		std::string filepath = FileDialogs::OpenFile("Dymatic Theme (*.dytheme)\0*.dytheme\0");
+		if (!filepath.empty())
 		{			
-			OpenThemeByPath(*filepath);
+			OpenThemeByPath(filepath);
 		}
 	}
 
 	void PreferencesPannel::ExportTheme()
 	{
-		std::optional<std::string> filepath = FileDialogs::SaveFile("Dymatic Theme (*.dytheme)\0*.dytheme\0");
-		if (filepath)
+		std::string filepath = FileDialogs::SaveFile("Dymatic Theme (*.dytheme)\0*.dytheme\0");
+		if (!filepath.empty())
 		{
-			SaveThemeByPath(*filepath);
+			SaveThemeByPath(filepath);
 		}
 	}
 
@@ -1061,6 +1142,22 @@ namespace Dymatic {
 
 		//Content Browser -- In Custom
 
+		// Text Editor
+		colors[ImGuiCol_TextEditorDefault] = theme[TextEditorDefault];
+		colors[ImGuiCol_TextEditorKeyword] = theme[TextEditorKeyword];
+		colors[ImGuiCol_TextEditorNumber] = theme[TextEditorNumber];
+		colors[ImGuiCol_TextEditorString] = theme[TextEditorString];
+		colors[ImGuiCol_TextEditorCharLiteral] = theme[TextEditorCharLiteral];
+		colors[ImGuiCol_TextEditorPunctuation] = theme[TextEditorPunctuation];
+		colors[ImGuiCol_TextEditorPreprocessor] = theme[TextEditorPreprocessor];
+		colors[ImGuiCol_TextEditorIdentifier] = theme[TextEditorIdentifier];
+		colors[ImGuiCol_TextEditorComment] = theme[TextEditorComment];
+		colors[ImGuiCol_TextEditorMultiLineComment] = theme[TextEditorMultiLineComment];
+		colors[ImGuiCol_TextEditorLineNumber] = theme[TextEditorLineNumber];
+		colors[ImGuiCol_TextEditorCurrentLineFill] = theme[TextEditorCurrentLineFill];
+		colors[ImGuiCol_TextEditorCurrentLineFillInactive] = theme[TextEditorCurrentLineEdge];
+		colors[ImGuiCol_TextEditorCurrentLineEdge] = theme[TextEditorCurrentLineEdge];
+
 		//Checkbox -- In Custom
 		colors[ImGuiCol_CheckMark] = theme[CheckMark];
 
@@ -1101,19 +1198,19 @@ namespace Dymatic {
 
 	void PreferencesPannel::ImportKeyBinds()
 	{
-		std::optional<std::string> filepath = FileDialogs::OpenFile("Key Bind (*.keybind)\0*.keybind\0");
-		if (filepath)
+		std::string filepath = FileDialogs::OpenFile("Key Bind (*.keybind)\0*.keybind\0");
+		if (!filepath.empty())
 		{
-			OpenKeyBindsByFilepath(*filepath);
+			OpenKeyBindsByFilepath(filepath);
 		}
 	}
 
 	void PreferencesPannel::ExportKeyBinds()
 	{
-		std::optional<std::string> filepath = FileDialogs::SaveFile("Key Bind (*.keybind)\0*.keybind\0");
-		if (filepath)
+		std::string filepath = FileDialogs::SaveFile("Key Bind (*.keybind)\0*.keybind\0");
+		if (!filepath.empty())
 		{
-			SaveKeyBindsByFilepath(*filepath);
+			SaveKeyBindsByFilepath(filepath);
 		}
 	}
 
@@ -1213,19 +1310,19 @@ namespace Dymatic {
 
 	void PreferencesPannel::ImportPreferences()
 	{
-		std::optional<std::string> filepath = FileDialogs::OpenFile("Preferences (*.prefs)\0*.prefs\0");
-		if (filepath)
+		std::string filepath = FileDialogs::OpenFile("Preferences (*.prefs)\0*.prefs\0");
+		if (!filepath.empty())
 		{
-			OpenPreferencesByFilepath(*filepath);
+			OpenPreferencesByFilepath(filepath);
 		}
 	}
 
 	void PreferencesPannel::ExportPreferences()
 	{
-		std::optional<std::string> filepath = FileDialogs::SaveFile("Preferences (*.prefs)\0*.prefs\0");
-		if (filepath)
+		std::string filepath = FileDialogs::SaveFile("Preferences (*.prefs)\0*.prefs\0");
+		if (!filepath.empty())
 		{
-			SavePreferencesByFilepath(*filepath);
+			SavePreferencesByFilepath(filepath);
 		}
 	}
 
@@ -1293,6 +1390,7 @@ namespace Dymatic {
 				else if (CurrentValueName == "ShowSplash") { prefs.showSplash = CurrentValue == "true" ? true : false; }
 				else if (CurrentValueName == "FileColors") { SetFileColorsFromString(CurrentValue); }
 				else if (CurrentValueName == "DoubleClickSpeed") { prefs.doubleClickSpeed = std::stof(CurrentValue); }
+				else if (CurrentValueName == "EmulateNumpad") { prefs.emulateNumpad = CurrentValue == "true" ? true : false; }
 				else if (CurrentValueName == "NotificationPreset") { prefs.NotificationPreset = std::clamp((int)std::stof(CurrentValue), 0, 3); }
 				else if (CurrentValueName == "NotificationToastEnabled") { for (int i = 0; i < CurrentValue.length() && prefs.NotificationToastEnabled.size(); i++) { prefs.NotificationToastEnabled[i] = std::stof(CurrentValue.substr(i, 1)) > 2 || std::stof(CurrentValue.substr(i, 1)) < 0 ? 0 : std::stof(CurrentValue.substr(i, 1)); } }
 				else if (CurrentValueName == "NotificationEnabled") { for (int i = 0; i < CurrentValue.length() && prefs.NotificationEnabled.size(); i++) { prefs.NotificationEnabled[i] = CurrentValue.substr(i, 1) == "1" ? 1 : 0; } }
@@ -1319,6 +1417,7 @@ namespace Dymatic {
 		out = out + "<FileColors> {" + (FileColorString) + "}\r";
 
 		out = out + "<DoubleClickSpeed> {" + (std::to_string(prefs.doubleClickSpeed)) + "}\r";
+		out = out + "<EmulateNumpad> {" + (prefs.emulateNumpad ? "true" : "false") + "}\r";
 
 		out = out + "<NotificationPreset> {" + (std::to_string(prefs.NotificationPreset)) + "}\r";
 		std::string NotificationToastString = "";
@@ -1330,50 +1429,6 @@ namespace Dymatic {
 
 		std::ofstream fout(filepath);
 		fout << out.c_str();
-	}
-
-	//ImGui Code
-
-	std::string PreferencesPannel::DrawRoundedButtonStack(std::vector<std::string> buttonIds)
-	{
-		std::string buttonPressed = "";
-
-		ImGui::Dummy(ImVec2{ 0, 5 });
-
-		if (!buttonIds.empty())
-		{
-			if (buttonIds.size() == 1)
-			{
-				bool active = buttonIds[0] == m_CurrentCatagory;
-				if (ImGui::Custom::ButtonCornersEx(buttonIds[0].c_str(), ImVec2{ ImGui::GetContentRegionAvail().x - 5.0f, 22.0f }, NULL, 5.0f, ImDrawCornerFlags_All, active, ImVec2{ 0, -2 }, ImVec2{ 0, 2 }))
-					buttonPressed = buttonIds[0];
-			}
-
-			else
-			{
-				for (int i = 0; i < buttonIds.size(); i++)
-				{
-					bool active = buttonIds[i] == m_CurrentCatagory;
-
-					if (i == 0)
-					{
-						if (ImGui::Custom::ButtonCornersEx(buttonIds[i].c_str(), ImVec2{ ImGui::GetContentRegionAvail().x - 5.0f, 22.0f }, NULL, 5.0f, ImDrawCornerFlags_Top, active, ImVec2{ 0, -2 }, ImVec2{ 0, 2 }))
-							buttonPressed = buttonIds[i];
-					}
-					else if (i == buttonIds.size() - 1)
-					{
-						if (ImGui::Custom::ButtonCornersEx(buttonIds[i].c_str(), ImVec2{ ImGui::GetContentRegionAvail().x - 5.0f, 22.0f }, NULL, 5.0f, ImDrawCornerFlags_Bot, active, ImVec2{ 0, -2 }, ImVec2{ 0, 2 }))
-							buttonPressed = buttonIds[i];
-					}
-					else
-					{
-						if (ImGui::Custom::ButtonCornersEx(buttonIds[i].c_str(), ImVec2{ ImGui::GetContentRegionAvail().x - 5.0f, 22.0f }, NULL, 5.0f, ImDrawCornerFlags_None, active, ImVec2{ 0, -2 }, ImVec2{ 0, 2 }))
-							buttonPressed = buttonIds[i];
-					}
-				}
-			}
-		}
-		return buttonPressed;
 	}
 
 	void PreferencesPannel::SetFileColorsFromString(std::string colorString)
@@ -1430,6 +1485,113 @@ namespace Dymatic {
 	{
 		transform(inString.begin(), inString.end(), inString.begin(), ::tolower);
 		return inString;
+	}
+
+	void PreferencesPannel::LoadPresetLayout()
+	{
+		{
+			// Load Themes
+
+			std::string result;
+			std::ifstream in("saved/presets/themes/ThemePresets.txt", std::ios::in | std::ios::binary); // ifstream closes itself due to RAII
+
+			if (in)
+			{
+				in.seekg(0, std::ios::end);
+				size_t size = in.tellg();
+				if (size != -1)
+				{
+					result.resize(size);
+					in.seekg(0, std::ios::beg);
+					in.read(&result[0], size);
+				}
+			}
+
+			while (result.find_first_of("\n") != -1)
+			{
+				result = result.erase(result.find_first_of("\n"), 1);
+			}
+
+			while (result.find_first_of("\r") != -1)
+			{
+				result = result.erase(result.find_first_of("\r"), 1);
+			}
+
+			bool openValueName = false;
+			bool openValue = false;
+			std::string CurrentValueName = "";
+			std::string CurrentValue = "";
+			for (int i = 0; i < result.length(); i++)
+			{
+				std::string character = result.substr(i, 1);
+
+				if (character == ">") { openValueName = false; }
+				if (openValueName) { CurrentValueName = CurrentValueName + character; }
+				if (character == "<") { openValueName = true; CurrentValueName = ""; }
+
+				if (character == "}") { openValue = false; }
+				if (openValue) { CurrentValue = CurrentValue + character; }
+				if (character == "{") { openValue = true; CurrentValue = ""; }
+
+				if (character == "}" && CurrentValue != "")
+				{
+					m_SelectableThemeNames.push_back(CurrentValueName);
+					m_SelectableThemePaths.push_back(CurrentValue);
+				}
+			}
+		}
+
+		// Load Keybinds
+		
+		{
+			std::string result;
+			std::ifstream in("saved/presets/keybinds/KeybindPresets.txt", std::ios::in | std::ios::binary); // ifstream closes itself due to RAII
+
+			if (in)
+			{
+				in.seekg(0, std::ios::end);
+				size_t size = in.tellg();
+				if (size != -1)
+				{
+					result.resize(size);
+					in.seekg(0, std::ios::beg);
+					in.read(&result[0], size);
+				}
+			}
+
+			while (result.find_first_of("\n") != -1)
+			{
+				result = result.erase(result.find_first_of("\n"), 1);
+			}
+
+			while (result.find_first_of("\r") != -1)
+			{
+				result = result.erase(result.find_first_of("\r"), 1);
+			}
+
+			bool openValueName = false;
+			bool openValue = false;
+			std::string CurrentValueName = "";
+			std::string CurrentValue = "";
+			for (int i = 0; i < result.length(); i++)
+			{
+				std::string character = result.substr(i, 1);
+
+				if (character == ">") { openValueName = false; }
+				if (openValueName) { CurrentValueName = CurrentValueName + character; }
+				if (character == "<") { openValueName = true; CurrentValueName = ""; }
+
+				if (character == "}") { openValue = false; }
+				if (openValue) { CurrentValue = CurrentValue + character; }
+				if (character == "{") { openValue = true; CurrentValue = ""; }
+
+				if (character == "}" && CurrentValue != "")
+				{
+					m_SelectableKeybindNames.push_back(CurrentValueName);
+					m_SelectableKeybindPaths.push_back(CurrentValue);
+				}
+			}
+		}
 	}
 
 }

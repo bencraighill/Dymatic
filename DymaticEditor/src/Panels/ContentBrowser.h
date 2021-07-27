@@ -4,6 +4,7 @@
 #include "Dymatic/Core/Base.h"
 
 #include "../Preferences.h"
+#include "TextEditor.h"
 
 namespace Dymatic {
 
@@ -22,7 +23,7 @@ namespace Dymatic {
 	class ContentBrowser
 	{
 	public:
-		ContentBrowser(Preferences* preferencesRef);
+		ContentBrowser(Preferences* preferencesRef, TextEditorPannel* textEditorPannelRef);
 
 		void OnImGuiRender(Timestep ts);
 
@@ -59,6 +60,7 @@ namespace Dymatic {
 		std::string GetFileName(std::string filename);
 		std::string GetFileFormat(std::string filename);
 
+		std::string GetBrowseDirectory() { return m_BrowsePath; }
 		void SetBrowseDirectory(std::string path);
 		std::vector<FileProperties> GetFilesAtDirectory(std::string filepath);
 
@@ -67,8 +69,18 @@ namespace Dymatic {
 		std::string& GetFileToOpen() { return m_FileToOpen; }
 		FileProperties GetSelectedFile() { return m_SelectedFile; }
 
+		std::vector<FileProperties> GetFilesDisplayed() { return filesDisplayed; }
+
+		std::string GetSearchBarBuffer() { return m_SearchBarBuffer; }
+		void SetSearchBarBuffer(std::string buffer) { m_SearchBarBuffer = buffer; }
+
+		bool& GetContentBrowserVisible() { return m_ContentBrowserVisible; }
+
 	private:
+		bool m_ContentBrowserVisible = true;
+
 		Preferences* m_PreferencesReference;
+		TextEditorPannel* m_TextEditorPannelReference;
 
 		std::string m_RootPath = "C:/dev/ExperimentalContentFolder";
 		std::string m_BrowsePath;
@@ -80,10 +92,10 @@ namespace Dymatic {
 		std::string m_CopyBrowsePathContext;
 
 		FileProperties m_RenamePopupContext;
-		char m_RenameBuffer[200] = {};
+		std::string m_RenameBuffer = "";
 		bool m_OpenRenamePopup = false;
 
-		char m_SearchBarBuffer[450] = {};
+		std::string m_SearchBarBuffer = "";
 		std::string m_DirectoryViewDropdownPath;
 
 		std::string m_FileToOpen;
@@ -114,14 +126,6 @@ namespace Dymatic {
 		Ref<Texture2D> m_IconFileTypeDytheme = Texture2D::Create("assets/icons/ContentBrowser/FileTypes/FileTypeDytheme.png");
 		Ref<Texture2D> m_IconFileTypeKeybind = Texture2D::Create("assets/icons/ContentBrowser/FileTypes/FileTypeKeybind.png");
 		Ref<Texture2D> m_IconFileTypePrefs = Texture2D::Create("assets/icons/ContentBrowser/FileTypes/FileTypePrefs.png");
-
-		//Popup Error messages
-		Ref<Texture2D> m_IconFileExists = Texture2D::Create("assets/icons/Popups/FileExistsMessage.png");
-		Ref<Texture2D> m_IconFileShort = Texture2D::Create("assets/icons/Popups/ShortFilenameErrorMessage.png");
-		Ref<Texture2D> m_IconFileInvalid = Texture2D::Create("assets/icons/Popups/InvalidFilenameErrorMessage.png");
-		Ref<Texture2D> m_IconFileExtension = Texture2D::Create("assets/icons/Popups/FileExtensionErrorMessage.png");
-		Ref<Texture2D> m_IconFileEmpty = Texture2D::Create("assets/icons/Popups/EmptyFilenameErrorMessage.png");
-
 	};
 
 }

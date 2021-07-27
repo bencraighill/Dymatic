@@ -149,6 +149,41 @@ namespace Dymatic {
 			out << YAML::EndMap; // SpriteRendererComponent
 		}
 
+		if (entity.HasComponent<ParticleSystem>())
+		{
+			out << YAML::Key << "ParticleSystemComponent";
+			out << YAML::BeginMap; // ParticleSystemComponent
+
+			auto& particleSystemComponent = entity.GetComponent<ParticleSystem>();
+			out << YAML::Key << "Offset" << YAML::Value << particleSystemComponent.Offset;
+			out << YAML::Key << "Velocity" << YAML::Value << particleSystemComponent.Velocity;
+			out << YAML::Key << "VelocityVariation" << YAML::Value << particleSystemComponent.VelocityVariation;
+			out << YAML::Key << "Gravity" << YAML::Value << particleSystemComponent.Gravity;
+			out << YAML::Key << "ColorMethod" << YAML::Value << particleSystemComponent.ColorMethod;
+			out << YAML::Key << "ColorBegin" << YAML::Value << particleSystemComponent.ColorBegin;
+			out << YAML::Key << "ColorEnd" << YAML::Value << particleSystemComponent.ColorEnd;
+			out << YAML::Key << "ColorConstant" << YAML::Value << particleSystemComponent.ColorConstant;
+			out << YAML::Key << "ColorPoints" << YAML::Value << YAML::BeginSeq; particleSystemComponent.ColorEnd;
+			for (auto colorPoint : particleSystemComponent.ColorPoints)
+			{
+				out << YAML::BeginMap; // Color Point
+				out << YAML::Key << "Point" << YAML::Value << colorPoint.point;
+				out << YAML::Key << "Color" << YAML::Value << colorPoint.color;
+				out << YAML::EndMap; // Color Point
+			}
+			out << YAML::EndSeq;
+
+			out << YAML::Key << "SizeBegin" << YAML::Value << particleSystemComponent.SizeBegin;
+			out << YAML::Key << "SizeEnd" << YAML::Value << particleSystemComponent.SizeEnd;
+			out << YAML::Key << "SizeVariation" << YAML::Value << particleSystemComponent.SizeVariation;
+			out << YAML::Key << "LifeTime" << YAML::Value << particleSystemComponent.LifeTime;
+			out << YAML::Key << "EmissionNumber" << YAML::Value << particleSystemComponent.EmissionNumber;
+			out << YAML::Key << "Active" << YAML::Value << particleSystemComponent.Active;
+			out << YAML::Key << "FaceCamera" << YAML::Value << particleSystemComponent.FaceCamera;
+
+			out << YAML::EndMap; // ParticleSystemComponent
+		}
+
 		out << YAML::EndMap; // Entity
 	}
 
@@ -239,6 +274,33 @@ namespace Dymatic {
 				{
 					auto& src = deserializedEntity.AddComponent<SpriteRendererComponent>();
 					src.Color = spriteRendererComponent["Color"].as<glm::vec4>();
+				}
+
+				auto particleSystemComponent = entity["ParticleSystemComponent"];
+				if (particleSystemComponent)
+				{
+					auto& ps = deserializedEntity.AddComponent<ParticleSystem>();
+
+					ps.Offset = particleSystemComponent["Offset"].as<glm::vec3>();
+					ps.Velocity = particleSystemComponent["Velocity"].as<glm::vec3>();
+					ps.VelocityVariation = particleSystemComponent["VelocityVariation"].as<glm::vec3>();
+					ps.Gravity = particleSystemComponent["Gravity"].as<glm::vec3>();
+					ps.ColorMethod = particleSystemComponent["ColorMethod"].as<int>();
+					ps.ColorBegin = particleSystemComponent["ColorBegin"].as<glm::vec4>();
+					ps.ColorEnd = particleSystemComponent["ColorEnd"].as<glm::vec4>();
+					ps.ColorConstant = particleSystemComponent["ColorConstant"].as<glm::vec4>();
+					auto colorPoints = particleSystemComponent["ColorPoints"];
+					for (auto colorPoint : colorPoints)
+					{
+						ps.ColorPoints.push_back({ ps.GetNextColorPointId(), colorPoint["Point"].as<float>(), colorPoint["Color"].as<glm::vec4>() });
+					}
+					ps.SizeBegin = particleSystemComponent["SizeBegin"].as<float>();
+					ps.SizeEnd = particleSystemComponent["SizeEnd"].as<float>();
+					ps.SizeVariation = particleSystemComponent["SizeVariation"].as<float>();
+					ps.LifeTime = particleSystemComponent["LifeTime"].as<float>();
+					ps.EmissionNumber = particleSystemComponent["EmissionNumber"].as<int>();
+					ps.Active = particleSystemComponent["Active"].as<bool>();
+					ps.FaceCamera = particleSystemComponent["FaceCamera"].as<bool>();
 				}
 			}
 		}

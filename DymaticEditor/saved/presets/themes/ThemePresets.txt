@@ -1,0 +1,8 @@
+Add custom presets here:
+You may use relative or full paths, in the format "Preset_Name - Preset_Path"
+
+//Default Presets:
+<Dymatic Dark> {saved/presets/themes/DymaticDark.dytheme}
+<Dymatic Light> {saved/presets/themes/DymaticLight.dytheme}
+<Sunset Gold> {saved/presets/themes/SunsetGold.dytheme}
+<Ocean Blue> {saved/presets/themes/OceanBlue.dytheme}

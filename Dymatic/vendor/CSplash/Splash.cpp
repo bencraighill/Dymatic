@@ -172,6 +172,7 @@ int CSplash::DoLoop()
     //  =======================================================================
     //  Show the window
     //  =======================================================================
+
     if(!m_hwnd)
         ShowSplash();
 
@@ -275,4 +276,19 @@ bool CSplash::MakeTransparent()
         g_pSetLayeredWindowAttributes(m_hwnd, m_colTrans, 0, LWA_COLORKEY);
     }    
     return TRUE;
+}
+
+void CSplash::DrawLoadText(LPCWSTR text, RECT rect, int fontSize)
+{
+	HDC hDC = GetDC(m_hwnd);
+	HBITMAP hBmpOld = (HBITMAP)SelectObject(hDC, m_hBitmap);
+	HFONT NewFont = CreateFont(fontSize, 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, 0, DEFAULT_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"Arial");
+	HBRUSH NewBrush = CreateSolidBrush(RGB(255, 0, 0));
+	SelectObject(hDC, NewFont);
+	SelectObject(hDC, NewBrush);
+	DrawText(hDC, text, 25, &rect, DT_LEFT | DT_WORDBREAK);
+	DeleteObject(NewBrush);
+	DeleteObject(NewFont);
+	SelectObject(hDC, hBmpOld);
+	ReleaseDC(m_hwnd, hDC);
 }

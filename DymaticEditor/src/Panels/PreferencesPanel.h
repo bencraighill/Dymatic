@@ -3,10 +3,24 @@
 #include "Dymatic.h"
 #include "Dymatic/Core/Base.h"
 #include "../Preferences.h"
-#include "Dymatic/Utils/PlatformUtils.h"
 #include "PopupsAndNotifications.h"
 
 namespace Dymatic {
+
+	enum PreferencesCategory
+	{
+		Interface,
+		Themes,
+		Viewport,
+		Editing,
+		Input,
+		Navigation,
+		Keymap,
+		Plugins,
+		System,
+		SaveLoad,
+		FilePaths
+	};
 
 	class PreferencesPannel
 	{
@@ -43,16 +57,18 @@ namespace Dymatic {
 		std::string DrawRoundedButtonStack(std::vector<std::string> buttonIds);
 		Preferences& GetPreferences() { return m_Preferences; }
 
-		void SetShowWindow(bool showWindow) { m_ShowWindow = showWindow; }
+		bool& GetPreferencesPanelVisible() { return m_PreferencesPanelVisible; }
 		void SetRecentDythemePath(std::string filepath) { m_RecentThemePath = filepath; }
 
 		void SetFileColorsFromString(std::string colorString);
 
 		PopupData m_PreferencesMessage;
 		std::string ToLower(std::string inString);
+
+		void LoadPresetLayout();
 	private:
 		Preferences m_Preferences;
-		bool m_ShowWindow = false;
+		bool m_PreferencesPanelVisible = false;
 
 		std::string KeyBindSearchBar;
 		bool SearchByNameKey = true;
@@ -66,10 +82,16 @@ namespace Dymatic {
 		float variation1 = 0.0f;
 		float variation2 = 0.0f;
 
-		std::string m_CurrentCatagory = "Input";
+		PreferencesCategory m_CurrentCategory = Input;
 
 		//Icons
 		Ref<Texture2D> m_IconMoreOptions = Texture2D::Create("assets/icons/SystemIcons/MoreOptionsIcon.png");
+
+		std::vector<std::string> m_SelectableThemeNames;
+		std::vector<std::string> m_SelectableThemePaths;
+
+		std::vector<std::string> m_SelectableKeybindNames;
+		std::vector<std::string> m_SelectableKeybindPaths;
 	};
 
 }

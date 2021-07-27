@@ -84,6 +84,8 @@ public:
 
 	HWND m_hwnd;
 
+	void DrawLoadText(LPCWSTR text, RECT rect, int fontSize);
+
 private:
 	void Init();
 	void  OnPaint(HWND hwnd);

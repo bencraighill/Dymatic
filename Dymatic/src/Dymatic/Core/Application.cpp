@@ -15,12 +15,12 @@ namespace Dymatic {
 
 	Application* Application::s_Instance = nullptr;
 
-	CSplash splash1(TEXT("splash.bmp"), RGB(128, 128, 128));
+	CSplash splash1(TEXT("splash.bmp"), RGB(255, 0, 0));
 
-	Application::Application(const std::string& name)
+	Application::Application(const std::string& name, ApplicationCommandLineArgs args)
+		: m_CommandLineArgs(args)
 	{
 		DY_PROFILE_FUNCTION();
-
 		splash1.ShowSplash();
 
 		DY_CORE_ASSERT(!s_Instance, "Application already exists!");
@@ -114,25 +114,12 @@ namespace Dymatic {
 			
 
 			m_Window->OnUpdate();
-
-			if (m_CloseWindowCallback >= 2)
-				m_CloseWindowCallback = 0;
-
-			if (m_CloseWindowCallback == 1)
-				m_CloseWindowCallback = 2;
-
 		}
 	}
 
 	bool Application::OnWindowClose(WindowCloseEvent& e)
 	{
-		if (m_CloseCallbackEnabled)
-		{
-			m_CloseWindowCallback = 1;
-		}
-		else {
-			m_Running = false;
-		}
+		m_Running = false;
 		return true;
 	}
 

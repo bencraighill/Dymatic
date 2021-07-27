@@ -54,6 +54,20 @@ namespace Dymatic {
 		else if (theme == FileIcon) { return "File Icon"; }
 		else if (theme == FileHovered) { return "File Hovered"; }
 		else if (theme == FileSelected) { return "File Selected"; }
+		else if (theme == TextEditorDefault) { return "Default"; }
+		else if (theme == TextEditorKeyword) { return "Keyword"; }
+		else if (theme == TextEditorNumber) { return "Number"; }
+		else if (theme == TextEditorString) { return "String"; }
+		else if (theme == TextEditorCharLiteral) { return "Character Literal"; }
+		else if (theme == TextEditorPunctuation) { return "Punctuation"; }
+		else if (theme == TextEditorPreprocessor) { return "Preprocessor"; }
+		else if (theme == TextEditorIdentifier) { return "Identifier"; }
+		else if (theme == TextEditorComment) { return "Comment"; }
+		else if (theme == TextEditorMultiLineComment) { return "Multiline Comment"; }
+		else if (theme == TextEditorLineNumber) { return "Line Number"; }
+		else if (theme == TextEditorCurrentLineFill) { return "Current Line Fill"; }
+		else if (theme == TextEditorCurrentLineFillInactive) { return "Current Line Fill Inactive"; }
+		else if (theme == TextEditorCurrentLineEdge) { return "Current Line Edge"; }
 		else if (theme == CheckMark) { return "Check Mark"; }
 		else if (theme == Checkbox) { return "Checkbox"; }
 		else if (theme == CheckboxHovered) { return "Checkbox Hovered"; }
@@ -127,6 +141,20 @@ namespace Dymatic {
 		else if (string == "File Icon") { return FileIcon; }
 		else if (string == "File Hovered") { return FileHovered; }
 		else if (string == "File Selected") { return FileSelected; }
+		else if (string == "Default") { return TextEditorDefault; }
+		else if (string == "Keyword") { return TextEditorKeyword; }
+		else if (string == "Number") { return TextEditorNumber; }
+		else if (string == "String") { return TextEditorString; }
+		else if (string == "Character Literal") { return TextEditorCharLiteral; }
+		else if (string == "Punctuation") { return TextEditorPunctuation; }
+		else if (string == "Preprocessor") { return TextEditorPreprocessor; }
+		else if (string == "Identifier") { return TextEditorIdentifier; }
+		else if (string == "Comment") { return TextEditorComment; }
+		else if (string == "Multiline Comment") { return TextEditorMultiLineComment; }
+		else if (string == "Line Number") { return TextEditorLineNumber; }
+		else if (string == "Current Line Fill") { return TextEditorCurrentLineFill; }
+		else if (string == "Current Line Fill Inactive") { return TextEditorCurrentLineFillInactive; }
+		else if (string == "Current Line Edge") { return TextEditorCurrentLineEdge; }
 		else if (string == "Check Mark") { return CheckMark; }
 		else if (string == "Checkbox") { return Checkbox; }
 		else if (string == "Checkbox Hovered") { return CheckboxHovered; }
