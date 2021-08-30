@@ -56,6 +56,7 @@ namespace Dymatic {
 		else if (theme == FileSelected) { return "File Selected"; }
 		else if (theme == TextEditorDefault) { return "Default"; }
 		else if (theme == TextEditorKeyword) { return "Keyword"; }
+		else if (theme == TextEditorSpecialKeyword) { return "Special Keyword"; }
 		else if (theme == TextEditorNumber) { return "Number"; }
 		else if (theme == TextEditorString) { return "String"; }
 		else if (theme == TextEditorCharLiteral) { return "Character Literal"; }
@@ -143,6 +144,7 @@ namespace Dymatic {
 		else if (string == "File Selected") { return FileSelected; }
 		else if (string == "Default") { return TextEditorDefault; }
 		else if (string == "Keyword") { return TextEditorKeyword; }
+		else if (string == "Special Keyword") { return TextEditorSpecialKeyword; }
 		else if (string == "Number") { return TextEditorNumber; }
 		else if (string == "String") { return TextEditorString; }
 		else if (string == "Character Literal") { return TextEditorCharLiteral; }

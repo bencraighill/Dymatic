@@ -69,6 +69,8 @@ public:
 	//  Arg    Either the file path or the handle to an already loaded bitmap
 	//  =======================================================================
 	DWORD SetBitmap(LPCTSTR lpszFileName);
+	//Custom Code To Reload
+	void ReloadBitmap();
 	DWORD SetBitmap(HBITMAP hBitmap);
 
 	//  =======================================================================
@@ -84,7 +86,7 @@ public:
 
 	HWND m_hwnd;
 
-	void DrawLoadText(LPCWSTR text, RECT rect, int fontSize);
+	void DrawLoadText(std::string text, RECT rect, int fontSize, LPCTSTR font = L"Arial");
 
 private:
 	void Init();

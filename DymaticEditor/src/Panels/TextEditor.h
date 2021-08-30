@@ -157,7 +157,8 @@ namespace TextEditorInternal {
 			typedef bool(*TokenizeCallback)(const char* in_begin, const char* in_end, const char*& out_begin, const char*& out_end, ImGuiCol_& paletteIndex);
 
 			std::string mName;
-			Keywords mKeywords;
+			Identifiers mKeywords;
+			Identifiers mSpecialKeywords;
 			Keywords mNamespace;
 			Identifiers mIdentifiers;
 			Identifiers mPreprocIdentifiers;
@@ -197,7 +198,7 @@ namespace TextEditorInternal {
 		std::unordered_set<int> GetBreakpoints() { return mBreakpoints; }
 		void SetHighlightLines(const std::map<int, ImVec4>& highlight_lines) { mHighlightLines = highlight_lines; }
 
-		void Render(const char* aTitle, const ImVec2& aSize = ImVec2(), bool aBorder = false);
+		void Render(const char* aTitle, float aFontSize = 0.0f, const ImVec2& aSize = ImVec2(), bool aBorder = false);
 		void SetText(const std::string& aText);
 		std::string GetText() const;
 
@@ -232,6 +233,8 @@ namespace TextEditorInternal {
 
 		inline void SetShowWhitespaces(bool aValue) { mShowWhitespaces = aValue; }
 		inline bool IsShowingWhitespaces() const { return mShowWhitespaces; }
+
+		inline void SetZoom(float* aZoom) { mZoom = aZoom; }
 
 		void SetTabSize(int aValue);
 		inline int GetTabSize() const { return mTabSize; }
@@ -389,6 +392,8 @@ namespace TextEditorInternal {
 		uint64_t mStartTime;
 
 		float mLastClick;
+		
+		float* mZoom;
 	};
 }
 
@@ -414,6 +419,9 @@ namespace Dymatic {
 	public:
 		TextEditorPannel();
 		void OnImGuiRender();
+
+		void OnEvent(Event& e);
+		bool OnMouseScrolled(MouseScrolledEvent& e);
 
 		void Duplicate() { if (m_SelectedEditor != NULL && m_TextEditorVisible) { if (!m_SelectedEditor->textEditor.IsReadOnly()) { m_SelectedEditor->textEditor.Duplicate(); } } }
 		void SwapLineUp() { if (m_SelectedEditor != NULL && m_TextEditorVisible) { if (!m_SelectedEditor->textEditor.IsReadOnly()) { m_SelectedEditor->textEditor.SwapLineUp(); } } }
@@ -444,5 +452,8 @@ namespace Dymatic {
 		unsigned int nextID = 0;
 		bool m_ShowWhitespaces = true;
 		int m_CloseToRightIndex = -1;
+		int m_CloseOtherIndex = -1;
+		bool m_CloseAll = false;
+		float m_Zoom = 0.25f;
 	};
 }

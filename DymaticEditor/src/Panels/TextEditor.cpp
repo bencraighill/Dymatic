@@ -1,6 +1,5 @@
 #include "TextEditor.h"
 
-
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include <imgui/imgui.h>
 #include <imgui/imgui_internal.h>
@@ -865,6 +864,7 @@ void TextEditor::HandleKeyboardInputs()
 			Delete();
 		else if (!IsReadOnly() && !ctrl && !alt && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Backspace)))
 			Backspace();
+		else if (!IsReadOnly() && ctrl && !alt && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Backspace))) { MoveLeft(1, true, true); Backspace(); MoveLeft(0, false, false); }
 		else if (!ctrl && !shift && !alt && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Insert)))
 			mOverwrite ^= true;
 		else if (ctrl && !shift && !alt && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Insert)))
@@ -989,6 +989,10 @@ void TextEditor::HandleMouseInputs()
 	}
 }
 
+static ImFont* ReleasedFont = nullptr;
+static void ReleaseCurrentFont() { if (ReleasedFont == nullptr) { ReleasedFont = ImGui::GetFont(); ImGui::PopFont(); } }
+static void ReturnCurrentFont() { if (ReleasedFont != nullptr) { ImGui::PushFont(ReleasedFont); ReleasedFont = nullptr; } }
+
 void TextEditor::Render()
 {
 	/* Compute mCharAdvance regarding to scaled font size (Ctrl + mouse wheel)*/
@@ -1023,8 +1027,8 @@ void TextEditor::Render()
 	auto globalLineMax = (int)mLines.size();
 	auto lineMax = std::max(0, std::min((int)mLines.size() - 1, lineNo + (int)floor((scrollY + contentSize.y) / mCharAdvance.y)));
 
-	int breakpoint_width = 10;
-	int breakpoint_pad = 2;
+	float breakpoint_width = /*10*/ 40.0f * *mZoom;
+	float breakpoint_pad = /*2*/ 8.0f * *mZoom;
 
 	// Deduce mTextStart by evaluating mLines size (global lineMax) plus two spaces as text width
 	char buf[16];
@@ -1090,6 +1094,7 @@ void TextEditor::Render()
 
 				if (ImGui::IsMouseHoveringRect(lineStartScreenPos, end))
 				{
+					ReleaseCurrentFont();
 					ImGui::BeginTooltip();
 					ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.2f, 0.2f, 1.0f));
 					ImGui::Text("Error at line %d:", errorIt->first);
@@ -1099,6 +1104,7 @@ void TextEditor::Render()
 					ImGui::Text("%s", errorIt->second.c_str());
 					ImGui::PopStyleColor();
 					ImGui::EndTooltip();
+					ReturnCurrentFont();
 				}
 			}
 
@@ -1106,7 +1112,8 @@ void TextEditor::Render()
 			snprintf(buf, 16, "%d", lineNo + 1);
 
 			auto lineNoWidth = ImGui::GetFont()->CalcTextSizeA(ImGui::GetFontSize(), FLT_MAX, -1.0f, buf, nullptr, nullptr).x;
-			drawList->AddText(ImVec2(lineStartScreenPos.x + mTextStart - lineNoWidth - breakpoint_width - breakpoint_pad, lineStartScreenPos.y), ImGui::ColorConvertFloat4ToU32(ImGui::GetStyleColorVec4(ImGuiCol_TextEditorLineNumber)), buf);
+			//drawList->AddText(ImVec2(lineStartScreenPos.x + mTextStart - lineNoWidth - breakpoint_width - breakpoint_pad, lineStartScreenPos.y), ImGui::ColorConvertFloat4ToU32(ImGui::GetStyleColorVec4(ImGuiCol_TextEditorLineNumber)), buf);
+			drawList->AddText(ImVec2(lineStartScreenPos.x + mTextStart - lineNoWidth - breakpoint_width / 2.0f, lineStartScreenPos.y), ImGui::ColorConvertFloat4ToU32(ImGui::GetStyleColorVec4(ImGuiCol_TextEditorLineNumber)), buf);
 
 			if (mBreakpoints.find(lineNo + 1) != mBreakpoints.end())
 			{
@@ -1118,9 +1125,11 @@ void TextEditor::Render()
 				// {ORIGINAL} ImGui::IsMouseHoveringRect(ImVec2(lineStartScreenPos.x + mTextStart - breakpoint_width - breakpoint_pad - 4, lineStartScreenPos.y), ImVec2(lineStartScreenPos.x + mTextStart, lineStartScreenPos.y + ImGui::CalcTextSize(" ").y)))
 				ImGui::IsMouseHoveringRect(ImVec2(ImGui::GetWindowPos().x + breakpoint_pad, lineStartScreenPos.y), ImVec2(ImGui::GetWindowPos().x + breakpoint_width + breakpoint_pad, lineStartScreenPos.y + breakpoint_width + ImGui::GetTextLineHeightWithSpacing() / 5)))
 			{
+				ReleaseCurrentFont();
 				ImGui::BeginTooltip();
 				ImGui::TextUnformatted("Toggle Breakpoint");
 				ImGui::EndTooltip();
+				ReturnCurrentFont();
 
 				if (ImGui::IsMouseClicked(0))
 				{
@@ -1259,8 +1268,16 @@ void TextEditor::Render()
 		{
 			float x_origin = ImGui::GetCursorScreenPos().x;
 			auto id = GetWordAt(ScreenPosToCoordinates(ImGui::GetMousePos()));
-			if (!id.empty() && ImGui::IsWindowHovered() && ImGui::GetMousePos().x >= x_origin + mTextStart)
+
+			static auto prevId = id;
+			static float hovertime = 0.0f;
+			if (id == prevId) hovertime += 1.0f / ImGui::GetIO().Framerate;
+			else hovertime = 0.0f;
+			prevId = id;
+
+			if (!id.empty() && ImGui::IsWindowHovered() && ImGui::GetMousePos().x >= x_origin + mTextStart && hovertime > 0.5f)
 			{
+				ReleaseCurrentFont();
 				auto it = mLanguageDefinition.mIdentifiers.find(id);
 				if (it != mLanguageDefinition.mIdentifiers.end())
 				{
@@ -1272,14 +1289,43 @@ void TextEditor::Render()
 				}
 				else
 				{
-					auto pi = mLanguageDefinition.mPreprocIdentifiers.find(id);
-					if (pi != mLanguageDefinition.mPreprocIdentifiers.end())
+					// Custom Code for Keywords
+					auto it = mLanguageDefinition.mKeywords.find(id);
+					if (it != mLanguageDefinition.mKeywords.end())
 					{
 						ImGui::BeginTooltip();
-						ImGui::TextUnformatted(pi->second.mDeclaration.c_str());
+						ImGui::PushTextWrapPos(400);
+						ImGui::TextUnformatted(it->second.mDeclaration.c_str());
+						ImGui::PopTextWrapPos();
 						ImGui::EndTooltip();
 					}
+					//End Custom Code
+					else
+					{
+						auto it = mLanguageDefinition.mSpecialKeywords.find(id);
+						if (it != mLanguageDefinition.mSpecialKeywords.end())
+						{
+							ImGui::BeginTooltip();
+							ImGui::PushTextWrapPos(400);
+							ImGui::TextUnformatted(it->second.mDeclaration.c_str());
+							ImGui::PopTextWrapPos();
+							ImGui::EndTooltip();
+						}
+						else
+						{
+							auto pi = mLanguageDefinition.mPreprocIdentifiers.find(id);
+							if (pi != mLanguageDefinition.mPreprocIdentifiers.end())
+							{
+								ImGui::BeginTooltip();
+								ImGui::PushTextWrapPos(400);
+								ImGui::TextUnformatted(pi->second.mDeclaration.c_str());
+								ImGui::PopTextWrapPos();
+								ImGui::EndTooltip();
+							}
+						}
+					}
 				}
+				ReturnCurrentFont();
 			}
 		}
 	}
@@ -1317,7 +1363,7 @@ void TextEditor::Render()
 	}
 }
 
-void TextEditor::Render(const char* aTitle, const ImVec2& aSize, bool aBorder)
+void TextEditor::Render(const char* aTitle, float aFontSize, const ImVec2& aSize, bool aBorder)
 {
 	mWithinRender = true;
 	mTextChanged = false;
@@ -1326,6 +1372,8 @@ void TextEditor::Render(const char* aTitle, const ImVec2& aSize, bool aBorder)
 	ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
 	if (!mIgnoreImGuiChild)
 		ImGui::BeginChild(aTitle, aSize, aBorder, ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoNav);
+
+	ImGui::SetWindowFontScale(aFontSize);
 
 	if (mHandleKeyboardInputs)
 	{
@@ -1535,6 +1583,10 @@ void TextEditor::EnterCharacter(ImWchar aChar, bool aShift)
 		line.erase(line.begin() + cindex, line.begin() + line.size());
 		SetCursorPosition(Coordinates(coord.mLine + 1, GetCharacterColumn(coord.mLine + 1, (int)whitespaceSize)));
 		u.mAdded = (char)aChar;
+
+		if (mLanguageDefinition.mAutoIndentation && !line.empty())
+			if (line[line.size() - 1].mChar == '{')
+				EnterCharacter('\t', false);
 	}
 	else
 	{
@@ -2459,6 +2511,8 @@ void TextEditor::ColorizeRange(int aFromLine, int aToLine)
 					{
 						if (mLanguageDefinition.mKeywords.count(id) != 0)
 							token_color = ImGuiCol_TextEditorKeyword;
+						if (mLanguageDefinition.mSpecialKeywords.count(id) != 0)
+							token_color = ImGuiCol_TextEditorSpecialKeyword;
 						else if (mLanguageDefinition.mIdentifiers.count(id) != 0)
 							token_color = ImGuiCol_TextEditorIdentifier; //Was Known Identifier
 						else if (mLanguageDefinition.mPreprocIdentifiers.count(id) != 0)
@@ -2996,26 +3050,249 @@ const TextEditor::LanguageDefinition& TextEditor::LanguageDefinition::CPlusPlus(
 	if (!inited)
 	{
 		static const char* const cppKeywords[] = {
-			"alignas", "alignof", "and", "and_eq", "asm", "atomic_cancel", "atomic_commit", "atomic_noexcept", "auto", "bitand", "bitor", "bool", "break", "case", "catch", "char", "char16_t", "char32_t", "class",
-			"compl", "concept", "const", "constexpr", "const_cast", "continue", "decltype", "default", "delete", "do", "double", "dynamic_cast", "else", "enum", "explicit", "export", "extern", "false", "float",
-			"for", "friend", "goto", "if", "import", "inline", "int", "long", "module", "mutable", "namespace", "new", "noexcept", "not", "not_eq", "nullptr", "operator", "or", "or_eq", "private", "protected", "public",
-			"register", "reinterpret_cast", "requires", "return", "short", "signed", "sizeof", "static", "static_assert", "static_cast", "struct", "switch", "synchronized", "template", "this", "thread_local",
-			"throw", "true", "try", "typedef", "typeid", "typename", "union", "unsigned", "using", "virtual", "void", "volatile", "wchar_t", "while", "xor", "xor_eq"
+			"alignas", "alignof", "and", "and_eq", "asm", "atomic_cancel", "atomic_commit", "atomic_noexcept", "auto", "bitand", "bitor", "bool", "char", "char8_t", "char16_t", "char32_t", "class",
+			"compl", "concept", "const", "constexpr", "const_cast", "decltype", "delete", "double", "dynamic_cast", "enum", "explicit", "export", "extern", "false", "float",
+			"friend", "import", "inline", "int", "long", "module", "mutable", "namespace", "new", "noexcept", "not", "not_eq", "nullptr", "operator", "or", "or_eq", "private", "protected", "public",
+			"register", "reinterpret_cast", "requires", "short", "signed", "sizeof", "static", "static_assert", "static_cast", "struct", "synchronized", "template", "this", "thread_local",
+			"true", "typedef", "typeid", "typename", "union", "unsigned", "using", "virtual", "void", "volatile", "wchar_t", "xor", "xor_eq"
 		};
-		for (auto& k : cppKeywords)
-			langDef.mKeywords.insert(k);
-
-		static const char* const identifiers[] = {
-			"abort", "abs", "acos", "asin", "atan", "atexit", "atof", "atoi", "atol", "ceil", "clock", "cosh", "ctime", "div", "exit", "fabs", "floor", "fmod", "getchar", "getenv", "isalnum", "isalpha", "isdigit", "isgraph",
-			"ispunct", "isspace", "isupper", "kbhit", "log10", "log2", "log", "memcmp", "modf", "pow", "printf", "sprintf", "snprintf", "putchar", "putenv", "puts", "rand", "remove", "rename", "sinh", "sqrt", "srand", "strcat", "strcmp", "strerror", "time", "tolower", "toupper",
-			"std", "string", "vector", "map", "unordered_map", "set", "unordered_set", "min", "max"
+		static const char* const cppKeywordsDeclarations[] = {
+			/*alignas*/ "Specifies custom alignment of variables and user defined types.",
+			/*alignof*/ "Returns the alignment, in bytes if the specified type.",
+			/*and*/ "Logical AND operator returns [true] if both operands are [true] and returns [false] otherwise.\nAlternative operator for [&&].",
+			/*and_eq*/ "Performs a Bitwise AND operation [&] and stores the result in the left operand.\nAlternative operator for [&=].",
+			/*asm*/ "Embeds assembly language source code within a C++ program.",
+			/*atomic_cancel*/ "Cancel transaction",
+			/*atomic_commit*/ "Commit transaction.",
+			/*atomic_noexcept*/ "Begin transaction",
+			/*auto*/ "The auto keyword is a simple way to declare a variable that has a complicated type.\nThe data type is deduced automatically by the compiler.",
+			/*bitand*/ "Bitwise AND. Returns 1 only if both bits are 1.\nAlternative operator for [&].",
+			/*bitor*/ "Bitwise OR. Returns 1 if either of the bits is 1 and returns 0 if both the bits are 0 or 1.\nAlternative operator for [|].",
+			/*bool*/ "Boolean data type. Use in declaration of data type. Conditional expressions take a bool value.\nValue can be [true] or [false].",
+			/*char*/ "Used to store characters from the ASCII character set. Char is an 8-bit type.\nAn unsigned char is often used to represent a byte, which is not a built in data type.",
+			/*char8_t*/ "8-bit wide unicode character.",
+			/*char16_t*/ "16-bit wide unicode character.",
+			/*char32_t*/ "32-bit wide unicode character.",
+			/*class*/ "The class keyword declares a class type or defines an object of a class type.\nIt has a 'tag', or the type name given to the class, becoming a data type.\nThe 'base list' declares the classes or structures this class derives from.\nIncludes a 'member list' which  can be marked as [public], [private], or [protected].\n[private] by default.",
+			/*compl*/ "Bitwise NOT, or complement. Changes each bit to its opposite, 0 becomes 1, and 1 becomes 0.\nAlternative operator for [~]",
+			/*concept*/ "A concept is a named set associated with a constraint, which specifies the requirements on template arguments, selecting the most appropriate overload.",
+			/*const*/ "The const keyword specifies to the compiler that the object or variable is not modifiable.\nDeclaring a const member function means that it is 'read only'.",
+			/*constexpr*/ "A constant expression. Unlike const, constexpr can also be applied to functions and class constructors. Where possible, computed at compile time.",
+			/*const_cast*/ "Removes the const, volatile and __unaligned attribute(s) from a class.",
+			/*decltype*/ "The decltype type specifier yields the type of a specified expression.\nOften used with the [auto] keyword to declare a template function with return type depending on arguments.",
+			/*delete*/ "Deallocates a block of memory.\nUse delete[] before a pointer to free an array.",
+			/*double*/ "Floating-point number.\n15 - 16 significant digits. 8 bytes.",
+			/*dynamic_cast*/ "Converts the operand expression to an object of type type-id.",
+			/*enum*/ "An enumeration is a user defined data type. Used to assign names to integral constants.\nBy default, underlying type is [int], but signed and unsigned forms of [short], [long], [__int32], [__int64], or [char] can be used.",
+			/*explicit*/ "The explicit keyword is used to mark constructors to not implicitly convert types.",
+			/*export*/ "Used to mark a template definition exported, which allows for the same template to be declared but not defined, in other translational units.",
+			/*extern*/ "Specifies that the symbol has external linkage. Linker looks for the definition in another translation unit.",
+			/*false*/ "Boolean literal.",
+			/*float*/ "Floating-point number.\n6 - 7 significant digits. 4 bytes.",
+			/*friend*/ "Grants member level access to functions that are not members of a class, or to all members in a separate class.",
+			/*import*/ "Imports a module unit / module partition / header unit.",
+			/*inline*/ "Inline is used to specify a function defined in the body of a class declaration.",
+			/*int*/ "Integer data type. Can be signed or unsigned.",
+			/*long*/ "Long type modifier. Used for long integers.",
+			/*module*/ "Declaration placed at the beginning of a module implementation file to specify that the file contents belongs to the named module.",
+			/*mutable*/ "Allows for a value to be assigned to this data member from a [const] member function.\nOnly applies to non-static and non-const data members of a class.",
+			/*namespace*/ "A namespace is a declarative region that provides a scope to the identifiers inside it.\nUsed to organize code into logical groups and prevent name collisions occurring.",
+			/*new*/ "Allocates memory for an object or array of objects from the free store and returns a suitably typed, nonzero pointer to the object.",
+			/*noexcept*/ "Specifies weather a function might throw exceptions. Takes in a constant expression.",
+			/*not*/ "Logical NOT operator reverses meaning of its operand. Returns [true] if operand is [false] and returns [false] if operand is [true].\nAlternative operator for [!].",
+			/*not_eq*/ "Returns a [bool] value. If both operands are not equal returns [true], otherwise returns [false].\nAlternative operator for [!=].",
+			/*nullptr*/ "A null pointer constant.\nUsed to indicate that an object handle, interior pointer or native pointer doesn't point to an object.",
+			/*operator*/ "Declares a function specifying what an 'operator symbol' means when applied to instances of a class.\nOverloads are differentiated based on the types of operands.",
+			/*or*/ "Logical OR operator returns [true] if either or both operands are [true], otherwise returns [false]\\nAlternative operator for [||].",
+			/*or_eq*/ "Performs a Bitwise OR operation [|] and stores the result in the left operand.\nAlternative operator for [|=].",
+			/*private*/ "Access specifier keyword.\nWhen preceding a list of class members, indicates those members are only accessible from other members or friends of the class.",
+			/*protected*/ "Access specifier keyword.\nSpecifies that protected class members can only be used by member functions that original declared them, friends of the class that originally declared them, classes derived with public or protected access from the class that originally declared these members or direct privately derives classes that also have private access to protected members.",
+			/*public*/ "Access specifier keyword.\nWhen preceding a list of class members, indicates those members are accessible from any function.",
+			/*register*/ "Register variables are stored in a register of the processor, rather than memory, making them faster to access compared to the [auto] keyword.",
+			/*reinterpret_cast*/ "Allows any pointer to be converted into any other pointer type.\nAlso allows any integral type to be converted into any pointer type and vice versa.",
+			/*requires*/ "Specifies a constant expression on template parameters that evaluate a requirement.",
+			/*short*/ "Short type modifier. Used for small integers.",
+			/*signed*/ "Signed type modifier.",
+			/*sizeof*/ "Returns a [size_t] in number of bytes. Operand can be a type name, or an expression.",
+			/*static*/ "Has a global lifetime, but is only visible within the block in which it was declared. Stored on the heap.",
+			/*static_assert*/ "Tests assertion at compile time. If expression is [false], compiler displays specifies message if one is provided.",
+			/*static_cast*/ "Converts an expression to the type of type-id based on the types that are present in the expression.", 
+			/*struct*/ "The struct keyword declares a structure type or defines an object of a structure type.\nIt has a 'tag', or the type name given to the class, becoming a data type.\nThe 'base list' declares the classes or structures this class derives from.\nIncludes a 'member list' which  can be marked as [public], [private], or [protected].\n[public] by default.", 
+			/*synchronized*/ "Executes the compound statement as if under a global lock. The end of each synchronized block synchronizes with the beginning of the next synchronized block in that order.",
+			/*template*/ "A construct that generates an ordinary type or function at compile time based on the arguments the user supplies for the template parameters.",
+			/*this*/ "Points to the object for which the member function is called.\nOnly accessible within non static member functions of a class, struct or union.",
+			/*thread_local*/ "Declares that a variable is only accessible on the thread on which it was created. Each thread will have its own copy of the variable",
+			/*true*/ "Boolean literal.",
+			/*typedef*/ "A typedef declaration introduces a name that, with its scope, becomes a synonym for the type given by the type-declaration portion of the declaration.",
+			/*typeid*/ "The typeid operator allows the type of an object to be determined at run time.",
+			/*typename*/ "Used in template definitions, provides a hint to the compiler that an unknown identifier is a type.",
+			/*union*/ "A union is a user-defined type in which all members share the same memory location. A union can contain no more than one object from its list of members. Only enough memory for its largest member. Includes a 'tag', or the type name given, and a 'member list'.",
+			/*unsigned*/ "Unsigned type modifier.",
+			/*using*/ "The using declaration introduces a name into the declarative region in which the using declaration appears.",
+			/*virtual*/ "Declares a virtual function or a virtual base class.",
+			/*void*/ "When used as a function type, specifies that function has no return value. When used in a parameter list, specifies it takes no parameters. When used in the declaration of a pointer, specifies that pointer is 'universal'.",
+			/*volatile*/ "A type qualifier that can be used to declare that an object can be modified in the program by the hardware.",
+			/*wchar_t*/ "The wchar_t type is used to represent a 16 - bit wide character used to store Unicode encoded characters.",
+			/*xor*/ "Bitwise Exclusive OR. If the bit in one operand is 0 and the other is 1, the corresponding bit is set to 1, otherwise the corresponding bit is set to 0.\nAlternative operator for [^].",
+			/*xor_eq*/ "Performs a Bitwise Exclusive OR operation [^] and stores the result in the left operand.\nAlternative operator for [^=]."
 		};
-		for (auto& k : identifiers)
+		//for (auto& k : cppKeywords)
+		//	langDef.mKeywords.insert(k);
+		for (int i = 0; i < sizeof(cppKeywords) / sizeof(cppKeywords[0]); i++)
 		{
 			Identifier id;
-			id.mDeclaration = "Built-in function";
-			langDef.mIdentifiers.insert(std::make_pair(std::string(k), id));
+			id.mDeclaration = cppKeywordsDeclarations[i];
+			langDef.mKeywords.insert(std::make_pair(std::string(cppKeywords[i]), id));
 		}
+
+		static const char* const cppSpecialKeywords[] = {
+			"break", "case", "catch", "continue", "default", "do", "else", "for", "goto", "if", "return", "switch", "throw", "try", "while"
+		};
+		static const char* const cppSpecialKeywordsDeclarations[] = {
+			/*break*/ "The break statement ends execution of the nearest enclosing loop or conditional statement in which it appears.\nControl is passed to the statement that follows the ended statement.\nBreak only ends the statement it is in, not nested structures.",
+			/*case*/ "A test for a possible value that is provided in a switch statement.\nData types include: [int], [char], [bool], [enum]",
+			/*catch*/ "One or more catch blocks can follow a [try] block when handling an exception. Each block specifies the type of exception it can handle.",
+			/*continue*/ "Continue forces transfer of control to the controlling expression of the smallest enclosing do, for or while loop. Any remaining statements in the current iteration are not executed.",
+			/*default*/ "A default label is an optional label in a switch statement body.\n May only appear once in the statement body.",
+			/*do*/ "Executes a statement repeatedly until the specified termination condition (the expression) evaluates to zero. Post loop condition check; therefore, the loop executes one or more times.",
+			/*else*/ "The else statement follows an [if] statement, and the branch it contains is only executed if the [if] statements condition fails.",
+			/*for*/ "Executes a statement repeatedly until the condition becomes false.\nContains an initial expression, condition expression and a loop expression.",
+			/*goto*/ "Unconditionally transfers control to the statement labeled by the specified identifier.",
+			/*if*/ "If condition evaluates to a non-zero (true) value, statement within branch is executed.\nIf condition succeeds next optional else is skipped.",
+			/*return*/ "Terminates the execution of a function and returns control to the calling function. An expression is returned with the same type as the function, aside from [void].",
+			/*switch*/ "Allows selection among multiple section of code depending on the value of an integral expression. The condition must have an integral type.\nThe body consists of multiple [case] labels and an optional [default] label. [Break] keyword must be used to end execution after [case].",
+			/*throw*/ "A throw expression signals that an exceptional condition - often, and error - has occurred in a [try] block. An object of any type can be used as the operand of a [throw] expression that typically is used to communicate information about the error.",
+			/*try*/ "A try block is used to enclose one or more statements that might throw an exception.",
+			/*while*/ "Executes statement repeatedly until expression evaluates to zero. Pre loop condition check; therefore, the loop executes zero or more times.",
+		};
+		for (int i = 0; i < sizeof(cppSpecialKeywords) / sizeof(cppSpecialKeywords[0]); i++)
+		{
+			Identifier id;
+			id.mDeclaration = cppSpecialKeywordsDeclarations[i];
+			langDef.mSpecialKeywords.insert(std::make_pair(std::string(cppSpecialKeywords[i]), id));
+		}
+
+		static const char* const identifiers[] = {
+			"abort", "abs", "acos", "asin", "atan", "atexit", "atof", "atoi", "atol", "atoll", "ceil", "clock", "cosh", "ctime", "div", "exit", "fabs", "floor", "fmod", "getchar", "getenv", "isalnum", "isalpha", "isdigit", "isgraph",
+			"ispunct", "isspace", "isupper", "kbhit", "log10", "log2", "log", "memcmp", "modf", "pow", "printf", "sprintf", "snprintf", "putchar", "putenv", "puts", "rand", "remove", "rename", "sinh", "sqrt", "srand", "strcat", "strcmp", "strerror", "time", "tolower", "toupper",
+			"std", "string", "wstring", "vector", "map", "unordered_map", "set", "unordered_set", "min", "max",
+			"Dymatic", "DY_CORE_TRACE", "DY_CORE_INFO", "DY_CORE_WARN", "DY_CORE_ERROR", "DY_CORE_CRITICAL", "DY_TRACE", "DY_INFO", "DY_WARN", "DY_ERROR", "DY_CRITICAL",
+			"glm", "ImGui"
+		};
+		static const char* const declarations[] = {
+			/*abort*/ "void abort();\n[[noreturn]] void abort() noexcept;\n\nCauses abnormal program termination.",
+			/*abs*/ "int abs( int n );\nlong abs( long n );\nlong long abs( long long n );\nstd::intmax_t abs( std::intmax_t n );\n\nComputes the absolute value of an integer number, if representable.",
+			/*acos*/ "float acos ( float arg );\ndouble acos ( double arg );\nlong double acos ( long double arg );\ndouble acos ( IntegralType arg );\n\nComputes the principal value of the arc cosine of arg.",
+			/*asin*/ "float asin ( float arg );\ndouble asin ( double arg );\nlong double asin ( long double arg );\ndouble asin ( IntegralType arg );\n\nComputes the principal value of the arc sine of arg.",
+			/*atan*/ "float atan ( float arg );\ndouble atan ( double arg );\nlong double atan ( long double arg );\ndouble atan ( IntegralType arg );\n\nComputes the principal value of the arc tangent of arg.",
+			/*atexit*/ "int atexit( /*atexit-handler*/* func ) noexcept;\n\nRegisters the function pointed to by func to be called on normal program termination (via [std::exit()] or returning from the main function).",
+			/*atof*/ "double atof( const char *str );\n\nInterprets a floating point value in a byte string pointed to by str.",
+			/*atoi*/ "int atoi( const char *str );\n\nInterprets an integer value in a byte string pointed to by str.",
+			/*atol*/ "long atol( const char *str );\n\nInterprets a long value in a byte string pointed to by str.",
+			/*atoll*/ "long long atol( const char *str );\n\nInterprets a long long value in a byte string pointed to by str.",
+			/*ceil*/ "float ceil ( float arg );\ndouble ceil ( double arg );\nlong double ceil ( long double arg );\ndouble ceil ( IntegralType arg );\n\nComputes the smallest integer value not less than arg.",
+			/*clock*/ "std::clock_t clock();\n\nReturns the approximate processor time used by the process since the beginning of an implementation-defined era related to the program's execution.",
+			/*cosh*/ "float cosh ( float arg );\ndouble cosh ( double arg );\nlong double cosh ( long double arg );\ndouble cosh ( IntegralType arg );\n\nComputes the hyperbolic cosine of arg.",
+			/*ctime*/ "char* ctime( const std::time_t* time );\n\nConverts given time since epoch to a calendar local time and then to a textual representation, as if by calling [std::asctime]([std::localtime(time)]).\nThe resulting string has the following format: Www Mmm dd hh : mm:ss yyyy",
+			/*div*/ "std::div_t div( int x, int y );\nstd::ldiv_t div( long x, long y );\nstd::lldiv_t div( long long x, long long y );\nstd::imaxdiv_t div( std::intmax_t x, std::intmax_t y );\n\nComputes both the quotient and the remainder of the division of the numerator x by the denominator y.",
+			/*exit*/ "[[noreturn]] void exit( int exit_code );\n\nCauses normal program termination to occur. Several cleanup steps are performed.",
+			/*fabs*/ "float fabs ( float arg );\ndouble fabs ( double arg );\nlong double fabs ( long double arg );\ndouble fabs ( IntegralType arg );\n\nComputes the absolute value of a floating point value arg.",
+			/*floor*/ "float floor ( float arg );\ndouble floor ( double arg );\nlong double floor ( long double arg );\ndouble floor ( IntegralType arg );\n\nComputes the largest integer value not greater than arg.",
+			/*fmod*/ "float fmod ( float x, float y );\ndouble fmod ( double x, double y );\nlong double fmod ( long double x, long double y );\nPromoted fmod ( Arithmetic1 x, Arithmetic2 y );\n\nComputes the floating-point remainder of the division operation x/y.",
+			/*getchar*/ "int getchar();\n\nReads the next character from [stdin]. Equivalent to [std::getc(stdin)].",
+			/*getenv*/ "char* getenv( const char* env_var );\n\nSearches the environment list provided by the host environment (the OS), for a string that matches the C string pointed to by env_var and returns a pointer to the C string that is associated with the matched environment list member.",
+			/*isalnum*/ "int isalnum( int ch );\n\nChecks if the given character is an alphanumeric character as classified by the current C locale. In the default locale, the following characters are alphanumeric:\n    - digits (0123456789)\n    - uppercase letters (ABCDEFGHIJKLMNOPQRSTUVWXYZ)\n    - lowercase letters (abcdefghijklmnopqrstuvwxyz)",
+			/*isalpha*/ "int isalpha( int ch );\n\nChecks if the given character is an alphabetic character as classified by the currently installed C locale. In the default locale, the following characters are alphabetic:\n    - uppercase letters (ABCDEFGHIJKLMNOPQRSTUVWXYZ)\n    - lowercase letters (abcdefghijklmnopqrstuvwxyz)",
+			/*isdigit*/ "int isdigit( int ch );\n\nChecks if the given character is one of the 10 decimal digits: 0123456789.",
+			/*isgraph*/ "int isgraph( int ch );\n\nChecks if the given character is graphic (has a graphical representation) as classified by the currently installed C locale. In the default C locale, the following characters are graphic:\n    - digits (0123456789)\n    - uppercase letters (ABCDEFGHIJKLMNOPQRSTUVWXYZ)\n    - lowercase letters (abcdefghijklmnopqrstuvwxyz)\n    - punctuation characters (!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~)",
+			/*ispunct*/ "int ispunct( int ch );\n\nChecks if the given character is a punctuation character as classified by the current C locale. The default C locale classifies the characters !\"#$ % &'()*+,-./:;<=>?@[\\]^_`{|}~ as punctuation.",
+			/*isspace*/ "int isspace( int ch );\n\nChecks if the given character is whitespace character as classified by the currently installed C locale. In the default locale, the whitespace characters are the following:\n    - space(0x20, ' ')\n    - form feed(0x0c, '\\f')\n    - line feed(0x0a, '\\n')\n    - carriage return (0x0d, '\\r')\n    - horizontal tab(0x09, '\\t')\n    - vertical tab(0x0b, '\\v')",
+			/*isupper*/ "int isupper( int ch );\n\nChecks if the given character is an uppercase character as classified by the currently installed C locale. In the default \"C\" locale, isupper returns a nonzero value only for the uppercase letters (ABCDEFGHIJKLMNOPQRSTUVWXYZ).\nIf isupper returns a nonzero value, it is guaranteed that iscntrl, isdigit, ispunct,and isspace return zero for the same character in the same C locale.",
+			/*kbhit*/ "Note : kbhit() is not a standard library function and should be avoided.",
+			/*log10*/ "float log10 ( float arg );\ndouble log10 ( double arg );\nlong double log10 ( long double arg );\ndouble log10 ( IntegralType arg );\n\nComputes the common (base-10) logarithm of arg.",
+			/*log2*/ "float log2 ( float arg );\ndouble log2 ( double arg );\nlong double log2 ( long double arg );\ndouble log2 ( IntegralType arg );\n\nComputes the binary (base-2) logarithm of arg.",
+			/*log*/ "float log ( float arg );\ndouble log ( double arg );\nlong double log ( long double arg );\ndouble log ( IntegralType arg );\n\nComputes the natural (base e) logarithm of arg.",
+			/*memcmp*/ "int memcmp( const void* lhs, const void* rhs, std::size_t count );\n\nReinterprets the objects pointed to by lhs and rhs as arrays of unsigned char and compares the first count characters of these arrays. The comparison is done lexicographically.",
+			/*modf*/ "float modf ( float x, float* iptr );\ndouble modf ( double x, double* iptr );\nlong double modf ( long double x, long double* iptr );\n\nDecomposes given floating point value x into integral and fractional parts, each having the same type and sign as x. The integral part (in floating-point format) is stored in the object pointed to by iptr.",
+			/*pow*/ "float pow ( float base, float exp );\ndouble pow ( double base, double exp );\nlong double pow ( long double base, long double exp );\ndouble pow ( double base, int iexp );\nlong double pow ( long double base, int iexp );\n\nComputes the value of base raised to the power exp or iexp.",
+			/*printf*/ "int printf( const char* format, ... );\n\nWrites the results to stdout.",
+			/*sprintf*/ "int sprintf( char* buffer, const char* format, ... );\n\nWrites the results to a character string buffer.",
+			/*snprintf*/ "int snprintf( char* buffer, std::size_t buf_size, const char* format, ... );\n\nWrites the results to a character string buffer. At most buf_size - 1 characters are written. The resulting character string will be terminated with a null character, unless buf_size is zero. If buf_size is zero, nothing is written and buffer may be a null pointer, however the return value (number of bytes that would be written not including the null terminator) is still calculated and returned.",
+			/*putchar*/ "int putchar( int ch );\n\nWrites a character ch to stdout. Internally, the character is converted to unsigned char just before being written.",
+			/*putenv*/ "Note: putenv() i a C function, not a C++ function.\nA better solution is [setenv].",
+			/*puts*/ "int puts( const char *str );\n\nWrites every character from the null-terminated string str and one additional newline character '\\n' to the output stream stdout, as if by repeatedly executing std::fputc.\nThe terminating null character from str is not written.",
+			/*rand*/ "int rand();\n\nReturns a pseudo-random integral value between 0 and RAND_MAX (0 and RAND_MAX included).",
+			/*remove*/ "template< class ForwardIt, class T >\nForwardIt remove(ForwardIt first, ForwardIt last, const T & value);\n\nRemoves all elements that are equal to value, using operator== to compare them.",
+			/*rename*/ "int rename( const char *old_filename, const char *new_filename );\n\nChanges the filename of a file. The file is identified by character string pointed to by old_filename. The new filename is identified by character string pointed to by new_filename.",
+			/*sinh*/ "float sinh ( float arg );\ndouble sinh ( double arg );\nlong double sinh ( long double arg );\ndouble sinh ( IntegralType arg );\n\nComputes the hyperbolic sine of arg.",
+			/*sqrt*/ "float sqrt ( float arg );\ndouble sqrt ( double arg );\nlong double sqrt ( long double arg );\ndouble sqrt ( IntegralType arg );\n\nComputes the square root of arg.",
+			/*srand*/ "void srand( unsigned seed );\n\nSeeds the pseudo-random number generator used by std::rand() with the value seed.",
+			/*strcat*/ "char *strcat( char *dest, const char *src );\n\nAppends a copy of the character string pointed to by src to the end of the character string pointed to by dest. The character src[0] replaces the null terminator at the end of dest. The resulting byte string is null-terminated.",
+			/*strcmp*/ "int strcmp( const char *lhs, const char *rhs );\n\nCompares two null-terminated byte strings lexicographically.",
+			/*strerror*/ "char* strerror( int errnum );\n\nReturns a pointer to the textual description of the system error code errnum, identical to the description that would be printed by std::perror().",
+			/*time*/ "std::time_t time( std::time_t* arg );\n\nReturns the current calendar time encoded as a std::time_t object, and also stores it in the object pointed to by arg, unless arg is a null pointer.",
+			/*tolower*/ "int tolower( int ch );\n\nConverts the given character to lowercase according to the character conversion rules defined by the currently installed C locale.\nIn the default \"C\" locale, the following uppercase letters ABCDEFGHIJKLMNOPQRSTUVWXYZ are replaced with respective lowercase letters abcdefghijklmnopqrstuvwxyz.",
+			/*toupper*/ "int toupper( int ch );\n\nConverts the given character to uppercase according to the character conversion rules defined by the currently installed C locale.\nIn the default \"C\" locale, the following lowercase letters abcdefghijklmnopqrstuvwxyz are replaced with respective uppercase letters ABCDEFGHIJKLMNOPQRSTUVWXYZ.",
+			/*std*/ "The C++ standard library [namespace].",
+			/*string*/ "std::basic_string<char>\n\nStores and manipulates sequences of char-like objects.",
+			/*wstring*/ "std::basic_string<wchar_t>\n\nStores and manipulates sequences of char-like objects.",
+			/*vector*/ "template<class T, class Allocator = std::allocator<T>> class vector;\n\nstd::vector is a sequence container that encapsulates dynamic size arrays.",
+			/*map*/ "template<class Key, class T, class Compare = std::less<Key>, class Allocator = std::allocator<std::pair<const Key, T> >> class map;\n\nstd::map is a sorted associative container that contains key - value pairs with unique keys.",
+			/*unordered_map*/ "template< class Key, class T, class Hash = std::hash<Key>, class KeyEqual = std::equal_to<Key>, class Allocator = std::allocator< std::pair<const Key, T> >> class unordered_map;\n\nUnordered map is an associative container that contains key - value pairs with unique keys.Search, insertion,and removal of elements have average constant - time complexity.\nInternally, the elements are not sorted in any particular order, but organized into buckets.",
+			/*set*/ "template<class Key, class Compare = std::less<Key>, class Allocator = std::allocator<Key>> class set;\n\nstd::set is an associative container that contains a sorted set of unique objects of type Key.",
+			/*unordered_set*/ "template<class Key, class Hash = std::hash<Key>, class KeyEqual = std::equal_to<Key>, class Allocator = std::allocator<Key>> class unordered_set;\n\nUnordered set is an associative container that contains a set of unique objects of type Key.Search, insertion,and removal have average constant - time complexity.\nInternally, the elements are not sorted in any particular order, but organized into buckets.",
+			/*min*/ "template< class T >\nconst T & min(const T & a, const T & b);\ntemplate< class T, class Compare >\nconst T & min(const T & a, const T & b, Compare comp);\ntemplate< class T >\nT min(std::initializer_list<T> ilist);\ntemplate< class T, class Compare >\nT min(std::initializer_list<T> ilist, Compare comp);\n\nReturns the smaller of the given values. All have [constexpr] alternatives.",
+			/*max*/ "template< class T >\nconst T & max(const T & a, const T & b);\ntemplate< class T, class Compare >\nconst T & max(const T & a, const T & b, Compare comp);\ntemplate< class T >\nT max(std::initializer_list<T> ilist);\ntemplate< class T, class Compare >\nT max(std::initializer_list<T> ilist, Compare comp);\n\nReturns the greater of the given values. All have [constexpr] alternatives.",
+			// Dymatic Identifiers
+			/*Dymatic*/ "Dymatic Engine [namespace].",
+			/*DY_CORE_TRACE*/	"Outputs message with a varying number of arguments to the CORE [Dymatic] Log.\n\n'Trace' severity.\n\nNote: Internal use only.",
+			/*DY_CORE_INFO*/	"Outputs message with a varying number of arguments to the CORE [Dymatic] Log.\n\n'Info' severity.\n\nNote: Internal use only.",
+			/*DY_CORE_WARN*/	"Outputs message with a varying number of arguments to the CORE [Dymatic] Log.\n\n'Warning' severity.\n\nNote: Internal use only.",
+			/*DY_CORE_ERROR*/	"Outputs message with a varying number of arguments to the CORE [Dymatic] Log.\n\n'Error' severity.\n\nNote: Internal use only.",
+			/*DY_CORE_CRITICAL*/"Outputs message with a varying number of arguments to the CORE [Dymatic] Log.\n\n'Critical' severity.\n\nNote: Internal use only.",
+			/*DY_TRACE*/		 "Outputs message with a varying number of arguments to the APPLICATION [Dymatic] Log.\n\n'Trace' severity.",
+			/*DY_INFO*/			 "Outputs message with a varying number of arguments to the APPLICATION [Dymatic] Log.\n\n'Info' severity.",
+			/*DY_WARN*/			 "Outputs message with a varying number of arguments to the APPLICATION [Dymatic] Log.\n\n'Warning' severity.",
+			/*DY_ERROR*/		 "Outputs message with a varying number of arguments to the APPLICATION [Dymatic] Log.\n\n'Error' severity.",
+			/*DY_CRITICAL*/		 "Outputs message with a varying number of arguments to the APPLICATION [Dymatic] Log.\n\n'Critical' severity.",
+			/*glm*/ "OpenGL Mathematics [namespace].",
+			/*ImGui*/ "Dear ImGui [namespace].\n\GUI used internally to render [Dymatic] tools."
+		};
+		//for (auto& k : identifiers)
+		//{
+		//	Identifier id;
+		//	id.mDeclaration = "Built-in function";
+		//	langDef.mIdentifiers.insert(std::make_pair(std::string(k), id));
+		//}
+		for (int i = 0; i < sizeof(identifiers) / sizeof(identifiers[0]); i++)
+		{
+			Identifier id;
+			id.mDeclaration = declarations[i];
+			langDef.mIdentifiers.insert(std::make_pair(std::string(identifiers[i]), id));
+		}
+
+		// Custom Preprocessor Identifiers
+		static const char* const preprocessorIdentifiers[] = {
+			"if", "elif", "else", "endif",
+			"ifdef", "ifndef", "define", "undef",
+			"include", "line", "error", "pragma"
+		};
+
+		//Declaration definitions taken from https://cppreference.com
+		static const char* const preprocessorDeclarations[] = {
+			"If the expression evaluates to nonzero value, the controlled code block is included and skipped otherwise.", "An #else statement with an #if condition. If the expression evaluates to nonzero value, the controlled code block is included and skipped otherwise. There can be any number of #elif s", "If all previous #if and #elif statements fail, the controlled code block is included and skipped otherwise.", "The #endif directive terminates the conditional preprocessing block.\nCan be included after #if, #elif, or #else.",
+			"Checks if the identifier was defined as a macro name.", "Checks if the identifier was not defined as a macro name.", "This directive defines the identifier as macro. The #define directive defines a function-like macro with variable number of arguments, but no regular arguments.", "The #undef directive undefines the identifier, that is cancels previous definition of the identifier by #define directive. If the identifier does not have associated macro, the directive is ignored.",
+			"Includes source file, identified by filename into the current source file at the line immediately after the directive. Any preprocessing tokens (macro constants or expressions) are allowed as arguments to #include", "Changes the current preprocessor line number to lineno. Expansions of the macro __LINE__ beyond this point will expand to lineno plus the number of actual source code lines encountered since.", "After encountering the #error directive, an implementation displays the diagnostic message error_message and renders the program ill-formed (the compilation stops).", 
+			"Pragma directive controls implementation-specific behavior of the compiler, such as disabling compiler warnings or changing alignment requirements. Any pragma that is not recognized is ignored."
+		};
+
+		for (int i = 0; i < sizeof(preprocessorIdentifiers) / sizeof(preprocessorIdentifiers[0]); i++)
+		{
+			Identifier id;
+			id.mDeclaration = preprocessorDeclarations[i];
+			langDef.mPreprocIdentifiers.insert(std::make_pair(std::string(preprocessorIdentifiers[i]), id));
+		}
+		// End Custom Code
 
 		langDef.mTokenize = [](const char* in_begin, const char* in_end, const char*& out_begin, const char*& out_end, ImGuiCol_& paletteIndex) -> bool
 		{
@@ -3085,8 +3362,14 @@ const TextEditor::LanguageDefinition& TextEditor::LanguageDefinition::HLSL()
 			"half1x1","half2x1","half3x1","half4x1","half1x2","half2x2","half3x2","half4x2",
 			"half1x3","half2x3","half3x3","half4x3","half1x4","half2x4","half3x4","half4x4",
 		};
+		//for (auto& k : keywords)
+		//	langDef.mKeywords.insert(k);
 		for (auto& k : keywords)
-			langDef.mKeywords.insert(k);
+		{
+			Identifier id;
+			id.mDeclaration = "Keyword";
+			langDef.mKeywords.insert(std::make_pair(std::string(k), id));
+		}
 
 		static const char* const identifiers[] = {
 			"abort", "abs", "acos", "all", "AllMemoryBarrier", "AllMemoryBarrierWithGroupSync", "any", "asdouble", "asfloat", "asin", "asint", "asint", "asuint",
@@ -3145,8 +3428,14 @@ const TextEditor::LanguageDefinition& TextEditor::LanguageDefinition::GLSL()
 			"signed", "sizeof", "static", "struct", "switch", "typedef", "union", "unsigned", "void", "volatile", "while", "_Alignas", "_Alignof", "_Atomic", "_Bool", "_Complex", "_Generic", "_Imaginary",
 			"_Noreturn", "_Static_assert", "_Thread_local"
 		};
+		//for (auto& k : keywords)
+		//	langDef.mKeywords.insert(k);
 		for (auto& k : keywords)
-			langDef.mKeywords.insert(k);
+		{
+			Identifier id;
+			id.mDeclaration = "Keyword";
+			langDef.mKeywords.insert(std::make_pair(std::string(k), id));
+		}
 
 		static const char* const identifiers[] = {
 			"abort", "abs", "acos", "asin", "atan", "atexit", "atof", "atoi", "atol", "ceil", "clock", "cosh", "ctime", "div", "exit", "fabs", "floor", "fmod", "getchar", "getenv", "isalnum", "isalpha", "isdigit", "isgraph",
@@ -3194,8 +3483,14 @@ const TextEditor::LanguageDefinition& TextEditor::LanguageDefinition::C()
 			"signed", "sizeof", "static", "struct", "switch", "typedef", "union", "unsigned", "void", "volatile", "while", "_Alignas", "_Alignof", "_Atomic", "_Bool", "_Complex", "_Generic", "_Imaginary",
 			"_Noreturn", "_Static_assert", "_Thread_local"
 		};
+		//for (auto& k : keywords)
+		//	langDef.mKeywords.insert(k);
 		for (auto& k : keywords)
-			langDef.mKeywords.insert(k);
+		{
+			Identifier id;
+			id.mDeclaration = "Keyword";
+			langDef.mKeywords.insert(std::make_pair(std::string(k), id));
+		}
 
 		static const char* const identifiers[] = {
 			"abort", "abs", "acos", "asin", "atan", "atexit", "atof", "atoi", "atol", "ceil", "clock", "cosh", "ctime", "div", "exit", "fabs", "floor", "fmod", "getchar", "getenv", "isalnum", "isalpha", "isdigit", "isgraph",
@@ -3268,8 +3563,14 @@ const TextEditor::LanguageDefinition& TextEditor::LanguageDefinition::SQL()
 			"DUMMY", "OPENXML", "WAITFOR", "DUMP", "OPTION", "WHEN", "ELSE", "OR", "WHERE", "END", "ORDER", "WHILE", "ERRLVL", "OUTER", "WITH", "ESCAPE", "OVER", "WRITETEXT"
 		};
 
+		//for (auto& k : keywords)
+		//	langDef.mKeywords.insert(k);
 		for (auto& k : keywords)
-			langDef.mKeywords.insert(k);
+		{
+			Identifier id;
+			id.mDeclaration = "Keyword";
+			langDef.mKeywords.insert(std::make_pair(std::string(k), id));
+		}
 
 		static const char* const identifiers[] = {
 			"ABS",  "ACOS",  "ADD_MONTHS",  "ASCII",  "ASCIISTR",  "ASIN",  "ATAN",  "ATAN2",  "AVG",  "BFILENAME",  "BIN_TO_NUM",  "BITAND",  "CARDINALITY",  "CASE",  "CAST",  "CEIL",
@@ -3326,8 +3627,14 @@ const TextEditor::LanguageDefinition& TextEditor::LanguageDefinition::AngelScrip
 			"uint64", "void", "while", "xor"
 		};
 
+		//for (auto& k : keywords)
+		//	langDef.mKeywords.insert(k);
 		for (auto& k : keywords)
-			langDef.mKeywords.insert(k);
+		{
+			Identifier id;
+			id.mDeclaration = "Keyword";
+			langDef.mKeywords.insert(std::make_pair(std::string(k), id));
+		}
 
 		static const char* const identifiers[] = {
 			"cos", "sin", "tab", "acos", "asin", "atan", "atan2", "cosh", "sinh", "tanh", "log", "log10", "pow", "sqrt", "abs", "ceil", "floor", "fraction", "closeTo", "fpFromIEEE", "fpToIEEE",
@@ -3373,8 +3680,14 @@ const TextEditor::LanguageDefinition& TextEditor::LanguageDefinition::Lua()
 			"and", "break", "do", "", "else", "elseif", "end", "false", "for", "function", "if", "in", "", "local", "nil", "not", "or", "repeat", "return", "then", "true", "until", "while"
 		};
 
+		//for (auto& k : keywords)
+		//	langDef.mKeywords.insert(k);
 		for (auto& k : keywords)
-			langDef.mKeywords.insert(k);
+		{
+			Identifier id;
+			id.mDeclaration = "Keyword";
+			langDef.mKeywords.insert(std::make_pair(std::string(k), id));
+		}
 
 		static const char* const identifiers[] = {
 			"assert", "collectgarbage", "dofile", "error", "getmetatable", "ipairs", "loadfile", "load", "loadstring",  "next",  "pairs",  "pcall",  "print",  "rawequal",  "rawlen",  "rawget",  "rawset",
@@ -3501,6 +3814,8 @@ namespace Dymatic {
 				ImGui::EndMenu();
 			}
 			ImGui::EndMenuBar();
+
+			ImGui::BeginChild("##TextEditorDropArea");
 	
 			// Internal Code (Based on BeginTabBar())
 			ImGuiTabBarFlags tab_bar_flags = (ImGuiTabBarFlags_FittingPolicyScroll) | ImGuiTabBarFlags_Reorderable | ImGuiTabBarFlags_AutoSelectNewTabs;
@@ -3518,6 +3833,8 @@ namespace Dymatic {
 			{
 				// Submit Tabs
 				bool closeTabsRight = m_CloseToRightIndex != -1;
+				bool closeTabsOther = m_CloseOtherIndex != -1;
+				bool closeAll = m_CloseAll;
 				for (int n = 0; n < m_TextEditors.size(); n++)
 				{
 					ImGui::PushID(m_TextEditors[n].ID);
@@ -3530,8 +3847,10 @@ namespace Dymatic {
 						if (ImGui::MenuItem("Save")) { SaveTextFileByReference(&m_TextEditors[n]); }
 						if (ImGui::MenuItem("Save All")) { for (auto& textEditor : m_TextEditors) { SaveTextFileByReference(&textEditor); } }
 						if (ImGui::MenuItem("Close")) { open = false; }
-						if (ImGui::MenuItem("Close All")) { for (int i = 0; i < m_TextEditors.size(); i++) { if (m_TextEditors[i].ID == m_TextEditors[n].ID) { open = false; } else { if (DeleteTextEditor(&m_TextEditors[i])) { i--; } } } }
-						if (ImGui::MenuItem("Close All But This")) { for (int i = 0; i < m_TextEditors.size(); i++) { if (m_TextEditors[i].ID != m_TextEditors[n].ID) { if (DeleteTextEditor(&m_TextEditors[i])) { i--; } } } }
+						//if (ImGui::MenuItem("Close All")) { for (int i = 0; i < m_TextEditors.size(); i++) { if (m_TextEditors[i].ID == m_TextEditors[n].ID) { open = false; } else { if (DeleteTextEditor(&m_TextEditors[i])) { i--; } } } }
+						if (ImGui::MenuItem("Close All")) { m_CloseAll = true; }
+						//if (ImGui::MenuItem("Close All But This")) { for (int i = 0; i < m_TextEditors.size(); i++) { if (m_TextEditors[i].ID != m_TextEditors[n].ID) { if (DeleteTextEditor(&m_TextEditors[i])) { i--; } } } }
+						if (ImGui::MenuItem("Close All But This")) { m_CloseOtherIndex = m_TextEditors[n].ID; }
 						if (ImGui::MenuItem("Close All To Right")) { m_CloseToRightIndex = tab_bar->LastTabItemIdx; }
 
 						ImGui::EndPopup();
@@ -3544,14 +3863,16 @@ namespace Dymatic {
 						auto label = (m_TextEditors[n].Filepath + ((m_TextEditors[n].Language != "") ? (" [" + m_TextEditors[n].Language + "]") : ("")));
 						ImGui::SetTooltip("%.*s", (int)(ImGui::FindRenderedTextEnd(label.c_str()) - label.c_str()), label.c_str());
 					}
-					if (!open || (closeTabsRight && tab_bar->LastTabItemIdx > m_CloseToRightIndex)) 
+					if (!open || (closeTabsRight && tab_bar->LastTabItemIdx > m_CloseToRightIndex) || (closeAll) || (closeTabsOther && m_CloseOtherIndex != m_TextEditors[n].ID)) 
 					{
 						if (DeleteTextEditor(&m_TextEditors[n])) { n--; }
 					}
 					else if (visible)
 					{
 						m_SelectedEditor = &m_TextEditors[n];
-						m_TextEditors[n].textEditor.Render("##TextEditorWindow");
+						ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[2]);
+						m_TextEditors[n].textEditor.Render("##TextEditorWindow", m_Zoom);
+						ImGui::PopFont();
 						if (ImGui::BeginPopupContextItem("##EditorContextItem"))
 						{
 							if (ImGui::MenuItem("Copy")) { m_TextEditors[n].textEditor.Copy(); }
@@ -3572,12 +3893,44 @@ namespace Dymatic {
 					ImGui::PopID();
 				}
 				if (closeTabsRight) { m_CloseToRightIndex = -1; }
+				if (closeTabsOther) { m_CloseOtherIndex = -1; }
+				if (closeAll) { m_CloseAll = false; }
 	
 				ImGui::EndTabBar();
 			}
 	
+			ImGui::EndChild();
+
+			if (ImGui::BeginDragDropTarget())
+			{
+				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_ITEM"))
+				{
+					const char* filepath = (const char*)payload->Data;
+					OpenTextFileByFilepath(filepath);
+				}
+				ImGui::EndDragDropTarget();
+			}
+
 			ImGui::End();
 		}
+	}
+
+	void TextEditorPannel::OnEvent(Event& e)
+	{
+		EventDispatcher dispatcher(e);
+
+		dispatcher.Dispatch<MouseScrolledEvent>(DY_BIND_EVENT_FN(TextEditorPannel::OnMouseScrolled));
+	}
+
+	bool TextEditorPannel::OnMouseScrolled(MouseScrolledEvent& e)
+	{
+		if (Input::IsKeyPressed(Key::LeftControl) || Input::IsKeyPressed(Key::RightControl))
+		{
+			m_Zoom = std::clamp(m_Zoom + e.GetYOffset() * 0.025f, 0.1f, 1.0f);
+			//for (auto textEditor : m_TextEditors)
+			//	textEditor.textEditor.SetZoom(&m_Zoom);
+		}
+		return false;
 	}
 
 	void TextEditorPannel::SwitchCStyleHeader()
@@ -3611,7 +3964,11 @@ namespace Dymatic {
 	void TextEditorPannel::NewTextFile()
 	{
 		auto id = GetNextTextEditorID();
-		m_TextEditors.insert(m_TextEditors.begin(), TextEditorInformation(id, ("Untitled-" + std::to_string(id)), true));
+		int number = 1;
+		for (auto const& textEditor : m_TextEditors) { if (textEditor.Filename != ("Untitled-" + std::to_string(number))) break; else number++; }
+		m_TextEditors.insert(m_TextEditors.begin(), TextEditorInformation(id, ("Untitled-" + std::to_string(number)), true));
+		m_TextEditors[0].textEditor.SetShowWhitespaces(m_ShowWhitespaces);
+		m_TextEditors[0].textEditor.SetZoom(&m_Zoom);
 		m_TextEditors[0].SetSelected = true;
 	}
 	
@@ -3636,6 +3993,8 @@ namespace Dymatic {
 		}
 		auto id = GetNextTextEditorID();
 		m_TextEditors.insert(m_TextEditors.begin(), TextEditorInformation(id, filepath));
+		m_TextEditors[0].textEditor.SetShowWhitespaces(m_ShowWhitespaces);
+		m_TextEditors[0].textEditor.SetZoom(&m_Zoom);
 		m_TextEditors[0].SetSelected = true;
 		UpdateLanguage(&m_TextEditors[0]);
 	}
@@ -3711,7 +4070,7 @@ namespace Dymatic {
 			     if (suffix == ".cpp")		{ reference->textEditor.SetLanguageDefinition(TextEditorInternal::TextEditor::LanguageDefinition::CPlusPlus()); reference->Language = "C++"; }
 			else if (suffix == ".pch")		{ reference->textEditor.SetLanguageDefinition(TextEditorInternal::TextEditor::LanguageDefinition::CPlusPlus()); reference->Language = "Precompiled Header"; }
 			else if (suffix == ".hpp")		{ reference->textEditor.SetLanguageDefinition(TextEditorInternal::TextEditor::LanguageDefinition::CPlusPlus()); reference->Language = "C++ Header"; }
-			else if (suffix == ".h")		{ reference->textEditor.SetLanguageDefinition(TextEditorInternal::TextEditor::LanguageDefinition::C()); reference->Language = "Header"; }
+			else if (suffix == ".h")		{ reference->textEditor.SetLanguageDefinition(TextEditorInternal::TextEditor::LanguageDefinition::CPlusPlus()); reference->Language = "Header"; }
 			else if (suffix == ".c")		{ reference->textEditor.SetLanguageDefinition(TextEditorInternal::TextEditor::LanguageDefinition::C()); reference->Language = "C"; }
 			else if (suffix == ".hlsl")		{ reference->textEditor.SetLanguageDefinition(TextEditorInternal::TextEditor::LanguageDefinition::HLSL()); reference->Language = "HLSL"; }
 			else if (suffix == ".glsl")		{ reference->textEditor.SetLanguageDefinition(TextEditorInternal::TextEditor::LanguageDefinition::GLSL()); reference->Language = "GLSL"; }

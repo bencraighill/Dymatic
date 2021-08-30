@@ -512,4 +512,102 @@ namespace Dymatic::Sandbox {
 
 	}
 
+	// Rope Simulation
+
+	RopeSimulation::RopeSimulation()
+	{
+		m_Points.reserve(128);
+		m_Sticks.reserve(128);
+		m_Points.push_back({ GetNextId(), glm::vec2(20.0f, 50.0f), true });
+		m_Points.push_back({ GetNextId(), glm::vec2(50.0f, 50.0f), false });
+		m_Sticks.push_back({ GetNextId(), &m_Points[0], &m_Points[1], 30.0f });
+	}
+
+	void RopeSimulation::OnImGuiRender(Timestep ts)
+	{
+		if (m_Simulating)
+			Simulate(ts);
+
+		ImGui::Begin("Rope Simulation");
+		ImGui::ToggleButton("Simulate", &m_Simulating);
+
+		auto drawList = ImGui::GetWindowDrawList();
+		auto shift = (Input::IsKeyPressed(Key::LeftShift) || Input::IsKeyPressed(Key::RightShift));
+		auto ctrl = (Input::IsKeyPressed(Key::LeftControl) || Input::IsKeyPressed(Key::RightControl));
+
+		for (auto const& stick : m_Sticks)
+		{
+			drawList->AddLine(ImGui::GetWindowPos() + ImVec2(stick.pointA->position.x, stick.pointA->position.y), ImGui::GetWindowPos() + ImVec2(stick.pointB->position.x, stick.pointB->position.y), ImGui::ColorConvertFloat4ToU32(ImVec4(0.8f, 0.8f, 0.8f, 1.0f)));
+		}
+
+		for (auto& point : m_Points)
+		{
+			ImGui::PushID(point.id);
+
+			auto centre = ImGui::GetWindowPos() + ImVec2(point.position.x, point.position.y);
+			static float radius = 5.0f;
+
+			const ImGuiID id = ImGui::GetID("##PointButton");
+			const ImRect bb = ImRect(ImVec2(centre.x - 5.0f, centre.y - 5.0f), ImVec2(centre.x + 5.0f, centre.y + 5.0f));
+			bool held, hovered;
+			bool clicked = ImGui::ButtonBehavior(bb, id, &hovered, & held);
+
+			if (clicked && shift)
+			{
+				if (joinPoint == nullptr)
+					joinPoint = &point;
+				else
+				{
+					float distance = std::sqrt(std::pow((joinPoint->position.x - point.position.x), 2) + std::pow((joinPoint->position.y - point.position.y), 2));
+					m_Sticks.push_back({ GetNextId(), joinPoint, &point, distance });
+					joinPoint = nullptr;
+				}
+			}
+
+			if (clicked && !shift)
+				point.locked = !point.locked;
+
+			drawList->AddCircleFilled(centre, radius, ImGui::ColorConvertFloat4ToU32(point.locked ? ImVec4(0.8f, 0.1f, 0.2f, 1.0f) : ImVec4(1.0f, 1.0f, 1.0f, 1.0f)));
+			ImGui::PopID();
+		}
+
+		if (ImGui::IsWindowHovered() && ImGui::IsMouseClicked(0))
+		{
+			joinPoint = nullptr;
+			if (ctrl)
+			{
+				auto pos = ImGui::GetMousePos() - ImGui::GetWindowPos();
+				m_Points.push_back({ GetNextId(), glm::vec2(pos.x, pos.y), false });
+			}
+		}
+
+		ImGui::End();
+	}
+
+	void RopeSimulation::Simulate(Timestep ts)
+	{
+		for (auto& p : m_Points)
+		{
+			if (!p.locked)
+			{
+				glm::vec2 positionBeforeUpdate = p.position;
+				p.position += p.position - p.prevPosition;
+				p.position += glm::vec2(0.0f, 9.8f) * ts.GetSeconds();
+				p.prevPosition = positionBeforeUpdate;
+			}
+		}
+
+		for (int i = 0; i < m_InterationNumber; i++)
+			for (auto& stick : m_Sticks)
+			 {
+				glm::vec2 stickCentre = (stick.pointA->position + stick.pointB->position) / 2.0f;
+				glm::vec2 stickDir = glm::normalize(stick.pointA->position - stick.pointB->position);
+				if (!stick.pointA->locked)
+					stick.pointA->position = stickCentre + stickDir * stick.length / 2.0f;
+				if (!stick.pointB->locked)
+					stick.pointB->position = stickCentre - stickDir * stick.length / 2.0f;
+
+			}
+	}
+
 }

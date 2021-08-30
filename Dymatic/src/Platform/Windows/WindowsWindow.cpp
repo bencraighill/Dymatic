@@ -97,6 +97,18 @@ namespace Dymatic {
 			data.EventCallback(event);
 		});
 
+		glfwSetDropCallback(m_Window, [](GLFWwindow* window, int count, const char** paths)
+		{
+			WindowData& data = *(WindowData*)glfwGetWindowUserPointer(window);
+			std::vector<std::string> pathsList;
+			for (int i = 0; i < count; i++)
+			{
+				pathsList.push_back(paths[i]);
+			}
+			WindowDropEvent event(pathsList);
+			data.EventCallback(event);
+		});
+
 		glfwSetKeyCallback(m_Window, [](GLFWwindow* window, int key, int scancode, int action, int mods)
 		{
 			WindowData& data = *(WindowData*)glfwGetWindowUserPointer(window);

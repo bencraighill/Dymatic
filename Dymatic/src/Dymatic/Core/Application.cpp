@@ -15,21 +15,32 @@ namespace Dymatic {
 
 	Application* Application::s_Instance = nullptr;
 
-	CSplash splash1(TEXT("splash.bmp"), RGB(255, 0, 0));
+	CSplash ApplicationSplash(TEXT("splash.bmp"), RGB(255, 0, 0));
+
+	static void UpdateSplashMessage(std::string message)
+	{
+		ApplicationSplash.ReloadBitmap();
+		ApplicationSplash.DrawLoadText(message, { (LONG)125.0, (LONG)315.0, (LONG)600.0, (LONG)331.0 }, 12.0f, TEXT("Lato"));
+	}
 
 	Application::Application(const std::string& name, ApplicationCommandLineArgs args)
 		: m_CommandLineArgs(args)
 	{
 		DY_PROFILE_FUNCTION();
-		splash1.ShowSplash();
+		ApplicationSplash.ShowSplash();
+		UpdateSplashMessage("Initializing Dymatic Core... (5%)");		
 
 		DY_CORE_ASSERT(!s_Instance, "Application already exists!");
 		s_Instance = this;
+		UpdateSplashMessage("Creating Window... (14%)");
 		m_Window = Window::Create(WindowProps(name));
+		UpdateSplashMessage("Binding Callbacks... (37%)");
 		m_Window->SetEventCallback(DY_BIND_EVENT_FN(Application::OnEvent));
 
+		UpdateSplashMessage("Initializing Renderer... (54%)");
 		Renderer::Init();
 
+		UpdateSplashMessage("Initializing GUI... (61%)");
 		m_ImGuiLayer = new ImGuiLayer();
 		PushOverlay(m_ImGuiLayer);
 	}
@@ -45,7 +56,8 @@ namespace Dymatic {
 	{
 		DY_PROFILE_FUNCTION();
 
-		splash1.CloseSplash();
+		UpdateSplashMessage("Launching Editor... (97%)");
+		ApplicationSplash.CloseSplash();
 
 		m_LayerStack.PushLayer(layer);
 		layer->OnAttach();

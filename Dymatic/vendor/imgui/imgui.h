@@ -1306,6 +1306,7 @@ enum ImGuiCol_
     // Text Editor
     ImGuiCol_TextEditorDefault,
     ImGuiCol_TextEditorKeyword,
+    ImGuiCol_TextEditorSpecialKeyword,
     ImGuiCol_TextEditorNumber,
     ImGuiCol_TextEditorString,
     ImGuiCol_TextEditorCharLiteral,

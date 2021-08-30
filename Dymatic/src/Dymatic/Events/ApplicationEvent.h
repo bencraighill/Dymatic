@@ -37,6 +37,20 @@ namespace Dymatic {
 		EVENT_CLASS_CATEGORY(EventCategoryApplication)
 	};
 
+	class WindowDropEvent : public Event
+	{
+	public:
+		WindowDropEvent(std::vector<std::string> paths)
+		: m_Paths(paths) {}
+
+		std::vector<std::string> GetPaths() { return m_Paths; }
+
+		EVENT_CLASS_TYPE(WindowDrop)
+			EVENT_CLASS_CATEGORY(EventCategoryApplication)
+	private:
+		std::vector<std::string> m_Paths;
+	};
+
 	class AppTickEvent : public Event
 	{
 	public:

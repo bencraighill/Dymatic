@@ -186,7 +186,7 @@ int CSplash::DoLoop()
         DispatchMessage  (&msg) ;
     }
 
-    return msg.wParam ;
+    return msg.wParam;
 
 }
 
@@ -204,6 +204,19 @@ DWORD CSplash::SetBitmap(LPCTSTR lpszFileName)
     HBITMAP    hBitmap       = NULL;
     hBitmap = (HBITMAP)::LoadImage(0, lpszFileName, IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE);
     return SetBitmap(hBitmap);
+}
+
+//Custom Code To Reset
+void CSplash::ReloadBitmap()
+{
+    RECT rect;
+	GetWindowRect(m_hwnd, &rect);
+    rect = { 0, 0, rect.right - rect.left, rect.bottom - rect.top };
+	HDC hdc = GetDC(m_hwnd);
+	HBRUSH brush = CreatePatternBrush(m_hBitmap);
+	FillRect(hdc, &rect, brush);
+	DeleteObject(brush);
+	ReleaseDC(m_hwnd, hdc);
 }
 
 DWORD CSplash::SetBitmap(HBITMAP hBitmap)
@@ -278,15 +291,30 @@ bool CSplash::MakeTransparent()
     return TRUE;
 }
 
-void CSplash::DrawLoadText(LPCWSTR text, RECT rect, int fontSize)
+static std::wstring StringToWString(const std::string& s)
+{
+	int len;
+	int slength = (int)s.length() + 1;
+	len = MultiByteToWideChar(CP_ACP, 0, s.c_str(), slength, 0, 0);
+	wchar_t* buf = new wchar_t[len];
+	MultiByteToWideChar(CP_ACP, 0, s.c_str(), slength, buf, len);
+	std::wstring r(buf);
+	delete[] buf;
+	return r;
+}
+
+void CSplash::DrawLoadText(std::string text, RECT rect, int fontSize, LPCTSTR font)
 {
 	HDC hDC = GetDC(m_hwnd);
+    SetBkMode(hDC, TRANSPARENT);
 	HBITMAP hBmpOld = (HBITMAP)SelectObject(hDC, m_hBitmap);
-	HFONT NewFont = CreateFont(fontSize, 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, 0, DEFAULT_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"Arial");
-	HBRUSH NewBrush = CreateSolidBrush(RGB(255, 0, 0));
+	HFONT NewFont = CreateFont(fontSize, 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, 0, PROOF_QUALITY, DEFAULT_PITCH | FF_DONTCARE, font);
+	HBRUSH NewBrush = CreateSolidBrush(RGB(150, 150, 150));
+    SetTextColor(hDC, RGB(255, 255, 255));
 	SelectObject(hDC, NewFont);
-	SelectObject(hDC, NewBrush);
-	DrawText(hDC, text, 25, &rect, DT_LEFT | DT_WORDBREAK);
+    SelectObject(hDC, NewBrush);
+    //SetBkMode(hDC, TRANSPARENT);
+	DrawText(hDC, StringToWString(text).c_str(), text.length(), &rect, DT_LEFT | DT_WORDBREAK);
 	DeleteObject(NewBrush);
 	DeleteObject(NewFont);
 	SelectObject(hDC, hBmpOld);

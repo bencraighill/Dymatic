@@ -32,6 +32,8 @@ namespace Dymatic {
 		Ref<Scene> m_Context;
 		Entity m_SelectionContext;
 
+		Ref<Texture2D> m_CheckerboardTexture = Texture2D::Create("assets/textures/Checkerboard.png");
+
 		Ref<Texture2D> m_IconAddComponent = Texture2D::Create("assets/icons/Properties/PropertiesAddComponent.png");
 		Ref<Texture2D> m_IconDuplicate = Texture2D::Create("assets/icons/Properties/PropertiesDuplicate.png");
 		Ref<Texture2D> m_IconDelete = Texture2D::Create("assets/icons/Properties/PropertiesDelete.png");

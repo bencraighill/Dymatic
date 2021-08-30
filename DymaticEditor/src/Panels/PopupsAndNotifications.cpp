@@ -22,29 +22,18 @@ namespace Dymatic {
 		m_PreferencesReference = preferencesRef;
 	}
 
-	PopupData PopupsAndNotifications::Popup(PopupData popupData)
-	{
-		m_PopupList.push_back(popupData);
-		return popupData;
-	}
-
-	PopupData PopupsAndNotifications::Popup(std::string title, std::string message, std::vector<std::string> buttons, bool loading)
+	void PopupsAndNotifications::Popup(std::string title, std::string message, std::vector<ButtonData> buttons, bool loading)
 	{
 		PopupData data;
 		data.title = title;
 		data.message = message;
-		if (data.message.substr(data.message.size() - 1, 1) != "\n")
-		{
-			data.message = data.message + "\n";
-		}
+		if (data.message[data.message.size() - 1] != '\n') { data.message += '\n'; }
 		data.buttons = buttons;
 
-		data.id = Math::GetRandomInRange(0, 999999);
+		data.id = GetNextNotificationId();
 		data.loading = loading;
 
 		m_PopupList.push_back(data);
-
-		return data;
 	}
 
 	void PopupsAndNotifications::RemoveTopmostPopup()
@@ -55,7 +44,7 @@ namespace Dymatic {
 		}
 	}
 
-	Dymatic::PopupData PopupsAndNotifications::PopupUpdate()
+	void PopupsAndNotifications::PopupUpdate()
 	{
 		//Popup Update Code
 
@@ -73,7 +62,7 @@ namespace Dymatic {
 				float additionalPadding = 20.0f;
 				for (int i = 0; i < data.buttons.size(); i++)
 				{
-					totalWidth += ImGui::CalcTextSize(data.buttons[i].c_str()).x + additionalPadding;
+					totalWidth += ImGui::CalcTextSize(data.buttons[i].name.c_str()).x + additionalPadding;
 				}
 				float totalTextWidth = ImGui::CalcTextSize(data.message.c_str()).x;
 
@@ -147,24 +136,20 @@ namespace Dymatic {
 
 				for (int i = 0; i < data.buttons.size(); i++)
 				{
-					if (ImGui::Button(data.buttons[i].c_str(), ImVec2(ImGui::CalcTextSize(data.buttons[i].c_str()).x + additionalPadding, size.y)))
+					ImGui::PushID(data.buttons[i].id);
+					if (ImGui::Button(data.buttons[i].name.c_str(), ImVec2(ImGui::CalcTextSize(data.buttons[i].name.c_str()).x + additionalPadding, size.y)))
 					{
-						m_PopupList.erase(m_PopupList.begin() + 0);
-						data.buttonClicked = i;
+						m_PopupList.erase(m_PopupList.begin());
+						data.buttons[i].func();
 						m_CurrentTitle = "";
-						
 					}
 					ImGui::SameLine();
+					ImGui::PopID();
 				}
 				ImGui::EndPopup();
 				ImGui::PopStyleVar(2);
-				if (data.buttonClicked != -1)
-				{
-					return data;
-				}
 			}
 		}
-		return {};
 	}
 
 	void PopupsAndNotifications::Notification(int notificationIndex, std::string title, std::string message, std::vector<ButtonData> buttons, bool loading, float displayTime)
@@ -203,7 +188,7 @@ namespace Dymatic {
 		}
 	}
 
-	void PopupsAndNotifications::NotificationUpdate(float programTime)
+	void PopupsAndNotifications::NotificationUpdate(Timestep ts, float programTime)
 	{
 		// Show Notification Popups
 		bool visible = !ImGui::GetTopMostPopupModal();
@@ -226,7 +211,7 @@ namespace Dymatic {
 				}
 
 				//Lerping Between Positions
-				m_NotificationList[i].offsetMin = glm::lerp(m_NotificationList[i].offsetMin, ImGui::GetWindowPos().y + ImGui::GetWindowSize().y - WindowPosMin.y, 0.1f);
+				m_NotificationList[i].offsetMin = glm::lerp(m_NotificationList[i].offsetMin, ImGui::GetWindowPos().y + ImGui::GetWindowSize().y - WindowPosMin.y, /*0.1f*/ 6.0f * ts);
 				m_NotificationList[i].offsetMax = m_NotificationList[i].offsetMin - (WindowPosMax.y - WindowPosMin.y);
 				
 				WindowPosMin = ImVec2(WindowPosMin.x, ImGui::GetWindowPos().y + ImGui::GetWindowSize().y - m_NotificationList[i].offsetMin);
@@ -234,9 +219,9 @@ namespace Dymatic {
 
 				//Setting Colors
 				auto& OverallOpacity = m_NotificationList[i].currentOpacity;
-				if (m_NotificationList[i].fadeIn) { OverallOpacity += 0.0375f; if (OverallOpacity >= 1.0f) { m_NotificationList[i].fadeIn = false; } }
-				else if (m_NotificationList[i].fadeOut) { OverallOpacity -= 0.0375f; }
-				else { OverallOpacity = glm::lerp(OverallOpacity, ((i > (int)m_NotificationList.size() - 6)? 1.0f : 0.0f), 0.15f); }
+				if (m_NotificationList[i].fadeIn) { OverallOpacity += /*0.0375*/ (2.25f * ts); if (OverallOpacity >= 1.0f) { m_NotificationList[i].fadeIn = false; } }
+				else if (m_NotificationList[i].fadeOut) { OverallOpacity -= /*0.0375*/ (2.25f * ts); }
+				else { OverallOpacity = glm::lerp(OverallOpacity, ((i > (int)m_NotificationList.size() - 6)? 1.0f : 0.0f), /*0.15f*/(9.0f * ts)); }
 				auto textCol = ImGui::GetStyleColorVec4(ImGuiCol_Text);
 				auto popupBgCol = ImGui::GetStyleColorVec4(ImGuiCol_PopupBg);
 				auto borderCol = ImGui::GetStyleColorVec4(ImGuiCol_Border);
@@ -287,7 +272,7 @@ namespace Dymatic {
 
 						ImGui::GetForegroundDrawList()->AddRectFilled(bb.Min, bb.Max, ImGui::ColorConvertFloat4ToU32(buttonColor), 3.0f);
 						ImGui::GetForegroundDrawList()->AddText(ImVec2(bb.Min.x + 2.5f, bb.Min.y), ImGui::ColorConvertFloat4ToU32(textCol), button.name.c_str());
-						if (pressed)
+						if (pressed && visible)
 						{
 							// Button Pressed Code
 							m_NotificationList[i].fadeOut = true;

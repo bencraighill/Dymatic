@@ -13,9 +13,6 @@
 
 #include "Dymatic/Math/Math.h"
 
-#define DEBUG_DRAW_IMPLEMENTATION
-#include "vendor/debug_draw.hpp"
-
 namespace Dymatic {
 
 	Scene::Scene()
@@ -39,7 +36,7 @@ namespace Dymatic {
 	{
 		//Finding Tag
 		auto initialTag = entity.GetComponent<TagComponent>().Tag;
-		int lastDot = initialTag.find_last_of(".");
+		int lastDot = initialTag.find_last_of("_");
 		if (lastDot != -1)
 		{			
 			std::string s = initialTag.substr(lastDot + 1, initialTag.length() - 1);;
@@ -60,7 +57,7 @@ namespace Dymatic {
 			for (auto entityView : view)
 			{
 				const auto& tag = view.get<TagComponent>(entityView);
-				if (tag.Tag == initialTag + "." + (std::to_string(currentInt).length() == 1 ? "00" + std::to_string(currentInt) : std::to_string(currentInt).length() == 2 ? "0" + std::to_string(currentInt) : std::to_string(currentInt)))
+				if (tag.Tag == initialTag + "_" + (std::to_string(currentInt).length() == 1 ? "00" + std::to_string(currentInt) : std::to_string(currentInt).length() == 2 ? "0" + std::to_string(currentInt) : std::to_string(currentInt)))
 				{
 					success = false;
 				}
@@ -72,7 +69,7 @@ namespace Dymatic {
 			}
 			currentInt++;
 		}
-		nameValue = initialTag + "." + (std::to_string(currentInt).length() == 1 ? "00" + std::to_string(currentInt) : std::to_string(currentInt).length() == 2 ? "0" + std::to_string(currentInt) : std::to_string(currentInt));
+		nameValue = initialTag + "_" + (std::to_string(currentInt).length() == 1 ? "00" + std::to_string(currentInt) : std::to_string(currentInt).length() == 2 ? "0" + std::to_string(currentInt) : std::to_string(currentInt));
 
 
 		Entity createdEntity = CreateEntity(nameValue);
@@ -170,7 +167,7 @@ namespace Dymatic {
 			* rotation1
 			* glm::scale(glm::mat4(1.0f), glm::vec3{ 20.0f, 20.0f, 20.0f });
 		
-		Dymatic::Renderer2D::DrawQuad(transform, m_GridTexture, 20.0f, glm::vec4{ 0.318f, 0.318f, 0.318f, 1.0f });
+		Renderer2D::DrawQuad(transform, m_GridTexture, 20.0f, glm::vec4{ 0.318f, 0.318f, 0.318f, 1.0f });
 		
 		Renderer2D::EndScene();
 		//-------------------------------------------------------------------------------------------------------//

@@ -2,7 +2,7 @@ Scene: Untitled
 Entities:
   - Entity: 12837192831273
     TagComponent:
-      Tag: Empty Entity
+      Tag: Water Particle System
     TransformComponent:
       Translation: [0, 0, 0]
       Rotation: [0, 0, 0]
@@ -27,6 +27,6 @@ Entities:
       SizeEnd: 0.0149999997
       SizeVariation: 0.100000001
       LifeTime: 1.20000005
-      EmissionNumber: 20
+      EmissionNumber: 40
       Active: true
       FaceCamera: true

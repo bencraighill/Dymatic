@@ -6,6 +6,8 @@
 #include <stdlib.h>
 #include <algorithm>
 
+#include <filesystem>
+
 #include "../TextSymbols.h"
 
 namespace Dymatic {
@@ -13,12 +15,11 @@ namespace Dymatic {
 	ContentBrowser::ContentBrowser(Preferences* preferencesRef, TextEditorPannel* textEditorPannelRef)
 		: m_PreferencesReference(preferencesRef), m_TextEditorPannelReference(textEditorPannelRef)
 	{
-		SetBrowseDirectory("C:/dev/ExperimentalContentFolder");
+		SetBrowseDirectory(m_RootPath);
 	}
 
 	void ContentBrowser::OnImGuiRender(Timestep ts)
 	{
-		m_TimeSinceFilePressed += ts;
 		FileProperties fileToOpen = {};
 		FileProperties fileToDelete = {};
 		std::string newBrowseDirectory = "";
@@ -28,10 +29,7 @@ namespace Dymatic {
 		{
 			ImGui::Begin((std::string(CHARACTER_WINDOW_ICON_CONTENT_BROWSER) + " Content Browser").c_str(), &m_ContentBrowserVisible);
 
-			if (ImGui::ImageButton(reinterpret_cast<void*>(m_IconRefresh->GetRendererID()), ImVec2{ 20, 20 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 }))
-			{
-				UpdateFileView();
-			}
+			if (ImGui::Button(CHARACTER_CONTENT_BROWSER_REFRESH, ImVec2{ 35.0f, 25.0f })) { UpdateFileView(); }
 
 			ImGui::SameLine();
 
@@ -41,8 +39,7 @@ namespace Dymatic {
 			slashLocations.push_back(-1);
 			for (int i = 0; i < m_BrowsePath.length(); i++)
 			{
-				std::string a = std::string(1, m_BrowsePath[i]);
-				if (a == "/")
+				if (m_BrowsePath[i] == '\\')
 				{
 					slashLocations.push_back(i);
 				}
@@ -63,11 +60,21 @@ namespace Dymatic {
 					newBrowseDirectory = m_BrowsePath.substr(0, slashLocations[i] + (i == 1 ? 1 : 0));
 					m_ScrollToTop = true;
 				}
+				if (ImGui::BeginDragDropTarget())
+				{
+					if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_ITEM"))
+					{
+						const char* filepath = (const char*)payload->Data;
+						SystemCommand("move \"" + std::string(filepath) + "\" \"" + m_BrowsePath.substr(0, slashLocations[i] + (i == 1 ? 1 : 0)) + "\"");
+						UpdateFileView();
+					}
+					ImGui::EndDragDropTarget();
+				}
 				if (GetNumberOfFolders(filesAtDirectory) > 0 || i != slashLocations.size() - 1)
 				{
 					ImGui::SameLine();
 					ImGui::BeginGroup();
-					ImGui::Dummy(ImVec2{ 0, (ImGui::CalcTextSize("W").y / 2.0f) - (10.0f * 0.75f) });
+					ImGui::Dummy(ImVec2{ 0, 0 });
 					
 					if (ImGui::ImageButton(reinterpret_cast<void*>(m_IconRightArrow->GetRendererID()), ImVec2{ 10, 10 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 }))
 					{
@@ -96,7 +103,7 @@ namespace Dymatic {
 					{
 						if (ImGui::MenuItem(filesAtDir[i].filename.c_str()))
 						{
-							SetBrowseDirectory(m_DirectoryViewDropdownPath + "/" + filesAtDir[i].filename);
+							SetBrowseDirectory(m_DirectoryViewDropdownPath + '\\' + filesAtDir[i].filename);
 							m_ScrollToTop = true;
 						}
 					}
@@ -124,10 +131,7 @@ namespace Dymatic {
 
 				ImGui::BeginChild("##PathsViewerWindow", ImVec2(sz1, h), false);
 
-				if (ImGui::ImageButton(reinterpret_cast<void*>(m_IconPathViewer->GetRendererID()), ImVec2{ 18, 18 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 }))
-				{
-					m_PathsWindowOpen = false;
-				}
+				if (ImGui::Button(CHARACTER_CONTENT_BROWSER_VIEW_PATHS, ImVec2{ 35.0f, 22.0f })) { m_PathsWindowOpen = false; }
 
 				ImGui::SameLine();
 
@@ -155,12 +159,9 @@ namespace Dymatic {
 			//ImGui::BeginChild("##ContentBrowserWholeWindow");
 			ImGui::BeginChild("##ContentBrowserWholeWindow", ImVec2(sz2, h), false);
 
-			if (m_PathsWindowOpen == false)
+			if (!m_PathsWindowOpen)
 			{
-				if (ImGui::ImageButton(reinterpret_cast<void*>(m_IconPathViewer->GetRendererID()), ImVec2{ 18, 18 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 }))
-				{
-					m_PathsWindowOpen = true;
-				}
+				if (ImGui::Button(CHARACTER_CONTENT_BROWSER_VIEW_PATHS, ImVec2{ 35.0f, 22.0f })) { m_PathsWindowOpen = true; }
 			}
 
 			ImGui::SameLine();
@@ -178,7 +179,7 @@ namespace Dymatic {
 			}
 			ImGui::PopItemWidth();
 			ImGui::SameLine();
-			if (ImGui::Button("X", ImVec2{ 24, 24 }))
+			if (ImGui::Button("X", ImVec2{ 22.0f, 22.0f }))
 			{
 				m_SearchBarBuffer = "";
 				UpdateFileView();
@@ -265,6 +266,29 @@ namespace Dymatic {
 
 					bool filePressed = ImGui::ImageButton(reinterpret_cast<void*>(FormatBackground->GetRendererID()), ImVec2{ IconSize, IconSize }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 }, -1, ImVec4{ 0.0f, 0.0f, 0.0f, 0.0f }, tintColor);
 					if (FormatTexture) { ImGui::GetWindowDrawList()->AddImage(reinterpret_cast<void*>(FormatTexture->GetRendererID()), curPos, ImVec2{ curPos.x + IconSize, curPos.y + IconSize }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 }, ImGui::ColorConvertFloat4ToU32(ImGui::Custom::GetImGuiCustomColorValue(ImGui::Custom::ImGuiCol_FileIcon))); }
+					ImGui::IsItemClicked();
+
+
+					if (ImGui::BeginDragDropSource())
+					{
+						std::string path = (m_BrowsePath + '\\' + filesDisplayed[i].filename);
+						ImGui::SetDragDropPayload("CONTENT_BROWSER_ITEM", path.c_str(), sizeof(char) * path.length() + 5, ImGuiCond_Once);
+						ImGui::Text((std::string(filesDisplayed[i].fileCatagory == Folder ? CHARACTER_WINDOW_ICON_CONTENT_BROWSER : CHARACTER_SYSTEM_ICON_NEW_FILE) + " Move " + filesDisplayed[i].filename).c_str());
+						ImGui::EndDragDropSource();
+					}
+					if (filesDisplayed[i].fileCatagory == Folder)
+					{
+						if (ImGui::BeginDragDropTarget())
+						{
+							if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_ITEM"))
+							{
+								const char* filepath = (const char*)payload->Data;
+								SystemCommand("move \"" + std::string(filepath) + "\" \"" + m_BrowsePath + '\\' + filesDisplayed[i].filename + "\"");
+								UpdateFileView();
+							}
+							ImGui::EndDragDropTarget();
+						}
+					}
 
 					if (ImGui::IsItemHovered())
 					{
@@ -273,17 +297,16 @@ namespace Dymatic {
 						ImGui::Text(filesDisplayed[i].filename.c_str());
 						ImGui::PopFont();
 						ImGui::EndTooltip();
-					}
 
-					if (filePressed)
-					{
-						if (filesDisplayed[i].filename == m_SelectedFile.filename && m_TimeSinceFilePressed < ((float)m_PreferencesReference->m_PreferenceData.doubleClickSpeed) / 1000.0f)
+						if (ImGui::IsMouseDoubleClicked(0))
 						{
 							fileToOpen = filesDisplayed[i];
 						}
-						m_TimeSinceFilePressed = 0.0f;
-						m_SelectedFile = filesDisplayed[i];
 					}
+
+					if (filePressed)
+						m_SelectedFile = filesDisplayed[i];
+
 					ImGui::PopStyleColor(3);
 					if (ImGui::BeginPopupContextItem())
 					{
@@ -308,7 +331,7 @@ namespace Dymatic {
 
 						if (ImGui::MenuItem("Duplicate"))
 						{
-							CopyFileToDirectory(m_BrowsePath + "/" + filesDisplayed[i].filename, m_BrowsePath + "/" + FindNextNumericalName(filesDisplayed[i].filename), filesDisplayed[i].fileCatagory);
+							CopyFileToDirectory(m_BrowsePath + '\\' + filesDisplayed[i].filename, m_BrowsePath + '\\' + FindNextNumericalName(filesDisplayed[i].filename), filesDisplayed[i].fileCatagory);
 						}
 
 						if (ImGui::MenuItem("Delete"))
@@ -363,7 +386,7 @@ namespace Dymatic {
 
 					newLineLocations.push_back(fileName.length() - 1);
 
-					for (int s = 1; s < newLineLocations.size() - 1; s++)//
+					for (int s = 1; s < newLineLocations.size() - 1; s++)
 					{
 						if (((newLineLocations[s + 1] - newLineLocations[s]) + (newLineLocations[s] - newLineLocations[s - 1])) < maxLineLength)
 						{
@@ -467,8 +490,7 @@ namespace Dymatic {
 							newFile = FindNextNumericalName(m_CopyContext.filename);
 						}
 
-						//CopyFileToDirectoru handles "UpdateFileView()"
-						CopyFileToDirectory(m_CopyBrowsePathContext + "/" + m_CopyContext.filename, m_BrowsePath + "/" + newFile, m_CopyContext.fileCatagory);
+						CopyFileToDirectory(m_CopyBrowsePathContext + '\\' + m_CopyContext.filename, m_BrowsePath + '\\' + newFile, m_CopyContext.fileCatagory);
 					}
 				}
 
@@ -482,14 +504,6 @@ namespace Dymatic {
 				ImGui::EndPopup();
 			}
 
-			//if (m_RenamePopupContext.filename != "")
-			//{
-			//	ImGui::OpenPopup("RenameFilePopup");
-			//}
-			//else
-			//{
-			//	m_RenamePopupContext = {};
-			//}
 			if (m_OpenRenamePopup)
 			{
 				ImGui::OpenPopup("RenameFilePopup");
@@ -500,7 +514,7 @@ namespace Dymatic {
 			if (ImGui::BeginPopup("RenameFilePopup", ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar))
 			{
 				ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[1]);
-				ImGui::Text(("Renaming File: " + m_BrowsePath + "/" + m_RenamePopupContext.filename).c_str());
+				ImGui::Text(("Renaming File: " + m_BrowsePath + '\\' + m_RenamePopupContext.filename).c_str());
 				ImGui::PopFont();
 				ImGui::Dummy(ImVec2{ 0, 10 });
 				ImGui::PushItemWidth(-1);
@@ -517,7 +531,7 @@ namespace Dymatic {
 				bool canRename = true;
 				std::string renameMessage = "";
 				if (m_RenameBuffer == "") { renameMessage = "Filename cannot be empty!"; canRename = false; }
-				else if (!(m_RenameBuffer.find("\\") == std::string::npos) || !(m_RenameBuffer.find("/") == std::string::npos) || !(m_RenameBuffer.find(":") == std::string::npos) || !(m_RenameBuffer.find("*") == std::string::npos) || !(m_RenameBuffer.find("?") == std::string::npos) || !(m_RenameBuffer.find("<") == std::string::npos) || !(m_RenameBuffer.find(">") == std::string::npos) || !(m_RenameBuffer.find("|") == std::string::npos) || !(m_RenameBuffer.find("\"") == std::string::npos)) { renameMessage = "Invalid Filename! ( Cannot Include: \\/:*?<>|\" )"; canRename = false; }
+				else if (!(m_RenameBuffer.find("\\") == std::string::npos) || !(m_RenameBuffer.find('\\') == std::string::npos) || !(m_RenameBuffer.find(":") == std::string::npos) || !(m_RenameBuffer.find("*") == std::string::npos) || !(m_RenameBuffer.find("?") == std::string::npos) || !(m_RenameBuffer.find("<") == std::string::npos) || !(m_RenameBuffer.find(">") == std::string::npos) || !(m_RenameBuffer.find("|") == std::string::npos) || !(m_RenameBuffer.find("\"") == std::string::npos)) { renameMessage = "Invalid Filename! ( Cannot Include: \\/:*?<>|\" )"; canRename = false; }
 				else if (DoesFileExist(m_RenameBuffer) && m_RenameBuffer != m_RenamePopupContext.filename) { renameMessage = "A file with this name already exists!"; canRename = false; }
 				else if ((m_RenameBuffer.length() < 4) && m_RenamePopupContext.fileCatagory != FileCatagory::Folder) { renameMessage = "Filename is too short!"; canRename = false; }
 				else if ((GetFileFormat(m_RenameBuffer) == "" || GetFileFormat(m_RenameBuffer) == ".") && m_RenamePopupContext.fileCatagory != FileCatagory::Folder) { renameMessage = "Filename must have an extension!"; canRename = false; }
@@ -559,7 +573,7 @@ namespace Dymatic {
 			ImGui::EndChild();
 
 			ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[1]);
-			std::string numberOfFiles = std::to_string(GetNumberOfFiles(filesAtDirectory) + GetNumberOfFolders(filesAtDirectory)) + " items";
+			std::string numberOfFiles = std::to_string(GetNumberOfFiles(filesDisplayed) + GetNumberOfFolders(filesDisplayed)) + " items";
 			ImGui::Text(numberOfFiles.c_str());
 			ImGui::PopFont();
 
@@ -572,7 +586,7 @@ namespace Dymatic {
 		//Delete File
 		if (fileToDelete.filename != "")
 		{
-			DeleteFileBrowsed(m_BrowsePath + "/" + fileToDelete.filename, fileToDelete.fileCatagory);
+			DeleteFileBrowsed(m_BrowsePath + '\\' + fileToDelete.filename, fileToDelete.fileCatagory);
 		}
 
 		//Open File
@@ -602,18 +616,30 @@ namespace Dymatic {
 					flags |= ImGuiTreeNodeFlags_SpanAvailWidth;
 
 					bool treeVisible = false;
-					bool lastFolder = (GetNumberOfFolders(GetFilesAtDirectory(path + "/" + listOfFiles[i].filename)) == 0);
+					bool lastFolder = (GetNumberOfFolders(GetFilesAtDirectory(path + '\\' + listOfFiles[i].filename)) == 0);
 					ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[1]);
 					treeVisible = ImGui::TreeNodeEx(listOfFiles[i].filename.c_str(), flags | (lastFolder ? ImGuiTreeNodeFlags_Leaf : 0));
 					ImGui::PopFont();
 					if (ImGui::IsItemClicked() && (ImGui::GetMousePos().x - ImGui::GetItemRectMin().x) > ImGui::GetTreeNodeToLabelSpacing())
 					{
-						SetBrowseDirectory(path + "/" + listOfFiles[i].filename);
+						SetBrowseDirectory(path + '\\' + listOfFiles[i].filename);
 						m_ScrollToTop = true;
 					}
+					
+					if (ImGui::BeginDragDropTarget())
+					{
+						if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_ITEM"))
+						{
+							const char* filepath = (const char*)payload->Data;
+							SystemCommand("move \"" + std::string(filepath) + "\" \"" + path + "\\" + listOfFiles[i].filename + "\"");
+							UpdateFileView();
+						}
+						ImGui::EndDragDropTarget();
+					}
+
 					if (treeVisible)
 					{
-						GeneratePathList(path + "/" + listOfFiles[i].filename);
+						GeneratePathList(path + '\\' + listOfFiles[i].filename);
 						ImGui::TreePop();
 					}
 				}
@@ -642,7 +668,7 @@ namespace Dymatic {
 	{
 		if (!DoesFileExist(filename))
 		{
-			std::string message = "rename \"" + m_BrowsePath + "/" + fileProperties.filename + "\"  \"" + filename + "\"";
+			std::string message = "rename \"" + m_BrowsePath + '\\' + fileProperties.filename + "\"  \"" + filename + "\"";
 			message = SwapStringSlashesSingle(message);
 			SystemCommand(message);
 			UpdateFileView();
@@ -684,12 +710,12 @@ namespace Dymatic {
 	{
 		if (fileProperties.fileCatagory == FileCatagory::File)
 		{
-			m_FileToOpen = m_BrowsePath + "/" +fileProperties.filename;
+			m_FileToOpen = m_BrowsePath + '\\' +fileProperties.filename;
 		}
 
 		if (fileProperties.fileCatagory == FileCatagory::Folder)
 		{
-			SetBrowseDirectory(m_BrowsePath + "/" + fileProperties.filename);
+			SetBrowseDirectory(m_BrowsePath + '\\' + fileProperties.filename);
 			m_SelectedFile = {};
 			m_ScrollToTop = true;
 		}
@@ -869,9 +895,9 @@ namespace Dymatic {
 	std::string ContentBrowser::GetFullFileNameFromPath(std::string filepath)
 	{
 		std::string name = "";
-		if (filepath.find_first_of("/") != -1)
+		if (filepath.find_first_of('\\') != -1)
 		{
-			name = filepath.substr(filepath.find_last_of("/") + 1, filepath.length() - filepath.find_last_of("/") - 1);
+			name = filepath.substr(filepath.find_last_of('\\') + 1, filepath.length() - filepath.find_last_of('\\') - 1);
 		}
 		return name;
 	}
@@ -910,7 +936,7 @@ namespace Dymatic {
 			}
 		}
 		//Remove items with slash last
-		if (m_BrowsePath.find_last_of("/") == m_BrowsePath.length() - 1)
+		if (m_BrowsePath.find_last_of('\\') == m_BrowsePath.length() - 1)
 		{
 			m_BrowsePath = m_BrowsePath.erase(m_BrowsePath.length() - 1, 1);
 		}
@@ -923,9 +949,9 @@ namespace Dymatic {
 		std::vector<Dymatic::FileProperties> filesAtLocation;
 
 		//Add slash to end of path if it doesn't have one
-		if (filepath.find_first_of("/") == -1)
+		if (filepath.find_first_of('\\') == -1)
 		{
-			filepath = filepath + "/";
+			filepath = filepath + '\\';
 		}
 
 		//Folders
@@ -970,6 +996,13 @@ namespace Dymatic {
 		//Return Final Vector of Files
 		return filesAtLocation;
 
+	}
+
+	bool ContentBrowser::IsDirectory(std::string filepath)
+	{
+		struct stat path_stat;
+		stat(filepath.c_str(), &path_stat);
+		return S_ISDIR(path_stat.st_mode);
 	}
 
 	std::vector<std::string> ContentBrowser::GetRecords(std::string record_dir_path, FileCatagory fileCatagory)

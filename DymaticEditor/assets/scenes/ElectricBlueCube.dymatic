@@ -2,40 +2,13 @@ Scene: Untitled
 Entities:
   - Entity: 12837192831273
     TagComponent:
-      Tag: Face A
+      Tag: Empty Entity.005
     TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
+      Translation: [-0.00155324035, -0.5, -0.5]
+      Rotation: [3.14159274, 1.57079637, 1.57079637]
+      Scale: [0.999957681, 1.00000048, 0.999935746]
     SpriteRendererComponent:
-      Color: [0.474817365, 0.951198816, 0.968627453, 1]
-  - Entity: 12837192831273
-    TagComponent:
-      Tag: FaceB
-    TransformComponent:
-      Translation: [0.5, -2.72322342e-09, -0.5]
-      Rotation: [3.14159274, 1.57079637, 3.14159274]
-      Scale: [0.999993026, 1, 0.999993026]
-    SpriteRendererComponent:
-      Color: [0.422914237, 0.847221613, 0.862745106, 1]
-  - Entity: 12837192831273
-    TagComponent:
-      Tag: Empty Entity.002
-    TransformComponent:
-      Translation: [0.000311415177, 0.5, -0.5]
-      Rotation: [1.57079637, 1.57079637, 3.14159274]
-      Scale: [0.999995828, 0.999999881, 0.999979973]
-    SpriteRendererComponent:
-      Color: [0.409457892, 0.820264578, 0.835294127, 1]
-  - Entity: 12837192831273
-    TagComponent:
-      Tag: Empty Entity.003
-    TransformComponent:
-      Translation: [-0.5, -2.72322342e-09, -0.50000006]
-      Rotation: [0, 1.57079637, 0]
-      Scale: [0.999990046, 1, 0.999990046]
-    SpriteRendererComponent:
-      Color: [0.274894267, 0.550694048, 0.56078434, 1]
+      Color: [0.192233741, 0.385100722, 0.392156869, 1]
   - Entity: 12837192831273
     TagComponent:
       Tag: Empty Entity.004
@@ -47,10 +20,37 @@ Entities:
       Color: [0.224913478, 0.450567842, 0.458823532, 1]
   - Entity: 12837192831273
     TagComponent:
-      Tag: Empty Entity.005
+      Tag: Empty Entity.003
     TransformComponent:
-      Translation: [-0.00155324035, -0.5, -0.5]
-      Rotation: [3.14159274, 1.57079637, 1.57079637]
-      Scale: [0.999957681, 1.00000048, 0.999935746]
+      Translation: [-0.5, -2.72322342e-09, -0.50000006]
+      Rotation: [0, 1.57079637, 0]
+      Scale: [0.999990046, 1, 0.999990046]
     SpriteRendererComponent:
-      Color: [0.192233741, 0.385100722, 0.392156869, 1]
+      Color: [0.274894267, 0.550694048, 0.56078434, 1]
+  - Entity: 12837192831273
+    TagComponent:
+      Tag: Empty Entity.002
+    TransformComponent:
+      Translation: [0.000311415177, 0.5, -0.5]
+      Rotation: [1.57079637, 1.57079637, 3.14159274]
+      Scale: [0.999995828, 0.999999881, 0.999979973]
+    SpriteRendererComponent:
+      Color: [0.409457892, 0.820264578, 0.835294127, 1]
+  - Entity: 12837192831273
+    TagComponent:
+      Tag: FaceB
+    TransformComponent:
+      Translation: [0.5, -2.72322342e-09, -0.5]
+      Rotation: [3.14159274, 1.57079637, 3.14159274]
+      Scale: [0.999993026, 1, 0.999993026]
+    SpriteRendererComponent:
+      Color: [0.422914237, 0.847221613, 0.862745106, 1]
+  - Entity: 12837192831273
+    TagComponent:
+      Tag: Face A
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    SpriteRendererComponent:
+      Color: [0.474817365, 0.951198816, 0.968627453, 1]

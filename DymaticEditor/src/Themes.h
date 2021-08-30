@@ -87,6 +87,7 @@ namespace Dymatic {
 		//---
 		TextEditorDefault,
 		TextEditorKeyword,
+		TextEditorSpecialKeyword,
 		TextEditorNumber,
 		TextEditorString,
 		TextEditorCharLiteral,

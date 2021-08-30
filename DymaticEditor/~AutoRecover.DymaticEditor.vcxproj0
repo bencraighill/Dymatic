@@ -1,0 +1,205 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Dist|x64">
+      <Configuration>Dist</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{97412512-0302-A148-CC3C-EAC538BCE524}</ProjectGuid>
+    <IgnoreWarnCompileDuplicatedFilename>true</IgnoreWarnCompileDuplicatedFilename>
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>DymaticEditor</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <CharacterSet>Unicode</CharacterSet>
+    <PlatformToolset>v142</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <CharacterSet>Unicode</CharacterSet>
+    <PlatformToolset>v142</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Dist|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <CharacterSet>Unicode</CharacterSet>
+    <PlatformToolset>v142</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Dist|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>true</LinkIncremental>
+    <OutDir>..\bin\Debug-windows-x86_64\DymaticEditor\</OutDir>
+    <IntDir>..\bin-int\Debug-windows-x86_64\DymaticEditor\</IntDir>
+    <TargetName>DymaticEditor</TargetName>
+    <TargetExt>.exe</TargetExt>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LinkIncremental>false</LinkIncremental>
+    <OutDir>..\bin\Release-windows-x86_64\DymaticEditor\</OutDir>
+    <IntDir>..\bin-int\Release-windows-x86_64\DymaticEditor\</IntDir>
+    <TargetName>DymaticEditor</TargetName>
+    <TargetExt>.exe</TargetExt>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Dist|x64'">
+    <LinkIncremental>false</LinkIncremental>
+    <OutDir>..\bin\Dist-windows-x86_64\DymaticEditor\</OutDir>
+    <IntDir>..\bin-int\Dist-windows-x86_64\DymaticEditor\</IntDir>
+    <TargetName>DymaticEditor</TargetName>
+    <TargetExt>.exe</TargetExt>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <PreprocessorDefinitions>DY_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>..\Dymatic\vendor\spdlog\include;..\Dymatic\src;..\Dymatic\vendor;..\Dymatic\vendor\glm;..\Dymatic\vendor\entt\include;..\Dymatic\vendor\ImGuizmo;..\Dymatic\vendor\ImGuiNode;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
+      <Optimization>Disabled</Optimization>
+      <MinimalRebuild>false</MinimalRebuild>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>shlwapi.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <DelayLoadDLLs>shlwapi.dll;%(DelayLoadDLLs)</DelayLoadDLLs>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <PreprocessorDefinitions>DY_RELEASE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>..\Dymatic\vendor\spdlog\include;..\Dymatic\src;..\Dymatic\vendor;..\Dymatic\vendor\glm;..\Dymatic\vendor\entt\include;..\Dymatic\vendor\ImGuizmo;..\Dymatic\vendor\ImGuiNode;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <Optimization>Full</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <MinimalRebuild>false</MinimalRebuild>
+      <StringPooling>true</StringPooling>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalDependencies>shlwapi.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <DelayLoadDLLs>shlwapi.dll;%(DelayLoadDLLs)</DelayLoadDLLs>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Dist|x64'">
+    <ClCompile>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <PreprocessorDefinitions>DY_DIST;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>..\Dymatic\vendor\spdlog\include;..\Dymatic\src;..\Dymatic\vendor;..\Dymatic\vendor\glm;..\Dymatic\vendor\entt\include;..\Dymatic\vendor\ImGuizmo;..\Dymatic\vendor\ImGuiNode;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <Optimization>Full</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <MinimalRebuild>false</MinimalRebuild>
+      <StringPooling>true</StringPooling>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalDependencies>shlwapi.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <DelayLoadDLLs>shlwapi.dll;%(DelayLoadDLLs)</DelayLoadDLLs>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClInclude Include="src\BlueprintCode.h" />
+    <ClInclude Include="src\DragDrop.h" />
+    <ClInclude Include="src\DymaticNodeLibrary.h" />
+    <ClInclude Include="src\EditorLayer.h" />
+    <ClInclude Include="src\KeyBinds.h" />
+    <ClInclude Include="src\Panels\ConsoleWindow.h" />
+    <ClInclude Include="src\Panels\ContentBrowser.h" />
+    <ClInclude Include="src\Panels\CurveEditor.h" />
+    <ClInclude Include="src\Panels\FilePrompt.h" />
+    <ClInclude Include="src\Panels\ImGuiCustom.h" />
+    <ClInclude Include="src\Panels\ImageEditor.h" />
+    <ClInclude Include="src\Panels\ImageEditorNew.h" />
+    <ClInclude Include="src\Panels\MemoryEditor.h" />
+    <ClInclude Include="src\Panels\NodeEditor\NodeProgram.h" />
+    <ClInclude Include="src\Panels\NodeEditor\utilities\builders.h" />
+    <ClInclude Include="src\Panels\NodeEditor\utilities\drawing.h" />
+    <ClInclude Include="src\Panels\NodeEditor\utilities\widgets.h" />
+    <ClInclude Include="src\Panels\PerformanceAnalyser.h" />
+    <ClInclude Include="src\Panels\PopupsAndNotifications.h" />
+    <ClInclude Include="src\Panels\PreferencesPanel.h" />
+    <ClInclude Include="src\Panels\SandboxArea.h" />
+    <ClInclude Include="src\Panels\SceneHierarchyPanel.h" />
+    <ClInclude Include="src\Panels\TextEditor.h" />
+    <ClInclude Include="src\Panels\dirent.h" />
+    <ClInclude Include="src\Preferences.h" />
+    <ClInclude Include="src\TextSymbols.h" />
+    <ClInclude Include="src\Themes.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\DymaticEditorApplication.cpp" />
+    <ClCompile Include="src\DymaticNodeLibrary.cpp" />
+    <ClCompile Include="src\EditorLayer.cpp" />
+    <ClCompile Include="src\KeyBinds.cpp" />
+    <ClCompile Include="src\Panels\ConsoleWindow.cpp" />
+    <ClCompile Include="src\Panels\ContentBrowser.cpp" />
+    <ClCompile Include="src\Panels\CurveEditor.cpp" />
+    <ClCompile Include="src\Panels\FilePrompt.cpp" />
+    <ClCompile Include="src\Panels\ImGuiCustom.cpp" />
+    <ClCompile Include="src\Panels\ImageEditor.cpp" />
+    <ClCompile Include="src\Panels\ImageEditorNew.cpp" />
+    <ClCompile Include="src\Panels\NodeEditor\NodeProgram.cpp" />
+    <ClCompile Include="src\Panels\NodeEditor\utilities\builders.cpp" />
+    <ClCompile Include="src\Panels\NodeEditor\utilities\drawing.cpp" />
+    <ClCompile Include="src\Panels\NodeEditor\utilities\widgets.cpp" />
+    <ClCompile Include="src\Panels\PerformanceAnalyser.cpp" />
+    <ClCompile Include="src\Panels\PopupsAndNotifications.cpp" />
+    <ClCompile Include="src\Panels\PreferencesPanel.cpp" />
+    <ClCompile Include="src\Panels\SandboxArea.cpp" />
+    <ClCompile Include="src\Panels\SceneHierarchyPanel.cpp" />
+    <ClCompile Include="src\Panels\TextEditor.cpp" />
+    <ClCompile Include="src\Preferences.cpp" />
+    <ClCompile Include="src\Themes.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Dymatic\Dymatic.vcxproj">
+      <Project>{D08F6398-3C6F-E233-4587-6D0AB1E54895}</Project>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

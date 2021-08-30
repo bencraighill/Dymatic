@@ -1,0 +1,102 @@
+Current Windows Open:<Viewport Open> {true}<Toolbar Open> {true}<Stats Open> {true}<Info Open> {true}<Memory Open> {false}<Node Editor Open> {false}<Scene Hierarchy Open> {true}<Properties Open> {true}<Notifications Open> {true}<Content Browser Open> {true}<Text Editor Open> {false}<Curve Editor Open> {false}<Image Editor Open> {false}<Console Open> {false}<Ini Contents> {[Window][Dymatic Editor Dockspace Window]
+Pos=0,0
+Size=1600,900
+Collapsed=0
+
+[Window][Debug##Default]
+Pos=60,60
+Size=400,400
+Collapsed=0
+
+[Window][܅ Content Browser]
+Pos=377,585
+Size=1218,281
+Collapsed=0
+DockId=0x00000002,0
+
+[Window][܉ Text Editor]
+Pos=959,22
+Size=961,488
+Collapsed=0
+DockId=0x00000004,0
+
+[Window][Unsaved Changes]
+Pos=601,382
+Size=416,143
+Collapsed=0
+
+[Window][܃ Viewport]
+Pos=377,87
+Size=923,496
+Collapsed=0
+DockId=0x0000000C,0
+
+[Window][܂ Preferences]
+Pos=60,60
+Size=617,363
+Collapsed=0
+
+[Window][Performance Analyser]
+Pos=60,60
+Size=614,365
+Collapsed=0
+
+[Window][܊ Toolbar]
+Pos=377,27
+Size=923,58
+Collapsed=0
+DockId=0x0000000B,0
+
+[Window][܆ Scene Hierarchy]
+Pos=5,27
+Size=370,321
+Collapsed=0
+DockId=0x00000009,0
+
+[Window][܁ Properties]
+Pos=5,350
+Size=370,516
+Collapsed=0
+DockId=0x0000000A,0
+
+[Window][܄ Info]
+Pos=5,868
+Size=1590,27
+Collapsed=0
+DockId=0x0000000E,0
+
+[Window][܀ Stats]
+Pos=1302,27
+Size=293,556
+Collapsed=0
+DockId=0x00000006,0
+
+[Window][܋ Notifications]
+Pos=1302,27
+Size=293,556
+Collapsed=0
+DockId=0x00000006,1
+
+[Window][܈ Node Editor]
+Pos=365,117
+Size=923,496
+Collapsed=0
+
+[Docking][Data]
+DockSpace             ID=0xD7F3C3E6 Window=0xD349C893 Pos=5,27 Size=1590,868 Split=Y Selected=0x1D7828A0
+  DockNode            ID=0x0000000D Parent=0xD7F3C3E6 SizeRef=1920,994 Split=X
+    DockNode          ID=0x00000007 Parent=0x0000000D SizeRef=370,1028 Split=Y Selected=0x069B0EC8
+      DockNode        ID=0x00000009 Parent=0x00000007 SizeRef=370,380 Selected=0x069B0EC8
+      DockNode        ID=0x0000000A Parent=0x00000007 SizeRef=370,612 Selected=0x6AC41B26
+    DockNode          ID=0x00000008 Parent=0x0000000D SizeRef=1548,1028 Split=Y
+      DockNode        ID=0x00000001 Parent=0x00000008 SizeRef=1590,556 Split=X Selected=0x1D7828A0
+        DockNode      ID=0x00000003 Parent=0x00000001 SizeRef=957,412 Split=X Selected=0x1D7828A0
+          DockNode    ID=0x00000005 Parent=0x00000003 SizeRef=1174,629 Split=Y Selected=0x1D7828A0
+            DockNode  ID=0x0000000B Parent=0x00000005 SizeRef=1174,58 HiddenTabBar=1 Selected=0x61BE6282
+            DockNode  ID=0x0000000C Parent=0x00000005 SizeRef=1174,496 CentralNode=1 HiddenTabBar=1 Selected=0x1D7828A0
+          DockNode    ID=0x00000006 Parent=0x00000003 SizeRef=372,629 Selected=0xEB8EEC4D
+        DockNode      ID=0x00000004 Parent=0x00000001 SizeRef=961,412 Selected=0x4912CB14
+      DockNode        ID=0x00000002 Parent=0x00000008 SizeRef=1590,281 Selected=0xF87A71F7
+  DockNode            ID=0x0000000E Parent=0xD7F3C3E6 SizeRef=1920,32 HiddenTabBar=1 Selected=0xFF108EF0
+
+}

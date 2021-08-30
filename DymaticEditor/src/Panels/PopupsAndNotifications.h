@@ -7,15 +7,6 @@
 
 namespace Dymatic {
 
-	struct PopupData
-	{
-		std::string title, message;
-		std::vector<std::string> buttons;
-		int buttonClicked = -1;
-		int id = -1;
-		bool loading = false;
-	};
-
 	struct ButtonData
 	{
 		unsigned int id;
@@ -25,6 +16,14 @@ namespace Dymatic {
 			: id(id), name(name), func(func)
 		{
 		}
+	};
+
+	struct PopupData
+	{
+		unsigned int id;
+		std::string title, message;
+		std::vector<ButtonData> buttons;
+		bool loading = false;
 	};
 
 	struct NotificationData
@@ -49,17 +48,14 @@ namespace Dymatic {
 	public:
 		PopupsAndNotifications(Preferences* preferencesRef);
 
-
-		PopupData Popup(PopupData popupData);
-		PopupData Popup(std::string title, std::string message, std::vector<std::string> buttons, bool loading = false);
+		void Popup(std::string title, std::string message, std::vector<ButtonData> buttons, bool loading = false);
 
 		void RemoveTopmostPopup();
 
-		PopupData PopupUpdate();
-
+		void PopupUpdate();
 
 		void Notification(int notificationIndex, std::string title, std::string message, std::vector<ButtonData> buttons = {}, bool loading = false, float displayTime = 0.0f);
-		void NotificationUpdate(float programTime);
+		void NotificationUpdate(Timestep ts, float programTime);
 		void ClearNotificationList();
 		bool GetPopupOpen() { return m_PopupOpen; }
 

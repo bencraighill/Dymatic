@@ -161,7 +161,7 @@ namespace Dymatic {
 				ImGui::PopStyleVar();
 				if (open)
 				{
-					ImGui::BeginChild("##Metrics");
+					//ImGui::BeginChild("##Metrics");
 
 					// Debugging enums
 					enum { WRT_OuterRect, WRT_OuterRectClipped, WRT_InnerRect, WRT_InnerClipRect, WRT_WorkRect, WRT_Content, WRT_ContentRegionRect, WRT_Count }; // Windows Rect Type
@@ -811,7 +811,7 @@ namespace Dymatic {
 						overlay_draw_list->AddText(NULL, 0.0f, pos, IM_COL32(255, 255, 255, 255), buf);
 					}
 #endif // #ifdef IMGUI_HAS_DOCK
-					ImGui::EndChild();
+					//ImGui::EndChild();
 					ImGui::TreePop();
 				}
 

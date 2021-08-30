@@ -305,6 +305,7 @@ namespace Dymatic {
 				{
 					EditThemeColor(TextEditorDefault);
 					EditThemeColor(TextEditorKeyword);
+					EditThemeColor(TextEditorSpecialKeyword);
 					EditThemeColor(TextEditorNumber);
 					EditThemeColor(TextEditorString);
 					EditThemeColor(TextEditorCharLiteral);
@@ -391,7 +392,10 @@ namespace Dymatic {
 				{
 					ImGui::Text("Double Click Speed");
 					ImGui::SameLine();
-					ImGui::SliderInt("##MouseDoubleClickSpeedSlider", &GetPreferences().m_PreferenceData.doubleClickSpeed, 1, 1000);
+					if (ImGui::SliderInt("##MouseDoubleClickSpeedSlider", &GetPreferences().m_PreferenceData.doubleClickSpeed, 1, 1000))
+					{
+						ImGui::GetIO().MouseDoubleClickTime = GetPreferences().m_PreferenceData.doubleClickSpeed / 1000.0f;
+					}
 					ImGui::TreePop();
 				}
 			}
@@ -879,7 +883,6 @@ namespace Dymatic {
 	void PreferencesPannel::OpenThemeByPath(std::string filepath)
 	{
 		m_RecentThemePath = filepath;
-		bool fatalError = false;
 		auto& theme = GetPreferences().m_PreferenceData.colorScheme.colorSchemeValues;
 
 		std::string result;
@@ -896,11 +899,7 @@ namespace Dymatic {
 			}
 			else
 			{
-				DY_CORE_ERROR("Could not read from file '{0}'", filepath);
-				fatalError = true;
-				m_PreferencesMessage.title = "Dytheme Read Error";
-				m_PreferencesMessage.message = "Dytheme file:\n" + filepath + "\nCould not read from Dytheme file\n";
-				m_PreferencesMessage.buttons = { "Retry", "Ok" };
+				DY_CORE_ERROR("Could not read from Dytheme file '{0}'", filepath);
 				return;
 			}
 		}
@@ -911,13 +910,13 @@ namespace Dymatic {
 		//	DY_CORE_ERROR("Could not open file '{0}'", filepath);
 		//}
 
-		if (result != "" && fatalError == false)
+		if (result != "")
 		{
 			//while (result.find_first_of(" ") != -1)
 			//{
 			//	result = result.erase(result.find_first_of(" "), 1);
 			//}
-			
+
 
 			while (result.find_first_of("\n") != -1)
 			{
@@ -935,10 +934,7 @@ namespace Dymatic {
 				std::string tempstring = editResultMain;
 				if (editResultMain.find_first_of(">") == -1 || (tempstring.erase(tempstring.find_first_of("<"), 1).find_first_of("<") < tempstring.find_first_of(">")))
 				{
-					fatalError = true;
-					m_PreferencesMessage.title = "Dytheme Read Error";
-					m_PreferencesMessage.message = "Dytheme file:\n" + filepath + "\nOpens name \"<\", but never closes it, \">\"\n";
-					m_PreferencesMessage.buttons = { "Retry", "Ok" };
+					DY_CORE_ERROR("Dytheme file: '{0}' opens name \"<\", but never closes it \">\".", filepath);
 					return;
 				}
 				editResultMain = editResultMain.erase(editResultMain.find_first_of("<"), editResultMain.find_first_of(">") + 1 - editResultMain.find_first_of("<"));
@@ -950,79 +946,74 @@ namespace Dymatic {
 				std::string tempstring = editResult;
 				if (editResult.find_first_of("}") == -1 || (tempstring.erase(tempstring.find_first_of("{"), 1).find_first_of("{") < tempstring.find_first_of("}")))
 				{
-					fatalError = true;
-					m_PreferencesMessage.title = "Dytheme Read Error";
-					m_PreferencesMessage.message = "Dytheme file:\n" + filepath + "\nOpens value \"{\", but never closes it, \"}\"\n";
-					m_PreferencesMessage.buttons = { "Retry", "Ok" };
+					DY_CORE_ERROR("Dytheme file: '{0}' opens value but never closes it.", filepath);
 					return;
 				}
 				editResult = editResult.erase(editResult.find_first_of("{"), editResult.find_first_of("}") + 1 - editResult.find_first_of("{"));
 			}
 
-			if (fatalError == false)
+			//Load In Theme
+			bool openValueName = false;
+			bool openValue = false;
+			std::string CurrentValueName = "";
+			std::string CurrentValue = "";
+			for (int i = 0; i < result.length(); i++)
 			{
-				bool openValueName = false;
-				bool openValue = false;
-				std::string CurrentValueName = "";
-				std::string CurrentValue = "";
-				for (int i = 0; i < result.length(); i++)
+				std::string character = result.substr(i, 1);
+
+				if (character == ">") { openValueName = false; }
+				if (openValueName) { CurrentValueName = CurrentValueName + character; }
+				if (character == "<") { openValueName = true; CurrentValueName = ""; }
+
+				if (character == "}") { openValue = false; }
+				if (openValue) { CurrentValue = CurrentValue + character; }
+				if (character == "{") { openValue = true; CurrentValue = ""; }
+
+				auto& prefs = GetPreferences().m_PreferenceData;
+				if (character == "}" && CurrentValue != "")
 				{
-					std::string character = result.substr(i, 1);
+					float x, y, z, w;
 
-					if (character == ">") { openValueName = false; }
-					if (openValueName) { CurrentValueName = CurrentValueName + character; }
-					if (character == "<") { openValueName = true; CurrentValueName = ""; }
-
-					if (character == "}") { openValue = false; }
-					if (openValue) { CurrentValue = CurrentValue + character; }
-					if (character == "{") { openValue = true; CurrentValue = ""; }
-
-					auto& prefs = GetPreferences().m_PreferenceData;
-					if (character == "}" && CurrentValue != "")
+					for (int y = 0; y < CurrentValue.length(); y++)
 					{
-						float x, y, z, w;
-
-						for (int y = 0; y < CurrentValue.length(); y++)
+						if (CurrentValue[y] == " "[0])
 						{
-							if (CurrentValue[y] == " "[0])
-							{
-								CurrentValue = CurrentValue.erase(y, 1);
-							}
+							CurrentValue = CurrentValue.erase(y, 1);
 						}
-
-						if (CurrentValue.find_first_of(",") != std::string::npos)
-						{
-							x = std::stof(CurrentValue.substr(0, CurrentValue.find_first_of(",")));
-							CurrentValue = CurrentValue.erase(0, CurrentValue.find_first_of(",") + 1);
-						}
-						else { x = theme[GetThemeFromString(CurrentValueName)].x; }
-
-						if (CurrentValue.find_first_of(",") != std::string::npos)
-						{
-							y = std::stof(CurrentValue.substr(0, CurrentValue.find_first_of(",")));  
-							CurrentValue = CurrentValue.erase(0, CurrentValue.find_first_of(",") + 1);
-						}
-						else { y = theme[GetThemeFromString(CurrentValueName)].y; }
-
-						if (CurrentValue.find_first_of(",") != std::string::npos)
-						{
-							z = std::stof(CurrentValue.substr(0, CurrentValue.find_first_of(",")));
-							CurrentValue = CurrentValue.erase(0, CurrentValue.find_first_of(",") + 1);
-						}
-						else { z = theme[GetThemeFromString(CurrentValueName)].z; }
-
-						if (CurrentValue.find_first_of(",") != std::string::npos)
-						{
-							w = std::stof(CurrentValue.substr(0, CurrentValue.find_first_of(",")));
-							CurrentValue = CurrentValue.erase(0, CurrentValue.find_first_of(",") + 1);
-						}
-						else { w = theme[GetThemeFromString(CurrentValueName)].w; }
-
-						theme[GetThemeFromString(CurrentValueName)] = ImVec4(x, y, z, w);
 					}
+
+					if (CurrentValue.find_first_of(",") != std::string::npos)
+					{
+						x = std::stof(CurrentValue.substr(0, CurrentValue.find_first_of(",")));
+						CurrentValue = CurrentValue.erase(0, CurrentValue.find_first_of(",") + 1);
+					}
+					else { x = theme[GetThemeFromString(CurrentValueName)].x; }
+
+					if (CurrentValue.find_first_of(",") != std::string::npos)
+					{
+						y = std::stof(CurrentValue.substr(0, CurrentValue.find_first_of(",")));
+						CurrentValue = CurrentValue.erase(0, CurrentValue.find_first_of(",") + 1);
+					}
+					else { y = theme[GetThemeFromString(CurrentValueName)].y; }
+
+					if (CurrentValue.find_first_of(",") != std::string::npos)
+					{
+						z = std::stof(CurrentValue.substr(0, CurrentValue.find_first_of(",")));
+						CurrentValue = CurrentValue.erase(0, CurrentValue.find_first_of(",") + 1);
+					}
+					else { z = theme[GetThemeFromString(CurrentValueName)].z; }
+
+					if (CurrentValue.find_first_of(",") != std::string::npos)
+					{
+						w = std::stof(CurrentValue.substr(0, CurrentValue.find_first_of(",")));
+						CurrentValue = CurrentValue.erase(0, CurrentValue.find_first_of(",") + 1);
+					}
+					else { w = theme[GetThemeFromString(CurrentValueName)].w; }
+
+					theme[GetThemeFromString(CurrentValueName)] = ImVec4(x, y, z, w);
 				}
-				UpdateThemePreferences();
 			}
+			UpdateThemePreferences();
 		}
 
 	}
@@ -1145,6 +1136,7 @@ namespace Dymatic {
 		// Text Editor
 		colors[ImGuiCol_TextEditorDefault] = theme[TextEditorDefault];
 		colors[ImGuiCol_TextEditorKeyword] = theme[TextEditorKeyword];
+		colors[ImGuiCol_TextEditorSpecialKeyword] = theme[TextEditorSpecialKeyword];
 		colors[ImGuiCol_TextEditorNumber] = theme[TextEditorNumber];
 		colors[ImGuiCol_TextEditorString] = theme[TextEditorString];
 		colors[ImGuiCol_TextEditorCharLiteral] = theme[TextEditorCharLiteral];
@@ -1216,8 +1208,6 @@ namespace Dymatic {
 
 	void PreferencesPannel::OpenKeyBindsByFilepath(std::string filepath)
 	{
-		bool fatalError = false;
-
 		std::string result;
 		std::ifstream in(filepath, std::ios::in | std::ios::binary); // ifstream closes itself due to RAII
 		if (in)
@@ -1232,11 +1222,7 @@ namespace Dymatic {
 			}
 			else
 			{
-				DY_CORE_ERROR("Could not read from file '{0}'", filepath);
-				fatalError = true;
-				m_PreferencesMessage.title = "Import Key Bind Error";
-				m_PreferencesMessage.message = "Bind file:\n" + filepath + "\nCould not read from Key Binds file\n";
-				m_PreferencesMessage.buttons = { "Ok" };
+				DY_CORE_ERROR("Could not read from keybinds file '{0}'", filepath);
 				return;
 			}
 		}
@@ -1328,8 +1314,6 @@ namespace Dymatic {
 
 	void PreferencesPannel::OpenPreferencesByFilepath(std::string filepath)
 	{
-		bool fatalError = false;
-
 		std::string result;
 		std::ifstream in(filepath, std::ios::in | std::ios::binary); // ifstream closes itself due to RAII
 		if (in)
@@ -1344,11 +1328,7 @@ namespace Dymatic {
 			}
 			else
 			{
-				DY_CORE_ERROR("Could not read from file '{0}'", filepath);
-				fatalError = true;
-				m_PreferencesMessage.title = "Import Preferences Error";
-				m_PreferencesMessage.message = "Preferences file:\n" + filepath + "\nCould not read from Preferences file\n";
-				m_PreferencesMessage.buttons = { "Ok" };
+				DY_CORE_ERROR("Could not read from preferences file '{0}'", filepath);
 				return;
 			}
 		}
@@ -1384,12 +1364,12 @@ namespace Dymatic {
 			if (character == "}" && CurrentValue != "")
 			{
 				if (CurrentValueName == "AutosavePreferences") { prefs.autosavePreferences = CurrentValue == "true" ? true : false; }
-				if (CurrentValueName == "AutosaveEnabled") { prefs.autosaveEnabled = CurrentValue == "true" ? true : false; }
+				else if (CurrentValueName == "AutosaveEnabled") { prefs.autosaveEnabled = CurrentValue == "true" ? true : false; }
 				else if (CurrentValueName == "AutosaveTime") { prefs.autosaveTime = std::stof(CurrentValue); }
 				else if (CurrentValueName == "RecentFiles") { prefs.recentFiles = std::stof(CurrentValue); }
 				else if (CurrentValueName == "ShowSplash") { prefs.showSplash = CurrentValue == "true" ? true : false; }
 				else if (CurrentValueName == "FileColors") { SetFileColorsFromString(CurrentValue); }
-				else if (CurrentValueName == "DoubleClickSpeed") { prefs.doubleClickSpeed = std::stof(CurrentValue); }
+				else if (CurrentValueName == "DoubleClickSpeed") { prefs.doubleClickSpeed = std::stof(CurrentValue); ImGui::GetIO().MouseDoubleClickTime = prefs.doubleClickSpeed / 1000.0f; }
 				else if (CurrentValueName == "EmulateNumpad") { prefs.emulateNumpad = CurrentValue == "true" ? true : false; }
 				else if (CurrentValueName == "NotificationPreset") { prefs.NotificationPreset = std::clamp((int)std::stof(CurrentValue), 0, 3); }
 				else if (CurrentValueName == "NotificationToastEnabled") { for (int i = 0; i < CurrentValue.length() && prefs.NotificationToastEnabled.size(); i++) { prefs.NotificationToastEnabled[i] = std::stof(CurrentValue.substr(i, 1)) > 2 || std::stof(CurrentValue.substr(i, 1)) < 0 ? 0 : std::stof(CurrentValue.substr(i, 1)); } }

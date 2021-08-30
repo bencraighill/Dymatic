@@ -14,7 +14,6 @@
 #include "Panels/ConsoleWindow.h"
 #include "Panels/PerformanceAnalyser.h"
 
-#include "Panels/ImageEditorNew.h"
 
 #include "Panels/SandboxArea.h"
 
@@ -38,6 +37,8 @@ namespace Dymatic {
 	private:
 		bool OnKeyPressed(KeyPressedEvent& e);
 		bool OnMouseButtonPressed(MouseButtonPressedEvent& e);
+		bool OnDropped(WindowDropEvent& e);
+		bool OnClosed(WindowCloseEvent& e);
 
 		bool ViewportKeyAllowed() { return m_ViewportHovered || m_ViewportFocused; }
 
@@ -66,6 +67,8 @@ namespace Dymatic {
 
 		std::string GetCurrentFileName();
 
+		void OpenWindowLayoutByFilepath(std::string filepath);
+		void SaveWindowLayoutByFilepath(std::string filepath);
 	public:
 		bool m_ViewportVisible = true;
 		bool m_ToolbarVisible = true;
@@ -92,11 +95,6 @@ namespace Dymatic {
 		Entity m_SecondCamera;
 
 		Entity m_HoveredEntity;
-		//TODO: REMOVE
-		int m_HoveredPixelID;
-		//--------//
-
-		bool m_PrimaryCamera = true;
 
 		EditorCamera m_EditorCamera;
 
@@ -146,8 +144,6 @@ namespace Dymatic {
 		bool m_ProjectionToggled = 0;
 		glm::mat4 m_PreviousCameraProjection;
 
-		std::string m_LayoutToLoad = "";
-
 		// Panels
 		PreferencesPannel m_PreferencesPannel;
 		SceneHierarchyPanel m_SceneHierarchyPanel;
@@ -162,11 +158,10 @@ namespace Dymatic {
 		FilePrompt m_FilePrompt = FilePrompt(&m_PreferencesPannel.GetPreferences());
 		PerformanceAnalyser m_PerformanceAnalyser;
 
-		ImageEditorNew m_ImageEditorNew;
-
 		//Sandbox::AgentSimulation m_AgentSimulation;
 		//Sandbox::MandelbrotSet m_MandelbrotSet;
 		//Sandbox::SandSimulation m_SandSimulation;
+		Sandbox::RopeSimulation m_RopeSimulation;
 
 
 		bool m_ShowSplash = m_PreferencesPannel.GetPreferences().m_PreferenceData.showSplash;

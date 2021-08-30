@@ -3,7 +3,6 @@
 #include "Dymatic.h"
 #include "Dymatic/Core/Base.h"
 #include "../Preferences.h"
-#include "PopupsAndNotifications.h"
 
 namespace Dymatic {
 
@@ -54,7 +53,6 @@ namespace Dymatic {
 		void OpenPreferencesByFilepath(std::string filepath);
 		void SavePreferencesByFilepath(std::string filepath);
 
-		std::string DrawRoundedButtonStack(std::vector<std::string> buttonIds);
 		Preferences& GetPreferences() { return m_Preferences; }
 
 		bool& GetPreferencesPanelVisible() { return m_PreferencesPanelVisible; }
@@ -62,7 +60,7 @@ namespace Dymatic {
 
 		void SetFileColorsFromString(std::string colorString);
 
-		PopupData m_PreferencesMessage;
+		//PopupData m_PreferencesMessage;
 		std::string ToLower(std::string inString);
 
 		void LoadPresetLayout();

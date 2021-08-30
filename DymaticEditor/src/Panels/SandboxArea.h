@@ -123,4 +123,44 @@ namespace Dymatic::Sandbox {
 		SandParticle m_SandParticles[512][512] = {SandParticle(m_NextID)};
 	};
 
+	//Cloth Simulation
+
+	struct Point
+	{
+		unsigned int id;
+		glm::vec2 position, prevPosition;
+		bool locked;
+		Point(unsigned int id, glm::vec2 position, bool locked)
+			: id(id), position(position), prevPosition(position), locked(locked)
+		{}
+	};
+
+	struct Stick
+	{
+		unsigned int id;
+		Point* pointA;
+		Point* pointB;
+		float length;
+		Stick(unsigned int id, Point* a, Point* b, float length)
+			: id(id), pointA(a), pointB(b), length(length)
+		{}
+	};
+
+	class RopeSimulation
+	{
+	public:
+		RopeSimulation();
+		void OnImGuiRender(Timestep ts);
+		void Simulate(Timestep ts);
+	private:
+		inline unsigned int GetNextId() { m_NextId++; return m_NextId; }
+	private:
+		std::vector<Point> m_Points;
+		std::vector<Stick> m_Sticks;
+		int m_InterationNumber = 5;
+		bool m_Simulating = false;
+		unsigned int m_NextId = 0;
+		Point* joinPoint = nullptr;
+	};
+
 }

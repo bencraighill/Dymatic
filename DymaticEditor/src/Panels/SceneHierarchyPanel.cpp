@@ -407,9 +407,23 @@ namespace Dymatic {
 			}
 		});		
 
-		DrawComponent<SpriteRendererComponent>("Sprite Renderer", entity, [](auto& component)
+		DrawComponent<SpriteRendererComponent>("Sprite Renderer", entity, [this](auto& component)
 		{
 			ImGui::ColorEdit4("Color", glm::value_ptr(component.Color));
+			// Texture
+			ImGui::ImageButton(component.Texture ? ((ImTextureID)component.Texture->GetRendererID()) : ((ImTextureID)m_CheckerboardTexture->GetRendererID()), ImVec2(100.0f, 100.0f), ImVec2( 0, 1 ), ImVec2( 1, 0));
+
+			if (ImGui::BeginDragDropTarget())
+			{
+				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_ITEM"))
+				{
+					const char* path = (const char*)payload->Data;
+					component.Texture = Texture2D::Create(path);
+				}
+				ImGui::EndDragDropTarget();
+			}
+
+			ImGui::DragFloat("Tiling Factor", &component.TilingFactor, 0.1f, 0.0f, 100.0f);
 		});
 
 		DrawComponent<ParticleSystem>("Particle System", entity, [](auto& component)

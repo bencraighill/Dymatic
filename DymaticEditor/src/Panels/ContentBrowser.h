@@ -64,6 +64,7 @@ namespace Dymatic {
 		void SetBrowseDirectory(std::string path);
 		std::vector<FileProperties> GetFilesAtDirectory(std::string filepath);
 
+		bool IsDirectory(std::string filepath);
 		std::vector<std::string> GetRecords(std::string record_dir_path, FileCatagory fileCatagory);
 
 		std::string& GetFileToOpen() { return m_FileToOpen; }
@@ -82,7 +83,7 @@ namespace Dymatic {
 		Preferences* m_PreferencesReference;
 		TextEditorPannel* m_TextEditorPannelReference;
 
-		std::string m_RootPath = "C:/dev/ExperimentalContentFolder";
+		std::string m_RootPath = "assets";
 		std::string m_BrowsePath;
 		std::vector<FileProperties> filesDisplayed;
 		std::vector<FileProperties> filesAtDirectory;
@@ -99,8 +100,6 @@ namespace Dymatic {
 		std::string m_DirectoryViewDropdownPath;
 
 		std::string m_FileToOpen;
-
-		float m_TimeSinceFilePressed = 0.0f;
 
 		bool m_ScrollToTop = false;
 

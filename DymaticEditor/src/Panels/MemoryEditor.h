@@ -476,7 +476,7 @@ struct MemoryEditor
 		if (ImGui::BeginPopup("context"))
 		{
 			ImGui::SetNextItemWidth(s.GlyphWidth * 7 + style.FramePadding.x * 2.0f);
-			if (ImGui::DragInt("##cols", &Cols, 0.2f, 4, 32, "%d cols")) { ContentsWidthChanged = true; if (Cols < 1) Cols = 1; }
+			if (ImGui::DragInt("##cols", &Cols, 0.2f, 4, 64, "%d cols")) { ContentsWidthChanged = true; if (Cols < 1) Cols = 1; }
 			ImGui::Checkbox("Show Data Preview", &OptShowDataPreview);
 			ImGui::Checkbox("Show HexII", &OptShowHexII);
 			if (ImGui::Checkbox("Show Ascii", &OptShowAscii)) { ContentsWidthChanged = true; }
