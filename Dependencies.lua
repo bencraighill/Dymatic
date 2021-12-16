@@ -12,6 +12,7 @@ IncludeDir["ImGui"] = "%{wks.location}/Dymatic/vendor/ImGui"
 IncludeDir["ImGuizmo"] = "%{wks.location}/Dymatic/vendor/ImGuizmo"
 IncludeDir["glm"] = "%{wks.location}/Dymatic/vendor/glm"
 IncludeDir["entt"] = "%{wks.location}/Dymatic/vendor/entt/include"
+IncludeDir["Box2D"] = "%{wks.location}/Dymatic/vendor/Box2D/include"
 IncludeDir["shaderc"] = "%{wks.location}/Dymatic/vendor/shaderc/include"
 IncludeDir["SPIRV_Cross"] = "%{wks.location}/Dymatic/vendor/SPIRV-Cross"
 IncludeDir["VulkanSDK"] = "%{VULKAN_SDK}/Include"
@@ -24,6 +25,7 @@ LibraryDir = {}
 
 LibraryDir["VulkanSDK"] = "%{VULKAN_SDK}/Lib"
 LibraryDir["VulkanSDK_Debug"] = "%{wks.location}/Dymatic/vendor/VulkanSDK/Lib"
+LibraryDir["VulkanSDK_DebugDLL"] = "%{wks.location}/Dymatic/vendor/VulkanSDK/Bin"
 
 Library = {}
 Library["Vulkan"] = "%{LibraryDir.VulkanSDK}/vulkan-1.lib"

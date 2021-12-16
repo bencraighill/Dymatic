@@ -220,7 +220,7 @@ private:
 class Sandbox : public Dymatic::Application
 {
 public:
-	Sandbox()
+	Sandbox(Dymatic::ApplicationCommandLineArgs args)
 	{
 		//PushLayer(new ExampleLayer());
 		PushLayer(new Sandbox2D());
@@ -233,7 +233,7 @@ public:
 
 };
 
-Dymatic::Application* Dymatic::CreateApplication()
+Dymatic::Application* Dymatic::CreateApplication(Dymatic::ApplicationCommandLineArgs args)
 {
-	return new Sandbox();
+	return new Sandbox(args);
 }

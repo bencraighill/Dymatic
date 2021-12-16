@@ -1,13 +1,14 @@
 #pragma once
 
+#include "SceneCamera.h"
+#include "Dymatic/Core/UUID.h"
+#include "Dymatic/Renderer/Texture.h"
+
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/quaternion.hpp>
-
-#include "SceneCamera.h"
-#include "ScriptableEntity.h"
 
 //----Particles------//
 #include <glm/gtc/constants.hpp>
@@ -18,6 +19,14 @@
 //-------------------//
 
 namespace Dymatic {
+
+	struct IDComponent
+	{
+		UUID ID;
+
+		IDComponent() = default;
+		IDComponent(const IDComponent&) = default;
+	};
 
 	struct TagComponent
 	{
@@ -62,10 +71,10 @@ namespace Dymatic {
 			: Color(color) {}
 	};
 
-	struct ParticleSystem
+	struct ParticleSystemComponent
 	{
 	public:
-		ParticleSystem::ParticleSystem(uint32_t maxParticles = 100000)
+		ParticleSystemComponent::ParticleSystemComponent(uint32_t maxParticles = 100000)
 			: m_PoolIndex(maxParticles - 1)
 		{
 			m_ParticlePool.resize(maxParticles);
@@ -106,7 +115,7 @@ namespace Dymatic {
 			bool Active = false;
 		};
 	
-		void ParticleSystem::OnUpdate(Dymatic::Timestep ts)
+		void ParticleSystemComponent::OnUpdate(Dymatic::Timestep ts)
 		{
 			for (auto& particle : m_ParticlePool)
 			{
@@ -215,6 +224,16 @@ namespace Dymatic {
 		uint32_t m_PoolIndex;
 	};
 
+	struct CircleRendererComponent
+	{
+		glm::vec4 Color{ 1.0f, 1.0f, 1.0f, 1.0f };
+		float Thickness = 1.0f;
+		float Fade = 0.005f;
+
+		CircleRendererComponent() = default;
+		CircleRendererComponent(const CircleRendererComponent&) = default;
+	};
+
 	struct CameraComponent
 	{
 		SceneCamera Camera;
@@ -224,6 +243,9 @@ namespace Dymatic {
 		CameraComponent() = default;
 		CameraComponent(const CameraComponent&) = default;
 	};
+
+	// Forward declaration
+	class ScriptableEntity;
 
 	struct NativeScriptComponent
 	{
@@ -238,6 +260,60 @@ namespace Dymatic {
 			InstantiateScript = []() { return static_cast<ScriptableEntity*>(new T()); };
 			DestroyScript = [](NativeScriptComponent* nsc) { delete nsc->Instance; nsc->Instance = nullptr; };
 		}
+	};
+
+	// Physics
+	struct Rigidbody2DComponent
+	{
+		enum class BodyType { Static = 0, Dynamic, Kinematic };
+		BodyType Type;
+		bool FixedRotation = false;
+
+		// Storage for runtime
+		void* RuntimeBody = nullptr;
+
+		Rigidbody2DComponent() = default;
+		Rigidbody2DComponent(const Rigidbody2DComponent& other) = default;
+	};
+
+	struct BoxCollider2DComponent
+	{
+		glm::vec2 Offset = { 0.0f, 0.0f };
+		glm::vec2 Size = { 0.5f, 0.5f };
+
+		float Density = 1.0f;
+		float Friction = 0.5f;
+		float Restitution = 0.0f;
+		float RestitutionThreshold = 0.5f;
+
+		// Storage for runtime
+		void* RuntimeFixture = nullptr;
+
+		BoxCollider2DComponent() = default;
+		BoxCollider2DComponent(const BoxCollider2DComponent& other) = default;
+	};
+
+	struct CircleCollider2DComponent
+	{
+		glm::vec2 Offset = { 0.0f, 0.0f };
+		float Radius = 0.5f;
+
+		float Density = 1.0f;
+		float Friction = 0.5f;
+		float Restitution = 0.0f;
+		float RestitutionThreshold = 0.5f;
+
+		// Storage for runtime
+		void* RuntimeFixture = nullptr;
+
+		CircleCollider2DComponent() = default;
+		CircleCollider2DComponent(const CircleCollider2DComponent& other) = default;
+	};
+
+	// For internal use
+	struct SceneComponent
+	{
+		UUID SceneID;
 	};
 
 }

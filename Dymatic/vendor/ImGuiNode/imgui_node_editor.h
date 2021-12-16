@@ -191,8 +191,8 @@ struct Style
         GroupRounding           = 6.0f;
         GroupBorderWidth        = 1.0f;
 
-        Colors[StyleColor_Bg]                 = ImColor( 60,  60,  70, 200);
-        Colors[StyleColor_Grid]               = ImColor(120, 120, 120,  40);
+        Colors[StyleColor_Bg]                 = ImColor( 40,  40,  41, 200);/*ImColor( 60,  60,  70, 200);*/
+        Colors[StyleColor_Grid]               = ImColor(147, 147, 147,  40);/*ImColor(120, 120, 120,  40);*/
         Colors[StyleColor_NodeBg]             = ImColor( 32,  32,  32, 200);
         Colors[StyleColor_NodeBorder]         = ImColor(255, 255, 255,  96);
         Colors[StyleColor_HovNodeBorder]      = ImColor( 50, 176, 255, 255);
@@ -308,6 +308,10 @@ bool DeleteLink(LinkId linkId);
 
 void NavigateToContent(float duration = -1);
 void NavigateToSelection(bool zoomIn = false, float duration = -1);
+// ImGui Custom:
+void GetSelectionBounds(ImVec2& min, ImVec2& max);
+void SetZoom(float zoom);
+//------------//
 
 bool ShowNodeContextMenu(NodeId* nodeId);
 bool ShowPinContextMenu(PinId* pinId);

@@ -2,6 +2,8 @@
 
 #include "Dymatic.h"
 #include "Panels/SceneHierarchyPanel.h"
+#include "Panels/ContentBrowserPanel.h"
+
 #include "Panels/PopupsAndNotifications.h"
 #include "Panels/ContentBrowser.h"
 #include "Panels/PreferencesPanel.h"
@@ -40,25 +42,33 @@ namespace Dymatic {
 		bool OnDropped(WindowDropEvent& e);
 		bool OnClosed(WindowCloseEvent& e);
 
-		bool ViewportKeyAllowed() { return m_ViewportHovered || m_ViewportFocused; }
+		void OnOverlayRender();
+
+		inline bool ViewportKeyAllowed() { return m_ViewportHovered || m_ViewportFocused; }
 
 		void NewScene();
-
 		void AppendScene();
-		void AppendSceneByFilepath(const std::string filepath);
-
+		void AppendScene(const std::filesystem::path& path);
 		void OpenScene();
-		void OpenSceneByFilepath(const std::string filepath);
-
-		void SaveSceneToFilepath(const std::string filepath);
+		void OpenScene(const std::filesystem::path& path);
 		bool SaveScene();
 		bool SaveSceneAs();
+
+		void SerializeScene(Ref<Scene> scene, const std::filesystem::path& path);
+
+		void OnScenePlay();
+		void OnSceneStop();
+
+		void OnDuplicateEntity();
 
 		void SaveAndExit();
 		void CloseProgramWindow();
 
-		void AddRecentFile(std::string filepath);
-		std::vector<std::string> GetRecentFiles();
+		// UI Panels
+		void UI_Toolbar();
+
+		void AddRecentFile(const std::filesystem::path& path);
+		std::vector<std::filesystem::path> GetRecentFiles();
 
 		void SetShadingIndex(int index);
 
@@ -67,15 +77,14 @@ namespace Dymatic {
 
 		std::string GetCurrentFileName();
 
-		void OpenWindowLayoutByFilepath(std::string filepath);
-		void SaveWindowLayoutByFilepath(std::string filepath);
+		void OpenWindowLayout(const std::filesystem::path& path);
+		void SaveWindowLayout(const std::filesystem::path& path);
 	public:
 		bool m_ViewportVisible = true;
 		bool m_ToolbarVisible = true;
 		bool m_InfoVisible = true;
 		bool m_StatsVisible = false;
 		bool m_MemoryEditorVisible = false;
-		bool m_NodeEditorVisible = false;
 	private:
 		Dymatic::OrthographicCameraController m_CameraController;
 
@@ -90,6 +99,8 @@ namespace Dymatic {
 		Ref<Framebuffer> m_Framebuffer;
 
 		Ref<Scene> m_ActiveScene;
+		Ref<Scene> m_EditorScene;
+		std::filesystem::path m_EditorScenePath;
 		Entity m_SquareEntity;
 		Entity m_CameraEntity;
 		Entity m_SecondCamera;
@@ -99,18 +110,18 @@ namespace Dymatic {
 		EditorCamera m_EditorCamera;
 
 		//Textures
-		Ref<Texture2D> m_CheckerboardTexture;
+		//Ref<Texture2D> m_CheckerboardTexture;
 
 		//Icons
 
-		Ref<Texture2D> m_DymaticLogo = Texture2D::Create("assets/icons/DymaticLogoTransparent.png");
-		Ref<Texture2D> m_DymaticSplash = Texture2D::Create("assets/icons/DymaticSplash.bmp");
+		//Ref<Texture2D> m_DymaticLogo = Texture2D::Create("assets/icons/DymaticLogoTransparent.png");
+		Ref<Texture2D> m_DymaticSplash = Texture2D::Create("assets/icons/DymaticSplash.png");
 
 		//Shader Icons
-		Ref<Texture2D> m_IconShaderWireframe = Texture2D::Create("assets/icons/Viewport/ShaderIconWireframe.png");
-		Ref<Texture2D> m_IconShaderUnlit = Texture2D::Create("assets/icons/Viewport/ShaderIconUnlit.png");
-		Ref<Texture2D> m_IconShaderSolid = Texture2D::Create("assets/icons/Viewport/ShaderIconSolid.png");
-		Ref<Texture2D> m_IconShaderRendered = Texture2D::Create("assets/icons/Viewport/ShaderIconRendered.png");
+		//Ref<Texture2D> m_IconShaderWireframe = Texture2D::Create("assets/icons/Viewport/ShaderIconWireframe.png");
+		//Ref<Texture2D> m_IconShaderUnlit = Texture2D::Create("assets/icons/Viewport/ShaderIconUnlit.png");
+		//Ref<Texture2D> m_IconShaderSolid = Texture2D::Create("assets/icons/Viewport/ShaderIconSolid.png");
+		//Ref<Texture2D> m_IconShaderRendered = Texture2D::Create("assets/icons/Viewport/ShaderIconRendered.png");
 
 		bool m_ViewportFocused = false, m_ViewportHovered = false;
 		glm::vec2 m_ViewportSize = { 0.0f, 0.0f };
@@ -120,6 +131,9 @@ namespace Dymatic {
 
 		int m_GizmoType = -1;
 		int m_GizmoSpace = 0;
+
+		bool m_ShowPhysicsColliders = false;
+
 		//Snap Enabled
 		bool m_TranslationSnap = false;
 		bool m_RotationSnap = false;
@@ -129,7 +143,6 @@ namespace Dymatic {
 		float m_RotationSnapValue = 45.0f;
 		float m_ScaleSnapValue = 0.5f;
 
-		std::string m_CurrentFilepath = "";
 		float m_ProgramTime = 0;
 		float m_LastSaveTime = 0;
 
@@ -144,9 +157,18 @@ namespace Dymatic {
 		bool m_ProjectionToggled = 0;
 		glm::mat4 m_PreviousCameraProjection;
 
+		// Runtime
+		enum class SceneState
+		{
+			Edit = 0, Play = 1
+		};
+		SceneState m_SceneState = SceneState::Edit;
+
 		// Panels
-		PreferencesPannel m_PreferencesPannel;
 		SceneHierarchyPanel m_SceneHierarchyPanel;
+		ContentBrowserPanel m_ContentBrowserPanel;
+
+		PreferencesPannel m_PreferencesPannel;
 		PopupsAndNotifications m_PopupsAndNotifications = PopupsAndNotifications(&m_PreferencesPannel.GetPreferences());
 		ContentBrowser m_ContentBrowser = ContentBrowser(&m_PreferencesPannel.GetPreferences(), &m_TextEditor);
 		NodeEditorPannel m_NodeEditorPannel;
@@ -161,8 +183,11 @@ namespace Dymatic {
 		//Sandbox::AgentSimulation m_AgentSimulation;
 		//Sandbox::MandelbrotSet m_MandelbrotSet;
 		//Sandbox::SandSimulation m_SandSimulation;
-		Sandbox::RopeSimulation m_RopeSimulation;
+		//Sandbox::RopeSimulation m_RopeSimulation;
+		//Sandbox::ChessAI m_ChessAI;
 
+		// Editor Resources
+		Ref<Texture2D> m_IconPlay, m_IconStop;
 
 		bool m_ShowSplash = m_PreferencesPannel.GetPreferences().m_PreferenceData.showSplash;
 	};

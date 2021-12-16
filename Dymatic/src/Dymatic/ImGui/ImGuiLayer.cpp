@@ -49,11 +49,12 @@ namespace Dymatic {
 		ImGuiStyle& style = ImGui::GetStyle();
 		if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
 		{
-			style.WindowRounding = 0.0f;
 			style.Colors[ImGuiCol_WindowBg].w = 1.0f;
 			//Total frame rounding
 			//Just makes everything a little softer.
+			style.WindowRounding = 5.0f;
 			style.FrameRounding = 3.0f;
+			style.PopupRounding = 5.0f;
 		}
 
 		Application& app = Application::Get();

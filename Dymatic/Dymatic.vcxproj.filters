@@ -111,6 +111,9 @@
     <ClInclude Include="src\Dymatic\Core\Timestep.h">
       <Filter>src\Dymatic\Core</Filter>
     </ClInclude>
+    <ClInclude Include="src\Dymatic\Core\UUID.h">
+      <Filter>src\Dymatic\Core</Filter>
+    </ClInclude>
     <ClInclude Include="src\Dymatic\Core\Window.h">
       <Filter>src\Dymatic\Core</Filter>
     </ClInclude>
@@ -1467,6 +1470,9 @@
     <ClInclude Include="vendor\stb_image\stb_image.h">
       <Filter>vendor\stb_image</Filter>
     </ClInclude>
+    <ClInclude Include="vendor\stb_image\stb_image_write.h">
+      <Filter>vendor\stb_image</Filter>
+    </ClInclude>
     <ClInclude Include="vendor\CSplash\Splash.h" />
     <ClInclude Include="vendor\CSplash\StdAfx.h" />
     <ClInclude Include="vendor\ImGuiNode\crude_json.h" />
@@ -1476,7 +1482,6 @@
     <ClInclude Include="vendor\ImGuiNode\imgui_node_editor.h" />
     <ClInclude Include="vendor\ImGuiNode\imgui_node_editor_internal.h" />
     <ClInclude Include="vendor\ImGuiNode\ScopeGuard.h" />
-    <ClInclude Include="vendor\stb_image\stb_image_write.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Dymatic\Core\Application.cpp">
@@ -1489,6 +1494,9 @@
       <Filter>src\Dymatic\Core</Filter>
     </ClCompile>
     <ClCompile Include="src\Dymatic\Core\Log.cpp">
+      <Filter>src\Dymatic\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Dymatic\Core\UUID.cpp">
       <Filter>src\Dymatic\Core</Filter>
     </ClCompile>
     <ClCompile Include="src\Dymatic\Core\Window.cpp">

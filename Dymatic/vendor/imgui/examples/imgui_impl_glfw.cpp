@@ -45,6 +45,10 @@
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 
+// IMGUI CUSTOM: //
+#include <stb_image.h>
+// ------------- //
+
 // GLFW
 #include <GLFW/glfw3.h>
 #ifdef _WIN32
@@ -667,6 +671,13 @@ static void ImGui_ImplGlfw_ShowWindow(ImGuiViewport* viewport)
 #endif
 
     glfwShowWindow(data->Window);
+
+    // IMGUI CUSTOM //
+    GLFWimage images[1];
+    images[0].pixels = stbi_load("assets/icons/DymaticLogo_Larger.png", &images[0].width, &images[0].height, 0, 4);
+    ::glfwSetWindowIcon(data->Window, 1, images);
+    ::stbi_image_free(images[0].pixels);
+    // ------------ //
 }
 
 static ImVec2 ImGui_ImplGlfw_GetWindowPos(ImGuiViewport* viewport)

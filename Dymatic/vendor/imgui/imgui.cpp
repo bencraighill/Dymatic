@@ -4936,6 +4936,16 @@ bool ImGui::IsItemActive()
     return false;
 }
 
+//-- ImGui Custom:
+bool ImGui::IsItemActivePreviousFrame()
+{
+    ImGuiContext& g = *GImGui;
+    if (g.ActiveIdPreviousFrame)
+        return g.ActiveIdPreviousFrame == GImGui->CurrentWindow->DC.LastItemId;
+    return false;
+}
+//--------------//
+
 bool ImGui::IsItemActivated()
 {
     ImGuiContext& g = *GImGui;
@@ -10068,6 +10078,9 @@ static void ImGui::NavUpdate()
     {
         #define NAV_MAP_KEY(_KEY, _NAV_INPUT)  do { if (IsKeyDown(g.IO.KeyMap[_KEY])) { g.IO.NavInputs[_NAV_INPUT] = 1.0f; g.NavInputSource = ImGuiInputSource_NavKeyboard; } } while (0)
         NAV_MAP_KEY(ImGuiKey_Space,     ImGuiNavInput_Activate );
+        // IMGUI CUSTOM:
+        NAV_MAP_KEY(ImGuiKey_Enter,     ImGuiNavInput_Activate );
+        // -----------//
         NAV_MAP_KEY(ImGuiKey_Enter,     ImGuiNavInput_Input    );
         NAV_MAP_KEY(ImGuiKey_Escape,    ImGuiNavInput_Cancel   );
         NAV_MAP_KEY(ImGuiKey_LeftArrow, ImGuiNavInput_KeyLeft_ );

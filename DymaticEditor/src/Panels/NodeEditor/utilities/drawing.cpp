@@ -155,7 +155,7 @@ void ax::Drawing::DrawIcon(ImDrawList* drawList, const ImVec2& a, const ImVec2& 
             triangleStart = br.x + w + 1.0f / 24.0f * rect_w;
         }
 
-        if (type == IconType::RoundSquare)
+        else if (type == IconType::RoundSquare)
         {
             if (filled)
             {
@@ -208,6 +208,29 @@ void ax::Drawing::DrawIcon(ImDrawList* drawList, const ImVec2& a, const ImVec2& 
                 drawList->PathStroke(color, true, 2.0f * outline_scale);
             }
         }
+        else if (type == IconType::Capsule)
+        {
+            const ImVec2 offset = ImVec2(rect_w * 0.3f, rect_h * 0.125f);
+            drawList->AddRectFilled(rect_center - offset, rect_center + offset, color, offset.y);
+        }
+		else if (type == IconType::Braces)
+		{
+            const float gap = rect_w * 0.1f;
+            const float thickness = 2.0f;
+            const ImVec2 scaling = { 0.35f, 0.55f };
+            const float offsetY = 0.25f;
+            rect_x += rect_w * scaling.x;
+            rect_y += rect_h * scaling.y - rect_h * offsetY;
+            rect_center_x += rect_w * scaling.x * 0.5f;
+            rect_center_y += rect_h * scaling.y * 0.5f - rect_h * offsetY;
+			rect_w -= rect_w * scaling.x;
+			rect_h -= rect_h * scaling.y;
+
+            drawList->AddBezierCurve(ImVec2(rect_x, rect_center_y), ImVec2(rect_center_x - gap, rect_center_y), ImVec2(rect_x, rect_y), ImVec2(rect_center_x - gap, rect_y), color, thickness);
+            drawList->AddBezierCurve(ImVec2(rect_x, rect_center_y), ImVec2(rect_center_x - gap, rect_center_y), ImVec2(rect_x, rect_y + rect_h), ImVec2(rect_center_x - gap, rect_y + rect_h), color, thickness);
+            drawList->AddBezierCurve(ImVec2(rect_x + rect_w, rect_center_y), ImVec2(rect_center_x + gap, rect_center_y), ImVec2(rect_x + rect_w, rect_y), ImVec2(rect_center_x + gap, rect_y), color, thickness);
+            drawList->AddBezierCurve(ImVec2(rect_x + rect_w, rect_center_y), ImVec2(rect_center_x + gap, rect_center_y), ImVec2(rect_x + rect_w, rect_y + rect_h), ImVec2(rect_center_x + gap, rect_y + rect_h), color, thickness);
+		}
         else
         {
             const auto triangleTip = triangleStart + rect_w * (0.45f - 0.32f);

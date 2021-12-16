@@ -2,6 +2,7 @@
 
 #include <imgui/imgui.h>
 #include <imgui/imgui_internal.h>
+#include "ImGuiCustom.h"
 
 #include <glm/gtc/type_ptr.hpp>
 
@@ -18,6 +19,8 @@
 #endif
 
 namespace Dymatic {
+
+	extern const std::filesystem::path g_AssetPath;
 
 	SceneHierarchyPanel::SceneHierarchyPanel(const Ref<Scene>& context)
 	{
@@ -36,22 +39,25 @@ namespace Dymatic {
 		{
 			ImGui::Begin((std::string(CHARACTER_WINDOW_ICON_SCENE_HIERARCHY) + " Scene Hierarchy").c_str(), &m_SceneHierarchyVisible);
 
-			m_Context->m_Registry.each([&](auto entityID)
+			if (m_Context)
 			{
-				Entity entity{ entityID , m_Context.get() };
-				DrawEntityNode(entity);
-			});
+				m_Context->m_Registry.each([&](auto entityID)
+					{
+						Entity entity{ entityID , m_Context.get() };
+						DrawEntityNode(entity);
+					});
 
-			if (ImGui::IsMouseDown(0) && ImGui::IsWindowHovered())
-				m_SelectionContext = {};
+				if (ImGui::IsMouseDown(0) && ImGui::IsWindowHovered())
+					m_SelectionContext = {};
 
-			// Right-click on blank space
-			if (ImGui::BeginPopupContextWindow(0, 1, false))
-			{
-				if (ImGui::MenuItem("Create Empty Entity"))
-					m_Context->CreateEntity("Empty Entity");
+				// Right-click on blank space
+				if (ImGui::BeginPopupContextWindow(0, 1, false))
+				{
+					if (ImGui::MenuItem("Create Empty Entity"))
+						m_Context->CreateEntity("Empty Entity");
 
-				ImGui::EndPopup();
+					ImGui::EndPopup();
+				}
 			}
 
 			ImGui::End();
@@ -76,6 +82,9 @@ namespace Dymatic {
 
 	void SceneHierarchyPanel::DrawEntityNode(Entity entity)
 	{
+		if (entity.HasComponent<SceneComponent>())
+			return;
+
 		auto& tag = entity.GetComponent<TagComponent>().Tag;
 
 		ImGuiTreeNodeFlags flags = ((m_SelectionContext == entity) ? ImGuiTreeNodeFlags_Selected : 0) | ImGuiTreeNodeFlags_OpenOnArrow;
@@ -112,7 +121,7 @@ namespace Dymatic {
 			std::vector<std::string> ComponentName;
 			//if (entity.HasComponent<TransformComponent>()) { ComponentName.push_back("Transform"); }
 			if (entity.HasComponent<SpriteRendererComponent>()) { ComponentName.push_back("Sprite Renderer"); }
-			if (entity.HasComponent<ParticleSystem>()) { ComponentName.push_back("Particle System"); }
+			if (entity.HasComponent<ParticleSystemComponent>()) { ComponentName.push_back("Particle System"); }
 			if (entity.HasComponent<CameraComponent>()) { ComponentName.push_back("Camera"); }
 
 			for (int i = 0; i < ComponentName.size(); i++)
@@ -137,7 +146,7 @@ namespace Dymatic {
 					{
 						if (ComponentName[i] == "Transform") { entity.RemoveComponent<TransformComponent>(); }
 						if (ComponentName[i] == "Sprite Renderer") { entity.RemoveComponent<SpriteRendererComponent>(); }
-						if (ComponentName[i] == "Particle System") { entity.RemoveComponent<ParticleSystem>(); }
+						if (ComponentName[i] == "Particle System") { entity.RemoveComponent<ParticleSystemComponent>(); }
 						if (ComponentName[i] == "Camera") { entity.RemoveComponent<Camera>(); }
 					}
 
@@ -283,12 +292,11 @@ namespace Dymatic {
 		ImGui::SameLine();
 		ImGui::PushItemWidth(-1);
 
-		//if (ImGui::Button("Add Component"))
 		if (ImGui::Button(std::string(CHARACTER_PROPERTIES_ICON_ADD).c_str(), ImVec2{ 31.0f, 24.0f }))
 			ImGui::OpenPopup("AddComponent");
 		ImGui::SameLine();
 		if (ImGui::Button(std::string(CHARACTER_PROPERTIES_ICON_DUPLICATE).c_str(), ImVec2{ 31.0f, 24.0f }))
-			m_SelectionContext = m_Context->DuplicateEntity(m_SelectionContext);
+			m_Context->DuplicateEntity(m_SelectionContext);
 		ImGui::SameLine();
 		if (ImGui::Button(std::string(CHARACTER_PROPERTIES_ICON_DELETE).c_str(), ImVec2{ 31.0f, 24.0f }))
 			entityDeleted = true;
@@ -307,31 +315,67 @@ namespace Dymatic {
 
 		if (ImGui::BeginPopup("AddComponent"))
 		{
-			if (ImGui::MenuItem("Camera"))
+			if (!m_SelectionContext.HasComponent<CameraComponent>())
 			{
-				if (!m_SelectionContext.HasComponent<CameraComponent>())
+				if (ImGui::MenuItem("Camera"))
+				{
 					m_SelectionContext.AddComponent<CameraComponent>();
-				else
-					DY_CORE_WARN("This entity already has the Camera Component!");
-				ImGui::CloseCurrentPopup();
+					ImGui::CloseCurrentPopup();
+				}
 			}
 
-			if (ImGui::MenuItem("Sprite Renderer"))
+			if (!m_SelectionContext.HasComponent<SpriteRendererComponent>())
 			{
-				if (!m_SelectionContext.HasComponent<SpriteRendererComponent>())
+				if (ImGui::MenuItem("Sprite Renderer"))
+				{
 					m_SelectionContext.AddComponent<SpriteRendererComponent>();
-				else
-					DY_CORE_WARN("This entity already has the Sprite Renderer Component!");
-				ImGui::CloseCurrentPopup();
+					ImGui::CloseCurrentPopup();
+				}
 			}
 
-			if (ImGui::MenuItem("Particle System"))
+			if (!m_SelectionContext.HasComponent<CircleRendererComponent>())
 			{
-				if (!m_SelectionContext.HasComponent<ParticleSystem>())
-					m_SelectionContext.AddComponent<ParticleSystem>();
-				else
-					DY_CORE_WARN("This entity already has the Particle System Component!");
-				ImGui::CloseCurrentPopup();
+				if (ImGui::MenuItem("Circle Renderer"))
+				{
+					m_SelectionContext.AddComponent<CircleRendererComponent>();
+					ImGui::CloseCurrentPopup();
+				}
+			}
+
+			if (!m_SelectionContext.HasComponent<ParticleSystemComponent>())
+			{
+				if (ImGui::MenuItem("Particle System"))
+				{
+					m_SelectionContext.AddComponent<ParticleSystemComponent>();
+					ImGui::CloseCurrentPopup();
+				}
+			}
+
+			if (!m_SelectionContext.HasComponent<Rigidbody2DComponent>())
+			{
+				if (ImGui::MenuItem("Rigidbody 2D"))
+				{
+					m_SelectionContext.AddComponent<Rigidbody2DComponent>();
+					ImGui::CloseCurrentPopup();
+				}
+			}
+
+			if (!m_SelectionContext.HasComponent<BoxCollider2DComponent>())
+			{
+				if (ImGui::MenuItem("Box Collider 2D"))
+				{
+					m_SelectionContext.AddComponent<BoxCollider2DComponent>();
+					ImGui::CloseCurrentPopup();
+				}
+			}
+
+			if (!m_SelectionContext.HasComponent<CircleCollider2DComponent>())
+			{
+				if (ImGui::MenuItem("Circle Collider 2D"))
+				{
+					m_SelectionContext.AddComponent<CircleCollider2DComponent>();
+					ImGui::CloseCurrentPopup();
+				}
 			}
 
 			ImGui::EndPopup();
@@ -410,15 +454,19 @@ namespace Dymatic {
 		DrawComponent<SpriteRendererComponent>("Sprite Renderer", entity, [this](auto& component)
 		{
 			ImGui::ColorEdit4("Color", glm::value_ptr(component.Color));
-			// Texture
+			
 			ImGui::ImageButton(component.Texture ? ((ImTextureID)component.Texture->GetRendererID()) : ((ImTextureID)m_CheckerboardTexture->GetRendererID()), ImVec2(100.0f, 100.0f), ImVec2( 0, 1 ), ImVec2( 1, 0));
-
 			if (ImGui::BeginDragDropTarget())
 			{
 				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_ITEM"))
 				{
-					const char* path = (const char*)payload->Data;
-					component.Texture = Texture2D::Create(path);
+					const wchar_t* path = (const wchar_t*)payload->Data;
+					std::filesystem::path texturePath = std::filesystem::path(g_AssetPath) / path;
+					Ref<Texture2D> texture = Texture2D::Create(texturePath.string());
+					if (texture->IsLoaded())
+						component.Texture = texture;
+					else
+						DY_WARN("Could not load texture {0}", texturePath.filename().string());
 				}
 				ImGui::EndDragDropTarget();
 			}
@@ -426,7 +474,14 @@ namespace Dymatic {
 			ImGui::DragFloat("Tiling Factor", &component.TilingFactor, 0.1f, 0.0f, 100.0f);
 		});
 
-		DrawComponent<ParticleSystem>("Particle System", entity, [](auto& component)
+		DrawComponent<CircleRendererComponent>("Circle Renderer", entity, [](auto& component)
+		{
+			ImGui::ColorEdit4("Color", glm::value_ptr(component.Color));
+			ImGui::DragFloat("Thickness", &component.Thickness, 0.025f, 0.0f, 1.0f);
+			ImGui::DragFloat("Fade", &component.Fade, 0.00025f, 0.0f, 1.0f);
+		});
+
+		DrawComponent<ParticleSystemComponent>("Particle System", entity, [](auto& component)
 		{
 			DrawVec3Control("Offset", component.Offset);
 
@@ -526,6 +581,52 @@ namespace Dymatic {
 			{
 				component.ClearParticlePool();
 			}
+		});
+
+		DrawComponent<Rigidbody2DComponent>("Rigidbody 2D", entity, [](auto& component)
+		{
+			const char* bodyTypeStrings[] = { "Static", "Dynamic", "Kinematic" };
+			const char* currentBodyTypeString = bodyTypeStrings[(int)component.Type];
+			if (ImGui::BeginCombo("Type", currentBodyTypeString))
+			{
+				for (int i = 0; i < 3; i++)
+				{
+					bool isSelected = currentBodyTypeString == bodyTypeStrings[i];
+					if (ImGui::Selectable(bodyTypeStrings[i], isSelected))
+					{
+						currentBodyTypeString = bodyTypeStrings[i];
+						component.Type = (Rigidbody2DComponent::BodyType)i;
+					}
+
+					if (isSelected)
+						ImGui::SetItemDefaultFocus();
+				}
+
+				ImGui::EndCombo();
+			}
+
+			ImGui::Checkbox("Fixed Rotation", &component.FixedRotation);
+		});
+
+		DrawComponent<BoxCollider2DComponent>("Box Collider 2D", entity, [](auto& component)
+		{
+			ImGui::DragFloat2("Offset", glm::value_ptr(component.Offset));
+			ImGui::DragFloat2("Size", glm::value_ptr(component.Size));
+			ImGui::DragFloat("Density", &component.Density, 0.01f, 0.0f, 1.0f);
+			ImGui::DragFloat("Friction", &component.Friction, 0.01f, 0.0f, 1.0f);
+			ImGui::DragFloat("Restitution", &component.Restitution, 0.01f, 0.0f, 1.0f);
+			ImGui::DragFloat("RestitutionThreshold", &component.RestitutionThreshold, 0.01f, 0.0f);
+		});
+
+		DrawComponent<CircleCollider2DComponent>("Circle Collider 2D", entity, [](auto& component)
+		{
+			ImGui::DragFloat2("Offset", glm::value_ptr(component.Offset));
+			//ImGui::DragFloat("Radius", &component.Radius);
+			ImGui::Custom::InputScalarCalc("Radius", &component.Radius, "%f", ImGuiInputTextFlags_None);
+			ImGui::DragFloat("Density", &component.Density, 0.01f, 0.0f, 1.0f);
+			ImGui::DragFloat("Friction", &component.Friction, 0.01f, 0.0f, 1.0f);
+			ImGui::DragFloat("Restitution", &component.Restitution, 0.01f, 0.0f, 1.0f);
+			ImGui::DragFloat("RestitutionThreshold", &component.RestitutionThreshold, 0.01f, 0.0f);
 		});
 
 		if (entityDeleted)

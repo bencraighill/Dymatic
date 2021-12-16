@@ -5,7 +5,6 @@
 #include <imgui/imgui_internal.h>
 #include "ImGuizmo.h"
 
-
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
@@ -21,15 +20,14 @@
 
 #include "TextSymbols.h"
 
-//#include "Panels/ExampleProj/ThumbnailToolbar.h"
-//#include "Panels/JumpList/CustomJumpListSample.h"
-
-//-URL OPENER-//
+// To Open URL
 #include <shellapi.h>
+
+#include "Nodes/UnrealBlueprintClass.h"
 
 namespace Dymatic {
 
-#include "BlueprintCode.h"
+	extern const std::filesystem::path g_AssetPath;
 
 	EditorLayer::EditorLayer()
 		: Layer("EditorLayer"), m_CameraController(1280.0f / 720.0f), m_SquareColor({ 0.2f, 0.3f, 0.8f, 1.0f })
@@ -40,19 +38,23 @@ namespace Dymatic {
 	{
 		DY_PROFILE_FUNCTION();
 
-		OpenWindowLayoutByFilepath("saved/presets/GeneralWorkspace.layout");
-		OpenWindowLayoutByFilepath("saved/SavedLayout.layout");
+		OpenWindowLayout("saved/presets/GeneralWorkspace.layout");
+		OpenWindowLayout("saved/SavedLayout.layout");
 		m_NodeEditorPannel.Application_Initialize();
 
 		//Add Preference Data load in here
 		auto& preferencesData = m_PreferencesPannel.GetPreferences().m_PreferenceData;
 
-		m_CheckerboardTexture = Texture2D::Create("assets/textures/Checkerboard.png");
+		//m_CheckerboardTexture = Texture2D::Create("assets/textures/Checkerboard.png");
+		m_IconPlay = Texture2D::Create("Resources/Icons/PlayButton.png");
+		m_IconStop = Texture2D::Create("Resources/Icons/StopButton.png");
 
 		Application::Get().GetImGuiLayer()->AddIconFont("assets/fonts/IconsFont.ttf", 25.0f, 0x700, 0x70F);	// Window Icons
 		Application::Get().GetImGuiLayer()->AddIconFont("assets/fonts/IconsFont.ttf", 12.0f, 0x710, 0x71E); // Viewport Shading Icons
 		Application::Get().GetImGuiLayer()->AddIconFont("assets/fonts/IconsFont.ttf", 25.0f, 0x71F, 0x72E); // Icons
 		Application::Get().GetImGuiLayer()->AddIconFont("assets/fonts/IconsFont.ttf", 10.0f, 0x72F, 0x72F); // Small Icons
+
+		Application::Get().GetImGuiLayer()->AddIconFont("assets/fonts/IconsFont.ttf", 10.0f, 0xF7, 0xF8); // Division Symbol
 
 		FramebufferSpecification fbSpec;
 		fbSpec.Attachments = { FramebufferTextureFormat::RGBA8, FramebufferTextureFormat::RED_INTEGER, FramebufferTextureFormat::Depth };
@@ -71,7 +73,6 @@ namespace Dymatic {
 		}
 
 		m_EditorCamera = EditorCamera(30.0f, 1.778f, 0.1f, 1000.0f);
-
 #if 0
 		// Entity
 		auto square = m_ActiveScene->CreateEntity("Green Square");
@@ -122,35 +123,29 @@ namespace Dymatic {
 		m_CameraEntity.AddComponent<NativeScriptComponent>().Bind<CameraController>();
 		m_SecondCamera.AddComponent<NativeScriptComponent>().Bind<CameraController>();
 #endif
-# if 1
 
-		auto testSquare  = m_ActiveScene->CreateEntity("Blueprint Class");
-		auto testSquare2 = m_ActiveScene->CreateEntity("Blueprint Class");
-		testSquare.AddComponent<SpriteRendererComponent>(glm::vec4{ 1.0f, 1.0f, 1.0f, 1.0f });
-		testSquare2.AddComponent<SpriteRendererComponent>(glm::vec4{ 1.0f, 1.0f, 1.0f, 1.0f });
-
-		//class BlueprintClass2 : public ScriptableEntity
-		//{
-		//};
-
-		testSquare.AddComponent<NativeScriptComponent>().Bind<BlueprintClass>();
-#endif
-
-		m_SceneHierarchyPanel.SetContext(m_ActiveScene);
+		auto entity = m_ActiveScene->CreateEntity("Entity");
+		entity.AddComponent<NativeScriptComponent>().Bind<Dymatic::UnrealBlueprintClass>();
 	}
-
-	
 
 	void EditorLayer::OnDetach()
 	{
 		DY_PROFILE_FUNCTION();
-		SaveWindowLayoutByFilepath("saved/SavedLayout.layout");
+		SaveWindowLayout("saved/SavedLayout.layout");
 	}
 
 	void EditorLayer::OnUpdate(Timestep ts)
 	{
 		DY_PROFILE_FUNCTION();
-		
+
+		static bool created = false;
+		if (Input::IsKeyPressed(Key::B) && !created)
+		{
+			auto entity = m_ActiveScene->CreateEntity("Entity");
+			entity.AddComponent<NativeScriptComponent>().Bind<Dymatic::UnrealBlueprintClass>();
+			created = true;
+		}
+
 		m_DeltaTime = ts;
 
 		if (m_PopupsAndNotifications.GetPopupOpen() == false) {
@@ -161,7 +156,7 @@ namespace Dymatic {
 		if (m_PreferencesPannel.GetPreferences().m_PreferenceData.autosaveEnabled)
 		{
 			//AutoSave
-			if (m_LastSaveTime >= m_PreferencesPannel.GetPreferences().m_PreferenceData.autosaveTime * 60.0f && m_CurrentFilepath != "")
+			if (m_LastSaveTime >= m_PreferencesPannel.GetPreferences().m_PreferenceData.autosaveTime * 60.0f && !m_EditorScenePath.empty())
 			{
 				SaveScene();
 				DY_CORE_INFO("Autosave Complete: Program Time - {0}", m_ProgramTime);
@@ -172,7 +167,7 @@ namespace Dymatic {
 			}
 
 			//Warning of autosave
-			if (m_LastSaveTime >= (m_PreferencesPannel.GetPreferences().m_PreferenceData.autosaveTime * 60.0f) - 10 && m_LastSaveTime <= (m_PreferencesPannel.GetPreferences().m_PreferenceData.autosaveTime * 60.0f) - 10 + ts && m_CurrentFilepath != "")
+			if (m_LastSaveTime >= (m_PreferencesPannel.GetPreferences().m_PreferenceData.autosaveTime * 60.0f) - 10 && m_LastSaveTime <= (m_PreferencesPannel.GetPreferences().m_PreferenceData.autosaveTime * 60.0f) - 10 + ts && !m_EditorScenePath.empty())
 			{
 				m_PopupsAndNotifications.Notification(0, "Autosave pending...", "Autosave of current scene will commence\n in 10 seconds.", { { m_PopupsAndNotifications.GetNextNotificationId(), "Cancel", [&]() { m_LastSaveTime = 1.0f; } }, { m_PopupsAndNotifications.GetNextNotificationId(), "Save Now", [&]() { m_LastSaveTime = m_PreferencesPannel.GetPreferences().m_PreferenceData.autosaveTime * 60; } } }, false, 10.0f);
 			}
@@ -189,13 +184,6 @@ namespace Dymatic {
 			m_ActiveScene->OnViewportResize((uint32_t)m_ViewportSize.x, (uint32_t)m_ViewportSize.y);
 		}
 
-		// Update
-		if (m_ViewportFocused)
-			m_CameraController.OnUpdate(ts);
-
-		m_EditorCamera.OnUpdate(ts);
-
-
 		// Render
 		Renderer2D::ResetStats();
 		m_Framebuffer->Bind();
@@ -206,8 +194,24 @@ namespace Dymatic {
 		//Clear entity ID attachment to -1
 		m_Framebuffer->ClearAttachment(1, -1);
 
-		// Update scene
-		m_ActiveScene->OnUpdateEditor(ts, m_EditorCamera);
+		switch (m_SceneState)
+		{
+			case SceneState::Edit:
+			{
+				if (m_ViewportFocused)
+					m_CameraController.OnUpdate(ts);
+
+				m_EditorCamera.OnUpdate(ts);
+
+				m_ActiveScene->OnUpdateEditor(ts, m_EditorCamera);
+				break;
+			}
+			case SceneState::Play:
+			{
+				m_ActiveScene->OnUpdateRuntime(ts);
+				break;
+			}
+		}
 
 		auto [mx, my] = ImGui::GetMousePos();
 		mx -= m_ViewportBounds[0].x;
@@ -222,6 +226,8 @@ namespace Dymatic {
 			int pixelData = m_Framebuffer->ReadPixel(1, mouseX, mouseY);
 			m_HoveredEntity = pixelData == -1 ? Entity() : Entity((entt::entity)pixelData, m_ActiveScene.get());
 		}
+
+		OnOverlayRender();
 
 		m_Framebuffer->Unbind();
 	}
@@ -262,10 +268,11 @@ namespace Dymatic {
 		// all active windows docked into it will lose their parent and become undocked.
 		// We cannot preserve the docking relationship between an active window and an inactive docking, otherwise 
 		// any change of dockspace/settings would lead to windows being stuck in limbo and never being visible.
+		//ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(1.0f, 20.0f));
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(maximized ? 0.0f : 5.0f, maximized ? 0.0f : 5.0f));
 		ImGui::Begin("Dymatic Editor Dockspace Window", &dockspaceOpen, window_flags);
 		ImVec2 dockspaceWindowPosition = ImGui::GetWindowPos();
-		ImGui::PopStyleVar();
+		ImGui::PopStyleVar(1);
 
 		if (opt_fullscreen)
 			ImGui::PopStyleVar(2);
@@ -394,7 +401,6 @@ namespace Dymatic {
 
 		if (ImGui::BeginMenuBar())
 		{
-
 			auto& window = Application::Get().GetWindow();
 
 			ImVec2 pos = ImVec2{ ImGui::GetWindowPos().x + ImGui::GetWindowSize().x / 2, ImGui::GetWindowPos().y + 10.0f };
@@ -416,7 +422,7 @@ namespace Dymatic {
 				ImGui::Separator();
 				if (ImGui::BeginMenu("System"))
 				{
-					ImGui::MenuItem("Performance Analyser", "", &m_PerformanceAnalyser.GetPerformanceAnalyserVisible());
+					ImGui::MenuItem("Performance Analyzer", "", &m_PerformanceAnalyser.GetPerformanceAnalyserVisible());
 					ImGui::EndMenu();
 				}
 				ImGui::EndMenu();
@@ -431,14 +437,14 @@ namespace Dymatic {
 				if (ImGui::MenuItem((std::string(CHARACTER_SYSTEM_ICON_OPEN_FILE) + " Open...").c_str(), GetBindAsString(OpenSceneBind).c_str())) OpenScene();
 				if (ImGui::BeginMenu((std::string(CHARACTER_SYSTEM_ICON_RECENT) + " Open Recent").c_str(), !GetRecentFiles().empty()))
 				{
-					std::vector<std::string> recentFiles = GetRecentFiles();
+					std::vector<std::filesystem::path> recentFiles = GetRecentFiles();
 					if (!recentFiles.empty())
 					{
 						for (int i = 0; i < recentFiles.size(); i++)
 						{
-							if (ImGui::MenuItem((m_ContentBrowser.GetFullFileNameFromPath(m_ContentBrowser.SwapStringSlashesSingle(recentFiles[i]))).c_str()))
+							if (ImGui::MenuItem((m_ContentBrowser.GetFullFileNameFromPath(m_ContentBrowser.SwapStringSlashesSingle(recentFiles[i].string()))).c_str()))
 							{
-								OpenSceneByFilepath(recentFiles[i]);
+								OpenScene(recentFiles[i]);
 							}
 						}
 					}
@@ -484,7 +490,7 @@ namespace Dymatic {
 				ImGui::MenuItem(		(std::string(CHARACTER_WINDOW_ICON_STATS)				+ " Stats").c_str(), "",				&m_StatsVisible);
 				ImGui::MenuItem(		(std::string(CHARACTER_WINDOW_ICON_INFO)				+ " Info").c_str(), "",					&m_InfoVisible);
 				ImGui::MenuItem(		(std::string(CHARACTER_WINDOW_ICON_MEMORY_EDITOR)		+ " Memory").c_str(), "",				&m_MemoryEditorVisible);
-				ImGui::MenuItem(		(std::string(CHARACTER_WINDOW_ICON_NODE_EDITOR)			+ " Node Editor").c_str(), "",			&m_NodeEditorVisible);
+				ImGui::MenuItem(		(std::string(CHARACTER_WINDOW_ICON_NODE_EDITOR)			+ " Node Editor").c_str(), "",			&m_NodeEditorPannel.GetNodeEditorVisible());
 				ImGui::MenuItem(		(std::string(CHARACTER_WINDOW_ICON_SCENE_HIERARCHY)		+ " Scene Hierarchy").c_str(), "",		&m_SceneHierarchyPanel.GetSceneHierarchyVisible());
 				ImGui::MenuItem(		(std::string(CHARACTER_WINDOW_ICON_PROPERTIES)			+ " Properties").c_str(), "",			&m_SceneHierarchyPanel.GetPropertiesVisible());
 				ImGui::MenuItem(		(std::string(CHARACTER_WINDOW_ICON_NOTIFICATIONS)		+ " Notifications").c_str(), "",		&m_PopupsAndNotifications.GetNotificationsVisible());
@@ -600,15 +606,26 @@ namespace Dymatic {
 			ImGui::EndMenuBar();
 		}
 
-		//ImGui::BeginDockable("Docking Test", NULL, NULL, dockspace_flags);
-		//ImGui::End();
-
 		//Toolbar Window
 		if (m_ToolbarVisible)
 		{
 			ImGui::Begin((std::string(CHARACTER_WINDOW_ICON_TOOLBAR) + " Toolbar").c_str(), &m_ToolbarVisible, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
-
+			
 			ImGui::Dummy(ImVec2{ 0, ((ImGui::GetContentRegionAvail().y - 30) / 2) });
+
+			float size = 30.0f;
+			Ref<Texture2D> icon = m_SceneState == SceneState::Edit ? m_IconPlay : m_IconStop;
+			ImGui::SetCursorPosX((ImGui::GetWindowContentRegionMax().x * 0.5f) - (size * 0.5f));
+			if (ImGui::ImageButton((ImTextureID)icon->GetRendererID(), ImVec2(size, size), ImVec2(0, 0), ImVec2(1, 1), 0))
+			{
+				if (m_SceneState == SceneState::Edit)
+					OnScenePlay();
+				else if (m_SceneState == SceneState::Play)
+					OnSceneStop();
+			}
+
+			ImGui::SameLine();
+
 			ImGui::Dummy(ImVec2{ ImGui::GetContentRegionAvail().x - 370, 0 });
 			ImGui::SameLine();
 
@@ -738,13 +755,14 @@ namespace Dymatic {
 		auto& contentFileToOpen = m_ContentBrowser.GetFileToOpen();
 		if (contentFileToOpen != "")
 		{
-			if (m_ContentBrowser.GetFileFormat(contentFileToOpen) == ".dymatic") { OpenSceneByFilepath(contentFileToOpen); }
+			if (m_ContentBrowser.GetFileFormat(contentFileToOpen) == ".dymatic") { OpenScene(contentFileToOpen); }
 			if (m_ContentBrowser.GetFileFormat(contentFileToOpen) == ".dytheme") { m_PopupsAndNotifications.Popup("Install Theme", "File: " + m_ContentBrowser.GetFullFileNameFromPath(contentFileToOpen) + "\n\nDo you wish to install this dytheme file? It will override you current theme.\nTo save your current theme, export it from Preferences.\n", { { m_PopupsAndNotifications.GetNextNotificationId(), "Cancel", [](){} }, { m_PopupsAndNotifications.GetNextNotificationId(), "Install", [&]() { m_PreferencesPannel.RetryDythemeFile(); } } }); m_PreferencesPannel.SetRecentDythemePath(contentFileToOpen); }
 			contentFileToOpen = "";
 		}
 
 		//Scene Hierarchy and properties pannel
 		m_SceneHierarchyPanel.OnImGuiRender();
+		//m_ContentBrowserPanel.OnImGuiRender();
 
 		m_PerformanceAnalyser.OnImGuiRender(m_DeltaTime);
 
@@ -787,24 +805,13 @@ namespace Dymatic {
 		//m_AgentSimulation.Update(m_DeltaTime);
 		//m_MandelbrotSet.OnImGuiRender();
 		//m_SandSimulation.OnImGuiRender();
-		m_RopeSimulation.OnImGuiRender(m_DeltaTime);
+		//m_RopeSimulation.OnImGuiRender(m_DeltaTime);
+		//m_ChessAI.OnImGuiRender(m_DeltaTime);
 		
 		m_TextEditor.OnImGuiRender();
+		m_NodeEditorPannel.OnImGuiRender();
 
-		if (m_NodeEditorVisible)
-		{
-			ImGui::Begin((std::string(CHARACTER_WINDOW_ICON_NODE_EDITOR) + " Node Editor").c_str(), &m_NodeEditorVisible);
-			m_NodeEditorPannel.Application_Frame();
-			ImGui::End();
-		}
-
-		static int abc = 0;
-		abc++;
-		if (abc == 200)
-		{
-			//m_PopupsAndNotifications.Popup("Operation Manager", "Dymatic Operation In Progress...", { "Cancel" }, true);
-		}
-
+		
 		m_PopupsAndNotifications.NotificationUpdate(m_DeltaTime, m_ProgramTime);
 
 		//Notifications Pannel Event Check
@@ -833,7 +840,10 @@ namespace Dymatic {
 			if ((entt::entity)m_HoveredEntity != entt::null)
 				name = m_HoveredEntity.GetComponent<TagComponent>().Tag;
 			ImGui::Text("Hovered Entity: %s", name.c_str());
+			ImGui::End();
 
+			ImGui::Begin("Settings");
+			ImGui::Checkbox("Show physics colliders", &m_ShowPhysicsColliders);
 			ImGui::End();
 		}
 
@@ -859,14 +869,13 @@ namespace Dymatic {
 
 			uint64_t textureID = m_Framebuffer->GetColorAttachmentRendererID();
 			ImGui::Image(reinterpret_cast<void*>(textureID), ImVec2{ m_ViewportSize.x, m_ViewportSize.y }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
-			//ImGui::GetWindowDrawList()->AddImage(reinterpret_cast<void*>(textureID), ImGui::GetWindowPos(), ImVec2{ ImGui::GetWindowPos().x + m_ViewportSize.x, ImGui::GetWindowPos().y + m_ViewportSize.y }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
 
 			if (ImGui::BeginDragDropTarget())
 			{
 				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_ITEM"))
 				{
-					const char* filepath = (const char*)payload->Data;
-					OpenSceneByFilepath(filepath);
+					const wchar_t* path = (const wchar_t*)payload->Data;
+					OpenScene(std::filesystem::path(g_AssetPath) / path);
 				}
 				ImGui::EndDragDropTarget();
 			}
@@ -1225,30 +1234,30 @@ namespace Dymatic {
 			ImGui::Text(versionName.c_str());
 			ImGui::Columns(2);
 			ImGui::TextDisabled("New File");
-			if (ImGui::Selectable((std::string(CHARACTER_SYSTEM_ICON_NEW_FILE) + "General Workspace").c_str())) { focused = false; OpenWindowLayoutByFilepath("saved/presets/layouts/GeneralWorkspace.layout"); NewScene(); AppendSceneByFilepath("saved/presets/scenes/DefaultCubeScene.dymatic"); }
+			if (ImGui::Selectable((std::string(CHARACTER_SYSTEM_ICON_NEW_FILE) + "General Workspace").c_str())) { focused = false; OpenWindowLayout("saved/presets/layouts/GeneralWorkspace.layout"); NewScene(); AppendScene("saved/presets/scenes/DefaultCubeScene.dymatic"); }
 			if (ImGui::IsItemFocused()) { focused = true; }
-			if (ImGui::Selectable((std::string(CHARACTER_SYSTEM_ICON_NEW_FILE) + "Scripting Workspace").c_str())) { focused = false; OpenWindowLayoutByFilepath("saved/presets/layouts/ScriptingWorkspace.layout"); NewScene(); AppendSceneByFilepath("saved/presets/scenes/DefaultCubeScene.dymatic"); }
+			if (ImGui::Selectable((std::string(CHARACTER_SYSTEM_ICON_NEW_FILE) + "Scripting Workspace").c_str())) { focused = false; OpenWindowLayout("saved/presets/layouts/ScriptingWorkspace.layout"); NewScene(); AppendScene("saved/presets/scenes/DefaultCubeScene.dymatic"); }
 			if (ImGui::IsItemFocused()) { focused = true; }
-			if (ImGui::Selectable((std::string(CHARACTER_SYSTEM_ICON_NEW_FILE) + "Environment Design Workspace").c_str())) { focused = false; OpenWindowLayoutByFilepath("saved/presets/layouts/EnvironmentDesignWorkspace.layout"); NewScene(); AppendSceneByFilepath("saved/presets/scenes/DefaultCubeScene.dymatic"); }
+			if (ImGui::Selectable((std::string(CHARACTER_SYSTEM_ICON_NEW_FILE) + "Environment Design Workspace").c_str())) { focused = false; OpenWindowLayout("saved/presets/layouts/EnvironmentDesignWorkspace.layout"); NewScene(); AppendScene("saved/presets/scenes/DefaultCubeScene.dymatic"); }
 			if (ImGui::IsItemFocused()) { focused = true; }
-			if (ImGui::Selectable((std::string(CHARACTER_SYSTEM_ICON_NEW_FILE) + "Animation Workspace").c_str())) { focused = false; OpenWindowLayoutByFilepath("saved/presets/layouts/AnimationWorkspace.layout"); }
+			if (ImGui::Selectable((std::string(CHARACTER_SYSTEM_ICON_NEW_FILE) + "Animation Workspace").c_str())) { focused = false; OpenWindowLayout("saved/presets/layouts/AnimationWorkspace.layout"); }
 			if (ImGui::IsItemFocused()) { focused = true; }
-			if (ImGui::Selectable((std::string(CHARACTER_SYSTEM_ICON_NEW_FILE) + "VFX Workspace").c_str())) { focused = false; OpenWindowLayoutByFilepath("saved/presets/layouts/VFXWorkspace.layout"); }
+			if (ImGui::Selectable((std::string(CHARACTER_SYSTEM_ICON_NEW_FILE) + "VFX Workspace").c_str())) { focused = false; OpenWindowLayout("saved/presets/layouts/VFXWorkspace.layout"); }
 			if (ImGui::IsItemFocused()) { focused = true; }
 			ImGui::NextColumn();
 			ImGui::TextDisabled("Recent Files");
 			ImGui::SetNextWindowSize(ImVec2{488 / 2, 600});
 			ImGui::BeginChild("##RecentFilesList");
 			if (ImGui::IsWindowFocused()) { focused = true; }
-			std::vector<std::string> recentFiles = GetRecentFiles();
+			std::vector<std::filesystem::path> recentFiles = GetRecentFiles();
 			if (!recentFiles.empty())
 			{
 				for (int i = 0; i < recentFiles.size(); i++)
 				{
-					if (ImGui::Selectable((std::string(CHARACTER_SYSTEM_ICON_NEW_FILE) + m_ContentBrowser.GetFullFileNameFromPath(m_ContentBrowser.SwapStringSlashesSingle(recentFiles[i]))).c_str()))
+					if (ImGui::Selectable((std::string(CHARACTER_SYSTEM_ICON_NEW_FILE) + m_ContentBrowser.GetFullFileNameFromPath(recentFiles[i].string())).c_str()))
 					{
 						focused = false;
-						OpenSceneByFilepath(recentFiles[i]);
+						OpenScene(recentFiles[i]);
 					}
 					if (ImGui::IsItemFocused()) { focused = true; }
 				}
@@ -1303,7 +1312,7 @@ namespace Dymatic {
 		else if (KeyBindCheck(ViewTopBind, bindCatagory))				{ if (ViewportKeyAllowed()) { m_YawUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360; m_PitchUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360 + 90; m_UpdateAngles = true; m_EditorCamera.SetProjectionType(1); } }
 		else if (KeyBindCheck(ViewFlipBind, bindCatagory))				{ if (ViewportKeyAllowed()) { m_YawUpdate = glm::degrees(m_EditorCamera.GetYaw()) + 180.0f; m_PitchUpdate = glm::degrees(m_EditorCamera.GetPitch()); m_UpdateAngles = true; m_EditorCamera.SetProjectionType(1); } }
 		else if (KeyBindCheck(ViewProjectionBind, bindCatagory))		{ if (ViewportKeyAllowed()) { m_ProjectionToggled = !m_EditorCamera.GetProjectionType(); m_EditorCamera.SetProjectionType(m_ProjectionToggled); } }
-		else if (KeyBindCheck(DuplicateBind, bindCatagory))				{ if (ViewportKeyAllowed() && m_SceneHierarchyPanel.GetSelectedEntity()) { m_SceneHierarchyPanel.SetSelectedEntity(m_ActiveScene->DuplicateEntity(m_SceneHierarchyPanel.GetSelectedEntity())); } m_NodeEditorPannel.DuplicateNodes(); }
+		else if (KeyBindCheck(DuplicateBind, bindCatagory))				{ if (ViewportKeyAllowed() && m_SceneHierarchyPanel.GetSelectedEntity()) { OnDuplicateEntity(); } m_NodeEditorPannel.DuplicateNodes(); }
 		else if (KeyBindCheck(RenameBind, bindCatagory))				{ if (m_ContentBrowser.GetSelectedFile().filename != "") m_ContentBrowser.OpenRenamePopup(m_ContentBrowser.GetSelectedFile()); }
 		else if (KeyBindCheck(ClosePopupBind, bindCatagory))			{ m_PopupsAndNotifications.RemoveTopmostPopup(); }
 		// Text Editor Keybinds
@@ -1419,12 +1428,66 @@ namespace Dymatic {
 		return true;
 	}
 
+	void EditorLayer::OnOverlayRender()
+	{
+		if (m_SceneState == SceneState::Play)
+		{
+			Entity camera = m_ActiveScene->GetPrimaryCameraEntity();
+			Renderer2D::BeginScene(camera.GetComponent<CameraComponent>().Camera, camera.GetComponent<TransformComponent>().GetTransform());
+		}
+		else
+		{
+			Renderer2D::BeginScene(m_EditorCamera);
+		}
+
+		if (m_ShowPhysicsColliders)
+		{
+			// Box Colliders
+			{
+				auto view = m_ActiveScene->GetAllEntitiesWith<TransformComponent, BoxCollider2DComponent>();
+				for (auto entity : view)
+				{
+					auto [tc, bc2d] = view.get<TransformComponent, BoxCollider2DComponent>(entity);
+
+					glm::vec3 translation = tc.Translation + glm::vec3(bc2d.Offset, 0.001f);
+					glm::vec3 scale = tc.Scale * glm::vec3(bc2d.Size * 2.0f, 1.0f);
+
+					glm::mat4 transform = glm::translate(glm::mat4(1.0f), translation)
+						* glm::rotate(glm::mat4(1.0f), tc.Rotation.z, glm::vec3(0.0f, 0.0f, 1.0f))
+						* glm::scale(glm::mat4(1.0f), scale);
+
+					Renderer2D::DrawRect(transform, glm::vec4(0, 1, 0, 1));
+				}
+			}
+
+			// Circle Colliders
+			{
+				auto view = m_ActiveScene->GetAllEntitiesWith<TransformComponent, CircleCollider2DComponent>();
+				for (auto entity : view)
+				{
+					auto [tc, cc2d] = view.get<TransformComponent, CircleCollider2DComponent>(entity);
+
+					glm::vec3 translation = tc.Translation + glm::vec3(cc2d.Offset, 0.001f);
+					glm::vec3 scale = tc.Scale * glm::vec3(cc2d.Radius * 2.0f);
+
+					glm::mat4 transform = glm::translate(glm::mat4(1.0f), translation)
+						* glm::scale(glm::mat4(1.0f), scale);
+
+					Renderer2D::DrawCircle(transform, glm::vec4(0, 1, 0, 1), 0.01f);
+				}
+			}
+		}
+
+		Renderer2D::EndScene();
+	}
+
 	void EditorLayer::NewScene()
 	{
 		m_ActiveScene = CreateRef<Scene>();
 		m_ActiveScene->OnViewportResize((uint32_t)m_ViewportSize.x, (uint32_t)m_ViewportSize.y);
 		m_SceneHierarchyPanel.SetContext(m_ActiveScene);
-		m_CurrentFilepath = "";
+		
+		m_EditorScenePath = std::filesystem::path();
 
 		//Reset Scene time values
 		m_LastSaveTime = 0;
@@ -1436,58 +1499,66 @@ namespace Dymatic {
 	{
 		std::string filepath = FileDialogs::OpenFile("Dymatic Scene (*.dymatic)\0*.dymatic\0");
 		if (!filepath.empty())
-		{
-			AppendSceneByFilepath(filepath);
-		}
+			AppendScene(filepath);
 	}
 
-	void EditorLayer::AppendSceneByFilepath(const std::string filepath)
+	void EditorLayer::AppendScene(const std::filesystem::path& path)
 	{
-		SceneSerializer serializer(m_ActiveScene);
-		serializer.Deserialize(filepath);
+		if (path.extension().string() != ".dymatic")
+		{
+			DY_WARN("Could not load {0} - not a scene file", path.filename().string());
+			return;
+		}
+
+		SceneSerializer serializer(m_EditorScene);
+		serializer.Deserialize(path.string());
 	}
 
 	void EditorLayer::OpenScene()
 	{
 		std::string filepath = FileDialogs::OpenFile("Dymatic Scene (*.dymatic)\0*.dymatic\0");
 		if (!filepath.empty())
+			OpenScene(filepath);
+	}
+
+	void EditorLayer::OpenScene(const std::filesystem::path& path)
+	{
+		if (m_SceneState != SceneState::Edit)
+			OnSceneStop();
+
+		if (path.extension().string() != ".dymatic")
 		{
-			OpenSceneByFilepath(filepath);
+			DY_WARN("Could not load {0} - not a scene file", path.filename().string());
+			return;
 		}
-	}
 
-	void EditorLayer::OpenSceneByFilepath(const std::string filepath)
-	{
-		m_ActiveScene = CreateRef<Scene>();
-		m_ActiveScene->OnViewportResize((uint32_t)m_ViewportSize.x, (uint32_t)m_ViewportSize.y);
-		m_SceneHierarchyPanel.SetContext(m_ActiveScene);
+		Ref<Scene> newScene = CreateRef<Scene>();
+		SceneSerializer serializer(newScene);
+		if (serializer.Deserialize(path.string()))
+		{
+			m_EditorScene = newScene;
+			m_EditorScene->OnViewportResize((uint32_t)m_ViewportSize.x, (uint32_t)m_ViewportSize.y);
+			m_SceneHierarchyPanel.SetContext(m_EditorScene);
 
-		AppendSceneByFilepath(filepath);
-		m_CurrentFilepath = filepath;
+			m_ActiveScene = m_EditorScene;
+			m_EditorScenePath = path;
 
-		AddRecentFile(filepath);
+			AddRecentFile(path.string());
 
-		//Reset Scene time values
-		m_LastSaveTime = 0;
-		m_ProgramTime = 0;
-		m_PopupsAndNotifications.ClearNotificationList();
-	}
-
-	void EditorLayer::SaveSceneToFilepath(const std::string filepath)
-	{
-		SceneSerializer serializer(m_ActiveScene);
-		serializer.Serialize(filepath);
-		m_CurrentFilepath = filepath;
-		m_LastSaveTime = 0;
+			//Reset Scene time values
+			m_LastSaveTime = 0;
+			m_ProgramTime = 0;
+			m_PopupsAndNotifications.ClearNotificationList();
+		}
 	}
 
 	bool EditorLayer::SaveScene()
 	{
-		if (m_CurrentFilepath == "")
+		if (m_EditorScenePath.empty())
 			return SaveSceneAs();
 		else
 		{
-			SaveSceneToFilepath(m_CurrentFilepath);
+			SerializeScene(m_ActiveScene, m_EditorScenePath);
 			return true;
 		}
 		return false;
@@ -1498,11 +1569,22 @@ namespace Dymatic {
 		std::string filepath = FileDialogs::SaveFile("Dymatic Scene (*.dymatic)\0*.dymatic\0");
 		if (!filepath.empty())
 		{
-			SaveSceneToFilepath(filepath);
+			SerializeScene(m_ActiveScene, filepath);
+			m_EditorScenePath = filepath;
+
 			AddRecentFile(filepath);
 			return true;
 		}
 		return false;
+	}
+
+	void EditorLayer::SerializeScene(Ref<Scene> scene, const std::filesystem::path& path)
+	{
+		DY_CORE_ASSERT(!path.empty());
+
+		SceneSerializer serializer(scene);
+		serializer.Serialize(path.string());
+		m_LastSaveTime = 0;
 	}
 
 	void EditorLayer::SaveAndExit()
@@ -1515,7 +1597,42 @@ namespace Dymatic {
 		Application::Get().Close();
 	}
 
-	void EditorLayer::AddRecentFile(std::string filepath)
+	void EditorLayer::OnScenePlay()
+	{
+		m_SceneState = SceneState::Play;
+
+		m_ActiveScene = Scene::Copy(m_EditorScene);
+		m_ActiveScene->OnRuntimeStart();
+
+		m_SceneHierarchyPanel.SetContext(m_ActiveScene);
+	}
+
+	void EditorLayer::OnSceneStop()
+	{
+		m_SceneState = SceneState::Edit;
+
+		m_ActiveScene->OnRuntimeStop();
+		m_ActiveScene = m_EditorScene;
+
+		m_SceneHierarchyPanel.SetContext(m_ActiveScene);
+	}
+
+	void EditorLayer::OnDuplicateEntity()
+	{
+		if (m_SceneState != SceneState::Edit)
+			return;
+
+		Entity selectedEntity = m_SceneHierarchyPanel.GetSelectedEntity();
+		if (selectedEntity)
+			m_EditorScene->DuplicateEntity(selectedEntity);
+	}
+
+	void EditorLayer::UI_Toolbar()
+	{
+
+	}
+
+	void EditorLayer::AddRecentFile(const std::filesystem::path& path)
 	{
 		std::ifstream file("saved/RecentPaths.txt", std::ios::binary);
 		std::string fileStr;
@@ -1526,12 +1643,12 @@ namespace Dymatic {
 		copy(inputIt, emptyInputIt, stringInsert);
 
 		//Check for existance
-		if (fileStr.find(filepath + "\r") != -1)
+		if (fileStr.find(path.string() + "\r") != -1)
 		{
-			fileStr = fileStr.erase(fileStr.find(filepath + "\r"), filepath.length() + 1);
+			fileStr = fileStr.erase(fileStr.find(path.string() + "\r"), path.string().length() + 1);
 		}
 
-		fileStr = filepath + "\r" + fileStr;
+		fileStr = path.string() + "\r" + fileStr;
 
 		int numberOfSaves = 0;
 		for (int i = 0; i < fileStr.length(); i++)
@@ -1556,9 +1673,9 @@ namespace Dymatic {
 
 	
 
-	std::vector<std::string> EditorLayer::GetRecentFiles()
+	std::vector<std::filesystem::path> EditorLayer::GetRecentFiles()
 	{
-		std::vector<std::string> recentFiles;
+		std::vector<std::filesystem::path> recentFiles;
 
 		std::ifstream file("saved/RecentPaths.txt", std::ios::binary);
 		std::string fileStr;
@@ -1571,7 +1688,6 @@ namespace Dymatic {
 		while (fileStr.find_first_of("\r") != -1)
 		{
 			recentFiles.push_back(fileStr.substr(0, fileStr.find_first_of("\r")));
-			//if (fileStr.find_first_of("\r") != fileStr.length() - 1)
 			{
 				int a = fileStr.find_first_of("\r") + 1;
 				int b = fileStr.length() - 1 - fileStr.find("\r");
@@ -1624,15 +1740,15 @@ namespace Dymatic {
 
 	std::string EditorLayer::GetCurrentFileName()
 	{
-		std::string filename = m_CurrentFilepath;
+		std::string filename = m_EditorScenePath.string();
 		return(filename != "" ? (filename.find_last_of("\\") != std::string::npos ? (filename.erase(0, filename.find_last_of("\\") + 1)) : (filename.find_last_of("/") != std::string::npos ? (filename.erase(0, filename.find_last_of("/") + 1)) : filename)) : "Unsaved Dymatic Document");
 	}
 
 	// Load Layout
-	void EditorLayer::OpenWindowLayoutByFilepath(std::string filepath)
+	void EditorLayer::OpenWindowLayout(const std::filesystem::path& path)
 	{
 		std::string result;
-		std::ifstream in(filepath, std::ios::in | std::ios::binary); // ifstream closes itself due to RAII
+		std::ifstream in(path, std::ios::in | std::ios::binary); // ifstream closes itself due to RAII
 		if (in)
 		{
 			in.seekg(0, std::ios::end);
@@ -1645,7 +1761,7 @@ namespace Dymatic {
 			}
 			else
 			{
-				DY_CORE_ERROR("Could not read from layout file '{0}'", filepath);
+				DY_CORE_ERROR("Could not read from layout file '{0}'", path);
 				return;
 			}
 		}
@@ -1673,7 +1789,7 @@ namespace Dymatic {
 				else if (CurrentValueName == "Stats Open") { m_StatsVisible = (CurrentValue == "true" ? true : false); }
 				else if (CurrentValueName == "Info Open") { m_InfoVisible = (CurrentValue == "true" ? true : false); }
 				else if (CurrentValueName == "Memory Open") { m_MemoryEditorVisible = (CurrentValue == "true" ? true : false); }
-				else if (CurrentValueName == "Node Editor Open") { m_NodeEditorVisible = (CurrentValue == "true" ? true : false); }
+				else if (CurrentValueName == "Node Editor Open") { m_NodeEditorPannel.GetNodeEditorVisible() = (CurrentValue == "true" ? true : false); }
 				else if (CurrentValueName == "Scene Hierarchy Open") { m_SceneHierarchyPanel.GetSceneHierarchyVisible() = (CurrentValue == "true" ? true : false); }
 				else if (CurrentValueName == "Properties Open") { m_SceneHierarchyPanel.GetPropertiesVisible() = (CurrentValue == "true" ? true : false); }
 				else if (CurrentValueName == "Notifications Open") { m_PopupsAndNotifications.GetNotificationsVisible() = (CurrentValue == "true" ? true : false); }
@@ -1688,7 +1804,7 @@ namespace Dymatic {
 		}
 	}
 
-	void EditorLayer::SaveWindowLayoutByFilepath(std::string filepath)
+	void EditorLayer::SaveWindowLayout(const std::filesystem::path& path)
 	{
 		std::string out = "Current Windows Open:";
 
@@ -1697,7 +1813,7 @@ namespace Dymatic {
 		out = out + "<Stats Open> {" + (m_StatsVisible ? "true" : "false") + "}\r";
 		out = out + "<Info Open> {" + (m_InfoVisible ? "true" : "false") + "}\r";
 		out = out + "<Memory Open> {" + (m_MemoryEditorVisible ? "true" : "false") + "}\r";
-		out = out + "<Node Editor Open> {" + (m_NodeEditorVisible ? "true" : "false") + "}\r";
+		out = out + "<Node Editor Open> {" + (m_NodeEditorPannel.GetNodeEditorVisible() ? "true" : "false") + "}\r";
 		out = out + "<Scene Hierarchy Open> {" + (m_SceneHierarchyPanel.GetSceneHierarchyVisible() ? "true" : "false") + "}\r";
 		out = out + "<Properties Open> {" + (m_SceneHierarchyPanel.GetPropertiesVisible() ? "true" : "false") + "}\r";
 		out = out + "<Notifications Open> {" + (m_PopupsAndNotifications.GetNotificationsVisible() ? "true" : "false") + "}\r";
@@ -1729,7 +1845,7 @@ namespace Dymatic {
 
 		out = out + "<Ini Contents> {" + result + "}\r";
 
-		std::ofstream fout(filepath);
+		std::ofstream fout(path);
 		fout << out.c_str();
 	}
 

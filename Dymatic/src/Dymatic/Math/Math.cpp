@@ -85,7 +85,8 @@ namespace Dymatic::Math {
 
 	unsigned int GetRandomInRange(int min, int max)
 	{
-		return ((rand() * std::time(nullptr)) % max + min);
+		static int seed = 0;
+		return ((rand() * std::time(nullptr) * seed++) % max + min);
 	}
 
 	// Normalizes any number to an arbitrary range 
@@ -95,12 +96,12 @@ namespace Dymatic::Math {
 		return value + ceil((-value + shift) / size) * size;
 	}
 
-	float LerpAngle(float a, float b, float x)
+	float LerpAngle(float a, float b, float x, float min, float max)
 	{
 		float angleDifference = b - a;
-		while (angleDifference > 180) angleDifference -= 360;
-		while (angleDifference < -180) angleDifference += 360;
-		return NormalizeAngle(a + angleDifference * x, -180);
+		while (angleDifference > max) angleDifference -= 360;
+		while (angleDifference < min) angleDifference += 360;
+		return NormalizeAngle(a + angleDifference * x, min);
 	}
 
 	float Lerp(float a, float b, float x)
@@ -138,4 +139,27 @@ namespace Dymatic::Math {
 		return (Absolute(a - b) <= ErrorTolerence);
 	}
 
+	float Distance(glm::vec2 a, glm::vec2 b)
+	{
+		return std::sqrt(std::pow((b.x - a.x), 2) + std::pow((b.y - a.y), 2));
+	}
+
+	float InterpEaseIn(float a, float b, float Alpha, float Exp)
+	{
+		float const ModifiedAlpha = std::pow(Alpha, Exp);
+		return Lerp(a, b, ModifiedAlpha);
+	}
+
+	float InterpEaseOut(float a, float b, float Alpha, float Exp)
+	{
+		float const ModifiedAlpha = 1.f - std::pow(1.f - Alpha, Exp);
+		return Lerp(a, b, ModifiedAlpha);
+	}
+
+	float InterpEaseInOut(float a, float b, float Alpha, float Exp)
+	{
+		return Lerp(a, b, (Alpha < 0.5f) ?
+			InterpEaseIn(0.f, 1.f, Alpha * 2.f, Exp) * 0.5f :
+			InterpEaseOut(0.f, 1.f, Alpha * 2.f - 1.f, Exp) * 0.5f + 0.5f);
+	}
 }

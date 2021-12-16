@@ -516,11 +516,8 @@ namespace Dymatic::Sandbox {
 
 	RopeSimulation::RopeSimulation()
 	{
-		m_Points.reserve(128);
-		m_Sticks.reserve(128);
-		m_Points.push_back({ GetNextId(), glm::vec2(20.0f, 50.0f), true });
-		m_Points.push_back({ GetNextId(), glm::vec2(50.0f, 50.0f), false });
-		m_Sticks.push_back({ GetNextId(), &m_Points[0], &m_Points[1], 30.0f });
+		m_Points.reserve(255);
+		m_Sticks.reserve(255);
 	}
 
 	void RopeSimulation::OnImGuiRender(Timestep ts)
@@ -530,15 +527,33 @@ namespace Dymatic::Sandbox {
 
 		ImGui::Begin("Rope Simulation");
 		ImGui::ToggleButton("Simulate", &m_Simulating);
+		ImGui::SameLine();
+		if (ImGui::Button("Reset")) { m_Points.clear(); m_Sticks.clear(); joinPoint = nullptr; }
+		ImGui::SameLine();
+		ImGui::SetNextItemWidth(100.0f);
+		ImGui::InputFloat("Cutting Tolerance", &m_CuttingTollerance, 0.1f, 0.2f, 4);
+		ImGui::SameLine();
+		ImGui::SetNextItemWidth(100.0f);
+		ImGui::InputFloat("Breaking Point", &m_BreakingPoint, 0.1f, 0.2f, 1);
+		ImGui::SameLine();
+		ImGui::Checkbox("Floor", &m_Floor);
+		ImGui::SameLine();
+		ImGui::SetNextItemWidth(100.0f);
+		if (ImGui::BeginCombo("##RopeSimulationPreset", "Select Preset"))
+		{
+			if (ImGui::Selectable("Grid")) { GenerateGrid(); }
+			if (ImGui::Selectable("Tree")) { GenerateTree(); }
+			ImGui::EndCombo();
+		}
+
+		m_FloorPos = ImGui::GetWindowPos().y + ImGui::GetContentRegionAvail().y;
+		m_WindowWidth = ImGui::GetWindowSize().x;
 
 		auto drawList = ImGui::GetWindowDrawList();
 		auto shift = (Input::IsKeyPressed(Key::LeftShift) || Input::IsKeyPressed(Key::RightShift));
 		auto ctrl = (Input::IsKeyPressed(Key::LeftControl) || Input::IsKeyPressed(Key::RightControl));
 
-		for (auto const& stick : m_Sticks)
-		{
-			drawList->AddLine(ImGui::GetWindowPos() + ImVec2(stick.pointA->position.x, stick.pointA->position.y), ImGui::GetWindowPos() + ImVec2(stick.pointB->position.x, stick.pointB->position.y), ImGui::ColorConvertFloat4ToU32(ImVec4(0.8f, 0.8f, 0.8f, 1.0f)));
-		}
+		// Point computation and interaction occurs
 
 		for (auto& point : m_Points)
 		{
@@ -548,9 +563,9 @@ namespace Dymatic::Sandbox {
 			static float radius = 5.0f;
 
 			const ImGuiID id = ImGui::GetID("##PointButton");
-			const ImRect bb = ImRect(ImVec2(centre.x - 5.0f, centre.y - 5.0f), ImVec2(centre.x + 5.0f, centre.y + 5.0f));
+			const ImRect bb = ImRect(ImVec2(centre.x - radius, centre.y - radius), ImVec2(centre.x + radius, centre.y + radius));
 			bool held, hovered;
-			bool clicked = ImGui::ButtonBehavior(bb, id, &hovered, & held);
+			bool clicked = ImGui::ButtonBehavior(bb, id, &hovered, &held);
 
 			if (clicked && shift)
 			{
@@ -558,7 +573,7 @@ namespace Dymatic::Sandbox {
 					joinPoint = &point;
 				else
 				{
-					float distance = std::sqrt(std::pow((joinPoint->position.x - point.position.x), 2) + std::pow((joinPoint->position.y - point.position.y), 2));
+					float distance = Math::Distance(joinPoint->position, point.position);
 					m_Sticks.push_back({ GetNextId(), joinPoint, &point, distance });
 					joinPoint = nullptr;
 				}
@@ -567,8 +582,30 @@ namespace Dymatic::Sandbox {
 			if (clicked && !shift)
 				point.locked = !point.locked;
 
-			drawList->AddCircleFilled(centre, radius, ImGui::ColorConvertFloat4ToU32(point.locked ? ImVec4(0.8f, 0.1f, 0.2f, 1.0f) : ImVec4(1.0f, 1.0f, 1.0f, 1.0f)));
 			ImGui::PopID();
+		}
+
+		// Stick draw call and computation happens
+
+		for (int i = 0; i < m_Sticks.size(); i++)
+		{
+			auto& stick = m_Sticks[i];
+			drawList->AddLine(ImGui::GetWindowPos() + ImVec2(stick.pointA->position.x, stick.pointA->position.y), ImGui::GetWindowPos() + ImVec2(stick.pointB->position.x, stick.pointB->position.y), ImGui::ColorConvertFloat4ToU32(ImVec4(0.8f, 0.8f, 0.8f, 1.0f)));
+
+			auto cPos = glm::vec2(ImGui::GetMousePos().x - ImGui::GetWindowPos().x, ImGui::GetMousePos().y - ImGui::GetWindowPos().y);
+			if (Input::IsMouseButtonPressed(Mouse::ButtonLeft) && !shift && !ctrl)
+				if (Math::NearlyEqual(Math::Distance(stick.pointA->position, cPos) + Math::Distance(stick.pointB->position, cPos), Math::Distance(stick.pointA->position, stick.pointB->position), m_CuttingTollerance))
+					m_Sticks.erase(m_Sticks.begin() + i);
+		}
+
+		// Point Draw Call happens later
+
+		for (auto const & point : m_Points)
+		{
+			auto centre = ImGui::GetWindowPos() + ImVec2(point.position.x, point.position.y);
+			float radius = 5.0f;
+
+			drawList->AddCircleFilled(centre, radius, ImGui::ColorConvertFloat4ToU32(point.locked ? ImVec4(0.8f, 0.1f, 0.2f, 1.0f) : ImVec4(1.0f, 1.0f, 1.0f, 1.0f)));
 		}
 
 		if (ImGui::IsWindowHovered() && ImGui::IsMouseClicked(0))
@@ -580,6 +617,17 @@ namespace Dymatic::Sandbox {
 				m_Points.push_back({ GetNextId(), glm::vec2(pos.x, pos.y), false });
 			}
 		}
+
+		if (Input::IsMouseButtonPressed(Mouse::ButtonMiddle))
+		{
+			auto pos = ImGui::GetMousePos() - ImGui::GetWindowPos();
+			m_Points.push_back({ GetNextId(), glm::vec2(pos.x, pos.y), false });
+			if (m_PreviousDrawPoint != nullptr)
+				m_Sticks.push_back({ GetNextId(), &m_Points.back(), m_PreviousDrawPoint, Math::Distance(m_Points.back().position, m_PreviousDrawPoint->position) });
+			m_PreviousDrawPoint = &m_Points.back();
+		}
+		else
+			m_PreviousDrawPoint = nullptr;
 
 		ImGui::End();
 	}
@@ -593,6 +641,8 @@ namespace Dymatic::Sandbox {
 				glm::vec2 positionBeforeUpdate = p.position;
 				p.position += p.position - p.prevPosition;
 				p.position += glm::vec2(0.0f, 9.8f) * ts.GetSeconds();
+				if (m_Floor)
+					p.position.y = std::min(p.position.y, m_FloorPos);
 				p.prevPosition = positionBeforeUpdate;
 			}
 		}
@@ -608,6 +658,269 @@ namespace Dymatic::Sandbox {
 					stick.pointB->position = stickCentre - stickDir * stick.length / 2.0f;
 
 			}
+
+		for (int i = 0; i < m_Sticks.size(); i++)
+		{
+			if (Math::Distance(m_Sticks[i].pointA->position, m_Sticks[i].pointB->position) > m_BreakingPoint)
+				m_Sticks.erase(m_Sticks.begin() + i);
+		}
 	}
 
+	void RopeSimulation::GenerateGrid()
+	{
+		float xOffset = 50.0f;
+		float yOffset = 50.0f;
+		int gridSize = 50/*30*/;
+		float gridGap = 10.0f/*15.0f*/;
+
+		for (int y = 0; y < gridSize; y++)
+			for (int x = 0; x < gridSize; x++)
+				m_Points.push_back({ GetNextId(), glm::vec2(xOffset + x * gridGap + Math::GetRandomInRange(0, 100) / 25.0f, yOffset + y * gridGap + Math::GetRandomInRange(0, 100) / 25.0f), false });
+
+		for (int y = 0; y < gridSize - 1; y++)
+		{
+			for (int x = 0; x < gridSize; x++)
+			{
+				m_Sticks.push_back({ GetNextId(), &m_Points[x + (y * gridSize)], &m_Points[x + ((y + 1) * gridSize)], gridGap });
+			}
+		}
+
+		for (int x = 0; x < gridSize - 1; x++)
+		{
+			for (int y = 0; y < gridSize; y++)
+			{
+				m_Sticks.push_back({ GetNextId(), &m_Points[x + (y * gridSize)], &m_Points[x + 1 + (y * gridSize)], gridGap });
+			}
+		}
+	}
+
+	void RopeSimulation::GenerateTree()
+	{
+		m_Points.push_back({ GetNextId(), glm::vec2(m_WindowWidth / 2.0f, 50), true });
+		TreeLoop(&m_Points.back());
+	}
+	void RopeSimulation::TreeLoop(Point* point)
+	{
+		m_TreeSeed++;
+		if ((int)std::fmod(hash(m_TreeSeed), 8.0f) != 3 && m_Points.size() < m_Points.capacity() && m_Sticks.size() < m_Sticks.capacity())
+		{
+			auto size = (int)std::fmod(hash(m_TreeSeed), 4.0f) + 1;
+			for (int i = 0; i < size; i++)
+			{
+				m_Points.push_back({ GetNextId(), point->position + glm::vec2((int)Math::GetRandomInRange(0, 100) - 50, Math::GetRandomInRange(1, 100)), false });
+				m_Sticks.push_back({ GetNextId(), point, &m_Points.back(), Math::Distance(point->position, m_Points.back().position) });
+				TreeLoop(&m_Points.back());
+			}
+		}
+	}
+
+	// Chess Simulation
+	
+	//void ChessAI::OnImGuiRender(Timestep ts)
+	//{
+	//	ImGui::Begin("Chess AI");
+	//	auto drawList = ImGui::GetWindowDrawList();
+	//	auto& startPos = ImVec2(ImGui::GetWindowPos().x, ImGui::GetWindowPos().y + ImGui::GetWindowSize().y);
+	//	const float squareSize = 80.0f;
+	//	auto cursorPos = ImGui::GetMousePos();
+	//	
+	//	for (int file = 0; file < 8; file++)
+	//	{
+	//		for (int rank = 0; rank < 8; rank++)
+	//		{
+	//			auto index = rank * 8 + file;
+	//			auto& currentSquare = m_Board.Square[index];
+	//
+	//			bool isLightSquare = std::fmod((file + rank), 2) != 0;
+	//			auto squareColor = (isLightSquare) ? ImColor(240, 209, 186) : ImColor(159, 110, 90);
+	//			auto min = startPos + ImVec2(file * squareSize, rank * -squareSize - squareSize);
+	//			auto max = startPos + ImVec2(file * squareSize + squareSize, rank * -squareSize);
+	//
+	//			// Drag n Drop Code
+	//			if (currentSquare != None)
+	//			{
+	//				if (m_StartDrag)
+	//				{
+	//					if (cursorPos.x > min.x && cursorPos.y > min.y && cursorPos.x < max.x && cursorPos.y < max.y)
+	//						m_DragIndex = rank * 8 + file;
+	//				}
+	//			}
+	//
+	//			if (m_StopDrag)
+	//			{
+	//				if (cursorPos.x > min.x && cursorPos.y > min.y && cursorPos.x < max.x && cursorPos.y < max.y && m_DragIndex != -1)
+	//				{
+	//					currentSquare = m_Board.Square[m_DragIndex];
+	//					m_Board.Square[m_DragIndex] = None;
+	//				}
+	//			}
+	//
+	//			// Draw Code
+	//	
+	//			drawList->AddRectFilled(min, max, squareColor);
+	//			if (index != m_DragIndex)
+	//			{
+	//				auto piece = currentSquare;
+	//
+	//				if (piece)
+	//				{
+	//					bool white = true;
+	//					if (piece >= 16) { piece -= 16; white = false; }
+	//					else piece -= 8;
+	//
+	//					auto& texture = GetPieceTexture(piece);
+	//
+	//					drawList->AddImage((ImTextureID)((white ? texture->GetRendererID() : texture->GetRendererID())), min, max, { 0, 1 }, { 1, 0 }, white ? ImColor(255, 255, 255) : ImColor(0, 0, 0));
+	//				}
+	//			}
+	//		}
+	//	}
+	//
+	//	if (m_DragIndex != -1)
+	//	{
+	//		auto piece = m_Board.Square[m_DragIndex];
+	//		if (piece)
+	//		{
+	//			bool white = true;
+	//			if (piece >= 16) { piece -= 16; white = false; }
+	//			else piece -= 8;
+	//
+	//			auto& texture = GetPieceTexture(piece);
+	//
+	//			drawList->AddImage((ImTextureID)((white ? texture->GetRendererID() : texture->GetRendererID())), cursorPos - ImVec2(squareSize * 0.5f, squareSize * 0.5f), cursorPos + ImVec2(squareSize * 0.5f, squareSize * 0.5f), { 0, 1 }, { 1, 0 }, white ? ImColor(255, 255, 255) : ImColor(0, 0, 0));
+	//		}
+	//	}
+	//
+	//	ImGui::End();
+	//
+	//	if (m_StopDrag)
+	//		m_DragIndex = -1;
+	//	m_StartDrag = false;
+	//	m_StopDrag = false;
+	//}
+	//
+	//ChessAI::ChessAI()
+	//{
+	//	m_TextureWKing = Texture2D::Create("assets/icons/ChessPieces/wKing.png");
+	//	m_TextureWPawn = Texture2D::Create("assets/icons/ChessPieces/wPawn.png");
+	//	m_TextureWKnight = Texture2D::Create("assets/icons/ChessPieces/wKnight.png");
+	//	m_TextureWBishop = Texture2D::Create("assets/icons/ChessPieces/wBishop.png");
+	//	m_TextureWRook = Texture2D::Create("assets/icons/ChessPieces/wRook.png");
+	//	m_TextureWQueen = Texture2D::Create("assets/icons/ChessPieces/wQueen.png");
+	//
+	//	PrecomputedMoveData();
+	//}
+	//
+	//void ChessAI::OnEvent(Event& e)
+	//{
+	//	EventDispatcher dispatcher(e);
+	//
+	//	dispatcher.Dispatch<MouseButtonPressedEvent>(DY_BIND_EVENT_FN(ChessAI::OnMouseButtonPressed));
+	//	dispatcher.Dispatch<MouseButtonReleasedEvent>(DY_BIND_EVENT_FN(ChessAI::OnMouseButtonReleased));
+	//}
+	//
+	//bool ChessAI::OnMouseButtonPressed(MouseButtonPressedEvent& e)
+	//{
+	//	if (e.GetMouseButton() == Mouse::ButtonLeft)
+	//	{
+	//		m_StartDrag = true;
+	//	}
+	//	return false;
+	//}
+	//
+	//bool ChessAI::OnMouseButtonReleased(MouseButtonReleasedEvent& e)
+	//{
+	//	if (e.GetMouseButton() == Mouse::ButtonLeft)
+	//	{
+	//		m_StopDrag = true;
+	//	}
+	//	return false;
+	//}
+	//
+	//Ref<Texture2D> ChessAI::GetPieceTexture(int piece)
+	//{
+	//	switch (piece)
+	//	{
+	//	case Piece::King: return m_TextureWKing;
+	//	case Piece::Pawn: return m_TextureWPawn;
+	//	case Piece::Knight: return m_TextureWKnight;
+	//	case Piece::Bishop: return m_TextureWBishop;
+	//	case Piece::Rook: return m_TextureWRook;
+	//	case Piece::Queen: return m_TextureWQueen;
+	//	}
+	//}
+	//
+	//void Board::LoadPositionFromFen(std::string fen)
+	//{
+	//	std::map<char, int> pieceTypeFromSymbol = {
+	//		{ 'k', Piece::King }, { 'p', Piece::Pawn }, { 'n', Piece::Knight },
+	//		{ 'b', Piece::Bishop }, { 'r', Piece::Rook }, { 'q', Piece::Queen },
+	//	};
+	//
+	//	std::string fenBoard = fen.substr(0, fen.find(' '));
+	//	int file = 0, rank = 7;
+	//
+	//	for (char symbol : fenBoard)
+	//	{
+	//		if (symbol == '/')
+	//		{
+	//			file = 0;
+	//			rank--;
+	//		}
+	//		else
+	//		{
+	//			if (isdigit(symbol))
+	//				file += symbol - '0';
+	//			else
+	//			{
+	//				int pieceColour = isupper(symbol) ? Piece::White : Piece::Black;
+	//				int pieceType = pieceTypeFromSymbol[tolower(symbol)];
+	//				Square[rank * 8 + file] = pieceType | pieceColour;
+	//				file++;
+	//			}
+	//		}
+	//	}
+	//}
+	//
+	//void ChessAI::PrecomputedMoveData()
+	//{
+	//	for (int file = 0; file < 8; file++)
+	//	{
+	//		for (int rank = 0; rank < 8; rank++)
+	//		{
+	//			int numNorth = 7 - rank;
+	//			int numSouth = rank;
+	//			int numWest = file;
+	//			int numEast = 7 - file;
+	//
+	//			int squareIndex = rank * 8 + file;
+	//
+	//			NumSquaresToEdge[squareIndex][0] = numNorth;
+	//			NumSquaresToEdge[squareIndex][1] = numSouth;
+	//			NumSquaresToEdge[squareIndex][2] = numEast;
+	//			NumSquaresToEdge[squareIndex][3] = numWest;
+	//			NumSquaresToEdge[squareIndex][4] = std::min(numNorth, numWest);
+	//			NumSquaresToEdge[squareIndex][5] = std::min(numSouth, numEast);
+	//			NumSquaresToEdge[squareIndex][6] = std::min(numNorth, numEast);
+	//			NumSquaresToEdge[squareIndex][7] = std::min(numSouth, numWest);
+	//		}
+	//	}
+	//}
+	//
+	//std::vector<Move> ChessAI::GenerateMoves()
+	//{
+	//	std::vector<Move> moves;
+	//
+	//	for (int startSquare = 0; startSquare < 64; startSquare++)
+	//	{
+	//		int piece = m_Board.Square[startSquare];
+	//		if (Piece::IsColour(piece, Board::ColorToMove))
+	//		{
+	//			if (Piece::IsSlidingPiece(piece))
+	//				GenerateSlidingMoves(startSquare, piece);
+	//		}
+	//	}
+	//
+	//	return moves;
+	//}
 }

@@ -50,14 +50,15 @@ namespace Dymatic {
 		bool& GetImageEditorVisible() { return m_ImageEditorVisible; }
 	private:
 		unsigned int GetNextLayerID() { m_NextLayerID++; return m_NextLayerID; }
-		void DrawLine(unsigned char* data, int dataSize, glm::vec2 p0, glm::vec2 p1);
+		void PutPixel(unsigned char* data, int& dataSize, glm::vec2 point);
+		void DrawLine(unsigned char* data, int& dataSize, glm::vec2 p0, glm::vec2 p1);
 
 		ImageLayer* GetLayerById(unsigned int id);
 		int GetLayerIndexById(unsigned int id);
 
 		void FindBoundingBox(unsigned char* data, uint32_t size, glm::vec2* min, glm::vec2* max);
-		glm::vec2 ConvertIndexToVector(unsigned int index, unsigned int width) { return { std::fmod(index, width), index / width }; }
-		unsigned int ConvertVectorToIndex(glm::vec2 vector, unsigned int width) { return vector.x + vector.y * width; }
+		glm::vec2 ConvertIndexToVector(int index, int width) { return { std::fmod(index, width), index / width }; }
+		inline const int ConvertVectorToIndex(const glm::vec2 vector, const int& width) { return vector.x + vector.y * width; }
 
 		void ExportImage(std::string);
 	private:
@@ -78,8 +79,7 @@ namespace Dymatic {
 		Ref<Texture2D> m_CheckerboardTexture = Texture2D::Create("assets/textures/Checkerboard.png");
 
 		Ref<Texture2D> m_Brush = Texture2D::Create("assets/BrushMask.png");
-		unsigned char* m_BrushData;
-		//Ref<Texture2D> m_StrokeTextureBuffer = Texture2D::Create(300, 300);
+		unsigned char* m_BrushData = nullptr;
 		unsigned char* m_StrokeBuffer = nullptr;
 		unsigned char* m_LayerBuffer = nullptr;
 
@@ -90,5 +90,6 @@ namespace Dymatic {
 
 		glm::vec4 m_BrushColor = { 1.0f, 1.0f, 1.0f, 1.0f };
 		int m_BrushOpacity = 100;
+		glm::vec2 m_BrushSize = { 100, 100 };
 	};
 }

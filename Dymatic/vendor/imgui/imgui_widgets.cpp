@@ -5784,55 +5784,7 @@ bool ImGui::TreeNodeEx(const char* str_id, ImGuiTreeNodeFlags flags, const char*
 
 //IMGUI CUSTOM:
 
-//ImGui::ObjectWInputReturn ImGui::TreeNodeInputEx(const char* id, const char* label, ImGuiTreeNodeFlags flags, char* buf, size_t buf_size, const char* fmt, bool beginEdit, ...)
-//{
-//
-//    ImGuiContext& g = *GImGui;
-//    ImGuiWindow* window = g.CurrentWindow;
-//    ImVec2 pos_before = window->DC.CursorPos;
-//
-//    ImGui::PushID(id);
-//    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(g.Style.ItemSpacing.x, g.Style.FramePadding.y * 2.0f));
-//    bool tree = ImGui::TreeNodeEx(label, flags | ImGuiTreeNodeFlags_AllowItemOverlap);
-//    bool ret = ImGui::IsItemClicked();
-//    ImGui::PopStyleVar();
-//    ImGui::PopID();
-//
-//
-//    char bufferLabel[256]; // <- danger, only storage for 256 characters.
-//    strncpy(bufferLabel, "##InputArea_", sizeof(bufferLabel));
-//    strncat(bufferLabel, id, sizeof(bufferLabel));
-//
-//    ImGui::PushID(bufferLabel);
-//
-//    ImGuiID im_id = window->GetID(bufferLabel);
-//    bool temp_input_is_active = ImGui::TempInputIsActive(im_id);
-//    bool temp_input_start = ret ? ImGui::IsMouseDoubleClicked(0) : false;
-//    if (beginEdit) { temp_input_is_active = true;  temp_input_start = true; }
-//
-//    if (temp_input_start)
-//    {
-//        ImGui::SetActiveID(im_id, window);
-//    }
-//
-//    if (temp_input_is_active || temp_input_start)
-//    {
-//        ImVec2 pos_after = window->DC.CursorPos;
-//        window->DC.CursorPos = pos_before;
-//        ret = ImGui::TempInputText(window->DC.LastItemRect, im_id, bufferLabel, buf, (int)buf_size, ImGuiInputTextFlags_None);
-//        window->DC.CursorPos = pos_after;
-//    }
-//
-//    ObjectWInputReturn returnVal;
-//    returnVal.object = tree;
-//    returnVal.input = ret;
-//
-//    ImGui::PopID();
-//
-//    return returnVal;
-//}
-
-ImGui::ObjectWInputReturn ImGui::TreeNodeInputEx(const char* str_id, const char* label, ImGuiTreeNodeFlags flags, char* buf, size_t buf_size)
+bool ImGui::SelectableInput(const char* str_id, float width, bool selected, ImGuiSelectableFlags flags, char* buf, size_t buf_size, bool& input, ImGuiInputTextFlags input_flags)
 {
     ImGuiContext& g = *GImGui;
     ImGuiWindow* window = g.CurrentWindow;
@@ -5840,12 +5792,46 @@ ImGui::ObjectWInputReturn ImGui::TreeNodeInputEx(const char* str_id, const char*
 
     PushID(str_id);
     PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(g.Style.ItemSpacing.x, g.Style.FramePadding.y * 2.0f));
-
-    bool tree = TreeNodeEx("##TreeNode", flags | ImGuiTreeNodeFlags_AllowItemOverlap, label);
-    bool clicked = IsItemClicked();
-
+    Selectable("##Selectable", selected, flags | ImGuiSelectableFlags_AllowDoubleClick | ImGuiSelectableFlags_AllowItemOverlap, ImVec2(width, 0.0f));
     bool ret = IsItemClicked();
     PopStyleVar();
+
+    ImGuiID id = window->GetID("##Input");
+    bool temp_input_is_active = TempInputIsActive(id);
+    bool temp_input_start = ret ? IsMouseDoubleClicked(0) : false;
+
+    if (temp_input_start)
+        SetActiveID(id, window);
+
+    if (temp_input_is_active || temp_input_start)
+    {
+        ImVec2 pos_after = window->DC.CursorPos;
+        window->DC.CursorPos = pos_before;
+        SetNextItemWidth(width);
+        input = TempInputText(window->DC.LastItemRect, id, "##Input", buf, (int)buf_size, input_flags);
+        window->DC.CursorPos = pos_after;
+    }
+    else
+    {
+        window->DrawList->AddText(pos_before, GetColorU32(ImGuiCol_Text), buf);
+    }
+
+    PopID();
+    return ret;
+}
+
+bool ImGui::TreeNodeInput(const char* str_id, ImGuiTreeNodeFlags flags, char* buf, size_t buf_size, bool& tree, bool& input)
+{
+    ImGuiContext& g = *GImGui;
+    ImGuiWindow* window = g.CurrentWindow;
+    ImVec2 pos_before = window->DC.CursorPos;
+
+    PushID(str_id);
+    PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(g.Style.ItemSpacing.x, g.Style.FramePadding.y * 2.0f));
+    tree = TreeNodeEx("##TreeNode", flags | ImGuiTreeNodeFlags_AllowItemOverlap, buf);
+    bool ret = IsItemClicked();
+    PopStyleVar();
+
 
     ImGuiID id = window->GetID("##Input");
     bool temp_input_is_active = TempInputIsActive(id);
@@ -5860,23 +5846,17 @@ ImGui::ObjectWInputReturn ImGui::TreeNodeInputEx(const char* str_id, const char*
     {
         ImVec2 pos_after = window->DC.CursorPos;
         window->DC.CursorPos = pos_before;
-        ret = TempInputText(ImRect(window->DC.LastItemRect.Min, window->DC.LastItemRect.Max + ImVec2(0, 0)), id, "##Input", buf, (int)buf_size, ImGuiInputTextFlags_None);
+        input = TempInputText(ImRect(window->DC.LastItemRect.Min, window->DC.LastItemRect.Max + ImVec2(0, 0)), id, "##Input", buf, (int)buf_size, ImGuiInputTextFlags_None);
         window->DC.CursorPos = pos_after;
-        clicked = false;
     }
     else
     {
         //window->DrawList->AddText(pos_before, GetColorU32(ImGuiCol_Text), buf);
     }
-
-    ObjectWInputReturn returnVal;
-    returnVal.object = tree;
-    returnVal.clicked = clicked;
-    returnVal.input = ret;
     
     ImGui::PopID();
     
-    return returnVal;
+    return ret;
 }
 
 

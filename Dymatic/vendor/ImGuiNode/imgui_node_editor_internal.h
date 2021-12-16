@@ -1262,6 +1262,9 @@ struct EditorContext
 
     EditorAction* GetCurrentAction() { return m_CurrentAction; }
 
+    // IMGUI CUSTOM:
+    NavigateAction& GetNavigation() { return m_NavigateAction; }
+    // -----------//
     CreateItemAction& GetItemCreator() { return m_CreateItemAction; }
     DeleteItemsAction& GetItemDeleter() { return m_DeleteItemsAction; }
     ContextMenuAction& GetContextMenu() { return m_ContextMenuAction; }

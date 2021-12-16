@@ -3754,6 +3754,8 @@ namespace Dymatic {
 
 	void TextEditorPannel::OnImGuiRender()
 	{
+		auto& io = ImGui::GetIO();
+
 		if (m_TextEditorVisible)
 		{
 			for (int i = 0; i < m_TextEditors.size(); i++)
@@ -3811,9 +3813,14 @@ namespace Dymatic {
 			if (ImGui::BeginMenu("View"))
 			{
 				if (ImGui::MenuItem("Show Whitespaces", "", m_ShowWhitespaces)) { SetShowWhitespaces(!m_ShowWhitespaces); }
+				if (ImGui::MenuItem("Zoom In", "Ctrl+Scroll"))  { Zoom( 1.0f); }
+				if (ImGui::MenuItem("Zoom Out", "Ctrl+Scroll")) { Zoom(-1.0f); }
 				ImGui::EndMenu();
 			}
 			ImGui::EndMenuBar();
+
+			if (io.KeyCtrl)
+				Zoom(io.MouseWheel);
 
 			ImGui::BeginChild("##TextEditorDropArea");
 	
@@ -3924,12 +3931,6 @@ namespace Dymatic {
 
 	bool TextEditorPannel::OnMouseScrolled(MouseScrolledEvent& e)
 	{
-		if (Input::IsKeyPressed(Key::LeftControl) || Input::IsKeyPressed(Key::RightControl))
-		{
-			m_Zoom = std::clamp(m_Zoom + e.GetYOffset() * 0.025f, 0.1f, 1.0f);
-			//for (auto textEditor : m_TextEditors)
-			//	textEditor.textEditor.SetZoom(&m_Zoom);
-		}
 		return false;
 	}
 
@@ -3964,8 +3965,22 @@ namespace Dymatic {
 	void TextEditorPannel::NewTextFile()
 	{
 		auto id = GetNextTextEditorID();
-		int number = 1;
-		for (auto const& textEditor : m_TextEditors) { if (textEditor.Filename != ("Untitled-" + std::to_string(number))) break; else number++; }
+
+		int number = 0;
+		bool found = false;
+		while (!found)
+		{
+			number++;
+			found = true;
+			for (auto const & textEditor : m_TextEditors)
+			{
+				if (textEditor.Filename == "Untitled-" + std::to_string(number))
+				{
+					found = false;
+					break;
+				}
+			}
+		}
 		m_TextEditors.insert(m_TextEditors.begin(), TextEditorInformation(id, ("Untitled-" + std::to_string(number)), true));
 		m_TextEditors[0].textEditor.SetShowWhitespaces(m_ShowWhitespaces);
 		m_TextEditors[0].textEditor.SetZoom(&m_Zoom);
@@ -4077,6 +4092,7 @@ namespace Dymatic {
 			else if (suffix == ".sql")		{ reference->textEditor.SetLanguageDefinition(TextEditorInternal::TextEditor::LanguageDefinition::SQL()); reference->Language = "SQL"; }
 			else if (suffix == ".as")		{ reference->textEditor.SetLanguageDefinition(TextEditorInternal::TextEditor::LanguageDefinition::AngelScript()); reference->Language = "Angel Script"; }
 			else if (suffix == ".lua")		{ reference->textEditor.SetLanguageDefinition(TextEditorInternal::TextEditor::LanguageDefinition::Lua()); reference->Language = "Lua"; }
+			else if (suffix == ".node")		{ reference->textEditor.SetLanguageDefinition(TextEditorInternal::TextEditor::LanguageDefinition::None()); reference->Language = "Dymatic Node Graph"; }
 			else							
 			{
 				reference->textEditor.SetLanguageDefinition(TextEditorInternal::TextEditor::LanguageDefinition::None());

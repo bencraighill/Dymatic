@@ -577,15 +577,8 @@ namespace ImGui
     IMGUI_API bool          TreeNodeEx(const char* label, ImGuiTreeNodeFlags flags = 0);
     IMGUI_API bool          TreeNodeEx(const char* str_id, ImGuiTreeNodeFlags flags, const char* fmt, ...) IM_FMTARGS(3);
     //IMGUI CUSTOM:
-
-    struct ObjectWInputReturn
-    {
-        bool object;
-        bool clicked;
-        bool input;
-    };
-
-    IMGUI_API ObjectWInputReturn          TreeNodeInputEx(const char* str_id, const char* label, ImGuiTreeNodeFlags flags, char* buf, size_t buf_size);
+    IMGUI_API bool          SelectableInput(const char* str_id, float width, bool selected, ImGuiSelectableFlags flags, char* buf, size_t buf_size, bool& input, ImGuiInputTextFlags input_flags = 0);
+    IMGUI_API bool          TreeNodeInput(const char* str_id, ImGuiTreeNodeFlags flags, char* buf, size_t buf_size, bool& tree, bool& input);
     //------------//
     IMGUI_API bool          TreeNodeEx(const void* ptr_id, ImGuiTreeNodeFlags flags, const char* fmt, ...) IM_FMTARGS(3);
     IMGUI_API bool          TreeNodeExV(const char* str_id, ImGuiTreeNodeFlags flags, const char* fmt, va_list args) IM_FMTLIST(3);
@@ -753,6 +746,9 @@ namespace ImGui
     // - See Demo Window under "Widgets->Querying Status" for an interactive visualization of most of those functions.
     IMGUI_API bool          IsItemHovered(ImGuiHoveredFlags flags = 0);                         // is the last item hovered? (and usable, aka not blocked by a popup, etc.). See ImGuiHoveredFlags for more options.
     IMGUI_API bool          IsItemActive();                                                     // is the last item active? (e.g. button being held, text field being edited. This will continuously return true while holding mouse button on an item. Items that don't interact will always return false)
+    //-- ImGui Custom --//
+    IMGUI_API bool          IsItemActivePreviousFrame();
+    //------------------//
     IMGUI_API bool          IsItemFocused();                                                    // is the last item focused for keyboard/gamepad navigation?
     IMGUI_API bool          IsItemClicked(ImGuiMouseButton mouse_button = 0);                   // is the last item clicked? (e.g. button/node just clicked on) == IsMouseClicked(mouse_button) && IsItemHovered()
     IMGUI_API bool          IsItemVisible();                                                    // is the last item visible? (items may be out of sight because of clipping/scrolling)

@@ -132,6 +132,5 @@ namespace ImGui::Custom {
 		IMGUI_TEST_ENGINE_ITEM_INFO(id, label, window->DC.ItemFlags | ImGuiItemStatusFlags_Checkable | (*v ? ImGuiItemStatusFlags_Checked : 0));
 		return pressed;
 	}
-
 }
 

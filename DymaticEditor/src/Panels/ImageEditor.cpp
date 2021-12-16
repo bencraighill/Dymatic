@@ -42,7 +42,7 @@ namespace Dymatic {
 		//delete[] dataStroke;
 		//delete[] data;
 
-		auto dataSize = m_DocumentWidth * m_DocumentHeight * 4;
+		auto dataSize = m_DocumentWidth * m_DocumentHeight;
 		m_StrokeBuffer = new unsigned char[dataSize];
 		for (int i = 0; i < dataSize; i++) { m_StrokeBuffer[i] = 0.0f; }
 
@@ -76,15 +76,15 @@ namespace Dymatic {
 			switch (e.GetMouseButton())
 			{
 			case (Mouse::ButtonLeft): {
-				auto size = m_DocumentWidth * m_DocumentHeight * 4;
+				auto size = m_DocumentWidth * m_DocumentHeight;
 				if (m_SelectedLayer != nullptr)
 				{
 					if (m_LayerBuffer != NULL) {
 						delete[] m_LayerBuffer;
 					}
 					
-					m_LayerBuffer = new unsigned char[size];
-					m_SelectedLayer->Texture->GetData(m_LayerBuffer, size);
+					m_LayerBuffer = new unsigned char[size * 4];
+					m_SelectedLayer->Texture->GetData(m_LayerBuffer, size * 4);
 
 				}
 				for (int i = 0; i < size; i++) { m_StrokeBuffer[i] = 0.0f; }
@@ -231,7 +231,7 @@ namespace Dymatic {
 			m_MousePosition = glm::vec2(ImGui::GetMousePos().x - ImGui::GetWindowPos().x - (ImGui::GetWindowSize().x / 2) + m_DocumentWidth / 2, ImGui::GetMousePos().y - ImGui::GetWindowPos().y - (ImGui::GetWindowSize().y / 2) + m_DocumentWidth / 2);
 
 			auto drawList = ImGui::GetWindowDrawList();
-			m_HoveredPixel = glm::vec2(ImGui::GetMousePos().x - ImGui::GetWindowPos().x - m_Position.x, m_DocumentHeight - (ImGui::GetMousePos().y - ImGui::GetWindowPos().y - m_Position.y));
+			m_HoveredPixel = glm::vec2((ImGui::GetMousePos().x - ImGui::GetWindowPos().x - m_Position.x) / m_Zoom, (m_DocumentHeight - (ImGui::GetMousePos().y - ImGui::GetWindowPos().y - m_Position.y) / m_Zoom));
 
 			auto startPos = ImGui::GetWindowPos() + ImVec2(m_Position.x, m_Position.y);
 			auto endPos = ImGui::GetWindowPos() + ImVec2(m_DocumentWidth, m_DocumentHeight) * m_Zoom + ImVec2(m_Position.x, m_Position.y);
@@ -268,36 +268,40 @@ namespace Dymatic {
 			{
 				if (m_Tool == Move)
 				{
-					bool found = false;
-					for (int i = m_Layers.size() - 1; i >= 0; i--)
-					{
-						auto size = m_DocumentWidth * m_DocumentHeight * 4;
-						unsigned char* data = new unsigned char[size];
-						m_Layers[i].Texture->GetData(data, size);
-						auto index = ConvertVectorToIndex(m_HoveredPixel, m_DocumentWidth) * 4 + 3;
-						if (index < size && index > 0)
-						{
-							if (data[index] != 0)
-							{
-								found = true;
-								m_SelectedLayer = &m_Layers[i];
-								delete[] data;
-								break;
-							}
-						}
-						delete[] data;
-					}
-					if (!found) { m_SelectedLayer = nullptr; }
+					// Select Layer Code
+
+					//bool found = false;
+					//for (int i = m_Layers.size() - 1; i >= 0; i--)
+					//{
+					//	auto size = m_DocumentWidth * m_DocumentHeight * 4;
+					//	unsigned char* data = new unsigned char[size];
+					//	m_Layers[i].Texture->GetData(data, size);
+					//	auto index = ConvertVectorToIndex(m_HoveredPixel, m_DocumentWidth) * 4 + 3;
+					//	if (index < size && index > 0)
+					//	{
+					//		if (data[index] != 0)
+					//		{
+					//			found = true;
+					//			m_SelectedLayer = &m_Layers[i];
+					//			delete[] data;
+					//			break;
+					//		}
+					//	}
+					//	delete[] data;
+					//}
+					//if (!found) { m_SelectedLayer = nullptr; }
+
+					//m_SelectedLayer
 				}
 				else if (m_Tool == Brush)
 				{
 					if (m_SelectedLayer != nullptr)
 					{
-						int bpp = 4;
-						int dataSize = m_DocumentWidth * m_DocumentHeight * bpp;
+						int dataSize = m_DocumentWidth * m_DocumentHeight;
+						DrawLine(m_StrokeBuffer, dataSize, m_PreviouslyHoveredPixel, m_HoveredPixel);
+						dataSize *= 4;
 
 						// Draws Line To Stroke Buffer
-						DrawLine(m_StrokeBuffer, dataSize, m_PreviouslyHoveredPixel, m_HoveredPixel);
 
 						//Paint Code
 
@@ -309,10 +313,10 @@ namespace Dymatic {
 							//m_StrokeTextureBuffer->GetData(strokeData, dataSize);
 							for (int i = 0; i < dataSize; i += 4)
 							{
-								data[i + 0] = std::clamp(glm::lerp((float)m_LayerBuffer[i + 0], m_BrushColor.x * 255.0f, ((float)m_StrokeBuffer[i] / 255.0f) * (m_BrushOpacity / 100.0f)), 0.0f, 255.0f);
-								data[i + 1] = std::clamp(glm::lerp((float)m_LayerBuffer[i + 1], m_BrushColor.y * 255.0f, ((float)m_StrokeBuffer[i] / 255.0f) * (m_BrushOpacity / 100.0f)), 0.0f, 255.0f);
-								data[i + 2] = std::clamp(glm::lerp((float)m_LayerBuffer[i + 2], m_BrushColor.z * 255.0f, ((float)m_StrokeBuffer[i] / 255.0f) * (m_BrushOpacity / 100.0f)), 0.0f, 255.0f);
-								data[i + 3] = std::clamp(glm::lerp((float)m_LayerBuffer[i + 3], m_BrushColor.w * 255.0f, ((float)m_StrokeBuffer[i] / 255.0f) * (m_BrushOpacity / 100.0f)), 0.0f, 255.0f);
+								data[i + 0] = std::clamp(glm::lerp((float)m_LayerBuffer[i + 0], m_BrushColor.x * 255.0f, ((float)m_StrokeBuffer[i / 4] / 255.0f) * (m_BrushOpacity / 100.0f)), 0.0f, 255.0f);
+								data[i + 1] = std::clamp(glm::lerp((float)m_LayerBuffer[i + 1], m_BrushColor.y * 255.0f, ((float)m_StrokeBuffer[i / 4] / 255.0f) * (m_BrushOpacity / 100.0f)), 0.0f, 255.0f);
+								data[i + 2] = std::clamp(glm::lerp((float)m_LayerBuffer[i + 2], m_BrushColor.z * 255.0f, ((float)m_StrokeBuffer[i / 4] / 255.0f) * (m_BrushOpacity / 100.0f)), 0.0f, 255.0f);
+								data[i + 3] = std::clamp(glm::lerp((float)m_LayerBuffer[i + 3], m_BrushColor.w * 255.0f, ((float)m_StrokeBuffer[i / 4] / 255.0f) * (m_BrushOpacity / 100.0f)), 0.0f, 255.0f);
 
 								//data[i + 0] = std::clamp(glm::lerp((float)m_LayerBuffer[i + 0], m_BrushColor.x * 255.0f, ((float)m_StrokeBuffer[i] / 255.0f) * (m_BrushOpacity / 100.0f)), 0.0f, 255.0f);
 								//data[i + 1] = std::clamp(glm::lerp((float)m_LayerBuffer[i + 1], m_BrushColor.y * 255.0f, ((float)m_StrokeBuffer[i] / 255.0f) * (m_BrushOpacity / 100.0f)), 0.0f, 255.0f);
@@ -644,58 +648,112 @@ namespace Dymatic {
 	//	}
 	//}
 
-	void ImageEditor::DrawLine(unsigned char* data, int dataSize, glm::vec2 p0, glm::vec2 p1)
+	void ImageEditor::PutPixel(unsigned char* data, int& dataSize, glm::vec2 point)
 	{
-		int dx = p1.x - p0.x;
-		int dy = p1.y - p0.y;
-	
-		int dLong = abs(dx);
-		int dShort = abs(dy);
-	
-		int offsetLong = dx > 0 ? 1 : -1;
-		int offsetShort = dy > 0 ? m_DocumentWidth : -m_DocumentWidth; // Could be height
-	
-		if (dLong < dShort)
+		auto startPoint = point - (m_BrushSize / 2.0f);
+		glm::vec2 brushPoint = startPoint;
+		for (int y = 0; y < (m_BrushSize.x * m_BrushSize.y); y++)
 		{
-			std::swap(dShort, dLong);
-			std::swap(offsetShort, offsetLong);
-		}
-	
-		int error = dLong / 2;
-		glm::vec2 pos = p0; // Could be height
-		const int offset[] = { offsetLong, offsetLong + offsetShort };
-		const int abs_d[] = { dShort, dShort - dLong };
-		for (int i = 0; i <= dLong; ++i)
-		{
-			//buffer[index] = 255;  // or a call to your painting method
-
-			glm::vec2 yPos = { 0.0f, 0.0f };
-			for (int y = 0; y < (100 * 100); y++)
+			auto uIndex = ConvertVectorToIndex(brushPoint, m_DocumentWidth);
+			if (brushPoint.x >= 0 && brushPoint.x < m_DocumentWidth && brushPoint.y >= 0 && brushPoint.y < m_DocumentHeight)
 			{
-				glm::vec2 cPos = pos + yPos;
-				if (cPos.x >=0 && cPos.x <= m_DocumentWidth && cPos.y >= 0 && cPos.y <= m_DocumentHeight)
+				if (m_BrushData[y * 4 + 3] > data[uIndex + 0])
 				{
-					auto uIndex = ConvertVectorToIndex(cPos, m_DocumentWidth) * 4;
-					if (m_BrushData[y * 4 + 3] > data[uIndex + 0])
-					{
-
-						data[uIndex + 0] = (unsigned int)m_BrushData[y * 4 + 3];
-						data[uIndex + 1] = (unsigned int)m_BrushData[y * 4 + 3];
-						data[uIndex + 2] = (unsigned int)m_BrushData[y * 4 + 3];
-						data[uIndex + 3] = 255.0f;
-					}
-
-					yPos.x++;
-					if (std::fmod(y + 2, 100) == 1)
-					{
-						yPos.y++;
-						yPos.x = 0.0f;
-					}
+					data[uIndex + 0] = (unsigned int)m_BrushData[y * 4 + 3];
 				}
 			}
-			const int errorIsTooBig = error >= dLong;
-			pos += offset[errorIsTooBig];
-			error += abs_d[errorIsTooBig];
+		
+			brushPoint.x++;
+			if (std::fmod(y + 2, m_BrushSize.x) == 1)
+			{
+				brushPoint.y++;
+				brushPoint.x = startPoint.x;
+			}
+		}
+	}
+
+	void ImageEditor::DrawLine(unsigned char* data, int& dataSize, glm::vec2 p1, glm::vec2 p2)
+	{
+		int x, y, dx, dy, dx1, dy1, px, py, xe, ye, i;
+		dx = p2.x - p1.x;
+		dy = p2.y - p1.y;
+		dx1 = fabs(dx);
+		dy1 = fabs(dy);
+		px = 2 * dy1 - dx1;
+		py = 2 * dx1 - dy1;
+		if (dy1 <= dx1)
+		{
+			if (dx >= 0)
+			{
+				x = p1.x;
+				y = p1.y;
+				xe = p2.x;
+			}
+			else
+			{
+				x = p2.x;
+				y = p2.y;
+				xe = p1.x;
+			}
+			PutPixel(data, dataSize, { x, y });
+			for (i = 0; x < xe; i++)
+			{
+				x = x + 1;
+				if (px < 0)
+				{
+					px = px + 2 * dy1;
+				}
+				else
+				{
+					if ((dx < 0 && dy < 0) || (dx > 0 && dy > 0))
+					{
+						y = y + 1;
+					}
+					else
+					{
+						y = y - 1;
+					}
+					px = px + 2 * (dy1 - dx1);
+				}
+				PutPixel(data, dataSize, { x, y });
+			}
+		}
+		else
+		{
+			if (dy >= 0)
+			{
+				x = p1.x;
+				y = p1.y;
+				ye = p2.y;
+			}
+			else
+			{
+				x = p2.x;
+				y = p2.y;
+				ye = p1.y;
+			}
+			PutPixel(data, dataSize, { x, y });
+			for (i = 0; y < ye; i++)
+			{
+				y = y + 1;
+				if (py <= 0)
+				{
+					py = py + 2 * dx1;
+				}
+				else
+				{
+					if ((dx < 0 && dy < 0) || (dx > 0 && dy > 0))
+					{
+						x = x + 1;
+					}
+					else
+					{
+						x = x - 1;
+					}
+					py = py + 2 * (dx1 - dy1);
+				}
+				PutPixel(data, dataSize, { x, y });
+			}
 		}
 	}
 

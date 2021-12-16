@@ -428,6 +428,8 @@ namespace Dymatic {
 		void SwapLineDown() { if (m_SelectedEditor != NULL && m_TextEditorVisible) { if (!m_SelectedEditor->textEditor.IsReadOnly()) { m_SelectedEditor->textEditor.SwapLineDown(); } } }
 		void SwitchCStyleHeader();
 
+		void Zoom(float offset) { m_Zoom = std::clamp(m_Zoom + offset * 0.025f, 0.1f, 1.0f); }
+
 		bool& GetTextEditorVisible() { return m_TextEditorVisible; }
 		void OpenTextFileByFilepath(std::string filepath);
 	private:

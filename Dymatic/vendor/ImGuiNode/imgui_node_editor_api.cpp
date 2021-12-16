@@ -502,6 +502,20 @@ void ax::NodeEditor::NavigateToSelection(bool zoomIn, float duration)
     s_Editor->NavigateTo(s_Editor->GetSelectionBounds(), zoomIn, duration);
 }
 
+//ImGui Custom:
+void ax::NodeEditor::GetSelectionBounds(ImVec2& min, ImVec2& max)
+{
+    auto bounds = s_Editor->GetSelectionBounds();
+    min = bounds.Min;
+    max = bounds.Max;
+}
+
+void ax::NodeEditor::SetZoom(float zoom)
+{
+	s_Editor->GetNavigation().m_Zoom = zoom;
+}
+//------------//
+
 bool ax::NodeEditor::ShowNodeContextMenu(NodeId* nodeId)
 {
     return s_Editor->GetContextMenu().ShowNodeContextMenu(nodeId);

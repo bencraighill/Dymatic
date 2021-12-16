@@ -5,16 +5,12 @@
 
 namespace Dymatic {
 
-	struct NodeCompilerLoopBackOutput
-	{
-		std::string Declarations = "";
-		std::string Definitions = "";
-	};
-
 	class NodeEditorPannel
 	{
 	public:
 		NodeEditorPannel();
+
+		bool& GetNodeEditorVisible();
 	
 		void OnEvent(Event& e);
 
@@ -28,7 +24,7 @@ namespace Dymatic {
 		void DuplicateNodes();
 		void DeleteNodes();
 	
-		void Application_Frame();
+		void OnImGuiRender();
 	private:
 		
 
