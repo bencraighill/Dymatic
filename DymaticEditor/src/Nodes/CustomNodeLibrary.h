@@ -24,12 +24,13 @@ public:
 	DYFUNCTION(Category = "Debug|Testing", Pure)
 	static float Float4Addition(float a, float b, float c, float d, bool Add = true);
 
-	DYFUNCTION(Category = "Debug|Testing", Pure, DisplayName = "AND")
+	DYFUNCTION(Category = "Debug|Testing", Pure, DisplayName = "AND Boolean", CompactNodeTitle = "AND", NoPinLabels)
 	static bool BooleanAND(bool a, bool b);
 };
 
 String DYTestNodeLibrary::SomeFunFunction(const String& text, bool& success, float displayTime /*= 1.0f*/)
 {
+	success = true;
 	return text + std::to_string(displayTime);
 }
 

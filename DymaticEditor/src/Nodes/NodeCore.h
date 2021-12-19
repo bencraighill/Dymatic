@@ -6,7 +6,9 @@ enum Meta
 	Keywords,
 	Category,
 	Pure,
-	DisplayName
+	DisplayName,
+	CompactNodeTitle,
+	NoPinLabels
 };
 
 // Only used by Node Interpreter when importing functions from C++ files.
