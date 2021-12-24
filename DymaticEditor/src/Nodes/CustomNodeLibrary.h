@@ -7,7 +7,7 @@ class DYTestNodeLibrary : public DYBlueprintFunctionLibrary
 {
 public:
 	DYFUNCTION(BlueprintCallable, Meta = (ExpandEnumAsExecs = "Branches", Keywords = "Branching Thingo"), Category = "Flow Control")
-	static  String  SomeFunFunction   (const String& text, bool& success, float displayTime = 1.0f);
+	static  String  SomeFunFunction   (DYPARAM(Ref) float& fReference, const String& text, bool& Success, float displayTime = 1.0f);
 
 	DYFUNCTION(Category = "Utilities|String", Keywords = "log print")
 	/**
@@ -26,9 +26,18 @@ public:
 
 	DYFUNCTION(Category = "Debug|Testing", Pure, DisplayName = "AND Boolean", CompactNodeTitle = "AND", NoPinLabels)
 	static bool BooleanAND(bool a, bool b);
+
+	DYFUNCTION(Category = "Math|Float", Keywords = "+", Pure, DisplayName = "Float Addition", CompactNodeTitle = "+", NoPinLabels)
+	static float FloatAddition(float a, float b);
+
+	DYFUNCTION(DisplayName = "ToString (float)", Category = "Math|Conversions", Keywords = "convert cast", Pure, CompactNodeTitle = "->", ConversionAutocast)
+	static String Conv_FloatToString(Float InFloat);
+
+	DYFUNCTION(DisplayName = "Make Color", Category = "Math|Vector", Keywords = "create", Pure, NativeMakeFunc)
+	static Color Make_Color(float r, float g, float b, float a);
 };
 
-String DYTestNodeLibrary::SomeFunFunction(const String& text, bool& success, float displayTime /*= 1.0f*/)
+String DYTestNodeLibrary::SomeFunFunction(float& fReference, const String& text, bool& success, float displayTime /*= 1.0f*/)
 {
 	success = true;
 	return text + std::to_string(displayTime);
@@ -55,4 +64,19 @@ float DYTestNodeLibrary::Float4Addition(float a, float b, float c, float d, bool
 bool DYTestNodeLibrary::BooleanAND(bool a, bool b)
 {
 	return a && b;
+}
+
+float DYTestNodeLibrary::FloatAddition(float a, float b)
+{
+	return a + b;
+}
+
+String DYTestNodeLibrary::Conv_FloatToString(Float InFloat)
+{
+	return std::to_string(InFloat);
+}
+
+Color DYTestNodeLibrary::Make_Color(float r, float g, float b, float a)
+{
+	return { r, g, b, a };
 }

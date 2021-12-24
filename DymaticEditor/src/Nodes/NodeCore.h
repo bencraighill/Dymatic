@@ -1,19 +1,29 @@
 #pragma once
 #include "Dymatic/Core/Base.h"
 
-enum Meta
+enum FunctionMeta
 {
 	Keywords,
 	Category,
 	Pure,
 	DisplayName,
 	CompactNodeTitle,
-	NoPinLabels
+	NoPinLabels,
+	NativeMakeFunc,
+	NativeBreakFunc,
+	ConversionAutocast
+};
+
+enum ParamMeta
+{
+	// DisplayName
+	Ref
 };
 
 // Only used by Node Interpreter when importing functions from C++ files.
 #define DYCLASS(...)
 #define DYFUNCTION(...)
+#define DYPARAM(...)
 #define DYENUM(...)
 
 #define check(condition) DY_ASSERT(condition);

@@ -58,7 +58,7 @@ using namespace ax;
 
 using ax::Widgets::IconType;
 
-static ed::EditorContext* m_Editor = nullptr;
+//static ed::EditorContext* m_Editor = nullptr;
 
 //extern "C" __declspec(dllimport) short __stdcall GetAsyncKeyState(int vkey);
 //extern "C" bool Debug_KeyPress(int vkey)
@@ -155,6 +155,7 @@ struct Pin
 	ed::PinId   ID;
 	Node* Node;
 	std::string Name;
+	std::string DisplayName;
 	std::string Tooltip;
     PinData Data;
 	PinKind Kind;
@@ -175,6 +176,11 @@ struct Pin
 		: Data(data), Kind(kind)
 	{
 	}
+
+	std::string& GetName()
+	{
+		return DisplayName.empty() ? Name : DisplayName;
+	}
 };
 
 struct Node
@@ -191,7 +197,11 @@ struct Node
 	ImColor Color;
 	NodeType Type;
     NodeFunction Function;
+
+    ImVec2 Position = {};
 	ImVec2 Size;
+    ImRect GroupBounds;
+
     bool Internal = false;
 
 	std::string State;
@@ -201,7 +211,7 @@ struct Node
     bool CommentEnabled = false;
     bool CommentPinned = false;
     std::string Comment = "";
-    float Opacity = -2.5f;
+    //float CommentOpacity = -2.5f;
 
     bool AddInputs = false;
     bool AddOutputs = false;
@@ -251,6 +261,7 @@ struct SpawnNodeData
     }
 
 	unsigned int VariableID = 0;
+    unsigned int GraphID = 0;
 };
 
 struct Variable
@@ -381,10 +392,11 @@ struct FindResultsData
 {
     std::string Name;
     ImColor Color;
-    ed::NodeId ID;
+    int ID;
+    Ref<Texture2D> Icon = nullptr;
     std::vector<FindResultsData> SubData;
 
-    FindResultsData(const std::string& name, const ImColor& color, ed::NodeId id)
+    FindResultsData(const std::string& name, const ImColor& color, int id)
         : Name(name), Color(color), ID(id)
     {
     }
@@ -403,6 +415,8 @@ struct Ubergraph
 
 class NodeCompiler;
 class NodeLibrary;
+class NodeGraph;
+class GraphWindow;
 
 class NodeEditorInternal
 {
@@ -575,12 +589,19 @@ public:
     // No Category
     Node* SpawnComment(SpawnNodeData in);
 
-    void NodeEditorInternal::ConversionAvalible(Pin* A, Pin* B, spawnNodeFunction& Function);
-    void NodeEditorInternal::ConversionAvalible(PinData& A, PinData& B, spawnNodeFunction& Function);
+    // Via Function Library
+    Node* SpawnNodeFromLibrary(unsigned int id, NodeGraph& graph);
+
+    int GetConversionAvalible(Pin* A, Pin* B);
+    int GetConversionAvalible(PinData& A, PinData& B);
+
+    void ConversionAvalible(Pin* A, Pin* B, spawnNodeFunction& Function);
+    void ConversionAvalible(PinData& A, PinData& B, spawnNodeFunction& Function);
+
     void BuildNodes();
     const char* Application_GetName();
     ImColor GetIconColor(PinType type);
-    void DrawPinIcon(const PinData& data, bool connected, int alpha);
+    void DrawPinIcon(const PinData& data, const PinKind& kind, bool connected, int alpha);
     void DrawTypeIcon(ContainerType container, PinType type);
 
     void ShowStyleEditor(bool* show = nullptr);
@@ -620,6 +641,23 @@ public:
     void DuplicateNodes();
     void DeleteNodes();
 
+    void ShowFlow();
+
+    // Graph Management
+	inline NodeGraph* GetCurrentGraph() { return FindGraphByID(m_CurrentGraphID); }
+	NodeGraph* FindGraphByID(unsigned int id);
+
+    inline GraphWindow* GetCurrentWindow() { return FindWindowByID(m_CurrentWindowID); }
+    GraphWindow* FindWindowByID(unsigned int id);
+
+	GraphWindow* OpenGraph(unsigned int id);
+	GraphWindow* OpenGraphInNewTab(unsigned int id);
+
+    void ClearSelection();
+    void SetNodePosition(ed::NodeId id, ImVec2 position);
+    void NavigateToContent();
+    void NavigateToNode(ed::NodeId id);
+
     void DefaultValueInput(PinData& data, bool spring = false);
 
     void OpenSearchList(SearchData* searchData);
@@ -627,15 +665,19 @@ public:
     SearchResultData* DisplaySearchData(SearchData& searchData, bool origin = true);
 
     void CheckLinkSafety(Pin* startPin, Pin* endPin);
+    void CreateLink(NodeGraph& graph, Pin* a, Pin* b);
 
     void UpdateSearchData();
     void AddSearchData(std::string name, std::string category, std::vector<std::string> keywords, std::vector<Pin> params, PinData returnVal, bool pure, spawnNodeFunction Function = nullptr, SpawnNodeData spawnData = {}, int id = -1);
     void AddSearchDataReference(std::string& name, std::string& category, std::vector<std::string>& keywords, std::vector<Pin>& params, PinData& returnVal, bool& pure, int& id, spawnNodeFunction Function = nullptr, SpawnNodeData spawnData = {});
 
+    void ImplicitExecuteableLinks(NodeGraph& graph, Pin* startPin, Node* node);
+
     void Application_Initialize();
     void Application_Finalize();
     void OnImGuiRender();
 
+    void AddVariable(std::string name = "", PinType type = PinType::Void);
     Variable* GetVariableById(unsigned int id);
 	void SetVariableType(Variable* variable, const PinType type);
 	void SetVariableName(Variable* variable, const std::string name);
@@ -645,16 +687,23 @@ public:
     void FindResultsSearch(const std::string& search);
 
     void LoadNodeLibrary(const std::filesystem::path& path);
-    inline static bool IsCharacterNewWord(char& character) { return !isalnum(character); }
+    inline static bool IsCharacterNewWord(char& character) { return !isalnum(character) && character != '_'; }
 private:
     bool m_NodeEditorVisible = false;
 
     ImColor m_CurrentLinkColor = ImColor(255, 255, 255);
 
-	const int            m_PinIconSize = 24;
-	std::vector<Node>    m_Nodes;
-	std::vector<Link>    m_Links;
+	const int m_PinIconSize = 24;
+    unsigned int m_CurrentGraphID = 0;
+    unsigned int m_CurrentWindowID = 0;
+    std::vector<GraphWindow> m_Windows;
+    std::vector<NodeGraph> m_Graphs;
+
+    unsigned int m_SelectedVariable = 0;
     std::vector<Variable> m_Variables;
+    PinType m_RecentPinType = PinType::Bool;
+
+	std::map<PinType, std::map<PinType, int>> m_PinTypeConversions;
 
     bool m_HideUnconnected = false;
 
@@ -697,15 +746,60 @@ private:
 	Pin* m_NewNodeLinkPin = nullptr;
 	Pin* m_NewLinkPin = nullptr;
     ImVec2 m_NewNodePosition = {};
+    float* m_DefaultColorPickerValue = nullptr;
+    ImVec2 m_DefaultColorPickerPosition = { FLT_MAX, FLT_MAX };
 
 	bool m_OpenVarPopup = false;
-	bool m_ResetBackNode = false;
 
     bool m_ResetSearchArea = false;
 
-    unsigned int m_SelectedVariable = 0;
-
     std::vector<NodeLibrary> m_NodeLibraries;
+};
+
+class NodeGraph
+{
+public:
+    NodeGraph(int id, std::string name)
+        : ID(id), Name(name)
+    {
+    }
+public:
+    bool Editable = true;
+    std::vector<Node> Nodes;
+    std::vector<Link> Links;
+    int ID;
+    std::string Name;
+};
+
+class GraphWindow
+{
+public:
+    GraphWindow(unsigned int id, unsigned int graphId)
+        : ID(id), GraphID(graphId)
+    {
+		ed::Config config;
+		config.SettingsFile = "";
+
+		InternalEditor = ed::CreateEditor(&config);
+        ed::SetCurrentEditor(InternalEditor);
+    }
+
+	//~GraphWindow()
+	//{
+	//	ed::DestroyEditor(InternalEditor);
+	//	InternalEditor = nullptr;
+	//}
+public:
+    unsigned int ID;
+    unsigned int GraphID;
+    bool Initialized = false;
+    bool Focused = false;
+
+    // Comment Data
+    float CommentOpacity = -2.5f;
+    ed::NodeId HoveredCommentID = 0;
+
+    ed::EditorContext* InternalEditor = nullptr;
 };
 
 static std::vector<NodeEditorInternal> EditorInternalStack;
@@ -743,13 +837,25 @@ private:
 
 static std::string ConvertToDisplayString(std::string String)
 {
-    String::ReplaceAll(String, "_", " ");
-    for (int i = 0; i < String.length() - 1; i++)
-        if (islower(String[i]) && isupper(String[i + 1]))
+    if (!String.empty())
+    {
+        String::ReplaceAll(String, "_", " ");
+        const size_t length = String.length();
+        for (size_t i = 0; i < length; i++)
         {
-            String.insert(String.begin() + (i + 1), ' ');
-            i++;
+            bool first = i == 0;
+            if (i != length - 1)
+            if (islower(String[i]) && isupper(String[i + 1]))
+            {
+                String.insert(String.begin() + (i + 1), ' ');
+                i++;
+            }
+			if (first)
+				String[0] = toupper(String[0]);
+            else if (String[i - 1] == ' ')
+                String[i] = toupper(String[i]);
         }
+    }
     return String;
 }
 
@@ -784,6 +890,7 @@ public:
     bool FUNC_Pure = false;
     bool FUNC_CompactNode = false;
     bool FUNC_NoPinLabels = false;
+    bool FUNC_ConversionAutocast = false;
 
     bool FUNC_Internal = false;
 };
@@ -838,18 +945,20 @@ void NodeEditorInternal::UpdateTouch()
 
 Node* NodeEditorInternal::FindNode(ed::NodeId id)
 {
-    for (auto& node : m_Nodes)
-        if (node.ID == id)
-            return &node;
+    for (auto& graph : m_Graphs)
+		for (auto& node : graph.Nodes)
+			if (node.ID == id)
+				return &node;
 
     return nullptr;
 }
 
 Link* NodeEditorInternal::FindLink(ed::LinkId id)
 {
-    for (auto& link : m_Links)
-        if (link.ID == id)
-            return &link;
+    for (auto& graph : m_Graphs)
+		for (auto& link : graph.Links)
+			if (link.ID == id)
+				return &link;
 
     return nullptr;
 }
@@ -857,9 +966,10 @@ Link* NodeEditorInternal::FindLink(ed::LinkId id)
 std::vector<Link*> NodeEditorInternal::GetPinLinks(ed::PinId id)
 {
     std::vector<Link*> linksToReturn;
-    for (auto& link : m_Links)
-        if (link.StartPinID == id || link.EndPinID == id)
-            linksToReturn.push_back(&link);
+    for (auto& graph : m_Graphs)
+		for (auto& link : graph.Links)
+			if (link.StartPinID == id || link.EndPinID == id)
+				linksToReturn.push_back(&link);
 
 	return linksToReturn;
 }
@@ -869,16 +979,17 @@ Pin* NodeEditorInternal::FindPin(ed::PinId id)
     if (!id)
         return nullptr;
 
-    for (auto& node : m_Nodes)
-    {
-        for (auto& pin : node.Inputs)
-            if (pin.ID == id)
-                return &pin;
+    for (auto& graph : m_Graphs)
+		for (auto& node : graph.Nodes)
+		{
+			for (auto& pin : node.Inputs)
+				if (pin.ID == id)
+					return &pin;
 
-        for (auto& pin : node.Outputs)
-            if (pin.ID == id)
-                return &pin;
-    }
+			for (auto& pin : node.Outputs)
+				if (pin.ID == id)
+					return &pin;
+		}
 
     return nullptr;
 }
@@ -888,38 +999,21 @@ bool NodeEditorInternal::IsPinLinked(ed::PinId id)
     if (!id)
         return false;
 
-    for (auto& link : m_Links)
-        if (link.StartPinID == id || link.EndPinID == id)
-            return true;
+    for (auto& graph : m_Graphs)
+		for (auto& link : graph.Links)
+			if (link.StartPinID == id || link.EndPinID == id)
+				return true;
 
     return false;
 }
 
 bool NodeEditorInternal::CanCreateLink(Pin* a, Pin* b)
 {
-    spawnNodeFunction Function;
-    ConversionAvalible(a, b, Function);
-    if (!a || !b || a == b || a->Kind == b->Kind || ((Function != nullptr) ? false : (a->Data.Type != b->Data.Type)) || a->Node == b->Node || a->Data.Container != b->Data.Container)
+    if (!a || !b || a == b || a->Kind == b->Kind || ((GetConversionAvalible(a, b)) ? false : (a->Data.Type != b->Data.Type)) || a->Node == b->Node || a->Data.Container != b->Data.Container)
         return false;
 
     return true;
 }
-
-//static void DrawItemRect(ImColor color, float expand = 0.0f)
-//{
-//    ImGui::GetWindowDrawList()->AddRect(
-//        ImGui::GetItemRectMin() - ImVec2(expand, expand),
-//        ImGui::GetItemRectMax() + ImVec2(expand, expand),
-//        color);
-//};
-
-//static void FillItemRect(ImColor color, float expand = 0.0f, float rounding = 0.0f)
-//{
-//    ImGui::GetWindowDrawList()->AddRectFilled(
-//        ImGui::GetItemRectMin() - ImVec2(expand, expand),
-//        ImGui::GetItemRectMax() + ImVec2(expand, expand),
-//        color, rounding);
-//};
 
 void NodeEditorInternal::BuildNode(Node* node)
 {
@@ -939,62 +1033,63 @@ void NodeEditorInternal::BuildNode(Node* node)
 // Development
 Node* NodeEditorInternal::SpawnAssertNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "Assert", ImColor(128, 195, 248), NodeFunction::Node);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "", PinType::Flow);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "Condition", PinType::Bool);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "Message", PinType::String);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "", PinType::Flow);
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "Assert", ImColor(128, 195, 248), NodeFunction::Node);
 
-	BuildNode(&m_Nodes.back());
+	node.Inputs.emplace_back(GetNextId(), "", PinType::Flow);
+	node.Inputs.emplace_back(GetNextId(), "Condition", PinType::Bool);
+	node.Inputs.emplace_back(GetNextId(), "Message", PinType::String);
+	node.Outputs.emplace_back(GetNextId(), "", PinType::Flow);
 
-	return &m_Nodes.back();
+	BuildNode(&node);
+
+	return &node;
 }
 
 Node* NodeEditorInternal::SpawnErrorNode(SpawnNodeData in)
 {
-    m_Nodes.emplace_back(GetNextId(), "Error", ImColor(128, 195, 248), NodeFunction::Node);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "", PinType::Flow);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "Message", PinType::String);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "", PinType::Flow);
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "Error", ImColor(128, 195, 248), NodeFunction::Node);
+	node.Inputs.emplace_back(GetNextId(), "", PinType::Flow);
+	node.Inputs.emplace_back(GetNextId(), "Message", PinType::String);
+	node.Outputs.emplace_back(GetNextId(), "", PinType::Flow);
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 
 // Events
 Node* NodeEditorInternal::SpawnOnCreateNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "On Create", ImColor(255, 128, 128), NodeFunction::Event);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "", PinType::Flow);
-    m_Nodes.back().Icon = m_EventIcon;
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "On Create", ImColor(255, 128, 128), NodeFunction::Event);
+	node.Outputs.emplace_back(GetNextId(), "", PinType::Flow);
+    node.Icon = m_EventIcon;
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 
 Node* NodeEditorInternal::SpawnOnUpdateNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "On Update", ImColor(255, 128, 128), NodeFunction::Event);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "", PinType::Flow);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "Delta Seconds", PinType::Float);
-    m_Nodes.back().Icon = m_EventIcon;
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "On Update", ImColor(255, 128, 128), NodeFunction::Event);
+	node.Outputs.emplace_back(GetNextId(), "", PinType::Flow);
+	node.Outputs.emplace_back(GetNextId(), "Delta Seconds", PinType::Float);
+    node.Icon = m_EventIcon;
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 
 Node* NodeEditorInternal::SpawnOnDestroyNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "On Destroy", ImColor(255, 128, 128), NodeFunction::Event);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "", PinType::Flow);
-	m_Nodes.back().Icon = m_EventIcon;
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "On Destroy", ImColor(255, 128, 128), NodeFunction::Event);
+	node.Outputs.emplace_back(GetNextId(), "", PinType::Flow);
+	node.Icon = m_EventIcon;
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 
 // Variables
@@ -1003,15 +1098,15 @@ Node* NodeEditorInternal::SpawnGetVariableNode(SpawnNodeData in)
 	for (auto& variable : m_Variables)
 		if (variable.ID == in.VariableID)
 		{
-			m_Nodes.emplace_back(GetNextId(), "Get " + variable.Name, ImColor(170, 242, 172), NodeFunction::Variable);
-			m_Nodes.back().DisplayName = "Get " + variable.Name;
-			m_Nodes.back().Type = NodeType::Simple;
-			m_Nodes.back().Outputs.emplace_back(GetNextId(), "", variable.Data.Type);
-			m_Nodes.back().VariableId = variable.ID;
+            auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "Get " + variable.Name, ImColor(170, 242, 172), NodeFunction::Variable);
+			node.DisplayName = "Get " + variable.Name;
+			node.Type = NodeType::Simple;
+			node.Outputs.emplace_back(GetNextId(), "", variable.Data.Type);
+			node.VariableId = variable.ID;
             
-			BuildNode(&m_Nodes.back());
+			BuildNode(&node);
             
-			return &m_Nodes.back();
+			return &node;
 		}
     return nullptr;
 }
@@ -1021,17 +1116,17 @@ Node* NodeEditorInternal::SpawnSetVariableNode(SpawnNodeData in)
 	for (auto& variable : m_Variables)
 		if (variable.ID == in.VariableID)
 		{
-			m_Nodes.emplace_back(GetNextId(), "Set " + variable.Name, ImColor(128, 195, 248), NodeFunction::Variable);
-			m_Nodes.back().DisplayName = "Set " + variable.Name;
-			m_Nodes.back().Inputs.emplace_back(GetNextId(), "", PinType::Flow);
-			m_Nodes.back().Inputs.emplace_back(GetNextId(), "", variable.Data.Type);
-			m_Nodes.back().Outputs.emplace_back(GetNextId(), "", PinType::Flow);
-			m_Nodes.back().Outputs.emplace_back(GetNextId(), "", variable.Data.Type);
-			m_Nodes.back().VariableId = variable.ID;
+            auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "Set " + variable.Name, ImColor(128, 195, 248), NodeFunction::Variable);
+			node.DisplayName = "Set " + variable.Name;
+			node.Inputs.emplace_back(GetNextId(), "", PinType::Flow);
+			node.Inputs.emplace_back(GetNextId(), "", variable.Data.Type);
+			node.Outputs.emplace_back(GetNextId(), "", PinType::Flow);
+			node.Outputs.emplace_back(GetNextId(), "", variable.Data.Type);
+			node.VariableId = variable.ID;
 
-			BuildNode(&m_Nodes.back());
+			BuildNode(&node);
 
-			return &m_Nodes.back();
+			return &node;
 		}
 	return nullptr;
 }
@@ -1039,214 +1134,214 @@ Node* NodeEditorInternal::SpawnSetVariableNode(SpawnNodeData in)
 // Math -> Boolean
 Node* NodeEditorInternal::SpawnMakeLiteralBoolNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "Make Literal Bool", ImColor(170, 242, 172), NodeFunction::Node);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "Value", PinType::Bool);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "Return Value", PinType::Bool);
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "Make Literal Bool", ImColor(170, 242, 172), NodeFunction::Node);
+	node.Inputs.emplace_back(GetNextId(), "Value", PinType::Bool);
+	node.Outputs.emplace_back(GetNextId(), "Return Value", PinType::Bool);
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 
 Node* NodeEditorInternal::SpawnANDBooleanNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "AND Boolean", ImColor(170, 242, 172), NodeFunction::Node);
-	m_Nodes.back().DisplayName = "AND";
-	m_Nodes.back().Type = NodeType::Simple;
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "A", PinType::Bool);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "B", PinType::Bool);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "", PinType::Bool);
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "AND Boolean", ImColor(170, 242, 172), NodeFunction::Node);
+	node.DisplayName = "AND";
+	node.Type = NodeType::Simple;
+	node.Inputs.emplace_back(GetNextId(), "A", PinType::Bool);
+	node.Inputs.emplace_back(GetNextId(), "B", PinType::Bool);
+	node.Outputs.emplace_back(GetNextId(), "", PinType::Bool);
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 
 Node* NodeEditorInternal::SpawnEqualBooleanNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "Equal Boolean", ImColor(170, 242, 172), NodeFunction::Node);
-	m_Nodes.back().DisplayName = "==";
-	m_Nodes.back().Type = NodeType::Simple;
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "A", PinType::Bool);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "B", PinType::Bool);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "", PinType::Bool);
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "Equal Boolean", ImColor(170, 242, 172), NodeFunction::Node);
+	node.DisplayName = "==";
+	node.Type = NodeType::Simple;
+	node.Inputs.emplace_back(GetNextId(), "A", PinType::Bool);
+	node.Inputs.emplace_back(GetNextId(), "B", PinType::Bool);
+	node.Outputs.emplace_back(GetNextId(), "", PinType::Bool);
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 
 Node* NodeEditorInternal::SpawnNANDBooleanNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "NAND Boolean", ImColor(170, 242, 172), NodeFunction::Node);
-	m_Nodes.back().DisplayName = "NAND";
-	m_Nodes.back().Type = NodeType::Simple;
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "A", PinType::Bool);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "B", PinType::Bool);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "", PinType::Bool);
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "NAND Boolean", ImColor(170, 242, 172), NodeFunction::Node);
+	node.DisplayName = "NAND";
+	node.Type = NodeType::Simple;
+	node.Inputs.emplace_back(GetNextId(), "A", PinType::Bool);
+	node.Inputs.emplace_back(GetNextId(), "B", PinType::Bool);
+	node.Outputs.emplace_back(GetNextId(), "", PinType::Bool);
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 
 Node* NodeEditorInternal::SpawnNORBooleanNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "NOR Boolean", ImColor(170, 242, 172), NodeFunction::Node);
-	m_Nodes.back().DisplayName = "NOR";
-	m_Nodes.back().Type = NodeType::Simple;
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "A", PinType::Bool);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "B", PinType::Bool);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "", PinType::Bool);
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "NOR Boolean", ImColor(170, 242, 172), NodeFunction::Node);
+	node.DisplayName = "NOR";
+	node.Type = NodeType::Simple;
+	node.Inputs.emplace_back(GetNextId(), "A", PinType::Bool);
+	node.Inputs.emplace_back(GetNextId(), "B", PinType::Bool);
+	node.Outputs.emplace_back(GetNextId(), "", PinType::Bool);
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 
 Node* NodeEditorInternal::SpawnNOTBooleanNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "NOT Boolean", ImColor(170, 242, 172), NodeFunction::Node);
-	m_Nodes.back().DisplayName = "NOT";
-	m_Nodes.back().Type = NodeType::Simple;
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "", PinType::Bool);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "", PinType::Bool);
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "NOT Boolean", ImColor(170, 242, 172), NodeFunction::Node);
+	node.DisplayName = "NOT";
+	node.Type = NodeType::Simple;
+	node.Inputs.emplace_back(GetNextId(), "", PinType::Bool);
+	node.Outputs.emplace_back(GetNextId(), "", PinType::Bool);
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 
 Node* NodeEditorInternal::SpawnNotEqualBooleanNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "Not Equal Boolean", ImColor(170, 242, 172), NodeFunction::Node);
-	m_Nodes.back().DisplayName = "!=";
-	m_Nodes.back().Type = NodeType::Simple;
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "A", PinType::Bool);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "B", PinType::Bool);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "", PinType::Bool);
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "Not Equal Boolean", ImColor(170, 242, 172), NodeFunction::Node);
+	node.DisplayName = "!=";
+	node.Type = NodeType::Simple;
+	node.Inputs.emplace_back(GetNextId(), "A", PinType::Bool);
+	node.Inputs.emplace_back(GetNextId(), "B", PinType::Bool);
+	node.Outputs.emplace_back(GetNextId(), "", PinType::Bool);
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 
 Node* NodeEditorInternal::SpawnORBooleanNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "OR Boolean", ImColor(170, 242, 172), NodeFunction::Node);
-	m_Nodes.back().DisplayName = "OR";
-	m_Nodes.back().Type = NodeType::Simple;
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "A", PinType::Bool);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "B", PinType::Bool);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "", PinType::Bool);
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "OR Boolean", ImColor(170, 242, 172), NodeFunction::Node);
+	node.DisplayName = "OR";
+	node.Type = NodeType::Simple;
+	node.Inputs.emplace_back(GetNextId(), "A", PinType::Bool);
+	node.Inputs.emplace_back(GetNextId(), "B", PinType::Bool);
+	node.Outputs.emplace_back(GetNextId(), "", PinType::Bool);
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 
 Node* NodeEditorInternal::SpawnXORBooleanNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "XOR Boolean", ImColor(170, 242, 172), NodeFunction::Node);
-	m_Nodes.back().DisplayName = "XOR";
-	m_Nodes.back().Type = NodeType::Simple;
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "A", PinType::Bool);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "B", PinType::Bool);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "", PinType::Bool);
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "XOR Boolean", ImColor(170, 242, 172), NodeFunction::Node);
+	node.DisplayName = "XOR";
+	node.Type = NodeType::Simple;
+	node.Inputs.emplace_back(GetNextId(), "A", PinType::Bool);
+	node.Inputs.emplace_back(GetNextId(), "B", PinType::Bool);
+	node.Outputs.emplace_back(GetNextId(), "", PinType::Bool);
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 
 // Math -> Int
 Node* NodeEditorInternal::SpawnMakeLiteralIntNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "Make Literal Int", ImColor(170, 242, 172), NodeFunction::Node);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "Value", PinType::Int);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "Return Value", PinType::Int);
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "Make Literal Int", ImColor(170, 242, 172), NodeFunction::Node);
+	node.Inputs.emplace_back(GetNextId(), "Value", PinType::Int);
+	node.Outputs.emplace_back(GetNextId(), "Return Value", PinType::Int);
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 
 // Math -> Float
 Node* NodeEditorInternal::SpawnMakeLiteralFloatNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "Make Literal Float", ImColor(170, 242, 172), NodeFunction::Node);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "Value", PinType::Float);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "Return Value", PinType::Float);
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "Make Literal Float", ImColor(170, 242, 172), NodeFunction::Node);
+	node.Inputs.emplace_back(GetNextId(), "Value", PinType::Float);
+	node.Outputs.emplace_back(GetNextId(), "Return Value", PinType::Float);
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 
 Node* NodeEditorInternal::SpawnModuloFloatNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "Modulo Float", ImColor(170, 242, 172), NodeFunction::Node);
-	m_Nodes.back().DisplayName = "%";
-	m_Nodes.back().Type = NodeType::Simple;
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "A", PinType::Float);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "B", PinType::Float);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "", PinType::Float);
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "Modulo Float", ImColor(170, 242, 172), NodeFunction::Node);
+	node.DisplayName = "%";
+	node.Type = NodeType::Simple;
+	node.Inputs.emplace_back(GetNextId(), "A", PinType::Float);
+	node.Inputs.emplace_back(GetNextId(), "B", PinType::Float);
+	node.Outputs.emplace_back(GetNextId(), "", PinType::Float);
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 
 Node* NodeEditorInternal::SpawnAbsoluteFloatNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "Absolute Float", ImColor(170, 242, 172), NodeFunction::Node);
-	m_Nodes.back().DisplayName = "ABS";
-	m_Nodes.back().Type = NodeType::Simple;
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "", PinType::Float);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "", PinType::Float);
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "Absolute Float", ImColor(170, 242, 172), NodeFunction::Node);
+	node.DisplayName = "ABS";
+	node.Type = NodeType::Simple;
+	node.Inputs.emplace_back(GetNextId(), "", PinType::Float);
+	node.Outputs.emplace_back(GetNextId(), "", PinType::Float);
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 
 Node* NodeEditorInternal::SpawnCeilNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "Ceil", ImColor(170, 242, 172), NodeFunction::Node);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "A", PinType::Float);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "Return Value", PinType::Int);
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "Ceil", ImColor(170, 242, 172), NodeFunction::Node);
+	node.Inputs.emplace_back(GetNextId(), "A", PinType::Float);
+	node.Outputs.emplace_back(GetNextId(), "Return Value", PinType::Int);
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 
 Node* NodeEditorInternal::SpawnClampFloatNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "Clamp Float", ImColor(170, 242, 172), NodeFunction::Node);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "Value", PinType::Float);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "Min", PinType::Float);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "Max", PinType::Float).Data.Value.Float = 1.0f;
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "Return Value", PinType::Float);
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "Clamp Float", ImColor(170, 242, 172), NodeFunction::Node);
+	node.Inputs.emplace_back(GetNextId(), "Value", PinType::Float);
+	node.Inputs.emplace_back(GetNextId(), "Min", PinType::Float);
+	node.Inputs.emplace_back(GetNextId(), "Max", PinType::Float).Data.Value.Float = 1.0f;
+	node.Outputs.emplace_back(GetNextId(), "Return Value", PinType::Float);
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 
 Node* NodeEditorInternal::SpawnCompareFloatNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "Compare Float", ImColor(255, 255, 255), NodeFunction::Node);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "Exec", PinType::Flow);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "Input", PinType::Float);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "Compare With", PinType::Float);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), ">", PinType::Flow);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "==", PinType::Flow);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "<", PinType::Flow);
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "Compare Float", ImColor(255, 255, 255), NodeFunction::Node);
+	node.Inputs.emplace_back(GetNextId(), "Exec", PinType::Flow);
+	node.Inputs.emplace_back(GetNextId(), "Input", PinType::Float);
+	node.Inputs.emplace_back(GetNextId(), "Compare With", PinType::Float);
+	node.Outputs.emplace_back(GetNextId(), ">", PinType::Flow);
+	node.Outputs.emplace_back(GetNextId(), "==", PinType::Flow);
+	node.Outputs.emplace_back(GetNextId(), "<", PinType::Flow);
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 
 Node* SpawnDecrementFloatNode(SpawnNodeData in);
@@ -1254,101 +1349,101 @@ Node* SpawnDivisionWholeAndRemainderNode(SpawnNodeData in);
 
 Node* NodeEditorInternal::SpawnEqualFloatNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "Equal Float", ImColor(170, 242, 172), NodeFunction::Node);
-	m_Nodes.back().DisplayName = "==";
-	m_Nodes.back().Type = NodeType::Simple;
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "A", PinType::Float);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "B", PinType::Float);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "", PinType::Bool);
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "Equal Float", ImColor(170, 242, 172), NodeFunction::Node);
+	node.DisplayName = "==";
+	node.Type = NodeType::Simple;
+	node.Inputs.emplace_back(GetNextId(), "A", PinType::Float);
+	node.Inputs.emplace_back(GetNextId(), "B", PinType::Float);
+	node.Outputs.emplace_back(GetNextId(), "", PinType::Bool);
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 
 Node* NodeEditorInternal::SpawnExpFloatNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "Exp Float", ImColor(170, 242, 172), NodeFunction::Node);
-	m_Nodes.back().DisplayName = "e";
-	m_Nodes.back().Type = NodeType::Simple;
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "", PinType::Float);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "", PinType::Float);
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "Exp Float", ImColor(170, 242, 172), NodeFunction::Node);
+	node.DisplayName = "e";
+	node.Type = NodeType::Simple;
+	node.Inputs.emplace_back(GetNextId(), "", PinType::Float);
+	node.Outputs.emplace_back(GetNextId(), "", PinType::Float);
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 
 Node* NodeEditorInternal::SpawnFInterpEaseInOutNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "FInterp Ease in Out", ImColor(170, 242, 172), NodeFunction::Node);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "A", PinType::Float);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "B", PinType::Float);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "Alpha", PinType::Float);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "Exponent", PinType::Float);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "Return Value", PinType::Float);
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "FInterp Ease in Out", ImColor(170, 242, 172), NodeFunction::Node);
+	node.Inputs.emplace_back(GetNextId(), "A", PinType::Float);
+	node.Inputs.emplace_back(GetNextId(), "B", PinType::Float);
+	node.Inputs.emplace_back(GetNextId(), "Alpha", PinType::Float);
+	node.Inputs.emplace_back(GetNextId(), "Exponent", PinType::Float);
+	node.Outputs.emplace_back(GetNextId(), "Return Value", PinType::Float);
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 
 Node* NodeEditorInternal::SpawnSubtractionFloatNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "Float Subtraction", ImColor(170, 242, 172), NodeFunction::Node);
-	m_Nodes.back().Type = NodeType::Simple;
-	m_Nodes.back().DisplayName = "-";
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "", PinType::Float);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "", PinType::Float);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "", PinType::Float);
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "Float Subtraction", ImColor(170, 242, 172), NodeFunction::Node);
+	node.Type = NodeType::Simple;
+	node.DisplayName = "-";
+	node.Inputs.emplace_back(GetNextId(), "", PinType::Float);
+	node.Inputs.emplace_back(GetNextId(), "", PinType::Float);
+	node.Outputs.emplace_back(GetNextId(), "", PinType::Float);
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 
 Node* NodeEditorInternal::SpawnMultiplicationFloatNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "Float Multiplication", ImColor(170, 242, 172), NodeFunction::Node);
-	m_Nodes.back().Type = NodeType::Simple;
-	m_Nodes.back().DisplayName = "*";
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "", PinType::Float);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "", PinType::Float);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "", PinType::Float);
-    m_Nodes.back().AddInputs = true;
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "Float Multiplication", ImColor(170, 242, 172), NodeFunction::Node);
+	node.Type = NodeType::Simple;
+	node.DisplayName = "*";
+	node.Inputs.emplace_back(GetNextId(), "", PinType::Float);
+	node.Inputs.emplace_back(GetNextId(), "", PinType::Float);
+	node.Outputs.emplace_back(GetNextId(), "", PinType::Float);
+    node.AddInputs = true;
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 
 Node* NodeEditorInternal::SpawnDivisionFloatNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "Float Division", ImColor(170, 242, 172), NodeFunction::Node);
-	m_Nodes.back().Type = NodeType::Simple;
-	m_Nodes.back().DisplayName = "/";
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "", PinType::Float);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "", PinType::Float);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "", PinType::Float);
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "Float Division", ImColor(170, 242, 172), NodeFunction::Node);
+	node.Type = NodeType::Simple;
+	node.DisplayName = "/";
+	node.Inputs.emplace_back(GetNextId(), "", PinType::Float);
+	node.Inputs.emplace_back(GetNextId(), "", PinType::Float);
+	node.Outputs.emplace_back(GetNextId(), "", PinType::Float);
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 
 Node* NodeEditorInternal::SpawnAdditionFloatNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "Float Addition", ImColor(170, 242, 172), NodeFunction::Node);
-	m_Nodes.back().Type = NodeType::Simple;
-	m_Nodes.back().DisplayName = "+";
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "", PinType::Float);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "", PinType::Float);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "", PinType::Float);
-    m_Nodes.back().AddInputs = true;
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "Float Addition", ImColor(170, 242, 172), NodeFunction::Node);
+	node.Type = NodeType::Simple;
+	node.DisplayName = "+";
+	node.Inputs.emplace_back(GetNextId(), "", PinType::Float);
+	node.Inputs.emplace_back(GetNextId(), "", PinType::Float);
+	node.Outputs.emplace_back(GetNextId(), "", PinType::Float);
+    node.AddInputs = true;
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 
 Node* SpawnLessThanFloatNode(SpawnNodeData in);
@@ -1364,17 +1459,17 @@ Node* SpawnIntMultipliedFloatNode(SpawnNodeData in);
 
 Node* NodeEditorInternal::SpawnLerpAngleNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "Lerp Angle", ImColor(170, 242, 172), NodeFunction::Node);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "A", PinType::Float);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "B", PinType::Float);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "Alpha", PinType::Float);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "Min Angle Degrees", PinType::Float).Data.Value.Float = -180.0f;
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "Max Angle Degrees", PinType::Float).Data.Value.Float = 180.0f;
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "Return Value", PinType::Float);
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "Lerp Angle", ImColor(170, 242, 172), NodeFunction::Node);
+	node.Inputs.emplace_back(GetNextId(), "A", PinType::Float);
+	node.Inputs.emplace_back(GetNextId(), "B", PinType::Float);
+	node.Inputs.emplace_back(GetNextId(), "Alpha", PinType::Float);
+	node.Inputs.emplace_back(GetNextId(), "Min Angle Degrees", PinType::Float).Data.Value.Float = -180.0f;
+	node.Inputs.emplace_back(GetNextId(), "Max Angle Degrees", PinType::Float).Data.Value.Float = 180.0f;
+	node.Outputs.emplace_back(GetNextId(), "Return Value", PinType::Float);
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 
 Node* SpawnLerpFloatNode(SpawnNodeData in);
@@ -1393,15 +1488,15 @@ Node* SpawnNegateFloatNode(SpawnNodeData in);
 
 Node* NodeEditorInternal::SpawnNormalizeAngleNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "Normalize Angle", ImColor(170, 242, 172), NodeFunction::Node);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "Angle Degrees", PinType::Float);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "Min Angle Degrees", PinType::Float).Data.Value.Float = -180.0f;
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "Max Angle Degrees", PinType::Float).Data.Value.Float = 180.0f;
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "Return Value", PinType::Float);
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "Normalize Angle", ImColor(170, 242, 172), NodeFunction::Node);
+	node.Inputs.emplace_back(GetNextId(), "Angle Degrees", PinType::Float);
+	node.Inputs.emplace_back(GetNextId(), "Min Angle Degrees", PinType::Float).Data.Value.Float = -180.0f;
+	node.Inputs.emplace_back(GetNextId(), "Max Angle Degrees", PinType::Float).Data.Value.Float = 180.0f;
+	node.Outputs.emplace_back(GetNextId(), "Return Value", PinType::Float);
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 
 Node* SpawnNormalizeToRangeNode(SpawnNodeData in);
@@ -1421,29 +1516,29 @@ Node* SpawnWrapFloatNode(SpawnNodeData in);
 //Math -> Interpolation
 Node* NodeEditorInternal::SpawnInterpEaseInNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "Interp Ease In", ImColor(170, 242, 172), NodeFunction::Node);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "A", PinType::Float);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "B", PinType::Float);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "Alpha", PinType::Float);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "Exponent", PinType::Float).Data.Value.Float = 2.0f;
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "Result", PinType::Float);
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "Interp Ease In", ImColor(170, 242, 172), NodeFunction::Node);
+	node.Inputs.emplace_back(GetNextId(), "A", PinType::Float);
+	node.Inputs.emplace_back(GetNextId(), "B", PinType::Float);
+	node.Inputs.emplace_back(GetNextId(), "Alpha", PinType::Float);
+	node.Inputs.emplace_back(GetNextId(), "Exponent", PinType::Float).Data.Value.Float = 2.0f;
+	node.Outputs.emplace_back(GetNextId(), "Result", PinType::Float);
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 Node* NodeEditorInternal::SpawnInterpEaseOutNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "Interp Ease Out", ImColor(170, 242, 172), NodeFunction::Node);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "A", PinType::Float);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "B", PinType::Float);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "Alpha", PinType::Float);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "Exponent", PinType::Float).Data.Value.Float = 2.0f;
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "Result", PinType::Float);
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "Interp Ease Out", ImColor(170, 242, 172), NodeFunction::Node);
+	node.Inputs.emplace_back(GetNextId(), "A", PinType::Float);
+	node.Inputs.emplace_back(GetNextId(), "B", PinType::Float);
+	node.Inputs.emplace_back(GetNextId(), "Alpha", PinType::Float);
+	node.Inputs.emplace_back(GetNextId(), "Exponent", PinType::Float).Data.Value.Float = 2.0f;
+	node.Outputs.emplace_back(GetNextId(), "Result", PinType::Float);
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 
 // Math -> Trig
@@ -1468,317 +1563,317 @@ Node* SpawnTanRadiansNode(SpawnNodeData in);
 // Math -> Conversions
 Node* NodeEditorInternal::SpawnIntToBoolNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "Int To Bool", ImColor(170, 242, 172), NodeFunction::Node);
-	m_Nodes.back().Type = NodeType::Simple;
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "", PinType::Int);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "", PinType::Bool);
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "Int To Bool", ImColor(170, 242, 172), NodeFunction::Node);
+	node.Type = NodeType::Simple;
+	node.Inputs.emplace_back(GetNextId(), "", PinType::Int);
+	node.Outputs.emplace_back(GetNextId(), "", PinType::Bool);
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 
 Node* NodeEditorInternal::SpawnFloatToBoolNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "Float To Bool", ImColor(170, 242, 172), NodeFunction::Node);
-	m_Nodes.back().Type = NodeType::Simple;
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "", PinType::Float);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "", PinType::Bool);
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "Float To Bool", ImColor(170, 242, 172), NodeFunction::Node);
+	node.Type = NodeType::Simple;
+	node.Inputs.emplace_back(GetNextId(), "", PinType::Float);
+	node.Outputs.emplace_back(GetNextId(), "", PinType::Bool);
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 
 Node* NodeEditorInternal::SpawnStringToBoolNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "String To Bool", ImColor(170, 242, 172), NodeFunction::Node);
-	m_Nodes.back().Type = NodeType::Simple;
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "", PinType::String);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "", PinType::Bool);
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "String To Bool", ImColor(170, 242, 172), NodeFunction::Node);
+	node.Type = NodeType::Simple;
+	node.Inputs.emplace_back(GetNextId(), "", PinType::String);
+	node.Outputs.emplace_back(GetNextId(), "", PinType::Bool);
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 
 Node* NodeEditorInternal::SpawnBoolToFloatNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "Bool To Float", ImColor(170, 242, 172), NodeFunction::Node);
-	m_Nodes.back().Type = NodeType::Simple;
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "", PinType::Bool);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "", PinType::Float);
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "Bool To Float", ImColor(170, 242, 172), NodeFunction::Node);
+	node.Type = NodeType::Simple;
+	node.Inputs.emplace_back(GetNextId(), "", PinType::Bool);
+	node.Outputs.emplace_back(GetNextId(), "", PinType::Float);
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 
 Node* NodeEditorInternal::SpawnIntToFloatNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "Int To Float", ImColor(170, 242, 172), NodeFunction::Node);
-	m_Nodes.back().Type = NodeType::Simple;
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "", PinType::Int);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "", PinType::Float);
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "Int To Float", ImColor(170, 242, 172), NodeFunction::Node);
+	node.Type = NodeType::Simple;
+	node.Inputs.emplace_back(GetNextId(), "", PinType::Int);
+	node.Outputs.emplace_back(GetNextId(), "", PinType::Float);
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 
 Node* NodeEditorInternal::SpawnStringToFloatNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "String To Float", ImColor(170, 242, 172), NodeFunction::Node);
-	m_Nodes.back().Type = NodeType::Simple;
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "", PinType::String);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "", PinType::Float);
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "String To Float", ImColor(170, 242, 172), NodeFunction::Node);
+	node.Type = NodeType::Simple;
+	node.Inputs.emplace_back(GetNextId(), "", PinType::String);
+	node.Outputs.emplace_back(GetNextId(), "", PinType::Float);
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 
 Node* NodeEditorInternal::SpawnBoolToIntNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "Bool To Int", ImColor(170, 242, 172), NodeFunction::Node);
-	m_Nodes.back().Type = NodeType::Simple;
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "", PinType::Bool);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "", PinType::Int);
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "Bool To Int", ImColor(170, 242, 172), NodeFunction::Node);
+	node.Type = NodeType::Simple;
+	node.Inputs.emplace_back(GetNextId(), "", PinType::Bool);
+	node.Outputs.emplace_back(GetNextId(), "", PinType::Int);
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 
 Node* NodeEditorInternal::SpawnFloatToIntNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "Float To Int", ImColor(170, 242, 172), NodeFunction::Node);
-	m_Nodes.back().Type = NodeType::Simple;
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "", PinType::Float);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "", PinType::Int);
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "Float To Int", ImColor(170, 242, 172), NodeFunction::Node);
+	node.Type = NodeType::Simple;
+	node.Inputs.emplace_back(GetNextId(), "", PinType::Float);
+	node.Outputs.emplace_back(GetNextId(), "", PinType::Int);
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 
 Node* NodeEditorInternal::SpawnStringToIntNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "String To Int", ImColor(170, 242, 172), NodeFunction::Node);
-	m_Nodes.back().Type = NodeType::Simple;
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "", PinType::String);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "", PinType::Int);
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "String To Int", ImColor(170, 242, 172), NodeFunction::Node);
+	node.Type = NodeType::Simple;
+	node.Inputs.emplace_back(GetNextId(), "", PinType::String);
+	node.Outputs.emplace_back(GetNextId(), "", PinType::Int);
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 
 Node* NodeEditorInternal::SpawnFloatToVectorNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "Float To Vector", ImColor(170, 242, 172), NodeFunction::Node);
-	m_Nodes.back().Type = NodeType::Simple;
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "", PinType::Float);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "", PinType::Vector);
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "Float To Vector", ImColor(170, 242, 172), NodeFunction::Node);
+	node.Type = NodeType::Simple;
+	node.Inputs.emplace_back(GetNextId(), "", PinType::Float);
+	node.Outputs.emplace_back(GetNextId(), "", PinType::Vector);
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 
 Node* NodeEditorInternal::SpawnStringToVectorNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "String To Vector", ImColor(170, 242, 172), NodeFunction::Node);
-	m_Nodes.back().Type = NodeType::Simple;
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "", PinType::String);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "", PinType::Vector);
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "String To Vector", ImColor(170, 242, 172), NodeFunction::Node);
+	node.Type = NodeType::Simple;
+	node.Inputs.emplace_back(GetNextId(), "", PinType::String);
+	node.Outputs.emplace_back(GetNextId(), "", PinType::Vector);
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 
 // Utilities -> String
 Node* NodeEditorInternal::SpawnMakeLiteralStringNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "Make Literal String", ImColor(170, 242, 172), NodeFunction::Node);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "Value", PinType::String);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "Return Value", PinType::String);
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "Make Literal String", ImColor(170, 242, 172), NodeFunction::Node);
+	node.Inputs.emplace_back(GetNextId(), "Value", PinType::String);
+	node.Outputs.emplace_back(GetNextId(), "Return Value", PinType::String);
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 
 Node* NodeEditorInternal::SpawnBoolToStringNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "Bool To String", ImColor(170, 242, 172), NodeFunction::Node);
-    m_Nodes.back().Type = NodeType::Simple;
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "", PinType::Bool);
-    m_Nodes.back().Outputs.emplace_back(GetNextId(), "", PinType::String);
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "Bool To String", ImColor(170, 242, 172), NodeFunction::Node);
+    node.Type = NodeType::Simple;
+	node.Inputs.emplace_back(GetNextId(), "", PinType::Bool);
+    node.Outputs.emplace_back(GetNextId(), "", PinType::String);
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 
 Node* NodeEditorInternal::SpawnIntToStringNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "Int To String", ImColor(170, 242, 172), NodeFunction::Node);
-	m_Nodes.back().Type = NodeType::Simple;
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "", PinType::Int);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "", PinType::String);
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "Int To String", ImColor(170, 242, 172), NodeFunction::Node);
+	node.Type = NodeType::Simple;
+	node.Inputs.emplace_back(GetNextId(), "", PinType::Int);
+	node.Outputs.emplace_back(GetNextId(), "", PinType::String);
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 
 Node* NodeEditorInternal::SpawnFloatToStringNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "Float To String", ImColor(170, 242, 172), NodeFunction::Node);
-	m_Nodes.back().Type = NodeType::Simple;
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "", PinType::Float);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "", PinType::String);
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "Float To String", ImColor(170, 242, 172), NodeFunction::Node);
+	node.Type = NodeType::Simple;
+	node.Inputs.emplace_back(GetNextId(), "", PinType::Float);
+	node.Outputs.emplace_back(GetNextId(), "", PinType::String);
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 
 Node* NodeEditorInternal::SpawnVectorToStringNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "Vector To String", ImColor(170, 242, 172), NodeFunction::Node);
-	m_Nodes.back().Type = NodeType::Simple;
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "", PinType::Vector);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "", PinType::String);
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "Vector To String", ImColor(170, 242, 172), NodeFunction::Node);
+	node.Type = NodeType::Simple;
+	node.Inputs.emplace_back(GetNextId(), "", PinType::Vector);
+	node.Outputs.emplace_back(GetNextId(), "", PinType::String);
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 
 Node* NodeEditorInternal::SpawnPrintStringNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "Print String", ImColor(128, 195, 248), NodeFunction::Node);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "", PinType::Flow);
-    m_Nodes.back().Inputs.back().Data.Container = ContainerType::Array;
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "In String", PinType::String);
-    m_Nodes.back().Inputs.back().Data.Container = ContainerType::Set;
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "", PinType::Flow);
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "Print String", ImColor(128, 195, 248), NodeFunction::Node);
+	node.Inputs.emplace_back(GetNextId(), "", PinType::Flow);
+    node.Inputs.back().Data.Container = ContainerType::Array;
+	node.Inputs.emplace_back(GetNextId(), "In String", PinType::String);
+    node.Inputs.back().Data.Container = ContainerType::Set;
+	node.Outputs.emplace_back(GetNextId(), "", PinType::Flow);
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 
 // Utilities -> Flow Control
 Node* NodeEditorInternal::SpawnBranchNode(SpawnNodeData in)
 {
-    m_Nodes.emplace_back(GetNextId(), "Branch");
-    m_Nodes.back().Inputs.emplace_back(GetNextId(), "", PinType::Flow);
-    m_Nodes.back().Inputs.emplace_back(GetNextId(), "Condition", PinType::Bool);
-    m_Nodes.back().Outputs.emplace_back(GetNextId(), "True", PinType::Flow);
-    m_Nodes.back().Outputs.emplace_back(GetNextId(), "False", PinType::Flow);
-    m_Nodes.back().Icon = m_BranchIcon;
-    m_Nodes.back().Internal = true;
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "Branch");
+    node.Inputs.emplace_back(GetNextId(), "", PinType::Flow);
+    node.Inputs.emplace_back(GetNextId(), "Condition", PinType::Bool);
+    node.Outputs.emplace_back(GetNextId(), "True", PinType::Flow);
+    node.Outputs.emplace_back(GetNextId(), "False", PinType::Flow);
+    node.Icon = m_BranchIcon;
+    node.Internal = true;
 
-    BuildNode(&m_Nodes.back());
+    BuildNode(&node);
 
-    return &m_Nodes.back();
+    return &node;
 }
 
 Node* NodeEditorInternal::SpawnDoNNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "Do N");
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "Enter", PinType::Flow);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "N", PinType::Int);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "Reset", PinType::Flow);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "Exit", PinType::Flow);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "Counter", PinType::Int);
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "Do N");
+	node.Inputs.emplace_back(GetNextId(), "Enter", PinType::Flow);
+	node.Inputs.emplace_back(GetNextId(), "N", PinType::Int);
+	node.Inputs.emplace_back(GetNextId(), "Reset", PinType::Flow);
+	node.Outputs.emplace_back(GetNextId(), "Exit", PinType::Flow);
+	node.Outputs.emplace_back(GetNextId(), "Counter", PinType::Int);
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 
 Node* NodeEditorInternal::SpawnDoOnceNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "Do Once");
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "", PinType::Flow);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "Reset", PinType::Flow);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "Start Closed", PinType::Bool);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "Completed", PinType::Flow);
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "Do Once");
+	node.Inputs.emplace_back(GetNextId(), "", PinType::Flow);
+	node.Inputs.emplace_back(GetNextId(), "Reset", PinType::Flow);
+	node.Inputs.emplace_back(GetNextId(), "Start Closed", PinType::Bool);
+	node.Outputs.emplace_back(GetNextId(), "Completed", PinType::Flow);
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 
 Node* NodeEditorInternal::SpawnForLoopNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "For Loop");
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "", PinType::Flow);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "First Index", PinType::Int);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "Last Index", PinType::Int);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "Loop Body", PinType::Flow);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "Index", PinType::Int);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "Completed", PinType::Flow);
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "For Loop");
+	node.Inputs.emplace_back(GetNextId(), "", PinType::Flow);
+	node.Inputs.emplace_back(GetNextId(), "First Index", PinType::Int);
+	node.Inputs.emplace_back(GetNextId(), "Last Index", PinType::Int);
+	node.Outputs.emplace_back(GetNextId(), "Loop Body", PinType::Flow);
+	node.Outputs.emplace_back(GetNextId(), "Index", PinType::Int);
+	node.Outputs.emplace_back(GetNextId(), "Completed", PinType::Flow);
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 
 Node* NodeEditorInternal::SpawnForLoopWithBreakNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "For Loop with Break");
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "", PinType::Flow);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "First Index", PinType::Int);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "Last Index", PinType::Int);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "Break", PinType::Flow);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "Loop Body", PinType::Flow);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "Index", PinType::Int);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "Completed", PinType::Flow);
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "For Loop with Break");
+	node.Inputs.emplace_back(GetNextId(), "", PinType::Flow);
+	node.Inputs.emplace_back(GetNextId(), "First Index", PinType::Int);
+	node.Inputs.emplace_back(GetNextId(), "Last Index", PinType::Int);
+	node.Inputs.emplace_back(GetNextId(), "Break", PinType::Flow);
+	node.Outputs.emplace_back(GetNextId(), "Loop Body", PinType::Flow);
+	node.Outputs.emplace_back(GetNextId(), "Index", PinType::Int);
+	node.Outputs.emplace_back(GetNextId(), "Completed", PinType::Flow);
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 
 Node* NodeEditorInternal::SpawnSequenceNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "Sequence");
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "", PinType::Flow);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "0", PinType::Flow);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "1", PinType::Flow);
-    m_Nodes.back().AddOutputs = true;
-    m_Nodes.back().Icon = m_SequenceIcon;
-    m_Nodes.back().Internal = true;
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "Sequence");
+	node.Inputs.emplace_back(GetNextId(), "", PinType::Flow);
+	node.Outputs.emplace_back(GetNextId(), "0", PinType::Flow);
+	node.Outputs.emplace_back(GetNextId(), "1", PinType::Flow);
+    node.AddOutputs = true;
+    node.Icon = m_SequenceIcon;
+    node.Internal = true;
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 
 Node* NodeEditorInternal::SpawnWhileLoopNode(SpawnNodeData in)
 {
-	m_Nodes.emplace_back(GetNextId(), "While Loop");
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "", PinType::Flow);
-	m_Nodes.back().Inputs.emplace_back(GetNextId(), "Condition", PinType::Bool);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "Loop Body", PinType::Flow);
-	m_Nodes.back().Outputs.emplace_back(GetNextId(), "Completed", PinType::Flow);
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "While Loop");
+	node.Inputs.emplace_back(GetNextId(), "", PinType::Flow);
+	node.Inputs.emplace_back(GetNextId(), "Condition", PinType::Bool);
+	node.Outputs.emplace_back(GetNextId(), "Loop Body", PinType::Flow);
+	node.Outputs.emplace_back(GetNextId(), "Completed", PinType::Flow);
 
-	BuildNode(&m_Nodes.back());
+	BuildNode(&node);
 
-	return &m_Nodes.back();
+	return &node;
 }
 
 // No Category
 Node* NodeEditorInternal::SpawnComment(SpawnNodeData in)
 {
-    m_Nodes.emplace_back(GetNextId(), "Comment");
-    m_Nodes.back().Type = NodeType::Comment;
+    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "Comment");
+    node.Type = NodeType::Comment;
 
     if (ed::GetSelectedObjectCount() > 0)
     {
@@ -1786,14 +1881,78 @@ Node* NodeEditorInternal::SpawnComment(SpawnNodeData in)
         ImVec2 min, max;
         ed::GetSelectionBounds(min, max);
 
-        ed::SetNodePosition(m_Nodes.back().ID, ImVec2(min.x - padding, min.y - padding * 2.0f));
-        m_Nodes.back().Size = ImVec2(max.x - min.x + padding, max.y - min.y + padding);
+        SetNodePosition(node.ID, ImVec2(min.x - padding, min.y - padding * 2.0f));
+        node.Size = ImVec2(max.x - min.x + padding, max.y - min.y + padding);
     }
     else
-        m_Nodes.back().Size = ImVec2(300, 100);
+        node.Size = ImVec2(300, 100);
 
 
-    return &m_Nodes.back();
+    return &node;
+}
+
+Node* NodeEditorInternal::SpawnNodeFromLibrary(unsigned int id, NodeGraph& graph)
+{
+	for (auto& library : m_NodeLibraries)
+		for (auto& Function : library.m_FunctionDeclarations)
+			if (Function.ID == id)
+			{
+				graph.Nodes.emplace_back(GetNextId(), Function.GetName().c_str(), Function.FUNC_Pure ? ImColor(170, 242, 172) : ImColor(128, 195, 248), NodeFunction::Node);
+				auto& newNode = graph.Nodes.back();
+
+				newNode.Icon = m_FunctionIcon;
+				newNode.IconColor = Function.FUNC_Pure ? ImColor(170, 242, 172) : ImColor(128, 195, 248);
+				newNode.FunctionID = Function.ID;
+				newNode.DisplayName = Function.FUNC_NodeDisplayName;
+				newNode.Pure = Function.FUNC_Pure;
+
+				if (Function.FUNC_CompactNode) newNode.Type = NodeType::Simple;
+
+				if (!Function.FUNC_Pure)
+				{
+					newNode.Inputs.emplace_back(GetNextId(), "", PinType::Flow);
+					newNode.Outputs.emplace_back(GetNextId(), "", PinType::Flow);
+				}
+
+				if (Function.FUNC_Return.Data.Type != PinType::Void)
+				{
+					newNode.Outputs.emplace_back(GetNextId(), Function.FUNC_NoPinLabels ? "" : "Return Value", Function.FUNC_Return.Data.Type);
+					newNode.Outputs.back().ArgumentID = Function.FUNC_Return.ArgumentID;
+				}
+				for (auto& param : Function.FUNC_Params)
+					if (param.Kind == PinKind::Input)
+					{
+						auto& input = newNode.Inputs.emplace_back(param);
+						input.ID = GetNextId();
+						input.Name = ConvertToDisplayString(param.GetName());
+						input.DisplayName = param.DisplayName;
+						input.ArgumentID = param.ArgumentID;
+						if (Function.FUNC_NoPinLabels) input.Name = "";
+					}
+					else
+					{
+						auto& output = newNode.Outputs.emplace_back(param);
+						output.ID = GetNextId();
+						output.Name = ConvertToDisplayString(param.GetName());
+						output.ArgumentID = param.ArgumentID;
+						if (Function.FUNC_NoPinLabels) output.Name = "";
+					}
+
+				BuildNode(&newNode);
+
+				return &newNode;
+			}
+    return nullptr;
+}
+
+int NodeEditorInternal::GetConversionAvalible(Pin* A, Pin* B)
+{
+    return GetConversionAvalible(A->Data, B->Data);
+}
+
+int NodeEditorInternal::GetConversionAvalible(PinData& A, PinData& B)
+{
+	return m_PinTypeConversions[A.Type][B.Type];
 }
 
 void NodeEditorInternal::ConversionAvalible(Pin* A, Pin* B, spawnNodeFunction& Function)
@@ -1834,8 +1993,9 @@ void NodeEditorInternal::ConversionAvalible(PinData& A, PinData& B, spawnNodeFun
 
 void NodeEditorInternal::BuildNodes()
 {
-    for (auto& node : m_Nodes)
-        BuildNode(&node);
+    for (auto& graph : m_Graphs)
+		for (auto& node : graph.Nodes)
+			BuildNode(&node);
 }
 
 const char* NodeEditorInternal::Application_GetName()
@@ -1861,7 +2021,7 @@ ImColor NodeEditorInternal::GetIconColor(PinType type)
     }
 };
 
-void NodeEditorInternal::DrawPinIcon(const PinData& data, bool connected, int alpha)
+void NodeEditorInternal::DrawPinIcon(const PinData& data, const PinKind& kind, bool connected, int alpha)
 {
     IconType iconType;
     ImColor  color = GetIconColor(data.Type);
@@ -1882,7 +2042,7 @@ void NodeEditorInternal::DrawPinIcon(const PinData& data, bool connected, int al
             return;
     }
 
-    if (data.Reference && data.Const)
+    if (kind == PinKind::Input && data.Reference && !data.Const)
         iconType = IconType::Diamond;
 
     switch (data.Container)
@@ -1988,166 +2148,168 @@ void NodeEditorInternal::ShowStyleEditor(bool* show)
 
 void NodeEditorInternal::ShowLeftPane(float paneWidth)
 {
-    auto& io = ImGui::GetIO();
-
-    ImGui::BeginChild("Selection", ImVec2(paneWidth, 0));
-
-    paneWidth = ImGui::GetContentRegionAvailWidth();
-
-    static bool showStyleEditor = false;
-    ImGui::BeginHorizontal("Style Editor", ImVec2(paneWidth, 0));
-    ImGui::Spring();
-    if (ImGui::Button("Edit Style"))
-        showStyleEditor = true;
-    ImGui::EndHorizontal();
-
-    if (showStyleEditor)
-        ShowStyleEditor(&showStyleEditor);
-
-    std::vector<ed::NodeId> selectedNodes;
-    std::vector<ed::LinkId> selectedLinks;
-    selectedNodes.resize(ed::GetSelectedObjectCount());
-    selectedLinks.resize(ed::GetSelectedObjectCount());
-
-    int nodeCount = ed::GetSelectedNodes(selectedNodes.data(), static_cast<int>(selectedNodes.size()));
-    int linkCount = ed::GetSelectedLinks(selectedLinks.data(), static_cast<int>(selectedLinks.size()));
-
-    selectedNodes.resize(nodeCount);
-    selectedLinks.resize(linkCount);
-
-    int saveIconWidth     = m_SaveIcon->GetWidth();
-    int saveIconHeight    = m_SaveIcon->GetHeight();
-    int restoreIconWidth = m_RestoreIcon->GetWidth();
-    int restoreIconHeight = m_RestoreIcon->GetHeight();
-
-    ImGui::GetWindowDrawList()->AddRectFilled(
-        ImGui::GetCursorScreenPos(),
-        ImGui::GetCursorScreenPos() + ImVec2(paneWidth, ImGui::GetTextLineHeight()),
-        ImColor(ImGui::GetStyle().Colors[ImGuiCol_HeaderActive]), ImGui::GetTextLineHeight() * 0.25f);
-    ImGui::Spacing(); ImGui::SameLine();
-    ImGui::TextUnformatted("NODES");
-    ImGui::Indent();
-    for (auto& node : m_Nodes)
+    if (ed::GetCurrentEditor() != nullptr)
     {
-        ImGui::PushID(node.ID.AsPointer());
-        auto start = ImGui::GetCursorScreenPos();
+        auto& io = ImGui::GetIO();
 
-        if (const auto progress = GetTouchProgress(node.ID))
-        {
-            ImGui::GetWindowDrawList()->AddLine(
-                start + ImVec2(-8, 0),
-                start + ImVec2(-8, ImGui::GetTextLineHeight()),
-                IM_COL32(255, 0, 0, 255 - (int)(255 * progress)), 4.0f);
-        }
+        ImGui::BeginChild("Selection", ImVec2(paneWidth, 0));
 
-        bool isSelected = std::find(selectedNodes.begin(), selectedNodes.end(), node.ID) != selectedNodes.end();
-        if (ImGui::Selectable((node.Name + "##" + std::to_string(reinterpret_cast<uintptr_t>(node.ID.AsPointer()))).c_str(), &isSelected))
+        paneWidth = ImGui::GetContentRegionAvailWidth();
+
+        static bool showStyleEditor = false;
+        ImGui::BeginHorizontal("Style Editor", ImVec2(paneWidth, 0));
+        ImGui::Spring();
+        if (ImGui::Button("Edit Style"))
+            showStyleEditor = true;
+        ImGui::EndHorizontal();
+
+        if (showStyleEditor)
+            ShowStyleEditor(&showStyleEditor);
+
+        std::vector<ed::NodeId> selectedNodes;
+        std::vector<ed::LinkId> selectedLinks;
+        selectedNodes.resize(ed::GetSelectedObjectCount());
+        selectedLinks.resize(ed::GetSelectedObjectCount());
+
+        int nodeCount = ed::GetSelectedNodes(selectedNodes.data(), static_cast<int>(selectedNodes.size()));
+        int linkCount = ed::GetSelectedLinks(selectedLinks.data(), static_cast<int>(selectedLinks.size()));
+
+        selectedNodes.resize(nodeCount);
+        selectedLinks.resize(linkCount);
+
+        int saveIconWidth = m_SaveIcon->GetWidth();
+        int saveIconHeight = m_SaveIcon->GetHeight();
+        int restoreIconWidth = m_RestoreIcon->GetWidth();
+        int restoreIconHeight = m_RestoreIcon->GetHeight();
+
+        ImGui::GetWindowDrawList()->AddRectFilled(
+            ImGui::GetCursorScreenPos(),
+            ImGui::GetCursorScreenPos() + ImVec2(paneWidth, ImGui::GetTextLineHeight()),
+            ImColor(ImGui::GetStyle().Colors[ImGuiCol_HeaderActive]), ImGui::GetTextLineHeight() * 0.25f);
+        ImGui::Spacing(); ImGui::SameLine();
+        ImGui::TextUnformatted("NODES");
+        ImGui::Indent();
+        for (auto& graph : m_Graphs)
         {
-            if (io.KeyCtrl)
+            for (auto& node : graph.Nodes)
             {
-                if (isSelected)
-                    ed::SelectNode(node.ID, true);
+                ImGui::PushID(node.ID.AsPointer());
+                auto start = ImGui::GetCursorScreenPos();
+
+                if (const auto progress = GetTouchProgress(node.ID))
+                {
+                    ImGui::GetWindowDrawList()->AddLine(
+                        start + ImVec2(-8, 0),
+                        start + ImVec2(-8, ImGui::GetTextLineHeight()),
+                        IM_COL32(255, 0, 0, 255 - (int)(255 * progress)), 4.0f);
+                }
+
+                bool isSelected = std::find(selectedNodes.begin(), selectedNodes.end(), node.ID) != selectedNodes.end();
+                if (ImGui::Selectable((node.Name + "##" + std::to_string(reinterpret_cast<uintptr_t>(node.ID.AsPointer()))).c_str(), &isSelected))
+                {
+                    if (io.KeyCtrl)
+                    {
+                        if (isSelected)
+                            ed::SelectNode(node.ID, true);
+                        else
+                            ed::DeselectNode(node.ID);
+                    }
+                    else
+                        ed::SelectNode(node.ID, false);
+
+                    ed::NavigateToSelection();
+                }
+                if (ImGui::IsItemHovered() && !node.State.empty())
+                    ImGui::SetTooltip("State: %s", node.State.c_str());
+
+                auto id = std::string("(") + std::to_string(reinterpret_cast<uintptr_t>(node.ID.AsPointer())) + ")";
+                auto textSize = ImGui::CalcTextSize(id.c_str(), nullptr);
+                auto iconPanelPos = start + ImVec2(
+                    paneWidth - ImGui::GetStyle().FramePadding.x - ImGui::GetStyle().IndentSpacing - saveIconWidth - restoreIconWidth - ImGui::GetStyle().ItemInnerSpacing.x * 1,
+                    (ImGui::GetTextLineHeight() - saveIconHeight) / 2);
+                ImGui::GetWindowDrawList()->AddText(
+                    ImVec2(iconPanelPos.x - textSize.x - ImGui::GetStyle().ItemInnerSpacing.x, start.y),
+                    IM_COL32(255, 255, 255, 255), id.c_str(), nullptr);
+
+                auto drawList = ImGui::GetWindowDrawList();
+                ImGui::SetCursorScreenPos(iconPanelPos);
+                ImGui::SetItemAllowOverlap();
+                if (node.SavedState.empty())
+                {
+                    if (ImGui::InvisibleButton("save", ImVec2((float)saveIconWidth, (float)saveIconHeight)))
+                        node.SavedState = node.State;
+
+                    if (ImGui::IsItemActive())
+                        drawList->AddImage(reinterpret_cast<void*>(m_SaveIcon->GetRendererID()), ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0, 1), ImVec2(1, 0), IM_COL32(255, 255, 255, 96));
+                    else if (ImGui::IsItemHovered())
+                        drawList->AddImage(reinterpret_cast<void*>(m_SaveIcon->GetRendererID()), ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0, 1), ImVec2(1, 0), IM_COL32(255, 255, 255, 255));
+                    else
+                        drawList->AddImage(reinterpret_cast<void*>(m_SaveIcon->GetRendererID()), ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0, 1), ImVec2(1, 0), IM_COL32(255, 255, 255, 160));
+                }
                 else
-                    ed::DeselectNode(node.ID);
+                {
+                    ImGui::Dummy(ImVec2((float)saveIconWidth, (float)saveIconHeight));
+                    drawList->AddImage(reinterpret_cast<void*>(m_SaveIcon->GetRendererID()), ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0, 1), ImVec2(1, 0), IM_COL32(255, 255, 255, 32));
+                }
+
+                ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
+                ImGui::SetItemAllowOverlap();
+                if (!node.SavedState.empty())
+                {
+                    if (ImGui::InvisibleButton("restore", ImVec2((float)restoreIconWidth, (float)restoreIconHeight)))
+                    {
+                        node.State = node.SavedState;
+                        ed::RestoreNodeState(node.ID);
+                        node.SavedState.clear();
+                    }
+
+                    if (ImGui::IsItemActive())
+                        drawList->AddImage(reinterpret_cast<void*>(m_RestoreIcon->GetRendererID()), ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0, 1), ImVec2(1, 0), IM_COL32(255, 255, 255, 96));
+                    else if (ImGui::IsItemHovered())
+                        drawList->AddImage(reinterpret_cast<void*>(m_RestoreIcon->GetRendererID()), ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0, 1), ImVec2(1, 0), IM_COL32(255, 255, 255, 255));
+                    else
+                        drawList->AddImage(reinterpret_cast<void*>(m_RestoreIcon->GetRendererID()), ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0, 1), ImVec2(1, 0), IM_COL32(255, 255, 255, 160));
+                }
+                else
+                {
+                    ImGui::Dummy(ImVec2((float)restoreIconWidth, (float)restoreIconHeight));
+                    drawList->AddImage(reinterpret_cast<void*>(m_RestoreIcon->GetRendererID()), ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0, 1), ImVec2(1, 0), IM_COL32(255, 255, 255, 32));
+                }
+
+                ImGui::SameLine(0, 0);
+                ImGui::SetItemAllowOverlap();
+                ImGui::Dummy(ImVec2(0, (float)restoreIconHeight));
+
+                ImGui::PopID();
             }
-            else
-                ed::SelectNode(node.ID, false);
-
-            ed::NavigateToSelection();
         }
-        if (ImGui::IsItemHovered() && !node.State.empty())
-            ImGui::SetTooltip("State: %s", node.State.c_str());
+        ImGui::Unindent();
 
-        auto id = std::string("(") + std::to_string(reinterpret_cast<uintptr_t>(node.ID.AsPointer())) + ")";
-        auto textSize = ImGui::CalcTextSize(id.c_str(), nullptr);
-        auto iconPanelPos = start + ImVec2(
-            paneWidth - ImGui::GetStyle().FramePadding.x - ImGui::GetStyle().IndentSpacing - saveIconWidth - restoreIconWidth - ImGui::GetStyle().ItemInnerSpacing.x * 1,
-            (ImGui::GetTextLineHeight() - saveIconHeight) / 2);
-        ImGui::GetWindowDrawList()->AddText(
-            ImVec2(iconPanelPos.x - textSize.x - ImGui::GetStyle().ItemInnerSpacing.x, start.y),
-            IM_COL32(255, 255, 255, 255), id.c_str(), nullptr);
+        static int changeCount = 0;
 
-        auto drawList = ImGui::GetWindowDrawList();
-        ImGui::SetCursorScreenPos(iconPanelPos);
-        ImGui::SetItemAllowOverlap();
-        if (node.SavedState.empty())
-        {
-            if (ImGui::InvisibleButton("save", ImVec2((float)saveIconWidth, (float)saveIconHeight)))
-                node.SavedState = node.State;
+        ImGui::GetWindowDrawList()->AddRectFilled(
+            ImGui::GetCursorScreenPos(),
+            ImGui::GetCursorScreenPos() + ImVec2(paneWidth, ImGui::GetTextLineHeight()),
+            ImColor(ImGui::GetStyle().Colors[ImGuiCol_HeaderActive]), ImGui::GetTextLineHeight() * 0.25f);
+        ImGui::Spacing(); ImGui::SameLine();
+        ImGui::TextUnformatted("Selection");
 
-            if (ImGui::IsItemActive())
-                drawList->AddImage(reinterpret_cast<void*>(m_SaveIcon->GetRendererID()), ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0, 1), ImVec2(1, 0), IM_COL32(255, 255, 255, 96));
-            else if (ImGui::IsItemHovered())
-                drawList->AddImage(reinterpret_cast<void*>(m_SaveIcon->GetRendererID()), ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0, 1), ImVec2(1, 0), IM_COL32(255, 255, 255, 255));
-            else
-                drawList->AddImage(reinterpret_cast<void*>(m_SaveIcon->GetRendererID()), ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0, 1), ImVec2(1, 0), IM_COL32(255, 255, 255, 160));
-        }
-        else
-        {
-            ImGui::Dummy(ImVec2((float)saveIconWidth, (float)saveIconHeight));
-            drawList->AddImage(reinterpret_cast<void*>(m_SaveIcon->GetRendererID()), ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0, 1), ImVec2(1, 0), IM_COL32(255, 255, 255, 32));
-        }
+        ImGui::BeginHorizontal("Selection Stats", ImVec2(paneWidth, 0));
+        ImGui::Text("Changed %d time%s", changeCount, changeCount > 1 ? "s" : "");
+        ImGui::Spring();
+        if (ImGui::Button("Deselect All"))
+            ClearSelection();
+        ImGui::EndHorizontal();
+        ImGui::Indent();
+        for (int i = 0; i < nodeCount; ++i) ImGui::Text("Node (%p)", selectedNodes[i].AsPointer());
+        for (int i = 0; i < linkCount; ++i) ImGui::Text("Link (%p)", selectedLinks[i].AsPointer());
+        ImGui::Unindent();
 
-        ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
-        ImGui::SetItemAllowOverlap();
-        if (!node.SavedState.empty())
-        {
-            if (ImGui::InvisibleButton("restore", ImVec2((float)restoreIconWidth, (float)restoreIconHeight)))
-            {
-                node.State = node.SavedState;
-                ed::RestoreNodeState(node.ID);
-                node.SavedState.clear();
-            }
+        if (ed::HasSelectionChanged())
+            ++changeCount;
 
-            if (ImGui::IsItemActive())
-                drawList->AddImage(reinterpret_cast<void*>(m_RestoreIcon->GetRendererID()), ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0, 1), ImVec2(1, 0), IM_COL32(255, 255, 255, 96));
-            else if (ImGui::IsItemHovered())
-                drawList->AddImage(reinterpret_cast<void*>(m_RestoreIcon->GetRendererID()), ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0, 1), ImVec2(1, 0), IM_COL32(255, 255, 255, 255));
-            else
-                drawList->AddImage(reinterpret_cast<void*>(m_RestoreIcon->GetRendererID()), ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0, 1), ImVec2(1, 0), IM_COL32(255, 255, 255, 160));
-        }
-        else
-        {
-            ImGui::Dummy(ImVec2((float)restoreIconWidth, (float)restoreIconHeight));
-            drawList->AddImage(reinterpret_cast<void*>(m_RestoreIcon->GetRendererID()), ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0, 1), ImVec2(1, 0), IM_COL32(255, 255, 255, 32));
-        }
-
-        ImGui::SameLine(0, 0);
-        ImGui::SetItemAllowOverlap();
-        ImGui::Dummy(ImVec2(0, (float)restoreIconHeight));
-
-        ImGui::PopID();
+        ImGui::EndChild();
     }
-    ImGui::Unindent();
-
-    static int changeCount = 0;
-
-    ImGui::GetWindowDrawList()->AddRectFilled(
-        ImGui::GetCursorScreenPos(),
-        ImGui::GetCursorScreenPos() + ImVec2(paneWidth, ImGui::GetTextLineHeight()),
-        ImColor(ImGui::GetStyle().Colors[ImGuiCol_HeaderActive]), ImGui::GetTextLineHeight() * 0.25f);
-    ImGui::Spacing(); ImGui::SameLine();
-    ImGui::TextUnformatted("Selection");
-
-    ImGui::BeginHorizontal("Selection Stats", ImVec2(paneWidth, 0));
-    ImGui::Text("Changed %d time%s", changeCount, changeCount > 1 ? "s" : "");
-    ImGui::Spring();
-    if (ImGui::Button("Deselect All"))
-        ed::ClearSelection();
-    ImGui::EndHorizontal();
-    ImGui::Indent();
-    for (int i = 0; i < nodeCount; ++i) ImGui::Text("Node (%p)", selectedNodes[i].AsPointer());
-    for (int i = 0; i < linkCount; ++i) ImGui::Text("Link (%p)", selectedLinks[i].AsPointer());
-    ImGui::Unindent();
-
-    if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Z)))
-        for (auto& link : m_Links)
-            ed::Flow(link.ID);
-
-    if (ed::HasSelectionChanged())
-        ++changeCount;
-
-    ImGui::EndChild();
 }
 
 void NodeEditorInternal::OnEvent(Dymatic::Event& e)
@@ -2250,16 +2412,16 @@ void NodeEditorInternal::CompileNodes()
     NodeCompiler header;
     NodeCompiler source;
 
-	for (auto& link : m_Links)
-		ed::Flow(link.ID);
+    ShowFlow();
 
 	// Clear Previous Compilation
 	m_CompilerResults.clear();
-    for (auto& node : m_Nodes)
-    {
-		node.Error = false;
-        node.UbergraphID = -1;
-    }
+    for (auto& graph : m_Graphs)
+        for (auto& node : graph.Nodes)
+        {
+	    	node.Error = false;
+            node.UbergraphID = -1;
+        }
 
 	// Set Window Focus
 	ImGui::SetWindowFocus("Compiler Results");
@@ -2269,34 +2431,36 @@ void NodeEditorInternal::CompileNodes()
 	// Pre Compile Checks
 	m_CompilerResults.push_back({ CompilerResultType::Info, "Initializing Pre Compile Link Checks" });
 	// Invalid Pin Links
-	for (auto& link : m_Links)
-	{
-		auto startPin = FindPin(link.StartPinID);
-		auto endPin = FindPin(link.EndPinID);
-		if (startPin->Data.Type != endPin->Data.Type)
+    for (auto& graph : m_Graphs)
+		for (auto& link : graph.Links)
 		{
-			m_CompilerResults.push_back({ CompilerResultType::Error, "Can't connect pins : Data type is not the same.", startPin->Node->ID });
-			startPin->Node->Error = true;
-			endPin->Node->Error = true;
+			auto startPin = FindPin(link.StartPinID);
+			auto endPin = FindPin(link.EndPinID);
+			if (startPin->Data.Type != endPin->Data.Type)
+			{
+				m_CompilerResults.push_back({ CompilerResultType::Error, "Can't connect pins : Data type is not the same.", startPin->Node->ID });
+				startPin->Node->Error = true;
+				endPin->Node->Error = true;
+			}
+			if (startPin->Data.Container != endPin->Data.Container)
+			{
+				m_CompilerResults.push_back({ CompilerResultType::Error, "Can't connect pins : Container type is not the same.", startPin->Node->ID });
+				startPin->Node->Error = true;
+				endPin->Node->Error = true;
+			}
 		}
-		if (startPin->Data.Container != endPin->Data.Container)
-		{
-            m_CompilerResults.push_back({ CompilerResultType::Error, "Can't connect pins : Container type is not the same.", startPin->Node->ID });
-			startPin->Node->Error = true;
-			endPin->Node->Error = true;
-		}
-	}
 
     // Pre Compile Node Checks
     m_CompilerResults.push_back({ CompilerResultType::Info, "Initializing Pre Compile Node Checks" });
-    for (auto& node : m_Nodes)
-        for (auto& pin : node.Inputs)
-            if (pin.Data.Reference)
-                if (!IsPinLinked(pin.ID))
-                {
-                    m_CompilerResults.push_back({ CompilerResultType::Error, "The pin '" + pin.Name + "' in node '" + node.Name + "' is a reference and expects a linked input.", node.ID });
-                    node.Error = true;
-                }
+    for (auto& graph : m_Graphs)
+		for (auto& node : graph.Nodes)
+			for (auto& pin : node.Inputs)
+				if (pin.Data.Reference)
+					if (!IsPinLinked(pin.ID))
+					{
+						m_CompilerResults.push_back({ CompilerResultType::Error, "The pin '" + pin.Name + "' in node '" + node.Name + "' is a reference and expects a linked input.", node.ID });
+						node.Error = true;
+					}
 
 	header.WriteLine("#pragma once");
 	header.WriteLine("//Dymatic C++ Node Script - Header - V1.2.2");
@@ -2346,10 +2510,11 @@ void NodeEditorInternal::CompileNodes()
     header.WriteLine("virtual void OnCreate() override;");
     source.WriteLine("void " + NodeScriptName + "::OnCreate()");
     source.OpenScope();
-	for (auto& node : m_Nodes)
-		if (node.Type != NodeType::Comment)
-			if (node.Name == "On Create")
-                source.WriteLine(source.GenerateFunctionName(node) + "();");
+    for (auto& graph : m_Graphs)
+		for (auto& node : graph.Nodes)
+			if (node.Type != NodeType::Comment)
+				if (node.Name == "On Create")
+					source.WriteLine(source.GenerateFunctionName(node) + "();");
     source.CloseScope();
     source.NewLine();
 
@@ -2357,10 +2522,11 @@ void NodeEditorInternal::CompileNodes()
 	header.WriteLine("virtual void OnDestroy() override;");
 	source.WriteLine("void " + NodeScriptName + "::OnDestroy()");
 	source.OpenScope();
-	for (auto& node : m_Nodes)
-		if (node.Type != NodeType::Comment)
-			if (node.Name == "On Destroy")
-				source.WriteLine(source.GenerateFunctionName(node) + "();");
+    for (auto& graph : m_Graphs)
+		for (auto& node : graph.Nodes)
+			if (node.Type != NodeType::Comment)
+				if (node.Name == "On Destroy")
+					source.WriteLine(source.GenerateFunctionName(node) + "();");
 	source.CloseScope();
 	source.NewLine();
 
@@ -2368,119 +2534,249 @@ void NodeEditorInternal::CompileNodes()
     header.WriteLine("virtual void OnUpdate(Timestep ts) override;");
     source.WriteLine("void " + NodeScriptName + "::OnUpdate(Timestep ts)");
     source.OpenScope();
-	for (auto& node : m_Nodes)
-		if (node.Type != NodeType::Comment)
-			if (node.Name == "On Update")
-                source.WriteLine(source.GenerateFunctionName(node) + "(ts.GetSeconds());");
+    for (auto& graph : m_Graphs)
+		for (auto& node : graph.Nodes)
+			if (node.Type != NodeType::Comment)
+				if (node.Name == "On Update")
+					source.WriteLine(source.GenerateFunctionName(node) + "(ts.GetSeconds());");
     source.CloseScope();
     source.NewLine();
 
-    // Generate Ubergraphs
-    std::vector<Ubergraph> ubergraphs;
-
-    for (auto& node : m_Nodes)
-        if (node.Function == NodeFunction::Event)
-        {
-            unsigned int id = compileTimeNextId++;
-            ubergraphs.push_back(id);
-            RecursiveUbergraphOrganisation(node, ubergraphs, id);
-        }
-
-    // Store ubergraph ID in each node for ease of access.
-    for (auto& ubergraph : ubergraphs)
-        for (auto& node : ubergraph.Nodes)
-            FindNode(node)->UbergraphID = ubergraph.ID;
-
-    // Generate code for each ubergraph
-    for (auto& ubergraph : ubergraphs)
+    for (auto& graph : m_Graphs)
     {
-        for (auto& node : m_Nodes)
-        {
-			node.Written = false;
-			for (auto& input : node.Inputs)
-				input.Written = false;
-			for (auto& output : node.Outputs)
-				output.Written = false;
-        }
-
-        header.WriteLine("void bpf__ExecuteUbergraph_" + source.UnderscoreSpaces(NodeScriptName) + "__pf_" + std::to_string(ubergraph.ID) + "(int32_t bpp__EntryPoint__pf);");
-
-
-        source.WriteLine("void " + source.UnderscoreSpaces(NodeScriptName) + "::bpf__ExecuteUbergraph_" + source.UnderscoreSpaces(NodeScriptName) + "__pf_" + std::to_string(ubergraph.ID) + "(int32_t bpp__EntryPoint__pf)");
-        source.OpenScope();
-
-        NodeCompiler ubergraphBody;
-        ubergraphBody.GetIndentation() = source.GetIndentation();
-        ubergraphBody.NewLine();
-
-        if (ubergraph.Nodes.size() == 1)
-        {
-            ubergraphBody.WriteLine("check(bpp__EntryPoint__pf == " + std::to_string(ubergraph.Nodes[0].Get()) + ");");
-            ubergraphBody.WriteLine("return; // Termination end of function");
-        }
-        else
-        {
-            // Node checks for internal compilation optimization
-            bool Sequences = false;
-            bool nonLinearUbergraph = !ubergraph.Linear;
-			for (auto& nodeID : ubergraph.Nodes)
-			{
-                auto node = FindNode(nodeID.Get());
-                if (node->Internal)
-                {
-                    if (node->Name == "Sequence")
-                    {
-                        bool found = false;
-                        for (auto& pin : node->Outputs)
-                            if (IsPinLinked(pin.ID))
-                            {
-                                if (found)
-                                {
-                                    Sequences = true;
-                                    nonLinearUbergraph = true;
-                                    break;
-                                }
-                                found = true;
-                            }
-                    }
-					else if (node->Name == "Branch")
-					{
-                        if (IsPinLinked(node->Outputs[1].ID))
-                        {
-						    nonLinearUbergraph = true;
-                        }
-					}
-                }
+        // Generate Ubergraphs
+        std::vector<Ubergraph> ubergraphs;
+        for (auto& node : graph.Nodes)
+            if (node.Function == NodeFunction::Event)
+            {
+                unsigned int id = compileTimeNextId++;
+                ubergraphs.push_back(id);
+                RecursiveUbergraphOrganisation(node, ubergraphs, id);
             }
 
+        // Store ubergraph ID in each node for ease of access.
+        for (auto& ubergraph : ubergraphs)
+            for (auto& node : ubergraph.Nodes)
+                FindNode(node)->UbergraphID = ubergraph.ID;
 
-            if (Sequences)
-                ubergraphBody.WriteLine("StateStack __StateStack;");
-
-            if (nonLinearUbergraph)
+        // Generate code for each ubergraph
+        for (auto& ubergraph : ubergraphs)
+        {
+            for (auto& node : graph.Nodes)
             {
-                ubergraphBody.WriteLine("int32_t __CurrentState = bpp__EntryPoint__pf;");
-                ubergraphBody.WriteLine("do");
-                ubergraphBody.OpenScope();
-                ubergraphBody.WriteLine("switch( __CurrentState )");
-                ubergraphBody.OpenScope();
+                node.Written = false;
+                for (auto& input : node.Inputs)
+                    input.Written = false;
+                for (auto& output : node.Outputs)
+                    output.Written = false;
+            }
+
+            header.WriteLine("void bpf__ExecuteUbergraph_" + source.UnderscoreSpaces(NodeScriptName) + "__pf_" + std::to_string(ubergraph.ID) + "(int32_t bpp__EntryPoint__pf);");
+
+
+            source.WriteLine("void " + source.UnderscoreSpaces(NodeScriptName) + "::bpf__ExecuteUbergraph_" + source.UnderscoreSpaces(NodeScriptName) + "__pf_" + std::to_string(ubergraph.ID) + "(int32_t bpp__EntryPoint__pf)");
+            source.OpenScope();
+
+            NodeCompiler ubergraphBody;
+            ubergraphBody.GetIndentation() = source.GetIndentation();
+            ubergraphBody.NewLine();
+
+            if (ubergraph.Nodes.size() == 1)
+            {
+                ubergraphBody.WriteLine("check(bpp__EntryPoint__pf == " + std::to_string(ubergraph.Nodes[0].Get()) + ");");
+                ubergraphBody.WriteLine("return; // Termination end of function");
             }
             else
-                ubergraphBody.WriteLine("check(bpp__EntryPoint__pf == " + std::to_string(ubergraph.Nodes[0].Get()) + ");");
-
-            for (int i = 0; i < ubergraph.Nodes.size(); i++)
             {
-                auto& nodeId = ubergraph.Nodes[i];
-
-                auto& node = *FindNode(nodeId);
-                ubergraphBody.WriteLine("// Node_" + ubergraphBody.GenerateFunctionName(node));
-                if (node.CommentEnabled)
-                    ubergraphBody.WriteLine("// Comment: " + node.Comment);
-
-                // Branch Specifies
-                if (node.Internal)
+                // Node checks for internal compilation optimization
+                bool Sequences = false;
+                bool nonLinearUbergraph = !ubergraph.Linear;
+                for (auto& nodeID : ubergraph.Nodes)
                 {
-                    if (node.Name == "Branch")
+                    auto node = FindNode(nodeID.Get());
+                    if (node->Internal)
+                    {
+                        if (node->Name == "Sequence")
+                        {
+                            bool found = false;
+                            for (auto& pin : node->Outputs)
+                                if (IsPinLinked(pin.ID))
+                                {
+                                    if (found)
+                                    {
+                                        Sequences = true;
+                                        nonLinearUbergraph = true;
+                                        break;
+                                    }
+                                    found = true;
+                                }
+                        }
+                        else if (node->Name == "Branch")
+                        {
+                            if (IsPinLinked(node->Outputs[1].ID))
+                            {
+                                nonLinearUbergraph = true;
+                            }
+                        }
+                    }
+                }
+
+
+                if (Sequences)
+                    ubergraphBody.WriteLine("StateStack __StateStack;");
+
+                if (nonLinearUbergraph)
+                {
+                    ubergraphBody.WriteLine("int32_t __CurrentState = bpp__EntryPoint__pf;");
+                    ubergraphBody.WriteLine("do");
+                    ubergraphBody.OpenScope();
+                    ubergraphBody.WriteLine("switch( __CurrentState )");
+                    ubergraphBody.OpenScope();
+                }
+                else
+                    ubergraphBody.WriteLine("check(bpp__EntryPoint__pf == " + std::to_string(ubergraph.Nodes[0].Get()) + ");");
+
+                for (int i = 0; i < ubergraph.Nodes.size(); i++)
+                {
+                    auto& nodeId = ubergraph.Nodes[i];
+
+                    auto& node = *FindNode(nodeId);
+                    ubergraphBody.WriteLine("// Node_" + ubergraphBody.GenerateFunctionName(node));
+                    if (node.CommentEnabled)
+                        ubergraphBody.WriteLine("// Comment: " + node.Comment);
+
+                    // Branch Specifies
+                    if (node.Internal)
+                    {
+                        if (node.Name == "Branch")
+                        {
+                            if (nonLinearUbergraph)
+                            {
+                                ubergraphBody.WriteLine("case " + std::to_string(node.ID.Get()) + ":");
+                                ubergraphBody.OpenScope();
+                            }
+
+                            // if false
+                            // check for line termination
+                            // set state
+                            // break
+
+                            std::string line;
+                            std::vector<ed::NodeId> pureList;
+                            std::vector<ed::NodeId> localList;
+                            RecursivePinWrite(node.Inputs[1], source, header, ubergraphBody, line, pureList, localList);
+
+                            ubergraphBody.WriteLine("if (!" + line + ")");
+                            ubergraphBody.OpenScope();
+
+                            if (IsPinLinked(node.Outputs[1].ID))
+                            {
+                                ubergraphBody.WriteLine("__CurrentState = " + std::to_string(GetNextExecNode(node.Outputs[1]).ID.Get()) + ";");
+                            }
+                            else
+                                ubergraphBody.WriteLine(Sequences ? "__CurrentState = (__StateStack.Num() > 0) ? __StateStack.Pop() : -1;" : (nonLinearUbergraph ? "__CurrentState = -1;" : "return; // Termination end of function"));
+                            if (nonLinearUbergraph)
+                                ubergraphBody.WriteLine("break;");
+
+                            ubergraphBody.CloseScope();
+
+                            // if true
+                            // check for line termination
+                            // set state and break if next state is not next index;
+
+                            if (IsPinLinked(node.Outputs[0].ID))
+                            {
+                                if (nonLinearUbergraph)
+                                {
+                                    auto& nextNode = GetNextExecNode(node.Outputs[0]);
+
+                                    bool write = true;
+                                    if (i + 1 < ubergraph.Nodes.size())
+                                        if (nextNode.ID == ubergraph.Nodes[i + 1])
+                                            write = false;
+                                    if (write)
+                                    {
+                                        ubergraphBody.WriteLine("__CurrentState = " + std::to_string(nextNode.ID.Get()) + ";");
+                                        ubergraphBody.WriteLine("break;");
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                ubergraphBody.WriteLine(Sequences ? "__CurrentState = (__StateStack.Num() > 0) ? __StateStack.Pop() : -1;" : (nonLinearUbergraph ? "__CurrentState = -1;" : "return; // Termination end of function"));
+                                if (nonLinearUbergraph)
+                                    ubergraphBody.WriteLine("break;");
+                            }
+
+                            if (nonLinearUbergraph)
+                                ubergraphBody.CloseScope();
+                        }
+                        // Sequence Specifics
+                        else if (node.Name == "Sequence" && Sequences)
+                        {
+                            // Find total number of connected pins
+                            int totalConnectedPins = 0;
+                            for (auto& output : node.Outputs)
+                                if (IsPinLinked(output.ID))
+                                    totalConnectedPins++;
+
+                            // Check to see if any pins generated and write termination case if so.
+                            if (totalConnectedPins == 0)
+                            {
+                                ubergraphBody.WriteLine("case " + std::to_string(node.ID.Get()) + ":");
+                                ubergraphBody.OpenScope();
+                                ubergraphBody.WriteLine("__CurrentState = (__StateStack.Num() > 0) ? __StateStack.Pop() : -1;");
+                                ubergraphBody.WriteLine("break;");
+                                ubergraphBody.CloseScope();
+                            }
+                            else
+                            {
+                                int currentConnectPins = 0;
+                                int blockId = node.ID.Get();
+                                for (auto& output : node.Outputs)
+                                {
+                                    // Only look at connected pins
+                                    if (IsPinLinked(output.ID))
+                                    {
+                                        currentConnectPins++;
+
+                                        ubergraphBody.WriteLine("case " + std::to_string(blockId) + ":");
+                                        ubergraphBody.OpenScope();
+
+                                        auto& nextNode = GetNextExecNode(output);
+
+                                        // Check if reached last executable index
+                                        if (currentConnectPins == totalConnectedPins)
+                                        {
+                                            // If next node is next index, leave case blank
+                                            // Else set state and break
+
+                                            bool write = true;
+                                            if (i + 1 < ubergraph.Nodes.size())
+                                                if (nextNode.ID == ubergraph.Nodes[i + 1])
+                                                    write = false;
+                                            if (write)
+                                            {
+                                                ubergraphBody.WriteLine("__CurrentState = " + std::to_string(nextNode.ID.Get()) + ";");
+                                                ubergraphBody.WriteLine("break;");
+                                            }
+                                        }
+                                        // push next sequence node, set state and break if not last index
+                                        else
+                                        {
+                                            blockId = compileTimeNextId++;
+                                            ubergraphBody.WriteLine("__StateStack.Push(" + std::to_string(blockId) + ");");
+                                            ubergraphBody.WriteLine("__CurrentState = " + std::to_string(nextNode.ID.Get()) + ";");
+                                            ubergraphBody.WriteLine("break;");
+                                        }
+
+                                        ubergraphBody.CloseScope();
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    else if (node.VariableId != 0)
                     {
                         if (nonLinearUbergraph)
                         {
@@ -2488,33 +2784,75 @@ void NodeEditorInternal::CompileNodes()
                             ubergraphBody.OpenScope();
                         }
 
-                        // if false
-                        // check for line termination
-                        // set state
-                        // break
+                        bool found = false;
+                        for (auto& variable : m_Variables)
+                            if (variable.ID == node.VariableId)
+                            {
+                                found = true;
 
-                        std::string line;
+                                std::string line;
+                                std::vector<ed::NodeId> pureList;
+                                std::vector<ed::NodeId> localList;
+                                RecursivePinWrite(node.Inputs[1], source, header, ubergraphBody, line, pureList, localList);
+
+                                ubergraphBody.WriteLine(ubergraphBody.UnderscoreSpaces("bpv__" + variable.Name + "_" + std::to_string(variable.ID) + "__pf") + " = " + line + ";");
+                            }
+                        if (!found)
+                            m_CompilerResults.push_back({ CompilerResultType::Error, "Couldn't find associated variable for node '" + node.Name + "'", node.ID });
+
+                        if (nonLinearUbergraph)
+                            ubergraphBody.CloseScope();
+                    }
+                    // Event Specifics
+                    else if (node.Function == NodeFunction::Event)
+                    {
+                        if (nonLinearUbergraph)
+                        {
+                            if (IsPinLinked(node.Outputs[0].ID))
+                            {
+                                ubergraphBody.WriteLine("case " + std::to_string(node.ID.Get()) + ":");
+                                ubergraphBody.OpenScope();
+
+
+                                auto& execOutput = node.Outputs[0];
+                                if (IsPinLinked(execOutput.ID))
+                                {
+                                    auto& nextNode = GetNextExecNode(execOutput);
+
+                                    bool write = true;
+                                    if (i + 1 < ubergraph.Nodes.size())
+                                        if (nextNode.ID == ubergraph.Nodes[i + 1])
+                                            write = false;
+                                    if (write)
+                                    {
+                                        ubergraphBody.WriteLine("__CurrentState = " + std::to_string(nextNode.ID.Get()) + ";");
+                                        ubergraphBody.WriteLine("break;");
+                                    }
+                                }
+                                else
+                                {
+                                    ubergraphBody.WriteLine("__CurrentState = -1;");
+                                    ubergraphBody.WriteLine("break;");
+                                }
+
+                                if (nonLinearUbergraph)
+                                    ubergraphBody.CloseScope();
+                            }
+                        }
+                    }
+                    // Normal Node Pass
+                    else
+                    {
+                        if (nonLinearUbergraph)
+                        {
+                            ubergraphBody.WriteLine("case " + std::to_string(node.ID.Get()) + ":");
+                            ubergraphBody.OpenScope();
+                        }
+
+                        // Node Execution Code
                         std::vector<ed::NodeId> pureList;
                         std::vector<ed::NodeId> localList;
-                        RecursivePinWrite(node.Inputs[1], source, header, ubergraphBody, line, pureList, localList);
-
-                        ubergraphBody.WriteLine("if (!" + line + ")");
-                        ubergraphBody.OpenScope();
-
-                        if (IsPinLinked(node.Outputs[1].ID))
-                        {
-                            ubergraphBody.WriteLine("__CurrentState = " + std::to_string(GetNextExecNode(node.Outputs[1]).ID.Get()) + ";");
-                        }
-                        else
-                            ubergraphBody.WriteLine(Sequences ? "__CurrentState = (__StateStack.Num() > 0) ? __StateStack.Pop() : -1;" : (nonLinearUbergraph ? "__CurrentState = -1;" : "return; // Termination end of function"));
-                        if (nonLinearUbergraph)
-                            ubergraphBody.WriteLine("break;");
-
-                        ubergraphBody.CloseScope();
-
-                        // if true
-                        // check for line termination
-                        // set state and break if next state is not next index;
+                        RecursiveNodeWrite(node, source, header, ubergraphBody, pureList, localList);
 
                         if (IsPinLinked(node.Outputs[0].ID))
                         {
@@ -2535,227 +2873,58 @@ void NodeEditorInternal::CompileNodes()
                         }
                         else
                         {
+                            // Terminate if end of line
                             ubergraphBody.WriteLine(Sequences ? "__CurrentState = (__StateStack.Num() > 0) ? __StateStack.Pop() : -1;" : (nonLinearUbergraph ? "__CurrentState = -1;" : "return; // Termination end of function"));
                             if (nonLinearUbergraph)
                                 ubergraphBody.WriteLine("break;");
                         }
-
                         if (nonLinearUbergraph)
                             ubergraphBody.CloseScope();
                     }
-                    // Sequence Specifics
-                    else if (node.Name == "Sequence" && Sequences)
-                    {
-                        // Find total number of connected pins
-                        int totalConnectedPins = 0;
-                        for (auto& output : node.Outputs)
-                            if (IsPinLinked(output.ID))
-                                totalConnectedPins++;
-
-                        // Check to see if any pins generated and write termination case if so.
-                        if (totalConnectedPins == 0)
-                        {
-                            ubergraphBody.WriteLine("case " + std::to_string(node.ID.Get()) + ":");
-                            ubergraphBody.OpenScope();
-                            ubergraphBody.WriteLine("__CurrentState = (__StateStack.Num() > 0) ? __StateStack.Pop() : -1;");
-                            ubergraphBody.WriteLine("break;");
-                            ubergraphBody.CloseScope();
-                        }
-                        else
-                        {
-                            int currentConnectPins = 0;
-                            int blockId = node.ID.Get();
-                            for (auto& output : node.Outputs)
-                            {
-                                // Only look at connected pins
-                                if (IsPinLinked(output.ID))
-                                {
-                                    currentConnectPins++;
-
-                                    ubergraphBody.WriteLine("case " + std::to_string(blockId) + ":");
-                                    ubergraphBody.OpenScope();
-
-                                    auto& nextNode = GetNextExecNode(output);
-
-                                    // Check if reached last executable index
-                                    if (currentConnectPins == totalConnectedPins)
-                                    {
-                                        // If next node is next index, leave case blank
-                                        // Else set state and break
-
-                                        bool write = true;
-                                        if (i + 1 < ubergraph.Nodes.size())
-                                            if (nextNode.ID == ubergraph.Nodes[i + 1])
-                                                write = false;
-                                        if (write)
-                                        {
-                                            ubergraphBody.WriteLine("__CurrentState = " + std::to_string(nextNode.ID.Get()) + ";");
-                                            ubergraphBody.WriteLine("break;");
-                                        }
-                                    }
-                                    // push next sequence node, set state and break if not last index
-                                    else
-                                    {
-                                        blockId = compileTimeNextId++;
-                                        ubergraphBody.WriteLine("__StateStack.Push(" + std::to_string(blockId) + ");");
-                                        ubergraphBody.WriteLine("__CurrentState = " + std::to_string(nextNode.ID.Get()) + ";");
-                                        ubergraphBody.WriteLine("break;");
-                                    }
-
-                                    ubergraphBody.CloseScope();
-                                }
-                            }
-                        }
-                    }
                 }
-                else if (node.VariableId != 0)
+
+                // Default Case for Safety
+                if (nonLinearUbergraph)
                 {
-                    if (nonLinearUbergraph)
-                    {
-                        ubergraphBody.WriteLine("case " + std::to_string(node.ID.Get()) + ":");
-                        ubergraphBody.OpenScope();
-                    }
+                    ubergraphBody.WriteLine("default:");
+                    ubergraphBody.Indent();
+                    ubergraphBody.WriteLine("check(false); // Invalid state");
+                    ubergraphBody.WriteLine("break;");
+                    ubergraphBody.Unindent();
 
-                    bool found = false;
-                    for (auto& variable : m_Variables)
-                        if (variable.ID == node.VariableId)
-                        {
-                            found = true;
-
-                            std::string line;
-                            std::vector<ed::NodeId> pureList;
-                            std::vector<ed::NodeId> localList;
-                            RecursivePinWrite(node.Inputs[1], source, header, ubergraphBody, line, pureList, localList);
-
-                            ubergraphBody.WriteLine(ubergraphBody.UnderscoreSpaces("bpv__" + variable.Name + "_" + std::to_string(variable.ID) + "__pf") + " = " + line + ";");
-                        }
-                    if (!found)
-                        m_CompilerResults.push_back({ CompilerResultType::Error, "Couldn't find associated variable for node '" + node.Name + "'", node.ID });
-
-                    if (nonLinearUbergraph)
-                        ubergraphBody.CloseScope();
-                }
-                // Event Specifics
-                else if (node.Function == NodeFunction::Event)
-                {
-                    if (nonLinearUbergraph)
-                    {
-                        if (IsPinLinked(node.Outputs[0].ID))
-                        {
-                            ubergraphBody.WriteLine("case " + std::to_string(node.ID.Get()) + ":");
-                            ubergraphBody.OpenScope();
-
-
-                            auto& execOutput = node.Outputs[0];
-                            if (IsPinLinked(execOutput.ID))
-                            {
-                                auto& nextNode = GetNextExecNode(execOutput);
-
-                                bool write = true;
-                                if (i + 1 < ubergraph.Nodes.size())
-                                    if (nextNode.ID == ubergraph.Nodes[i + 1])
-                                        write = false;
-                                if (write)
-                                {
-                                    ubergraphBody.WriteLine("__CurrentState = " + std::to_string(nextNode.ID.Get()) + ";");
-                                    ubergraphBody.WriteLine("break;");
-                                }
-                            }
-                            else
-                            {
-                                ubergraphBody.WriteLine("__CurrentState = -1;");
-                                ubergraphBody.WriteLine("break;");
-                            }
-
-                            if (nonLinearUbergraph)
-                                ubergraphBody.CloseScope();
-                        }
-                    }
-                }
-                // Normal Node Pass
-                else
-                {
-                    if (nonLinearUbergraph)
-                    {
-                        ubergraphBody.WriteLine("case " + std::to_string(node.ID.Get()) + ":");
-                        ubergraphBody.OpenScope();
-                    }
-
-                    // Node Execution Code
-                    std::vector<ed::NodeId> pureList;
-                    std::vector<ed::NodeId> localList;
-                    RecursiveNodeWrite(node, source, header, ubergraphBody, pureList, localList);
-
-                    if (IsPinLinked(node.Outputs[0].ID))
-                    {
-                        if (nonLinearUbergraph)
-                        {
-                            auto& nextNode = GetNextExecNode(node.Outputs[0]);
-
-                            bool write = true;
-                            if (i + 1 < ubergraph.Nodes.size())
-                                if (nextNode.ID == ubergraph.Nodes[i + 1])
-                                    write = false;
-                            if (write)
-                            {
-                                ubergraphBody.WriteLine("__CurrentState = " + std::to_string(nextNode.ID.Get()) + ";");
-                                ubergraphBody.WriteLine("break;");
-                            }
-                        }
-                    }
-                    else
-                    {
-                        // Terminate if end of line
-                        ubergraphBody.WriteLine(Sequences ? "__CurrentState = (__StateStack.Num() > 0) ? __StateStack.Pop() : -1;" : (nonLinearUbergraph ? "__CurrentState = -1;" : "return; // Termination end of function"));
-                        if (nonLinearUbergraph)
-                            ubergraphBody.WriteLine("break;");
-                    }
-                    if (nonLinearUbergraph)
-                        ubergraphBody.CloseScope();
+                    ubergraphBody.CloseScope();
+                    ubergraphBody.CloseScope();
+                    ubergraphBody.WriteLine("while( __CurrentState != -1 );");
                 }
             }
 
-            // Default Case for Safety
-            if (nonLinearUbergraph)
-            {
-                ubergraphBody.WriteLine("default:");
-                ubergraphBody.Indent();
-                ubergraphBody.WriteLine("check(false); // Invalid state");
-                ubergraphBody.WriteLine("break;");
-                ubergraphBody.Unindent();
-
-                ubergraphBody.CloseScope();
-                ubergraphBody.CloseScope();
-                ubergraphBody.WriteLine("while( __CurrentState != -1 );");
-            }
-        }
-
-        source.Write(ubergraphBody.Contents());
-        source.GetIndentation() = ubergraphBody.GetIndentation();
-        source.CloseScope();
-    }
-
-    for (auto& node : m_Nodes)
-    {
-        if (node.Function == NodeFunction::Event)
-        {
-            for (auto& output : node.Outputs)
-                if (output.Data.Type != PinType::Flow)
-                    header.WriteLine(header.ConvertPinTypeToCompiledString(output.Data.Type) + " b0l__NodeEvent_" + header.GenerateFunctionName(node) + "_" + header.UnderscoreSpaces(output.Name) + "__pf{};");
-            header.WriteLine("DYFUNCTION(BlueprintCallable)");
-            header.WriteLine("virtual " + header.GenerateFunctionSignature(node) + ";");
-            source.WriteLine(source.GenerateFunctionSignature(node, NodeScriptName));
-            source.OpenScope();
-            for (auto& ubergraph : ubergraphs)
-                for (auto& nodeId : ubergraph.Nodes)
-                    if (nodeId == node.ID)
-                    {
-                        source.WriteLine("bpf__ExecuteUbergraph_" + source.UnderscoreSpaces(NodeScriptName) + "__pf_" + std::to_string(ubergraph.ID) + "(" + std::to_string(node.ID.Get()) + ");");
-                        break;
-                    }
+            source.Write(ubergraphBody.Contents());
+            source.GetIndentation() = ubergraphBody.GetIndentation();
             source.CloseScope();
-            source.NewLine();
         }
+
+		for (auto& node : graph.Nodes)
+		{
+			if (node.Function == NodeFunction::Event)
+			{
+				for (auto& output : node.Outputs)
+					if (output.Data.Type != PinType::Flow)
+						header.WriteLine(header.ConvertPinTypeToCompiledString(output.Data.Type) + " b0l__NodeEvent_" + header.GenerateFunctionName(node) + "_" + header.UnderscoreSpaces(output.Name) + "__pf{};");
+				header.WriteLine("DYFUNCTION(BlueprintCallable)");
+				header.WriteLine("virtual " + header.GenerateFunctionSignature(node) + ";");
+				source.WriteLine(source.GenerateFunctionSignature(node, NodeScriptName));
+				source.OpenScope();
+				for (auto& ubergraph : ubergraphs)
+					for (auto& nodeId : ubergraph.Nodes)
+						if (nodeId == node.ID)
+						{
+							source.WriteLine("bpf__ExecuteUbergraph_" + source.UnderscoreSpaces(NodeScriptName) + "__pf_" + std::to_string(ubergraph.ID) + "(" + std::to_string(node.ID.Get()) + ");");
+							break;
+						}
+				source.CloseScope();
+				source.NewLine();
+			}
+		}
     }
 
     header.CloseScope(true);
@@ -3276,147 +3445,147 @@ void NodeEditorInternal::OpenNodes()
 
 void NodeEditorInternal::OpenNodes(const std::filesystem::path& path)
 {
-	std::string result;
-	std::ifstream in(path, std::ios::in | std::ios::binary); // ifstream closes itself due to RAII
-	if (in)
-	{
-		in.seekg(0, std::ios::end);
-		size_t size = in.tellg();
-		if (size != -1)
-		{
-			result.resize(size);
-			in.seekg(0, std::ios::beg);
-			in.read(&result[0], size);
-		}
-		else
-		{
-			DY_CORE_ERROR("Could not read from node graph file '{0}'", path);
-			return;
-		}
-	}
-
-
-	while (result.find_first_of("\n") != -1)
-	{
-		result = result.erase(result.find_first_of("\n"), 1);
-	}
-
-	while (result.find_first_of("\r") != -1)
-	{
-		result = result.erase(result.find_first_of("\r"), 1);
-	}
-
-	bool openName = false;
-	bool openValueName = false;
-	bool openValue = false;
-	std::string CurrentName = "";
-	std::string CurrentValueName = "";
-	std::string CurrentValue = "";
-
-    Node currentNode = {};
-    Pin currentPin = {};
-    Link currentLink = {};
-    Variable currentVariable = {};
-
-	for (int i = 0; i < result.length(); i++)
-	{
-		std::string character = result.substr(i, 1);
-
-		if (character == "]") { openName = false; }
-		if (openName) { CurrentName += character; }
-        if (character == "[") { openName = true; CurrentName = ""; }
-
-		if (character == ">") { openValueName = false; }
-		if (openValueName) { CurrentValueName += character; }
-		if (character == "<") { openValueName = true; CurrentValueName = ""; }
-
-		if (character == "}") { openValue = false; }
-		if (openValue) { CurrentValue += character; }
-		if (character == "{") { openValue = true; CurrentValue = ""; }
-
-		if (character == "}" && CurrentValue != "")
-		{
-            if (CurrentName == "Node")
-            {
-                if (CurrentValueName == "Id") { currentNode.ID = std::stoi(CurrentValue); }
-                else if (CurrentValueName == "Name") { currentNode.Name = CurrentValue; }
-                else if (CurrentValueName == "DisplayName") { currentNode.DisplayName = CurrentValue; }
-                else if (CurrentValueName == "PositionX") { ed::SetNodePosition(currentNode.ID, ImVec2(std::stof(CurrentValue), ed::GetNodePosition(currentNode.ID).y)); }
-                else if (CurrentValueName == "PositionY") { ed::SetNodePosition(currentNode.ID, ImVec2(ed::GetNodePosition(currentNode.ID).x, std::stof(CurrentValue))); }
-                else if (CurrentValueName == "ColorX") { currentNode.Color.Value.x = std::stof(CurrentValue); }
-                else if (CurrentValueName == "ColorY") { currentNode.Color.Value.y = std::stof(CurrentValue); }
-                else if (CurrentValueName == "ColorZ") { currentNode.Color.Value.z = std::stof(CurrentValue); }
-                else if (CurrentValueName == "Type") { currentNode.Type = ConvertStringToNodeType(CurrentValue); }
-                else if (CurrentValueName == "Function") { currentNode.Function = ConvertStringToNodeFunction(CurrentValue); }
-                else if (CurrentValueName == "SizeX") { currentNode.Size.x = std::stof(CurrentValue); }
-                else if (CurrentValueName == "SizeY") { currentNode.Size.y = std::stof(CurrentValue); }
-                else if (CurrentValueName == "State") { currentNode.State = CurrentValue; }
-                else if (CurrentValueName == "SavedState") { currentNode.SavedState = CurrentValue; }
-                else if (CurrentValueName == "CommentEnabled") { currentNode.CommentEnabled = CurrentValue == "true"; }
-                else if (CurrentValueName == "CommentPinned") { currentNode.CommentPinned = CurrentValue == "true"; }
-                else if (CurrentValueName == "Comment") { currentNode.Comment = CurrentValue; }
-                else if (CurrentValueName == "AddInputs") { currentNode.AddInputs = CurrentValue == "true"; }
-                else if (CurrentValueName == "AddOutputs") { currentNode.AddOutputs = CurrentValue == "true"; }
-
-				else if (CurrentValueName == "Initialize") { m_Nodes.emplace_back(currentNode); BuildNode(&m_Nodes.back()); currentNode = {}; }
-            }
-
-            else if (CurrentName == "Input")
-            {
-                if (CurrentValueName == "Id") { currentPin.ID = std::stoi(CurrentValue); }
-                else if (CurrentValueName == "Name") { currentPin.Name = CurrentValue; }
-                else if (CurrentValueName == "Type") { currentPin.Data.Type = ConvertStringToPinType(CurrentValue); }
-                else if (CurrentValueName == "Kind") { currentPin.Kind = ConvertStringToPinKind(CurrentValue); }
-                else if (CurrentValueName == "Value") { currentPin.Data.Value = ConvertStringToPinValue(currentPin.Data.Type, CurrentValue); }
-                else if (CurrentValueName == "Container") { currentPin.Data.Container = ConvertStringToContainerType(CurrentValue); }
-                else if (CurrentValueName == "Deletable") { currentPin.Deletable = CurrentValue == "true"; }
-
-                else if (CurrentValueName == "Initialize") { currentNode.Inputs.emplace_back(currentPin); currentPin = {}; }
-            }
-
-			else if (CurrentName == "Output")
-			{
-				if (CurrentValueName == "Id") { currentPin.ID = std::stoi(CurrentValue); }
-				else if (CurrentValueName == "Name") { currentPin.Name = CurrentValue; }
-				else if (CurrentValueName == "Type") { currentPin.Data.Type = ConvertStringToPinType(CurrentValue); }
-				else if (CurrentValueName == "Kind") { currentPin.Kind = ConvertStringToPinKind(CurrentValue); }
-				else if (CurrentValueName == "Value") { currentPin.Data.Value = ConvertStringToPinValue(currentPin.Data.Type, CurrentValue); }
-                else if (CurrentValueName == "Container") { currentPin.Data.Container = ConvertStringToContainerType(CurrentValue); }
-				else if (CurrentValueName == "Deletable") { currentPin.Deletable = CurrentValue == "true"; }
-
-				else if (CurrentValueName == "Initialize") { currentNode.Outputs.emplace_back(currentPin); currentPin = {}; }
-			}
-
-			else if (CurrentName == "Link")
-			{
-				if (CurrentValueName == "Id") { currentLink.ID = std::stoi(CurrentValue); }
-				else if (CurrentValueName == "StartPinId") { currentLink.StartPinID = std::stoi(CurrentValue); }
-				else if (CurrentValueName == "EndPinId") { currentLink.EndPinID = std::stoi(CurrentValue); }
-				else if (CurrentValueName == "ColorX") { currentLink.Color.Value.x = std::stof(CurrentValue); }
-				else if (CurrentValueName == "ColorY") { currentLink.Color.Value.y = std::stof(CurrentValue); }
-				else if (CurrentValueName == "ColorZ") { currentLink.Color.Value.z = std::stof(CurrentValue); }
-
-				else if (CurrentValueName == "Initialize") { currentLink.Color.Value.w = 1.0f; m_Links.emplace_back(currentLink); currentLink = {}; }
-			}
-
-			else if (CurrentName == "Variable")
-			{
-				if (CurrentValueName == "Id") { currentVariable.ID = std::stoi(CurrentValue); }
-                else if (CurrentValueName == "Name") { currentVariable.Name = CurrentValue; }
-                else if (CurrentValueName == "Type") { currentVariable.Data.Type = ConvertStringToPinType(CurrentValue); }
-                else if (CurrentValueName == "Value") { currentVariable.Data.Value = ConvertStringToPinValue(currentVariable.Data.Type, CurrentValue); }
-
-                else if (CurrentValueName == "Initialize") { m_Variables.emplace_back(currentVariable); currentVariable = {}; }
-			}
-
-			else if (CurrentName == "Graph")
-			{
-                if (CurrentValueName == "NextId") { m_NextId = std::stof(CurrentValue); }
-			}
-		}
-	}
-
-    BuildNodes();
+	//std::string result;
+	//std::ifstream in(path, std::ios::in | std::ios::binary); // ifstream closes itself due to RAII
+	//if (in)
+	//{
+	//	in.seekg(0, std::ios::end);
+	//	size_t size = in.tellg();
+	//	if (size != -1)
+	//	{
+	//		result.resize(size);
+	//		in.seekg(0, std::ios::beg);
+	//		in.read(&result[0], size);
+	//	}
+	//	else
+	//	{
+	//		DY_CORE_ERROR("Could not read from node graph file '{0}'", path);
+	//		return;
+	//	}
+	//}
+    //
+    //
+	//while (result.find_first_of("\n") != -1)
+	//{
+	//	result = result.erase(result.find_first_of("\n"), 1);
+	//}
+    //
+	//while (result.find_first_of("\r") != -1)
+	//{
+	//	result = result.erase(result.find_first_of("\r"), 1);
+	//}
+    //
+	//bool openName = false;
+	//bool openValueName = false;
+	//bool openValue = false;
+	//std::string CurrentName = "";
+	//std::string CurrentValueName = "";
+	//std::string CurrentValue = "";
+    //
+    //Node currentNode = {};
+    //Pin currentPin = {};
+    //Link currentLink = {};
+    //Variable currentVariable = {};
+    //
+	//for (int i = 0; i < result.length(); i++)
+	//{
+	//	std::string character = result.substr(i, 1);
+    //
+	//	if (character == "]") { openName = false; }
+	//	if (openName) { CurrentName += character; }
+    //    if (character == "[") { openName = true; CurrentName = ""; }
+    //
+	//	if (character == ">") { openValueName = false; }
+	//	if (openValueName) { CurrentValueName += character; }
+	//	if (character == "<") { openValueName = true; CurrentValueName = ""; }
+    //
+	//	if (character == "}") { openValue = false; }
+	//	if (openValue) { CurrentValue += character; }
+	//	if (character == "{") { openValue = true; CurrentValue = ""; }
+    //
+	//	if (character == "}" && CurrentValue != "")
+	//	{
+    //        if (CurrentName == "Node")
+    //        {
+    //            if (CurrentValueName == "Id") { currentNode.ID = std::stoi(CurrentValue); }
+    //            else if (CurrentValueName == "Name") { currentNode.Name = CurrentValue; }
+    //            else if (CurrentValueName == "DisplayName") { currentNode.DisplayName = CurrentValue; }
+    //            else if (CurrentValueName == "PositionX") { ed::SetNodePosition(currentNode.ID, ImVec2(std::stof(CurrentValue), ed::GetNodePosition(currentNode.ID).y)); }
+    //            else if (CurrentValueName == "PositionY") { ed::SetNodePosition(currentNode.ID, ImVec2(ed::GetNodePosition(currentNode.ID).x, std::stof(CurrentValue))); }
+    //            else if (CurrentValueName == "ColorX") { currentNode.Color.Value.x = std::stof(CurrentValue); }
+    //            else if (CurrentValueName == "ColorY") { currentNode.Color.Value.y = std::stof(CurrentValue); }
+    //            else if (CurrentValueName == "ColorZ") { currentNode.Color.Value.z = std::stof(CurrentValue); }
+    //            else if (CurrentValueName == "Type") { currentNode.Type = ConvertStringToNodeType(CurrentValue); }
+    //            else if (CurrentValueName == "Function") { currentNode.Function = ConvertStringToNodeFunction(CurrentValue); }
+    //            else if (CurrentValueName == "SizeX") { currentNode.Size.x = std::stof(CurrentValue); }
+    //            else if (CurrentValueName == "SizeY") { currentNode.Size.y = std::stof(CurrentValue); }
+    //            else if (CurrentValueName == "State") { currentNode.State = CurrentValue; }
+    //            else if (CurrentValueName == "SavedState") { currentNode.SavedState = CurrentValue; }
+    //            else if (CurrentValueName == "CommentEnabled") { currentNode.CommentEnabled = CurrentValue == "true"; }
+    //            else if (CurrentValueName == "CommentPinned") { currentNode.CommentPinned = CurrentValue == "true"; }
+    //            else if (CurrentValueName == "Comment") { currentNode.Comment = CurrentValue; }
+    //            else if (CurrentValueName == "AddInputs") { currentNode.AddInputs = CurrentValue == "true"; }
+    //            else if (CurrentValueName == "AddOutputs") { currentNode.AddOutputs = CurrentValue == "true"; }
+    //
+	//			else if (CurrentValueName == "Initialize") { m_Nodes.emplace_back(currentNode); BuildNode(&m_Nodes.back()); currentNode = {}; }
+    //        }
+    //
+    //        else if (CurrentName == "Input")
+    //        {
+    //            if (CurrentValueName == "Id") { currentPin.ID = std::stoi(CurrentValue); }
+    //            else if (CurrentValueName == "Name") { currentPin.Name = CurrentValue; }
+    //            else if (CurrentValueName == "Type") { currentPin.Data.Type = ConvertStringToPinType(CurrentValue); }
+    //            else if (CurrentValueName == "Kind") { currentPin.Kind = ConvertStringToPinKind(CurrentValue); }
+    //            else if (CurrentValueName == "Value") { currentPin.Data.Value = ConvertStringToPinValue(currentPin.Data.Type, CurrentValue); }
+    //            else if (CurrentValueName == "Container") { currentPin.Data.Container = ConvertStringToContainerType(CurrentValue); }
+    //            else if (CurrentValueName == "Deletable") { currentPin.Deletable = CurrentValue == "true"; }
+    //
+    //            else if (CurrentValueName == "Initialize") { currentNode.Inputs.emplace_back(currentPin); currentPin = {}; }
+    //        }
+    //
+	//		else if (CurrentName == "Output")
+	//		{
+	//			if (CurrentValueName == "Id") { currentPin.ID = std::stoi(CurrentValue); }
+	//			else if (CurrentValueName == "Name") { currentPin.Name = CurrentValue; }
+	//			else if (CurrentValueName == "Type") { currentPin.Data.Type = ConvertStringToPinType(CurrentValue); }
+	//			else if (CurrentValueName == "Kind") { currentPin.Kind = ConvertStringToPinKind(CurrentValue); }
+	//			else if (CurrentValueName == "Value") { currentPin.Data.Value = ConvertStringToPinValue(currentPin.Data.Type, CurrentValue); }
+    //            else if (CurrentValueName == "Container") { currentPin.Data.Container = ConvertStringToContainerType(CurrentValue); }
+	//			else if (CurrentValueName == "Deletable") { currentPin.Deletable = CurrentValue == "true"; }
+    //
+	//			else if (CurrentValueName == "Initialize") { currentNode.Outputs.emplace_back(currentPin); currentPin = {}; }
+	//		}
+    //
+	//		else if (CurrentName == "Link")
+	//		{
+	//			if (CurrentValueName == "Id") { currentLink.ID = std::stoi(CurrentValue); }
+	//			else if (CurrentValueName == "StartPinId") { currentLink.StartPinID = std::stoi(CurrentValue); }
+	//			else if (CurrentValueName == "EndPinId") { currentLink.EndPinID = std::stoi(CurrentValue); }
+	//			else if (CurrentValueName == "ColorX") { currentLink.Color.Value.x = std::stof(CurrentValue); }
+	//			else if (CurrentValueName == "ColorY") { currentLink.Color.Value.y = std::stof(CurrentValue); }
+	//			else if (CurrentValueName == "ColorZ") { currentLink.Color.Value.z = std::stof(CurrentValue); }
+    //
+	//			else if (CurrentValueName == "Initialize") { currentLink.Color.Value.w = 1.0f; m_Links.emplace_back(currentLink); currentLink = {}; }
+	//		}
+    //
+	//		else if (CurrentName == "Variable")
+	//		{
+	//			if (CurrentValueName == "Id") { currentVariable.ID = std::stoi(CurrentValue); }
+    //            else if (CurrentValueName == "Name") { currentVariable.Name = CurrentValue; }
+    //            else if (CurrentValueName == "Type") { currentVariable.Data.Type = ConvertStringToPinType(CurrentValue); }
+    //            else if (CurrentValueName == "Value") { currentVariable.Data.Value = ConvertStringToPinValue(currentVariable.Data.Type, CurrentValue); }
+    //
+    //            else if (CurrentValueName == "Initialize") { m_Variables.emplace_back(currentVariable); currentVariable = {}; }
+	//		}
+    //
+	//		else if (CurrentName == "Graph")
+	//		{
+    //            if (CurrentValueName == "NextId") { m_NextId = std::stof(CurrentValue); }
+	//		}
+	//	}
+	//}
+    //
+    //BuildNodes();
 }
 
 void NodeEditorInternal::SaveNodes()
@@ -3430,89 +3599,92 @@ void NodeEditorInternal::SaveNodes()
 
 void NodeEditorInternal::SaveNodes(const std::filesystem::path& path)
 {
-    std::string out = "";
-    for (auto& node : m_Nodes)
-    {
-        out += "[Node] ";
-		out += "<Id> {" + std::to_string(node.ID.Get()) + "} ";
-		out += "<Name> {" + node.Name + "} ";
-		out += "<DisplayName> {" + node.DisplayName + "} ";
-        out += "<PositionX> {" + std::to_string(ed::GetNodePosition(node.ID).x) + "} ";
-        out += "<PositionY> {" + std::to_string(ed::GetNodePosition(node.ID).y) + "} ";
-        out += "<ColorX> {" + std::to_string(node.Color.Value.x) + "} ";
-        out += "<ColorY> {" + std::to_string(node.Color.Value.y) + "} ";
-        out += "<ColorZ> {" + std::to_string(node.Color.Value.z) + "} ";
-        out += "<Type> {" + ConvertNodeTypeToString(node.Type) + "} ";
-		out += "<Function> {" + ConvertNodeFunctionToString(node.Function) + "} ";
-		out += "<SizeX> {" + std::to_string(node.Size.x) + "} ";
-		out += "<SizeY> {" + std::to_string(node.Size.y) + "} ";
-		out += "<State> {" + node.State + "} ";
-		out += "<SavedState> {" + node.SavedState + "} ";
-		out += "<CommentEnabled> {" + std::string(node.CommentEnabled ? "true" : "false") + "} ";
-		out += "<CommentPinned> {" + std::string(node.CommentPinned ? "true" : "false") + "} ";
-		out += "<Comment> {" + node.Comment + "} ";
-		out += "<AddInputs> {" + std::string(node.AddInputs ? "true" : "false") + "}";
-		out += "<AddOutputs> {" + std::string(node.AddOutputs ? "true" : "false") + "}";
-
-        for (auto& input : node.Inputs)
-        {
-            out += "\r\n        [Input]";
-            out += "<Id> {" + std::to_string(input.ID.Get()) + "} ";
-            out += "<Name> {" + input.Name + "} ";
-            out += "<Type> {" + ConvertPinTypeToString(input.Data.Type) + "} ";
-            out += "<Kind> {" + ConvertPinKindToString(input.Kind) + "} ";
-            out += "<Value> {" + ConvertPinValueToString(input.Data.Type, input.Data.Value) + "} ";
-            out += "<Container> {" + ConvertContainerTypeToString(input.Data.Container) + "} ";
-            out += "<Deletable> {" + std::string(input.Deletable ? "true" : "false") + "} ";
-            out += "<Initialize> {Pin}";
-        }
-
-		for (auto& output : node.Outputs)
-		{
-			out += "\r\n        [Output]";
-			out += "<Id> {" + std::to_string(output.ID.Get()) + "} ";
-			out += "<Name> {" + output.Name + "} ";
-			out += "<Type> {" + ConvertPinTypeToString(output.Data.Type) + "} ";
-			out += "<Kind> {" + ConvertPinKindToString(output.Kind) + "} ";
-			out += "<Value> {" + ConvertPinValueToString(output.Data.Type, output.Data.Value) + "} ";
-            out += "<Container> {" + ConvertContainerTypeToString(output.Data.Container) + "} ";
-			out += "<Deletable> {" + std::string(output.Deletable ? "true" : "false") + "} ";
-			out += "<Initialize> {Pin}";
-		}
-
-        out += "\r\n[Node] ";
-		out += "<Initialize> {Node}\r\n";
-    }
-
-    for (auto& link : m_Links)
-    {
-        out += "[Link] ";
-        out += "<Id> {" + std::to_string(link.ID.Get()) + "} ";
-        out += "<StartPinId> {" + std::to_string(link.StartPinID.Get()) + "} ";
-        out += "<EndPinId> {" + std::to_string(link.EndPinID.Get()) + "} ";
-        out += "<ColorX> {" + std::to_string(link.Color.Value.x) + "} ";
-        out += "<ColorY> {" + std::to_string(link.Color.Value.y) + "} ";
-        out += "<ColorZ> {" + std::to_string(link.Color.Value.z) + "} ";
-
-        out += "<Initialize> {Link}\r\n";
-    }
-
-    for (auto& variable : m_Variables)
-    {
-        out += "[Variable] ";
-        out += "<Id> {" + std::to_string(variable.ID) + "} ";
-        out += "<Name> {" + variable.Name + "} ";
-        out += "<Type> {" + ConvertPinTypeToString(variable.Data.Type) +"} ";
-        out += "<Value> {" + ConvertPinValueToString(variable.Data.Type, variable.Data.Value) + "} ";
-
-        out += "<Initialize> {Variable}\r\n";
-    }
-
-    out += "\r\n[Graph] ";
-    out += "<NextId> {" + std::to_string(m_NextId) + "}";
-
-	std::ofstream fout(path);
-    fout << out.c_str();
+	//std::string out = "";
+	//for (auto& graph : m_Graphs)
+	//{
+	//    for (auto& node : graph.Nodes)
+	//    {
+	//        out += "[Node] ";
+	//        out += "<Id> {" + std::to_string(node.ID.Get()) + "} ";
+	//        out += "<Name> {" + node.Name + "} ";
+	//        out += "<DisplayName> {" + node.DisplayName + "} ";
+	//        out += "<PositionX> {" + std::to_string(ed::GetNodePosition(node.ID).x) + "} ";
+	//        out += "<PositionY> {" + std::to_string(ed::GetNodePosition(node.ID).y) + "} ";
+	//        out += "<ColorX> {" + std::to_string(node.Color.Value.x) + "} ";
+	//        out += "<ColorY> {" + std::to_string(node.Color.Value.y) + "} ";
+	//        out += "<ColorZ> {" + std::to_string(node.Color.Value.z) + "} ";
+	//        out += "<Type> {" + ConvertNodeTypeToString(node.Type) + "} ";
+	//        out += "<Function> {" + ConvertNodeFunctionToString(node.Function) + "} ";
+	//        out += "<SizeX> {" + std::to_string(node.Size.x) + "} ";
+	//        out += "<SizeY> {" + std::to_string(node.Size.y) + "} ";
+	//        out += "<State> {" + node.State + "} ";
+	//        out += "<SavedState> {" + node.SavedState + "} ";
+	//        out += "<CommentEnabled> {" + std::string(node.CommentEnabled ? "true" : "false") + "} ";
+	//        out += "<CommentPinned> {" + std::string(node.CommentPinned ? "true" : "false") + "} ";
+	//        out += "<Comment> {" + node.Comment + "} ";
+	//        out += "<AddInputs> {" + std::string(node.AddInputs ? "true" : "false") + "}";
+	//        out += "<AddOutputs> {" + std::string(node.AddOutputs ? "true" : "false") + "}";
+	//
+	//        for (auto& input : node.Inputs)
+	//        {
+	//            out += "\r\n        [Input]";
+	//            out += "<Id> {" + std::to_string(input.ID.Get()) + "} ";
+	//            out += "<Name> {" + input.Name + "} ";
+	//            out += "<Type> {" + ConvertPinTypeToString(input.Data.Type) + "} ";
+	//            out += "<Kind> {" + ConvertPinKindToString(input.Kind) + "} ";
+	//            out += "<Value> {" + ConvertPinValueToString(input.Data.Type, input.Data.Value) + "} ";
+	//            out += "<Container> {" + ConvertContainerTypeToString(input.Data.Container) + "} ";
+	//            out += "<Deletable> {" + std::string(input.Deletable ? "true" : "false") + "} ";
+	//            out += "<Initialize> {Pin}";
+	//        }
+	//
+	//        for (auto& output : node.Outputs)
+	//        {
+	//            out += "\r\n        [Output]";
+	//            out += "<Id> {" + std::to_string(output.ID.Get()) + "} ";
+	//            out += "<Name> {" + output.Name + "} ";
+	//            out += "<Type> {" + ConvertPinTypeToString(output.Data.Type) + "} ";
+	//            out += "<Kind> {" + ConvertPinKindToString(output.Kind) + "} ";
+	//            out += "<Value> {" + ConvertPinValueToString(output.Data.Type, output.Data.Value) + "} ";
+	//            out += "<Container> {" + ConvertContainerTypeToString(output.Data.Container) + "} ";
+	//            out += "<Deletable> {" + std::string(output.Deletable ? "true" : "false") + "} ";
+	//            out += "<Initialize> {Pin}";
+	//        }
+	//
+	//        out += "\r\n[Node] ";
+	//        out += "<Initialize> {Node}\r\n";
+	//    }
+	//
+	//    for (auto& link : graph.Links)
+	//    {
+	//        out += "[Link] ";
+	//        out += "<Id> {" + std::to_string(link.ID.Get()) + "} ";
+	//        out += "<StartPinId> {" + std::to_string(link.StartPinID.Get()) + "} ";
+	//        out += "<EndPinId> {" + std::to_string(link.EndPinID.Get()) + "} ";
+	//        out += "<ColorX> {" + std::to_string(link.Color.Value.x) + "} ";
+	//        out += "<ColorY> {" + std::to_string(link.Color.Value.y) + "} ";
+	//        out += "<ColorZ> {" + std::to_string(link.Color.Value.z) + "} ";
+	//
+	//        out += "<Initialize> {Link}\r\n";
+	//    }
+	//}
+	//
+	//for (auto& variable : m_Variables)
+	//{
+	//    out += "[Variable] ";
+	//    out += "<Id> {" + std::to_string(variable.ID) + "} ";
+	//    out += "<Name> {" + variable.Name + "} ";
+	//    out += "<Type> {" + ConvertPinTypeToString(variable.Data.Type) +"} ";
+	//    out += "<Value> {" + ConvertPinValueToString(variable.Data.Type, variable.Data.Value) + "} ";
+	//
+	//    out += "<Initialize> {Variable}\r\n";
+	//}
+	//
+	//out += "\r\n[Graph] ";
+	//out += "<NextId> {" + std::to_string(m_NextId) + "}";
+	//
+	//std::ofstream fout(path);
+	//fout << out.c_str();
 }
 
 void NodeEditorInternal::CopyNodes()
@@ -3527,107 +3699,230 @@ void NodeEditorInternal::PasteNodes()
 
 void NodeEditorInternal::DuplicateNodes()
 {
-	std::vector<ed::NodeId> selectedNodes;
-	std::vector<ed::LinkId> selectedLinks;
-	selectedNodes.resize(ed::GetSelectedObjectCount());
-	selectedLinks.resize(ed::GetSelectedObjectCount());
-    
-	int nodeCount = ed::GetSelectedNodes(selectedNodes.data(), static_cast<int>(selectedNodes.size()));
-	int linkCount = ed::GetSelectedLinks(selectedLinks.data(), static_cast<int>(selectedLinks.size()));
-    
-	selectedNodes.resize(nodeCount);
-	selectedLinks.resize(linkCount);
-    
-    ed::ClearSelection();
-    
-    std::vector<ed::PinId> originalPins;
-    std::vector<ed::PinId> newPins;
-    
-	for (int i = 0; i < selectedNodes.size(); i++)
-	{
-		for (int x = 0; x < m_Nodes.size(); x++)
-		{
-			if (selectedNodes[i] == m_Nodes[x].ID)
-			{
-				m_Nodes.emplace_back(m_Nodes[x]);
-    
-				m_Nodes.back().ID = GetNextId();
-				for (int y = 0; y < m_Nodes.back().Inputs.size(); y++)
-				{
-                    m_Nodes.back().Inputs[y].ID = GetNextId();
-                    m_Nodes.back().Inputs[y].Node = &m_Nodes.back();
-    
-					originalPins.emplace_back(m_Nodes[x].Inputs[y].ID);
-					newPins.emplace_back(m_Nodes.back().Inputs[y].ID);
-				}
-                for (int y = 0; y < m_Nodes.back().Outputs.size(); y++)
-				{
-                    m_Nodes.back().Outputs[y].ID = GetNextId();
-                    m_Nodes.back().Outputs[y].Node = &m_Nodes.back();
-    
-                    originalPins.emplace_back(m_Nodes[x].Outputs[y].ID);
-                    newPins.emplace_back(m_Nodes.back().Outputs[y].ID);
-				}
-    
-				ed::SetNodePosition(m_Nodes.back().ID, ed::GetNodePosition(m_Nodes[x].ID) + ImVec2(50, 50));
-    
-				BuildNode(&m_Nodes[x]);
-				BuildNode(&m_Nodes.back());
-    
-                ed::SelectNode(m_Nodes.back().ID, true);
-			}
-		}
-	}
-    
-    for (int i = 0; i < m_Links.size(); i++)
+    for (auto& graph : m_Graphs)
     {
-        int selectSuccess = 0;
-        for (int x = 0; x < selectedNodes.size(); x++)
+        std::vector<ed::NodeId> selectedNodes;
+        std::vector<ed::LinkId> selectedLinks;
+        selectedNodes.resize(ed::GetSelectedObjectCount());
+        selectedLinks.resize(ed::GetSelectedObjectCount());
+
+        int nodeCount = ed::GetSelectedNodes(selectedNodes.data(), static_cast<int>(selectedNodes.size()));
+        int linkCount = ed::GetSelectedLinks(selectedLinks.data(), static_cast<int>(selectedLinks.size()));
+
+        selectedNodes.resize(nodeCount);
+        selectedLinks.resize(linkCount);
+
+        ClearSelection();
+
+        std::vector<ed::PinId> originalPins;
+        std::vector<ed::PinId> newPins;
+
+        for (auto& selectedNode : selectedNodes)
         {
-            auto selectedNodeTemp = FindNode(selectedNodes[x]);
-            for (int y = 0; y < selectedNodeTemp->Inputs.size(); y++)
+            for (auto& node : graph.Nodes)
             {
-                if (selectedNodeTemp->Inputs[y].ID == m_Links[i].StartPinID || selectedNodeTemp->Inputs[y].ID == m_Links[i].EndPinID)
+                if (selectedNode == node.ID)
                 {
-                    selectSuccess++;
+                    graph.Nodes.emplace_back(node);
+
+                    auto& newNode = graph.Nodes.back();
+                    newNode.ID = GetNextId();
+                    for (int i = 0; i < newNode.Inputs.size(); i++)
+                    {
+                        auto& input = newNode.Inputs[i];
+                        input.ID = GetNextId();
+
+                        originalPins.emplace_back(node.Inputs[i].ID);
+                        newPins.emplace_back(input.ID);
+                    }
+                    for (int i = 0; i < newNode.Outputs.size(); i++)
+                    {
+                        auto& output = newNode.Outputs[i];
+                        output.ID = GetNextId();
+
+                        originalPins.emplace_back(node.Outputs[i].ID);
+                        newPins.emplace_back(output.ID);
+                    }
+
+                    SetNodePosition(newNode.ID, ed::GetNodePosition(node.ID) + ImVec2(50, 50));
+
+                    BuildNode(&node);
+                    BuildNode(&newNode);
+
+                    ed::SelectNode(newNode.ID, true);
                 }
             }
-            for (int y = 0; y < selectedNodeTemp->Outputs.size(); y++)
-            {
-				if (selectedNodeTemp->Outputs[y].ID == m_Links[i].StartPinID || selectedNodeTemp->Outputs[y].ID == m_Links[i].EndPinID)
-				{
-					selectSuccess++;
-				}
-            }
         }
-        if (selectSuccess > 1)
+
+        for (auto& link : graph.Links)
         {
-            ed::PinId newStartPin;
-            ed::PinId newEndPin;
-    
-            for (int x = 0; x < originalPins.size(); x++)
+            int selectSuccess = 0;
+            for (int x = 0; x < selectedNodes.size(); x++)
             {
-                if (originalPins[x] == m_Links[i].StartPinID)
+                auto selectedNodeTemp = FindNode(selectedNodes[x]);
+                for (int y = 0; y < selectedNodeTemp->Inputs.size(); y++)
                 {
-                    newStartPin = newPins[x];
+                    if (selectedNodeTemp->Inputs[y].ID == link.StartPinID || selectedNodeTemp->Inputs[y].ID == link.EndPinID)
+                    {
+                        selectSuccess++;
+                    }
                 }
-				if (originalPins[x] == m_Links[i].EndPinID)
-				{
-					newEndPin = newPins[x];
-				}
+                for (int y = 0; y < selectedNodeTemp->Outputs.size(); y++)
+                {
+                    if (selectedNodeTemp->Outputs[y].ID == link.StartPinID || selectedNodeTemp->Outputs[y].ID == link.EndPinID)
+                    {
+                        selectSuccess++;
+                    }
+                }
             }
-    
-            m_Links.emplace_back(GetNextLinkId(), newStartPin, newEndPin);
-            m_Links.back().Color = m_Links[i].Color;
+            if (selectSuccess > 1)
+            {
+                ed::PinId newStartPin;
+                ed::PinId newEndPin;
+
+                for (int x = 0; x < originalPins.size(); x++)
+                {
+                    if (originalPins[x] == link.StartPinID)
+                    {
+                        newStartPin = newPins[x];
+                    }
+                    if (originalPins[x] == link.EndPinID)
+                    {
+                        newEndPin = newPins[x];
+                    }
+                }
+
+                graph.Links.emplace_back(GetNextLinkId(), newStartPin, newEndPin);
+                graph.Links.back().Color = link.Color;
+            }
         }
+
     }
-    
     BuildNodes();
 }
 
 void NodeEditorInternal::DeleteNodes()
 {
 
+}
+
+void NodeEditorInternal::ShowFlow()
+{
+    auto editor = ed::GetCurrentEditor();
+    for (auto& window : m_Windows)
+    {
+        ed::SetCurrentEditor(window.InternalEditor);
+        auto p_graph = FindGraphByID(window.GraphID);
+        if (p_graph != nullptr)
+            for (auto& link : p_graph->Links)
+                ed::Flow(link.ID);
+    }
+    ed::SetCurrentEditor(editor);
+}
+
+NodeGraph* NodeEditorInternal::FindGraphByID(unsigned int id)
+{
+    if (id)
+        for (auto& graph : m_Graphs)
+            if (graph.ID == id)
+                return &graph;
+    return nullptr;
+}
+
+GraphWindow* NodeEditorInternal::FindWindowByID(unsigned int id)
+{
+	if (id)
+		for (auto& window : m_Windows)
+			if (window.ID == id)
+				return &window;
+	return nullptr;
+}
+
+GraphWindow* NodeEditorInternal::OpenGraph(unsigned int id)
+{
+    auto p_window = GetCurrentWindow();
+    if (p_window != nullptr)
+        if (p_window->GraphID == id)
+            return p_window;
+
+    for (auto& window : m_Windows)
+        if (window.GraphID == id)
+        {
+            window.Focused = true;
+            return p_window;
+        }
+    return OpenGraphInNewTab(id);
+}
+
+GraphWindow* NodeEditorInternal::OpenGraphInNewTab(unsigned int id)
+{
+    auto& window = m_Windows.emplace_back(GetNextId(), id);
+
+    auto editor = ed::GetCurrentEditor();
+    ed::SetCurrentEditor(window.InternalEditor);
+    auto& graph = *FindGraphByID(window.GraphID);
+    for (auto& node : graph.Nodes)
+		ed::SetNodePosition(node.ID, node.Position);
+    ed::SetCurrentEditor(editor);
+
+    return &window;
+}
+
+void NodeEditorInternal::ClearSelection()
+{
+    auto editor = ed::GetCurrentEditor();
+    for (auto& window : m_Windows)
+    {
+        ed::SetCurrentEditor(window.InternalEditor);
+        ed::ClearSelection();
+    }
+    ed::SetCurrentEditor(editor);
+}
+
+void NodeEditorInternal::SetNodePosition(ed::NodeId id, ImVec2 position)
+{
+    auto p_node = FindNode(id);
+    if (p_node != nullptr)
+    {
+        p_node->Position = position;
+        auto editor = ed::GetCurrentEditor();
+        for (auto& window : m_Windows)
+        {
+            ed::SetCurrentEditor(window.InternalEditor);
+            ed::SetNodePosition(id, position);
+        }
+        ed::SetCurrentEditor(editor);
+    }
+}
+
+void NodeEditorInternal::NavigateToContent()
+{
+    auto p_window = GetCurrentWindow();
+    if (p_window != nullptr)
+    {
+        auto editor = ed::GetCurrentEditor();
+        ed::SetCurrentEditor(p_window->InternalEditor);
+        ed::NavigateToContent();
+        ed::SetCurrentEditor(editor);
+    }
+}
+
+void NodeEditorInternal::NavigateToNode(ed::NodeId id)
+{
+    for (auto& graph : m_Graphs)
+        for (auto& node : graph.Nodes)
+            if (node.ID == id)
+            {
+                auto window = OpenGraph(graph.ID);
+                if (window != nullptr)
+                {
+                    auto editor = ed::GetCurrentEditor();
+                    ed::SetCurrentEditor(window->InternalEditor);
+                    ed::SelectNode(node.ID);
+                    ed::NavigateToSelection();
+                    ed::SetCurrentEditor(editor);
+                }
+            }
 }
 
 void NodeEditorInternal::DefaultValueInput(PinData& data, bool spring)
@@ -3691,23 +3986,30 @@ void NodeEditorInternal::DefaultValueInput(PinData& data, bool spring)
             break;
         }
         case PinType::Color: {
-			//ImGui::GetCurrentWindow()->DC.CursorStartPos = ImVec2(100.0f, 100.0f);// = ImGui::GetCurrentWindow()->DC.CursorStartPos;
-			//
-			//static ImVec2 prepos = {};
-			//static bool lock = true;
-			//if (Input::IsKeyPressed(Key::Z)) lock = false;
-			//if (Input::IsKeyPressed(Key::X)) lock = true;
-			//auto cpos = ImGui::GetCursorPos();
-			//if (Input::IsKeyPressed(Key::B) || !lock)
-			//{
-			//    ImGui::SetCursorPos(prepos);
-			//    ImGui::SetNextWindowPos(prepos);
-			//}
-			//ImGui::ColorEdit4("##NodeEditorColor", glm::value_ptr(data.Value.Color), ImGuiColorEditFlags_NoInputs);
-			//ImGui::SetCursorPos(cpos);
-			//if (Input::IsKeyPressed(Key::A))
-			//prepos = ed::CanvasToScreen(ImGui::GetCurrentWindow()->DC.LastItemRect.GetBL() + ImVec2(-1, ImGui::GetStyle().ItemSpacing.y));//ed::CanvasToScreen();//ImGui::GetCurrentWindow()->DC.LastItemRect.GetBL();//ed::ScreenToCanvas(); //
-            if (spring) ImGui::Spring(0);
+
+            if (spring)
+            {
+                
+                // Code extracted and modified from ImGui ColorEdit4
+                ImGuiContext& g = *GImGui;
+                auto window = ImGui::GetCurrentWindow();
+                auto style = ImGui::GetStyle();
+                const float square_sz = ImGui::GetFrameHeight();
+                bool value_changed = false;
+
+                m_DefaultColorPickerValue = glm::value_ptr(data.Value.Color);
+				const ImVec4 col_v4(m_DefaultColorPickerValue[0], m_DefaultColorPickerValue[1], m_DefaultColorPickerValue[2], m_DefaultColorPickerValue[3]);
+				if (ImGui::ColorButton("##ColorButton", col_v4, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoTooltip))
+				{
+					// Store current color and open a picker
+				    g.ColorPickerRef = col_v4;
+					m_DefaultColorPickerPosition = ed::CanvasToScreen(window->DC.LastItemRect.GetBL() + ImVec2(-1, style.ItemSpacing.y));
+				}
+
+                if (spring) ImGui::Spring(0);
+            }
+            else
+                ImGui::ColorEdit4("##NodeEditorColor", glm::value_ptr(data.Value.Color), ImGuiColorEditFlags_NoInputs);
             break;
         }
         }
@@ -3777,17 +4079,29 @@ void NodeEditorInternal::CheckLinkSafety(Pin* startPin, Pin* endPin)
 			std::swap(startPin, endPin);
     }
 
-    for (auto& link : m_Links)
-    {
-        bool endPinCheck = false;
-        bool startPinCheck = false;
-        if (endPin != nullptr)
-            endPinCheck = (link.EndPinID == endPin->ID || link.StartPinID == endPin->ID) && endPin->Data.Type != PinType::Flow;
-        if (startPin != nullptr)
-            startPinCheck = (link.EndPinID == startPin->ID || link.StartPinID == startPin->ID) && /*endPin->Type*/startPin->Data.Type == PinType::Flow;
-        if (endPinCheck || startPinCheck)
-            ed::DeleteLink(link.ID);
-    }
+    for (auto& graph : m_Graphs)
+		for (auto& link : graph.Links)
+		{
+			bool endPinCheck = false;
+			bool startPinCheck = false;
+			if (endPin != nullptr)
+				endPinCheck = (link.EndPinID == endPin->ID || link.StartPinID == endPin->ID) && endPin->Data.Type != PinType::Flow;
+			if (startPin != nullptr)
+				startPinCheck = (link.EndPinID == startPin->ID || link.StartPinID == startPin->ID) && startPin->Data.Type == PinType::Flow;
+			if (endPinCheck || startPinCheck)
+				ed::DeleteLink(link.ID);
+		}
+}
+
+void NodeEditorInternal::CreateLink(NodeGraph& graph, Pin* a, Pin* b)
+{
+	if (a->Kind == PinKind::Input)
+		std::swap(a, b);
+
+    CheckLinkSafety(a, b);
+
+	graph.Links.emplace_back(GetNextLinkId(), a->ID, b->ID);
+	graph.Links.back().Color = GetIconColor(a->Data.Type);
 }
 
 void NodeEditorInternal::UpdateSearchData()
@@ -3939,24 +4253,13 @@ void NodeEditorInternal::AddSearchDataReference(std::string& name, std::string& 
         {
             bool found = false;
             for (auto& param : params)
-            {
-                spawnNodeFunction Function;
-                ConversionAvalible(&param, m_NewNodeLinkPin, Function);
-                if ((param.Data.Type == m_NewNodeLinkPin->Data.Type || Function != nullptr) && param.Kind != m_NewNodeLinkPin->Kind)
+                if ((param.Data.Type == m_NewNodeLinkPin->Data.Type || GetConversionAvalible(&param, m_NewNodeLinkPin)) && param.Kind != m_NewNodeLinkPin->Kind)
                     found = true;
-            }
             if (!found)
-            {
                 if (returnVal.Type == PinType::Void)
                     visible = false;
-                else
-                {
-                    spawnNodeFunction Function;
-                    ConversionAvalible(returnVal, m_NewNodeLinkPin->Data, Function);
-                    if ((returnVal.Type != m_NewNodeLinkPin->Data.Type && Function == nullptr) || m_NewNodeLinkPin->Kind == PinKind::Output)
+                else if ((returnVal.Type != m_NewNodeLinkPin->Data.Type && !GetConversionAvalible(returnVal, m_NewNodeLinkPin->Data)) || m_NewNodeLinkPin->Kind == PinKind::Output)
                         visible = false;
-                }
-            }
         }
 	}
 
@@ -3997,8 +4300,32 @@ void NodeEditorInternal::AddSearchDataReference(std::string& name, std::string& 
 	}
 }
 
+void NodeEditorInternal::ImplicitExecuteableLinks(NodeGraph& graph, Pin* startPin, Node* node)
+{
+    if (startPin->Data.Type != PinType::Flow)
+		for (auto& pin : (startPin->Kind == PinKind::Input ? startPin->Node->Inputs : startPin->Node->Outputs))
+			if (pin.Data.Type == PinType::Flow && !IsPinLinked(pin.ID))
+			{
+				for (auto& otherPin : startPin->Kind == PinKind::Input ? node->Outputs : node->Inputs)
+					if (otherPin.Data.Type == PinType::Flow && !IsPinLinked(otherPin.ID))
+					{
+                        CreateLink(graph, &pin, &otherPin);
+						break;
+					}
+				break;
+			}
+}
+
 void NodeEditorInternal::Application_Initialize()
 {
+    m_Graphs.emplace_back(GetNextId(), "Event Graph").Editable = false;
+    m_CurrentGraphID = m_Graphs.back().ID;
+    m_Graphs.emplace_back(GetNextId(), "Construction Script");
+
+    OpenGraph(m_CurrentGraphID);
+    OpenGraph(m_Graphs.back().ID);
+
+    //ed::SetCurrentEditor(m_Graphs[0].InternalEditor);
 
     //ed::EnableShortcuts(true);
 
@@ -4047,14 +4374,11 @@ void NodeEditorInternal::Application_Initialize()
 	m_BranchIcon = Dymatic::Texture2D::Create("src/Panels/NodeEditor/data/NodeBranch.png");
 	m_SwitchIcon = Dymatic::Texture2D::Create("src/Panels/NodeEditor/data/NodeSwitch.png");
 
-    m_Editor = ed::CreateEditor(&config);
-	ed::SetCurrentEditor(m_Editor);
-
     // Initial Node Loading
 	{
 		Node* node;
-		node = SpawnOnCreateNode({}); ed::SetNodePosition(node->ID, ImVec2(0, -100)); node->CommentEnabled = true; node->CommentPinned = true; node->Comment = "Executed when script starts.";
-		node = SpawnOnUpdateNode({}); ed::SetNodePosition(node->ID, ImVec2(0, 100)); node->CommentEnabled = true; node->CommentPinned = true; node->Comment = "Executed every frame and provides delta time.";
+        node = SpawnOnCreateNode({}); SetNodePosition(node->ID, { 0.0f, -100.0f }); node->CommentEnabled = true; node->CommentPinned = true; node->Comment = "Executed when script starts.";
+		node = SpawnOnUpdateNode({}); SetNodePosition(node->ID, { 0.0f,  100.0f }); node->CommentEnabled = true; node->CommentPinned = true; node->Comment = "Executed every frame and provides delta time.";
 	}
     
 	BuildNodes();
@@ -4066,9 +4390,7 @@ void NodeEditorInternal::Application_Initialize()
     m_Variables.emplace_back(Variable(GetNextId(), "Test Int", PinType::Int));
     m_Variables.back().Data.Value.Int = 12;
 
-    ed::NavigateToContent();
-
-	//auto& io = ImGui::GetIO();
+    NavigateToContent();
 }
 
 Dymatic::NodeEditorPannel::NodeEditorPannel()
@@ -4137,13 +4459,6 @@ void NodeEditorInternal::Application_Finalize()
 			id = nullptr;
 		}
 	};
-
-	//TODO add releasing of textures
-	if (m_Editor)
-	{
-		ed::DestroyEditor(m_Editor);
-		m_Editor = nullptr;
-	}
 }
 
 void NodeEditorInternal::OnImGuiRender()
@@ -4166,9 +4481,9 @@ void NodeEditorInternal::OnImGuiRender()
     	ImGuiStyle& style = ImGui::GetStyle();
     	float minWinSizeX = style.WindowMinSize.x;
     	style.WindowMinSize.x = 150.0f;
+    	ImGuiID dockspace_id = ImGui::GetID("Node DockSpace");
     	if (io.ConfigFlags & ImGuiConfigFlags_DockingEnable)
     	{
-    		ImGuiID dockspace_id = ImGui::GetID("Node DockSpace");
     		ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), dockspace_flags, &windowClass);
     	}
         style.WindowMinSize.x = minWinSizeX;
@@ -4186,1367 +4501,1413 @@ void NodeEditorInternal::OnImGuiRender()
 		{
             ImGui::MenuItem("Hide Unconnected Pins", "", &m_HideUnconnected);
             ImGui::Separator();
-			if (ImGui::MenuItem("Zoom to Content"))
-				ed::NavigateToContent();
-			if (ImGui::MenuItem("Show Flow"))
-			{
-				for (auto& link : m_Links)
-					ed::Flow(link.ID);
-			}
+            if (ImGui::MenuItem("Zoom to Content"))
+                NavigateToContent();
+            if (ImGui::MenuItem("Show Flow"))
+                ShowFlow();
 			ImGui::EndMenu();
 		}
     	ImGui::EndMenuBar();
         ImGui::End();
         
-    	ImGui::SetNextWindowClass(&windowClass);
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2());
-    	ImGui::Begin("Node Graph", NULL, ImGuiWindowFlags_NoNavFocus);
-        ImGui::PopStyleVar();
-    	UpdateTouch();
-    
-    	std::vector<ed::NodeId> selectedNodes;
-    	std::vector<ed::LinkId> selectedLinks;
-    	selectedNodes.resize(ed::GetSelectedObjectCount());
-    	selectedLinks.resize(ed::GetSelectedObjectCount());
-    
-    	int nodeCount = ed::GetSelectedNodes(selectedNodes.data(), static_cast<int>(selectedNodes.size()));
-    	int linkCount = ed::GetSelectedLinks(selectedLinks.data(), static_cast<int>(selectedLinks.size()));
-    
-    	selectedNodes.resize(nodeCount);
-    	selectedLinks.resize(linkCount);
-    
-    	ed::SetCurrentEditor(m_Editor);
+        for (size_t i = 0; i < m_Windows.size(); i++)
+        {
+            auto& window = m_Windows[i];
+            auto p_graph = FindGraphByID(window.GraphID);
+            if (p_graph != nullptr)
+            {
+                auto& graph = *p_graph;
+
+                ImGui::PushID(window.ID);
+
+				// Update Internal Editor for Each node graph
+				ed::SetCurrentEditor(window.InternalEditor);
+
+                if (!window.Initialized)
+                {
+                    window.Initialized = true;
+
+                    auto center_id = ImGui::DockBuilderGetCentralNode(dockspace_id)->ID;
+                    ImGui::DockBuilderDockWindow((graph.Name + "###GraphWindow" + std::to_string(window.ID)).c_str(), center_id);
+                }
+
+    	        ImGui::SetNextWindowClass(&windowClass);
+                ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2());
+                bool open = true;
+                if (window.Focused)
+                {
+                    ImGui::SetNextWindowFocus();
+                    window.Focused = false;
+                }
+    	        bool windowVisible = ImGui::Begin((graph.Name + "###GraphWindow" + std::to_string(window.ID)).c_str(), &open, ImGuiWindowFlags_NoNavFocus);
+                ImGui::PopStyleVar();
+    	        UpdateTouch();
+
+                if (ImGui::IsWindowFocused())
+                {
+                    m_CurrentGraphID = graph.ID;
+                    m_CurrentWindowID = window.ID;
+                }
     
 # if 0
-    	{
-    	    for (auto x = -io.DisplaySize.y; x < io.DisplaySize.x; x += 10.0f)
-    	    {
-    	        ImGui::GetWindowDrawList()->AddLine(ImVec2(x, 0), ImVec2(x + io.DisplaySize.y, io.DisplaySize.y),
-    	            IM_COL32(255, 255, 0, 255));
-    	    }
-    	}
+    	        {
+    	            for (auto x = -io.DisplaySize.y; x < io.DisplaySize.x; x += 10.0f)
+    	            {
+    	                ImGui::GetWindowDrawList()->AddLine(ImVec2(x, 0), ImVec2(x + io.DisplaySize.y, io.DisplaySize.y),
+    	                    IM_COL32(255, 255, 0, 255));
+    	            }
+    	        }
 # endif
 
-		auto var = GetVariableById(m_SelectedVariable);
-		if (var != nullptr)
-		{
-			const ImGuiID id = ImGui::GetID("##AddVariablePopup");
-			if (m_OpenVarPopup) { ImGui::OpenPopupEx(id, ImGuiPopupFlags_None); m_OpenVarPopup = false; }
+				
+				//{
+				//	const ImGuiID id = ImGui::GetID("##AddVariablePopup");
+				//	if (m_OpenVarPopup) { ImGui::OpenPopupEx(id, ImGuiPopupFlags_None); m_OpenVarPopup = false; }
+				//
+				//	if (ImGui::BeginPopupEx(id, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoSavedSettings))
+				//	{
+				//		ImGui::SetWindowPos(ImVec2(Dymatic::Input::GetMousePosition().x, Dymatic::Input::GetMousePosition().y), ImGuiCond_Appearing);
+				//		ImGui::TextDisabled(var->Name.c_str());
+				//		ImGui::Separator();
+				//        if (ImGui::MenuItem(("Get " + var->Name).c_str(), "Ctrl")) 
+				//        { SpawnNodeData spawnData = { var->ID }; spawnData.GraphID = window.GraphID; SetNodePosition(NodeEditorInternal::SpawnGetVariableNode(spawnData)->ID, ed::ScreenToCanvas(ImGui::GetMousePos())); }
+				//        else if (ImGui::MenuItem(("Set " + var->Name).c_str(), "Alt")) 
+				//        { SpawnNodeData spawnData = { var->ID }; spawnData.GraphID = window.GraphID; SetNodePosition(NodeEditorInternal::SpawnSetVariableNode(spawnData)->ID, ed::ScreenToCanvas(ImGui::GetMousePos())); }
+				//		ImGui::EndPopup();
+				//	}
+				//	else m_OpenVarPopup = false;
+				//}
 
-			if (ImGui::BeginPopupEx(id, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoSavedSettings))
-			{
-				ImGui::SetWindowPos(ImVec2(Dymatic::Input::GetMousePosition().x, Dymatic::Input::GetMousePosition().y), ImGuiCond_Appearing);
-				ImGui::TextDisabled(var->Name.c_str());
-				ImGui::Separator();
-                if (ImGui::MenuItem(("Get " + var->Name).c_str(), "Ctrl")) { NodeEditorInternal::SpawnGetVariableNode({ var->ID }); m_ResetBackNode = true; }
-                else if (ImGui::MenuItem(("Set " + var->Name).c_str(), "Alt")) { NodeEditorInternal::SpawnSetVariableNode({ var->ID }); m_ResetBackNode = true; }
-				ImGui::EndPopup();
-			}
-			else m_OpenVarPopup = false;
-		}
-        
-        ed::Begin("Node Editor Panel");
-        {
-            auto cursorTopLeft = ImGui::GetCursorScreenPos();
-        
-            util::BlueprintNodeBuilder builder(reinterpret_cast<void*>(m_HeaderBackground->GetRendererID()), m_HeaderBackground->GetWidth(), m_HeaderBackground->GetHeight());
-
-            // Drag Drop Target
-			if (ImGui::BeginDragDropTarget())
-			{
-				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("NODE_EDITOR_VARIABLE"))
-				{
-					int index = *(int*)payload->Data;
-                    m_SelectedVariable = m_Variables[index].ID;
-
-					if (io.KeyCtrl)
-					{
-						SpawnGetVariableNode({ m_Variables[index].ID });
-						ed::SetNodePosition(m_Nodes.back().ID, ImGui::GetMousePos());
-                        BuildNodes();
-					}
-					else if (io.KeyAlt)
-					{
-						SpawnSetVariableNode({ m_Variables[index].ID });
-						ed::SetNodePosition(m_Nodes.back().ID, ImGui::GetMousePos());
-                        BuildNodes();
-					}
-					else
-					{
-                        m_OpenVarPopup = true;
-					}
-				}
-				ImGui::EndDragDropTarget();
-			}
-
-            if (m_ResetBackNode)
-            {
-                ed::SetNodePosition(m_Nodes.back().ID, ImGui::GetMousePos());
-                BuildNodes();
-                m_ResetBackNode = false;
-            }
-        
-            for (auto& node : m_Nodes)
-            {
-                if (node.Type != NodeType::Blueprint && node.Type != NodeType::Simple)
-                    continue;
-        
-                Variable* payloadVariable = nullptr;
-                Pin* payloadPin = nullptr;
-
-                const auto isSimple = node.Type == NodeType::Simple;
-        
-                bool hasOutputDelegates = false;
-                for (auto& output : node.Outputs)
-                    if (output.Data.Type == PinType::Delegate)
-                        hasOutputDelegates = true;
-
-                builder.Begin(node.ID);
-                    if (!isSimple)
+                if (windowVisible)
+                {
+                    ed::Begin(("Node Editor Panel" + std::to_string(window.ID)).c_str());
                     {
-                        builder.Header(node.Color);
-                            ImGui::Spring(0);
+                        auto cursorTopLeft = ImGui::GetCursorScreenPos();
+                    
+                        util::BlueprintNodeBuilder builder(reinterpret_cast<void*>(m_HeaderBackground->GetRendererID()), m_HeaderBackground->GetWidth(), m_HeaderBackground->GetHeight());
 
-                            if (node.Icon != nullptr)
-                                ImGui::Image((ImTextureID)node.Icon->GetRendererID(), ImVec2(ImGui::GetTextLineHeight() * 1.25f, ImGui::GetTextLineHeight() * 1.25f), { 0, 1 }, { 1, 0 }, node.IconColor);
+                        // Drag Drop Target
+                        const ImGuiID id = ImGui::GetID("##AddVariablePopup");
+		            	if (ImGui::BeginDragDropTarget())
+		            	{
+		            		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("NODE_EDITOR_VARIABLE"))
+		            		{
+		            			int index = *(int*)payload->Data;
+                                m_SelectedVariable = m_Variables[index].ID;
 
-                            ImGui::TextUnformatted((node.DisplayName == "" ? node.Name : node.DisplayName).c_str());
-                            ImGui::Spring(1);
-                            ImGui::Dummy(ImVec2(0, 28));
-                            if (hasOutputDelegates)
-                            {
-                                ImGui::BeginVertical("delegates", ImVec2(0, 28));
-                                ImGui::Spring(1, 0);
-                                for (auto& output : node.Outputs)
-                                {
-                                    if (output.Data.Type != PinType::Delegate)
-                                        continue;
-        
-                                    auto alpha = ImGui::GetStyle().Alpha;
-                                    if (m_NewLinkPin && !CanCreateLink(m_NewLinkPin, &output) && &output != m_NewLinkPin)
-                                        alpha = alpha * (48.0f / 255.0f);
-        
-                                    ed::BeginPin(output.ID, ed::PinKind::Output);
-                                    ed::PinPivotAlignment(ImVec2(1.0f, 0.5f));
-                                    ed::PinPivotSize(ImVec2(0, 0));
-                                    ImGui::BeginHorizontal(output.ID.AsPointer());
-                                    ImGui::PushStyleVar(ImGuiStyleVar_Alpha, alpha);
-                                    if (!output.Name.empty())
-                                    {
-                                        ImGui::TextUnformatted(output.Name.c_str());
-                                        ImGui::Spring(0);
-                                    }
-                                    DrawPinIcon(output.Data, IsPinLinked(output.ID), (int)(alpha * 255));
-                                    ImGui::Spring(0, ImGui::GetStyle().ItemSpacing.x / 2);
-                                    ImGui::EndHorizontal();
-                                    ImGui::PopStyleVar();
-                                    ed::EndPin();
-        
-                                    //DrawItemRect(ImColor(255, 0, 0));
-                                }
-                                ImGui::Spring(1, 0);
-                                ImGui::EndVertical();
-                                ImGui::Spring(0, ImGui::GetStyle().ItemSpacing.x / 2);
-                            }
-                            else
-                                ImGui::Spring(0);
-                        builder.EndHeader();
-                    }
-        
-                    for (auto& input : node.Inputs)
-                    {
-                        if (!m_HideUnconnected || IsPinLinked(input.ID))
-                        {
-                            auto alpha = ImGui::GetStyle().Alpha;
-                            if (m_NewLinkPin && !CanCreateLink(m_NewLinkPin, &input) && &input != m_NewLinkPin)
-                                alpha = alpha * (48.0f / 255.0f);
-
-                            builder.Input(input.ID);
-                            ImGui::PushStyleVar(ImGuiStyleVar_Alpha, alpha);
-                            DrawPinIcon(input.Data, IsPinLinked(input.ID), (int)(alpha * 255));
-                            ImGui::Spring(0);
-                            if (!input.Name.empty())
-                            {
-                                ImGui::TextUnformatted(input.Name.c_str());
-                                ImGui::Spring(0);
-                            }
-
-                            if (!IsPinLinked(input.ID))
-                            {
-                                ImGui::PushID(input.ID.Get());
-                                DefaultValueInput(input.Data, true);
-                                ImGui::PopID();
-                            }
-                            ImGui::PopStyleVar();
-                            builder.EndInput();
-
-                            if (ImGui::IsItemHovered() && ImGui::IsMouseDown(0))
-                                m_CurrentLinkColor = GetIconColor(input.Data.Type);
-
-                            // Drag Drop Variable Inputs
-                            if (ImGui::BeginDragDropTarget())
-                            {
-                                auto payload = ImGui::GetDragDropPayload();
-                                if (strcmp(payload->DataType, "NODE_EDITOR_VARIABLE") == 0)
-                                    if (m_Variables[*(int*)payload->Data].Data.Type == input.Data.Type || input.Data.Type == PinType::Flow)
-                                        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("NODE_EDITOR_VARIABLE"))
-                                        {
-                                            payloadVariable = &m_Variables[*(int*)payload->Data];
-                                            payloadPin = &input;
-                                        }
-                                ImGui::EndDragDropTarget();
-                            }
-                        }
-                    }
-        
-                    if (isSimple)
-                    {
-                        builder.Middle();
-        
-                        ImGui::Spring(1, 0);
-                        ImGui::TextUnformatted((node.DisplayName == "" ? node.Name : node.DisplayName).c_str());
-                        ImGui::Spring(1, 0);
-                    }
-        
-                    for (auto& output : node.Outputs)
-					{
-                        if (!m_HideUnconnected || IsPinLinked(output.ID))
-                        {
-                            if (!isSimple && output.Data.Type == PinType::Delegate)
-                                continue;
-
-                            auto alpha = ImGui::GetStyle().Alpha;
-                            if (m_NewLinkPin && !CanCreateLink(m_NewLinkPin, &output) && &output != m_NewLinkPin)
-                                alpha = alpha * (48.0f / 255.0f);
-
-                            ImGui::PushStyleVar(ImGuiStyleVar_Alpha, alpha);
-                            builder.Output(output.ID);
-                            if (!output.Name.empty())
-                            {
-                                ImGui::Spring(0);
-                                ImGui::TextUnformatted(output.Name.c_str());
-                            }
-                            ImGui::Spring(0);
-                            DrawPinIcon(output.Data, IsPinLinked(output.ID), (int)(alpha * 255));
-                            ImGui::PopStyleVar();
-                            builder.EndOutput();
-
-                            if (ImGui::IsItemHovered() && ImGui::IsMouseDown(0))
-                                m_CurrentLinkColor = GetIconColor(output.Data.Type);
-
-                            // Drag Drop Variable Outputs
-                            if (ImGui::BeginDragDropTarget())
-                            {
-                                auto payload = ImGui::GetDragDropPayload();
-                                if (strcmp(payload->DataType, "NODE_EDITOR_VARIABLE") == 0)
-                                    if (m_Variables[*(int*)payload->Data].Data.Type == output.Data.Type || output.Data.Type == PinType::Flow)
-                                        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("NODE_EDITOR_VARIABLE"))
-                                        {
-                                            payloadVariable = &m_Variables[*(int*)payload->Data];
-                                            payloadPin = &output;
-                                        }
-                                ImGui::EndDragDropTarget();
-                            }
-                        }
-                    }
-        
-    				if (node.AddOutputs || node.AddInputs)
-    				{
-                        ImGui::Spring(0);
-        
-    					ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{ 0.0f, 0.0f, 0.0f, 0.0f });
-    					ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4{ 0.0f, 0.0f, 0.0f, 0.0f });
-    					ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4{ 0.0f, 0.0f, 0.0f, 0.0f });
-    					bool newPin = ImGui::Button("Add Pin +");
-    					ImGui::PopStyleColor(3);
-                        
-                        if (newPin)
-                        {
-                            if (node.AddOutputs)
-                            {
-                                std::string pinName = "0";
-                                if (!node.Outputs.empty())
-                                    pinName = std::to_string((int)std::stof(node.Outputs[node.Outputs.size() - 1].Name) + 1);
-                                node.Outputs.emplace_back(GetNextId(), pinName.c_str(), PinType::Flow);
-                                node.Outputs.back().Deletable = true;
-                            }
-                            else if (node.AddInputs)
-                            {
-                                node.Inputs.emplace_back(GetNextId(), "", node.Inputs.back().Data.Type).Deletable = true;
-                            }
-
-                            BuildNode(&node);
-                        }
-    				}    
-
-                    // Error Message
-                    if (node.Error)
-					{
-                        auto& nodePos = ed::GetNodePosition(node.ID);
-                        auto& nodeSize = ed::GetNodeSize(node.ID);
-                        auto fontSize = ImGui::GetFontSize();
-
-                        ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(nodePos.x + 2.5f, nodePos.y + nodeSize.y - fontSize), ImVec2(nodePos.x + 2.5f, nodePos.y + nodeSize.y) + ImVec2(nodeSize.x - 5.0f, 0.0f), ImColor(255, 0, 0), 5.0f);
-                        ImGui::GetWindowDrawList()->AddText(ImVec2(nodePos.x + (nodeSize.x - ImGui::CalcTextSize("ERROR!").x) * 0.5f, nodePos.y + nodeSize.y - fontSize), ImColor(255, 255, 255), "ERROR!");
-                    }
-
-                builder.End();
-
-                // Drawing shadows beneath nodes
-				auto& pos = ed::GetNodePosition(node.ID) - ImVec2(10.0f, 10.0f);
-				auto& size = ed::GetNodeSize(node.ID) + ImVec2(20.0f, 20.0f);
-				auto drawList = ImGui::GetWindowDrawList();
-
-				const int vert_start_idx = drawList->VtxBuffer.Size;
-				drawList->AddRect(pos, pos + size, ImColor(0, 0, 0, 75), ed::GetStyle().NodeRounding + 5.0f, 15, 20.0f);
-				const int vert_end_idx = drawList->VtxBuffer.Size;
-				ImDrawVert* vert_start = drawList->VtxBuffer.Data + vert_start_idx;
-				ImDrawVert* vert_end = drawList->VtxBuffer.Data + vert_end_idx;
-				for (ImDrawVert* vert = vert_start; vert < vert_end; vert++)
-					if (vert->pos.x < pos.x || vert->pos.y < pos.y || vert->pos.x > pos.x + size.x || vert->pos.y > pos.y + size.y || (pos.y + size.y - vert->pos.y) > size.y * 0.5f)
-						vert->col = ImGui::ColorConvertFloat4ToU32(ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
-
-                // Comments for Blueprint Nodes (Based off code for comments)
-                ImGui::PushID(node.ID.AsPointer());
-                if (node.CommentEnabled)
-				{
-
-					auto bgAlpha = static_cast<int>(ImGui::GetStyle().Alpha * 255);
-
-					auto zoom = node.CommentPinned ? ed::GetCurrentZoom() : 1.0f;
-					auto padding = ImVec2(2.5f, 2.5f);
-
-                    auto min = ed::GetNodePosition(node.ID) - ImVec2(0, padding.y * zoom * 2.0f);
-
-                    auto originalScale = ImGui::GetFont()->Scale;
-                    ImGui::GetFont()->Scale = zoom;
-                    ImGui::PushFont(ImGui::GetFont());
-
-					ImGui::SetCursorScreenPos(min - ImVec2(-8, ImGui::GetTextLineHeightWithSpacing() + 4));
-					ImGui::BeginGroup();
-					//ImGui::TextUnformatted(node.Comment.c_str());
-
-					char buffer[256];
-					memset(buffer, 0, sizeof(buffer));
-					std::strncpy(buffer, node.Comment.c_str(), sizeof(buffer));
-                    bool input, clicked = ImGui::SelectableInput("##NodeComment", node.Comment.empty() ? 1.0f : ImGui::CalcTextSize(buffer).x, false, NULL, buffer, sizeof(buffer), input, ImGuiInputTextFlags_NoHorizontalScroll);
-                    if (input) node.Comment = std::string(buffer);
-
-                    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4());
-                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
-					ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4());
-					ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 5.0f * zoom);
-
-                    ImGui::SameLine();
-                    if (ImGui::ImageButton((ImTextureID)(node.CommentPinned ? m_PinnedIcon : m_PinIcon)->GetRendererID(), ImVec2(15.0f, 15.0f) * zoom, { 0, 1 }, {1, 0}, 2 * zoom)) node.CommentPinned = !node.CommentPinned;
-                    ImGui::SameLine();
-                    if (ImGui::ImageButton((ImTextureID)m_CommentIcon->GetRendererID(), ImVec2(15.0f, 15.0f) * zoom, { 0, 1 }, { 1, 0 }, 2 * zoom)) node.CommentEnabled = false;
-
-                    ImGui::PopStyleVar();
-                    ImGui::PopStyleColor(3);
-
-					ImGui::EndGroup();
-
-                    ImGui::GetFont()->Scale = originalScale;
-                    ImGui::PopFont();
-
-                    auto drawList = ImGui::GetWindowDrawList();
-
-					auto hintBounds = ImGui_GetItemRect();
-					auto hintFrameBounds = ImRect_Expanded(hintBounds, 8, 4);
-
-					drawList->AddRectFilled(
-						hintFrameBounds.GetTL() - padding * zoom,
-                        hintFrameBounds.GetBR() + padding * zoom,//hintFrameBounds.GetTL() + (hintFrameBounds.GetSize() * ed::GetCurrentZoom()),
-						IM_COL32(255, 255, 255, 64 * bgAlpha / 255), 4.0f * zoom);
-
-					drawList->AddRect(
-						hintFrameBounds.GetTL() - padding * zoom,
-						hintFrameBounds.GetBR() + padding * zoom,//hintFrameBounds.GetTL() + (hintFrameBounds.GetSize() * ed::GetCurrentZoom()),
-						IM_COL32(255, 255, 255, 128 * bgAlpha / 255), 4.0f * zoom, ImDrawCornerFlags_All, zoom);
-				}
-                else if (ImGui::IsItemHovered() || node.Opacity > -1.0f)
-                {
-					auto zoom = node.CommentPinned ? ed::GetCurrentZoom() : 1.0f;
-					auto padding = ImVec2(2.5f, 2.5f);
-
-                    auto min = ed::GetNodePosition(node.ID) - ImVec2(0, padding.y * zoom * 2.0f);
-
-                    bool nodeHovered = ImGui::IsItemHovered();
-
-                    ImGui::SetCursorScreenPos(min - ImVec2(-8, ImGui::GetTextLineHeightWithSpacing() + 4));
-                    ImGui::PushStyleVar(ImGuiStyleVar_Alpha, node.Opacity);
-                    if (ImGui::ImageButton((ImTextureID)m_CommentIcon->GetRendererID(), ImVec2(15.0f, 15.0f) * zoom, { 0, 1 }, { 1, 0 }, 2 * zoom)) { node.Opacity = -2.5f; node.CommentEnabled = true; }
-                    ImGui::PopStyleVar();
-
-					if (ImGui::IsItemHovered() || nodeHovered)
-						node.Opacity = std::min(node.Opacity + 0.1f, 1.0f);
-					else
-						node.Opacity = std::max(node.Opacity - 0.1f, -2.5f);
-                }
-                else if (node.Opacity > -2.5f)
-                    node.Opacity = std::max(node.Opacity - 0.1f, -2.5f);
-
-                ImGui::PopID();
-
-                if (payloadVariable != nullptr)
-                {
-                    auto pinId = payloadPin->ID;
-                    auto nodeId = node.ID;
-
-                    CheckLinkSafety(nullptr, payloadPin);
-
-                    if (payloadPin->Kind == PinKind::Output || payloadPin->Data.Type == PinType::Flow)
-                        SpawnSetVariableNode({ payloadVariable->ID });
-                    else
-                        SpawnGetVariableNode({ payloadVariable->ID });
-
-                    ed::SetNodePosition(m_Nodes.back().ID, ImVec2(ed::GetNodePosition(nodeId).x + (payloadPin->Kind == PinKind::Input ? -250.0f : 250.0f), ImGui::GetMousePos().y));
-					m_Links.emplace_back(Link(GetNextLinkId(), (payloadPin->Kind == PinKind::Input ? (m_Nodes.back().Outputs[0]) : (m_Nodes.back().Inputs[payloadPin->Data.Type == PinType::Flow ? 0 : 1])).ID, pinId));
-					m_Links.back().Color = GetIconColor(payloadPin->Data.Type);
-
-                    BuildNodes();
-                }
-            }
-
-        
-            for (auto& node : m_Nodes)
-            {
-                if (node.Type != NodeType::Tree)
-                    continue;
-        
-                const float rounding = 5.0f;
-                const float padding  = 12.0f;
-        
-                const auto pinBackground = ed::GetStyle().Colors[ed::StyleColor_NodeBg];
-        
-                ed::PushStyleColor(ed::StyleColor_NodeBg,        ImColor(128, 128, 128, 200));
-                ed::PushStyleColor(ed::StyleColor_NodeBorder,    ImColor( 32,  32,  32, 200));
-                ed::PushStyleColor(ed::StyleColor_PinRect,       ImColor( 60, 180, 255, 150));
-                ed::PushStyleColor(ed::StyleColor_PinRectBorder, ImColor( 60, 180, 255, 150));
-        
-                ed::PushStyleVar(ed::StyleVar_NodePadding,  ImVec4(0, 0, 0, 0));
-                ed::PushStyleVar(ed::StyleVar_NodeRounding, rounding);
-                ed::PushStyleVar(ed::StyleVar_SourceDirection, ImVec2(0.0f,  1.0f));
-                ed::PushStyleVar(ed::StyleVar_TargetDirection, ImVec2(0.0f, -1.0f));
-                ed::PushStyleVar(ed::StyleVar_LinkStrength, 0.0f);
-                ed::PushStyleVar(ed::StyleVar_PinBorderWidth, 1.0f);
-                ed::PushStyleVar(ed::StyleVar_PinRadius, 5.0f);
-                ed::BeginNode(node.ID);
-        
-                ImGui::BeginVertical(node.ID.AsPointer());
-                ImGui::BeginHorizontal("inputs");
-                ImGui::Spring(0, padding * 2);
-        
-                ImRect inputsRect;
-                int inputAlpha = 200;
-                if (!node.Inputs.empty())
-                {
-                        auto& pin = node.Inputs[0];
-                        ImGui::Dummy(ImVec2(0, padding));
-                        ImGui::Spring(1, 0);
-                        inputsRect = ImGui_GetItemRect();
-        
-                        ed::PushStyleVar(ed::StyleVar_PinArrowSize, 10.0f);
-                        ed::PushStyleVar(ed::StyleVar_PinArrowWidth, 10.0f);
-                        ed::PushStyleVar(ed::StyleVar_PinCorners, 12);
-                        ed::BeginPin(pin.ID, ed::PinKind::Input);
-                        ed::PinPivotRect(inputsRect.GetTL(), inputsRect.GetBR());
-                        ed::PinRect(inputsRect.GetTL(), inputsRect.GetBR());
-                        ed::EndPin();
-                        ed::PopStyleVar(3);
-        
-                        if (m_NewLinkPin && !CanCreateLink(m_NewLinkPin, &pin) && &pin != m_NewLinkPin)
-                            inputAlpha = (int)(255 * ImGui::GetStyle().Alpha * (48.0f / 255.0f));
-                }
-                else
-                    ImGui::Dummy(ImVec2(0, padding));
-        
-                ImGui::Spring(0, padding * 2);
-                ImGui::EndHorizontal();
-        
-                ImGui::BeginHorizontal("content_frame");
-                ImGui::Spring(1, padding);
-        
-                ImGui::BeginVertical("content", ImVec2(0.0f, 0.0f));
-                ImGui::Dummy(ImVec2(160, 0));
-                ImGui::Spring(1);
-                ImGui::TextUnformatted(node.Name.c_str());
-                ImGui::Spring(1);
-                ImGui::EndVertical();
-                auto contentRect = ImGui_GetItemRect();
-        
-                ImGui::Spring(1, padding);
-                ImGui::EndHorizontal();
-        
-                ImGui::BeginHorizontal("outputs");
-                ImGui::Spring(0, padding * 2);
-        
-                ImRect outputsRect;
-                int outputAlpha = 200;
-                if (!node.Outputs.empty())
-                {
-                    auto& pin = node.Outputs[0];
-                    ImGui::Dummy(ImVec2(0, padding));
-                    ImGui::Spring(1, 0);
-                    outputsRect = ImGui_GetItemRect();
-        
-                    ed::PushStyleVar(ed::StyleVar_PinCorners, 3);
-                    ed::BeginPin(pin.ID, ed::PinKind::Output);
-                    ed::PinPivotRect(outputsRect.GetTL(), outputsRect.GetBR());
-                    ed::PinRect(outputsRect.GetTL(), outputsRect.GetBR());
-                    ed::EndPin();
-                    ed::PopStyleVar();
-        
-                    if (m_NewLinkPin && !CanCreateLink(m_NewLinkPin, &pin) && &pin != m_NewLinkPin)
-                        outputAlpha = (int)(255 * ImGui::GetStyle().Alpha * (48.0f / 255.0f));
-                }
-                else
-                    ImGui::Dummy(ImVec2(0, padding));
-        
-                ImGui::Spring(0, padding * 2);
-                ImGui::EndHorizontal();
-        
-                ImGui::EndVertical();
-        
-                ed::EndNode();
-                ed::PopStyleVar(7);
-                ed::PopStyleColor(4);
-        
-                auto drawList = ed::GetNodeBackgroundDrawList(node.ID);
-        
-                //const auto fringeScale = ImGui::GetStyle().AntiAliasFringeScale;
-                //const auto unitSize    = 1.0f / fringeScale;
-        
-                //const auto ImDrawList_AddRect = [](ImDrawList* drawList, const ImVec2& a, const ImVec2& b, ImU32 col, float rounding, int rounding_corners, float thickness)
-                //{
-                //    if ((col >> 24) == 0)
-                //        return;
-                //    drawList->PathRect(a, b, rounding, rounding_corners);
-                //    drawList->PathStroke(col, true, thickness);
-                //};
-        
-                drawList->AddRectFilled(inputsRect.GetTL() + ImVec2(0, 1), inputsRect.GetBR(),
-                    IM_COL32((int)(255 * pinBackground.x), (int)(255 * pinBackground.y), (int)(255 * pinBackground.z), inputAlpha), 4.0f, 12);
-                //ImGui::PushStyleVar(ImGuiStyleVar_AntiAliasFringeScale, 1.0f);
-                drawList->AddRect(inputsRect.GetTL() + ImVec2(0, 1), inputsRect.GetBR(),
-                    IM_COL32((int)(255 * pinBackground.x), (int)(255 * pinBackground.y), (int)(255 * pinBackground.z), inputAlpha), 4.0f, 12);
-                //ImGui::PopStyleVar();
-                drawList->AddRectFilled(outputsRect.GetTL(), outputsRect.GetBR() - ImVec2(0, 1),
-                    IM_COL32((int)(255 * pinBackground.x), (int)(255 * pinBackground.y), (int)(255 * pinBackground.z), outputAlpha), 4.0f, 3);
-                //ImGui::PushStyleVar(ImGuiStyleVar_AntiAliasFringeScale, 1.0f);
-                drawList->AddRect(outputsRect.GetTL(), outputsRect.GetBR() - ImVec2(0, 1),
-                    IM_COL32((int)(255 * pinBackground.x), (int)(255 * pinBackground.y), (int)(255 * pinBackground.z), outputAlpha), 4.0f, 3);
-                //ImGui::PopStyleVar();
-                drawList->AddRectFilled(contentRect.GetTL(), contentRect.GetBR(), IM_COL32(24, 64, 128, 200), 0.0f);
-                //ImGui::PushStyleVar(ImGuiStyleVar_AntiAliasFringeScale, 1.0f);
-                drawList->AddRect(
-                    contentRect.GetTL(),
-                    contentRect.GetBR(),
-                    IM_COL32(48, 128, 255, 100), 0.0f);
-                //ImGui::PopStyleVar();
-            }
-        
-            for (auto& node : m_Nodes)
-            {
-                if (node.Type != NodeType::Houdini)
-                    continue;
-        
-                const float rounding = 10.0f;
-                const float padding  = 12.0f;
-        
-                ed::PushStyleColor(ed::StyleColor_NodeBg,        ImColor(229, 229, 229, 200));
-                ed::PushStyleColor(ed::StyleColor_NodeBorder,    ImColor(125, 125, 125, 200));
-                ed::PushStyleColor(ed::StyleColor_PinRect,       ImColor(229, 229, 229, 60));
-                ed::PushStyleColor(ed::StyleColor_PinRectBorder, ImColor(125, 125, 125, 60));
-        
-                const auto pinBackground = ed::GetStyle().Colors[ed::StyleColor_NodeBg];
-        
-                ed::PushStyleVar(ed::StyleVar_NodePadding,  ImVec4(0, 0, 0, 0));
-                ed::PushStyleVar(ed::StyleVar_NodeRounding, rounding);
-                ed::PushStyleVar(ed::StyleVar_SourceDirection, ImVec2(0.0f,  1.0f));
-                ed::PushStyleVar(ed::StyleVar_TargetDirection, ImVec2(0.0f, -1.0f));
-                ed::PushStyleVar(ed::StyleVar_LinkStrength, 0.0f);
-                ed::PushStyleVar(ed::StyleVar_PinBorderWidth, 1.0f);
-                ed::PushStyleVar(ed::StyleVar_PinRadius, 6.0f);
-                ed::BeginNode(node.ID);
-        
-                ImGui::BeginVertical(node.ID.AsPointer());
-                if (!node.Inputs.empty())
-                {
-                    ImGui::BeginHorizontal("inputs");
-                    ImGui::Spring(1, 0);
-        
-                    ImRect inputsRect;
-                    int inputAlpha = 200;
-                    for (auto& pin : node.Inputs)
-                    {
-                        ImGui::Dummy(ImVec2(padding, padding));
-                        inputsRect = ImGui_GetItemRect();
-                        ImGui::Spring(1, 0);
-                        inputsRect.Min.y -= padding;
-                        inputsRect.Max.y -= padding;
-        
-                        //ed::PushStyleVar(ed::StyleVar_PinArrowSize, 10.0f);
-                        //ed::PushStyleVar(ed::StyleVar_PinArrowWidth, 10.0f);
-                        ed::PushStyleVar(ed::StyleVar_PinCorners, 15);
-                        ed::BeginPin(pin.ID, ed::PinKind::Input);
-                        ed::PinPivotRect(inputsRect.GetCenter(), inputsRect.GetCenter());
-                        ed::PinRect(inputsRect.GetTL(), inputsRect.GetBR());
-                        ed::EndPin();
-                        //ed::PopStyleVar(3);
-                        ed::PopStyleVar(1);
-        
-                        auto drawList = ImGui::GetWindowDrawList();
-                        drawList->AddRectFilled(inputsRect.GetTL(), inputsRect.GetBR(),
-                            IM_COL32((int)(255 * pinBackground.x), (int)(255 * pinBackground.y), (int)(255 * pinBackground.z), inputAlpha), 4.0f, 15);
-                        drawList->AddRect(inputsRect.GetTL(), inputsRect.GetBR(),
-                            IM_COL32((int)(255 * pinBackground.x), (int)(255 * pinBackground.y), (int)(255 * pinBackground.z), inputAlpha), 4.0f, 15);
-        
-                        if (m_NewLinkPin && !CanCreateLink(m_NewLinkPin, &pin) && &pin != m_NewLinkPin)
-                            inputAlpha = (int)(255 * ImGui::GetStyle().Alpha * (48.0f / 255.0f));
-                    }
-        
-                    //ImGui::Spring(1, 0);
-                    ImGui::EndHorizontal();
-                }
-        
-                ImGui::BeginHorizontal("content_frame");
-                ImGui::Spring(1, padding);
-        
-                ImGui::BeginVertical("content", ImVec2(0.0f, 0.0f));
-                ImGui::Dummy(ImVec2(160, 0));
-                ImGui::Spring(1);
-                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 0.0f, 0.0f, 1.0f));
-                ImGui::TextUnformatted(node.Name.c_str());
-                ImGui::PopStyleColor();
-                ImGui::Spring(1);
-                ImGui::EndVertical();
-                auto contentRect = ImGui_GetItemRect();
-        
-                ImGui::Spring(1, padding);
-                ImGui::EndHorizontal();
-        
-                if (!node.Outputs.empty())
-                {
-                    ImGui::BeginHorizontal("outputs");
-                    ImGui::Spring(1, 0);
-        
-                    ImRect outputsRect;
-                    int outputAlpha = 200;
-                    for (auto& pin : node.Outputs)
-                    {
-                        ImGui::Dummy(ImVec2(padding, padding));
-                        outputsRect = ImGui_GetItemRect();
-                        ImGui::Spring(1, 0);
-                        outputsRect.Min.y += padding;
-                        outputsRect.Max.y += padding;
-        
-                        ed::PushStyleVar(ed::StyleVar_PinCorners, 3);
-                        ed::BeginPin(pin.ID, ed::PinKind::Output);
-                        ed::PinPivotRect(outputsRect.GetCenter(), outputsRect.GetCenter());
-                        ed::PinRect(outputsRect.GetTL(), outputsRect.GetBR());
-                        ed::EndPin();
-                        ed::PopStyleVar();
-        
-                        auto drawList = ImGui::GetWindowDrawList();
-                        drawList->AddRectFilled(outputsRect.GetTL(), outputsRect.GetBR(),
-                            IM_COL32((int)(255 * pinBackground.x), (int)(255 * pinBackground.y), (int)(255 * pinBackground.z), outputAlpha), 4.0f, 15);
-                        drawList->AddRect(outputsRect.GetTL(), outputsRect.GetBR(),
-                            IM_COL32((int)(255 * pinBackground.x), (int)(255 * pinBackground.y), (int)(255 * pinBackground.z), outputAlpha), 4.0f, 15);
-        
-        
-                        if (m_NewLinkPin && !CanCreateLink(m_NewLinkPin, &pin) && &pin != m_NewLinkPin)
-                            outputAlpha = (int)(255 * ImGui::GetStyle().Alpha * (48.0f / 255.0f));
-                    }
-        
-                    ImGui::EndHorizontal();
-                }
-        
-                ImGui::EndVertical();
-        
-                ed::EndNode();
-                ed::PopStyleVar(7);
-                ed::PopStyleColor(4);
-        
-                auto drawList = ed::GetNodeBackgroundDrawList(node.ID);
-        
-                //const auto fringeScale = ImGui::GetStyle().AntiAliasFringeScale;
-                //const auto unitSize    = 1.0f / fringeScale;
-        
-                //const auto ImDrawList_AddRect = [](ImDrawList* drawList, const ImVec2& a, const ImVec2& b, ImU32 col, float rounding, int rounding_corners, float thickness)
-                //{
-                //    if ((col >> 24) == 0)
-                //        return;
-                //    drawList->PathRect(a, b, rounding, rounding_corners);
-                //    drawList->PathStroke(col, true, thickness);
-                //};
-        
-                //drawList->AddRectFilled(inputsRect.GetTL() + ImVec2(0, 1), inputsRect.GetBR(),
-                //    IM_COL32((int)(255 * pinBackground.x), (int)(255 * pinBackground.y), (int)(255 * pinBackground.z), inputAlpha), 4.0f, 12);
-                //ImGui::PushStyleVar(ImGuiStyleVar_AntiAliasFringeScale, 1.0f);
-                //drawList->AddRect(inputsRect.GetTL() + ImVec2(0, 1), inputsRect.GetBR(),
-                //    IM_COL32((int)(255 * pinBackground.x), (int)(255 * pinBackground.y), (int)(255 * pinBackground.z), inputAlpha), 4.0f, 12);
-                //ImGui::PopStyleVar();
-                //drawList->AddRectFilled(outputsRect.GetTL(), outputsRect.GetBR() - ImVec2(0, 1),
-                //    IM_COL32((int)(255 * pinBackground.x), (int)(255 * pinBackground.y), (int)(255 * pinBackground.z), outputAlpha), 4.0f, 3);
-                ////ImGui::PushStyleVar(ImGuiStyleVar_AntiAliasFringeScale, 1.0f);
-                //drawList->AddRect(outputsRect.GetTL(), outputsRect.GetBR() - ImVec2(0, 1),
-                //    IM_COL32((int)(255 * pinBackground.x), (int)(255 * pinBackground.y), (int)(255 * pinBackground.z), outputAlpha), 4.0f, 3);
-                ////ImGui::PopStyleVar();
-                //drawList->AddRectFilled(contentRect.GetTL(), contentRect.GetBR(), IM_COL32(24, 64, 128, 200), 0.0f);
-                //ImGui::PushStyleVar(ImGuiStyleVar_AntiAliasFringeScale, 1.0f);
-                //drawList->AddRect(
-                //    contentRect.GetTL(),
-                //    contentRect.GetBR(),
-                //    IM_COL32(48, 128, 255, 100), 0.0f);
-                //ImGui::PopStyleVar();
-            }
-        
-            for (auto& node : m_Nodes)
-            {
-                if (node.Type != NodeType::Comment)
-                    continue;
-        
-                const float commentAlpha = 0.75f;
-        
-                ImGui::PushStyleVar(ImGuiStyleVar_Alpha, commentAlpha);
-                ed::PushStyleColor(ed::StyleColor_NodeBg, ImColor(255, 255, 255, 64));
-                ed::PushStyleColor(ed::StyleColor_NodeBorder, ImColor(255, 255, 255, 64));
-                ed::BeginNode(node.ID);
-                ImGui::PushID(node.ID.AsPointer());
-                ImGui::BeginVertical("content");
-                ImGui::BeginHorizontal("horizontal");
-                ImGui::Spring(1);
-                //ImGui::TextUnformatted(node.Name.c_str());
-
-                //bool input;
-				char buffer[256];
-				memset(buffer, 0, sizeof(buffer));
-				std::strncpy(buffer, node.Name.c_str(), sizeof(buffer));
-                ImGui::SetNextItemWidth(ImGui::GetItemRectSize().x);
-                //bool tree, ret = ImGui::TreeNodeInput("##CommentName", ImGuiTreeNodeFlags_Leaf, buffer, sizeof(buffer), tree, input);
-                bool input, clicked = ImGui::SelectableInput("##CommentName", node.Name.empty() ? 1.0f : ImGui::CalcTextSize(buffer).x, false, NULL, buffer, sizeof(buffer), input, ImGuiInputTextFlags_NoHorizontalScroll);
-                //if (tree) ImGui::TreePop();
-				if (input) node.Name = std::string(buffer);
-
-
-                ImGui::Spring(1);
-                ImGui::EndHorizontal();
-                ed::Group(node.Size);
-                ImGui::EndVertical();
-                ImGui::PopID();
-                ed::EndNode();if (ed::BeginGroupHint(node.ID))
-                {
-                    //auto alpha   = static_cast<int>(commentAlpha * ImGui::GetStyle().Alpha * 255);
-                    auto bgAlpha = static_cast<int>(ImGui::GetStyle().Alpha * 255);
-        
-                    //ImGui::PushStyleVar(ImGuiStyleVar_Alpha, commentAlpha * ImGui::GetStyle().Alpha);
-        
-                    auto min = ed::GetGroupMin();
-                    //auto max = ed::GetGroupMax();
-        
-                    ImGui::SetCursorScreenPos(min - ImVec2(-8, ImGui::GetTextLineHeightWithSpacing() + 4));
-                    ImGui::BeginGroup();
-                    ImGui::TextUnformatted(node.Name.c_str());
-                    ImGui::EndGroup();
-        
-                    auto drawList = ed::GetHintBackgroundDrawList();
-        
-                    auto hintBounds      = ImGui_GetItemRect();
-                    auto hintFrameBounds = ImRect_Expanded(hintBounds, 8, 4);
-        
-                    drawList->AddRectFilled(
-                        hintFrameBounds.GetTL(),
-                        hintFrameBounds.GetBR(),
-                        IM_COL32(255, 255, 255, 64 * bgAlpha / 255), 4.0f);
-        
-                    drawList->AddRect(
-                        hintFrameBounds.GetTL(),
-                        hintFrameBounds.GetBR(),
-                        IM_COL32(255, 255, 255, 128 * bgAlpha / 255), 4.0f);
-        
-                    //ImGui::PopStyleVar();
-                }
-                ed::EndGroupHint();
-                ed::PopStyleColor(2);
-                ImGui::PopStyleVar();
-        
-				// Drawing shadows beneath nodes
-				auto& pos = ed::GetNodePosition(node.ID) - ImVec2(10.0f, 10.0f);
-				auto& size = ed::GetNodeSize(node.ID) + ImVec2(20.0f, 20.0f);
-				auto drawList = ImGui::GetWindowDrawList();
-
-				const int vert_start_idx = drawList->VtxBuffer.Size;
-				drawList->AddRect(pos, pos + size, ImColor(0, 0, 0, 75), ed::GetStyle().NodeRounding + 5.0f, 15, 20.0f);
-				const int vert_end_idx = drawList->VtxBuffer.Size;
-				ImDrawVert* vert_start = drawList->VtxBuffer.Data + vert_start_idx;
-				ImDrawVert* vert_end = drawList->VtxBuffer.Data + vert_end_idx;
-				for (ImDrawVert* vert = vert_start; vert < vert_end; vert++)
-					if (vert->pos.x < pos.x || vert->pos.y < pos.y || vert->pos.x > pos.x + size.x || vert->pos.y > pos.y + size.y || (pos.y + size.y - vert->pos.y) > size.y * 0.5f)
-						vert->col = ImGui::ColorConvertFloat4ToU32(ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
-                
-            }
-        
-            for (auto& link : m_Links)
-                ed::Link(link.ID, link.StartPinID, link.EndPinID, link.Color, 2.0f);
-        
-            if (!m_CreateNewNode)
-            {
-                ed::BeginCreate(m_CurrentLinkColor, 10.0f);
-                ed::EndCreate();
-
-                if (ed::BeginCreate(m_CurrentLinkColor, 2.0f))
-                {
-                    auto showLabel = [](const char* label, ImColor color)
-                    {
-                        ImGui::SetCursorPosY(ImGui::GetCursorPosY() - ImGui::GetTextLineHeight());
-                        auto size = ImGui::CalcTextSize(label);
-        
-                        auto padding = ImGui::GetStyle().FramePadding;
-                        auto spacing = ImGui::GetStyle().ItemSpacing;
-        
-                        ImGui::SetCursorPos(ImGui::GetCursorPos() + ImVec2(spacing.x, -spacing.y));
-        
-                        auto rectMin = ImGui::GetCursorScreenPos() - padding;
-                        auto rectMax = ImGui::GetCursorScreenPos() + size + padding;
-        
-                        auto drawList = ImGui::GetWindowDrawList();
-                        drawList->AddRectFilled(rectMin, rectMax, color, size.y * 0.15f);
-                        ImGui::TextUnformatted(label);
-                    };
-
-                    ed::PinId startPinId = 0, endPinId = 0;
-                    if (ed::QueryNewLink(&startPinId, &endPinId))
-                    {
-                        if (startPinId.Get() == 0)
-                            DY_ASSERT(false);
-
-                        auto startPin = FindPin(startPinId);
-                        auto endPin   = FindPin(endPinId);
-        
-                        m_NewLinkPin = startPin ? startPin : endPin;
-        
-                        if (startPin->Kind == PinKind::Input)
-                        {
-                            std::swap(startPin, endPin);
-                            std::swap(startPinId, endPinId);
-                        }
-        
-                        if (startPin && endPin)
-                        {
-                            if (endPin == startPin)
-                            {
-                                ed::RejectNewItem(ImColor(255, 0, 0), 2.0f);
-                            }
-                            else if (endPin->Kind == startPin->Kind)
-                            {
-                                showLabel("x Incompatible Pin Kind", ImColor(45, 32, 32, 180));
-                                ed::RejectNewItem(ImColor(255, 0, 0), 2.0f);
-                            }
-                            else if (endPin->Node == startPin->Node)
-                            {
-                                showLabel("x Cannot connect to self", ImColor(45, 32, 32, 180));
-                                ed::RejectNewItem(ImColor(255, 0, 0), 1.0f);
-                            }
-                            else if (endPin->Data.Type != startPin->Data.Type || endPin->Data.Container != startPin->Data.Container)
-                            {
-                                spawnNodeFunction Function;
-                                ConversionAvalible(startPin, endPin, Function);
-                                if (Function != nullptr)
-                                {
-                                    showLabel("+ Create Conversion", ImColor(32, 45, 32, 180));
-                                    if (ed::AcceptNewItem(ImColor(128, 206, 244), 4.0f))
-                                    {
-                                        auto startNodeId = startPin->Node->ID;
-                                        auto endNodeId = endPin->Node->ID;
-                                        auto startPinType = startPin->Data.Type;
-                                        auto endPinType = endPin->Data.Type;
-
-                                        CheckLinkSafety(startPin, endPin);
-
-                                        Node* node = (this->*Function)({});
-
-                                        ImVec2 pos = (ed::GetNodePosition(startNodeId) + ed::GetNodePosition(endNodeId)) / 2;
-                                        ed::SetNodePosition(node->ID, pos);
-
-                                        m_Links.emplace_back(Link(GetNextLinkId(), startPinId, node->Inputs[0].ID));
-                                        m_Links.back().Color = GetIconColor(startPinType);
-
-                                        m_Links.emplace_back(Link(GetNextLinkId(), node->Outputs[0].ID, endPinId));
-                                        m_Links.back().Color = GetIconColor(endPinType);
-
-                                        BuildNodes();
-                                    }
-                                }
-                                else if (endPin->Data.Type != startPin->Data.Type)
-                                {
-                                    showLabel("x Incompatible Pin Type", ImColor(45, 32, 32, 180));
-                                    ed::RejectNewItem(ImColor(255, 128, 128), 1.0f);
-                                }
+		            			if (io.KeyCtrl)
+		            			{
+		            				ed::SetNodePosition(SpawnGetVariableNode({ m_Variables[index].ID })->ID, ImGui::GetMousePos());
+                                    BuildNodes();
+		            			}
+		            			else if (io.KeyAlt)
+		            			{
+		            				ed::SetNodePosition(SpawnSetVariableNode({ m_Variables[index].ID })->ID, ImGui::GetMousePos());
+                                    BuildNodes();
+		            			}
                                 else
                                 {
-                                    showLabel("x Incompatible Pin Container", ImColor(45, 32, 32, 180));
-                                    ed::RejectNewItem(ImColor(255, 0, 0), 1.0f);
+                                    ed::Suspend();
+                                    ImGui::OpenPopupEx(id, ImGuiPopupFlags_None);
+                                    m_NewNodePosition = ImGui::GetMousePos();
+                                    ed::Resume();
+                                }
+		            		}
+		            		ImGui::EndDragDropTarget();
+		            	}
+
+                        ed::Suspend();
+                        if (ImGui::BeginPopupEx(id, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoSavedSettings))
+                        {
+				    		auto variable = GetVariableById(m_SelectedVariable);
+                            if (variable != nullptr)
+                            {
+
+                                ImGui::SetWindowPos(ImVec2(Dymatic::Input::GetMousePosition().x, Dymatic::Input::GetMousePosition().y), ImGuiCond_Appearing);
+                                ImGui::TextDisabled(variable->Name.c_str());
+                                ImGui::Separator();
+                                if (ImGui::MenuItem(("Get " + variable->Name).c_str(), "Ctrl"))
+                                {
+                                    SpawnNodeData spawnData = { variable->ID };
+                                    spawnData.GraphID = window.GraphID;
+                                    SetNodePosition(NodeEditorInternal::SpawnGetVariableNode(spawnData)->ID, ed::ScreenToCanvas(m_NewNodePosition));
+                                }
+                                else if (ImGui::MenuItem(("Set " + variable->Name).c_str(), "Alt"))
+                                {
+                                    SpawnNodeData spawnData = { variable->ID };
+                                    spawnData.GraphID = window.GraphID;
+                                    SetNodePosition(NodeEditorInternal::SpawnSetVariableNode(spawnData)->ID, ed::ScreenToCanvas(m_NewNodePosition));
                                 }
                             }
-                            else
-                            {
-                                showLabel("+ Create Link", ImColor(32, 45, 32, 180));
-                                if (ed::AcceptNewItem(ImColor(128, 255, 128), 4.0f))
-                                {
-                                    CheckLinkSafety(startPin, endPin);
-
-                                    m_Links.emplace_back(Link(GetNextId(), startPinId, endPinId));
-                                    m_Links.back().Color = GetIconColor(startPin->Data.Type);
-                                }
-                            }
+                            ImGui::EndPopup();
                         }
-                    }
-        
-                    ed::PinId pinId = 0;
-                    if (ed::QueryNewNode(&pinId))
-                    {
-                        m_NewLinkPin = FindPin(pinId);
-                        if (m_NewLinkPin)
-                            showLabel("+ Create Node", ImColor(32, 45, 32, 180));
-        
-                        if (ed::AcceptNewItem())
+                        ed::Resume();
+                    
+                        for (auto& node : graph.Nodes)
                         {
-                            ResetSearchArea();
-                            m_CreateNewNode  = true;
-                            m_NewNodeLinkPin = FindPin(pinId);
-                            m_NewLinkPin = nullptr;
-                            ed::Suspend();
-                            ImGui::OpenPopup("Create New Node");
-							UpdateSearchData();
-                            ed::Resume();
-                            m_NewNodePosition = ed::ScreenToCanvas(ImGui::GetMousePos());
-                        }
-                    }
-                }
-                else
-                m_NewLinkPin = nullptr;
-        
-                ed::EndCreate();
-        
-                if (ed::BeginDelete())
-                {
-                    ed::LinkId linkId = 0;
-                    while (ed::QueryDeletedLink(&linkId))
-                    {
-                        if (ed::AcceptDeletedItem())
-                        {
-                            auto id = std::find_if(m_Links.begin(), m_Links.end(), [linkId](auto& link) { return link.ID == linkId; });
-                            if (id != m_Links.end())
-                                m_Links.erase(id);
-                        }
-                    }
-        
-                    ed::NodeId nodeId = 0;
-                    while (ed::QueryDeletedNode(&nodeId))
-                    {
-                        if (ed::AcceptDeletedItem())
-                        {
-                            auto id = std::find_if(m_Nodes.begin(), m_Nodes.end(), [nodeId](auto& node) { return node.ID == nodeId; });
-                            if (id != m_Nodes.end())
-                                m_Nodes.erase(id);
-                        }
-                    }
-                }
-                ed::EndDelete();
-            }
-        
-            ImGui::SetCursorScreenPos(cursorTopLeft);
-        }
-        
-# if 1
-        ed::Suspend();
-        if (ed::ShowNodeContextMenu(&m_ContextNodeId))
-            ImGui::OpenPopup("Node Context Menu");
-        else if (ed::ShowPinContextMenu(&m_ContextPinId))
-            ImGui::OpenPopup("Pin Context Menu");
-        else if (ed::ShowLinkContextMenu(&m_ContextLinkId))
-            ImGui::OpenPopup("Link Context Menu");
-        else if (ed::ShowBackgroundContextMenu())
-        {
+                            if (node.Type != NodeType::Blueprint && node.Type != NodeType::Simple)
+                                continue;
+                    
+                            Variable* payloadVariable = nullptr;
+                            Pin* payloadPin = nullptr;
 
-            ImGui::OpenPopup("Create New Node");
-            ResetSearchArea();
-            UpdateSearchData();
-            m_NewNodeLinkPin = nullptr;
-            m_NewNodePosition = ed::ScreenToCanvas(ImGui::GetMousePos());
-        }
-        ed::Resume();
-        
-        ed::Suspend();
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 8));
-        if (ImGui::BeginPopup("Node Context Menu"))
-        {
-            auto node = FindNode(m_ContextNodeId);
-        
-            ImGui::TextUnformatted("Node Context Menu");
-            ImGui::Separator();
-            if (node)
-            {
-                ImGui::Text("ID: %p", node->ID.AsPointer());
-                ImGui::Text("Type: %s", node->Type == NodeType::Blueprint ? "Blueprint" : (node->Type == NodeType::Tree ? "Tree" : "Comment"));
-                ImGui::Text("Inputs: %d", (int)node->Inputs.size());
-                ImGui::Text("Outputs: %d", (int)node->Outputs.size());
-            }
-            else
-                ImGui::Text("Unknown node: %p", m_ContextNodeId.AsPointer());
-            ImGui::Separator();
-            if (ImGui::MenuItem("Find References"))
-            {
-                ImGui::SetWindowFocus("Find Results");
-                FindResultsSearch(node->Name);
-            }
+                            const auto isSimple = node.Type == NodeType::Simple;
+                    
+                            bool hasOutputDelegates = false;
+                            for (auto& output : node.Outputs)
+                                if (output.Data.Type == PinType::Delegate)
+                                    hasOutputDelegates = true;
 
-            if (ImGui::MenuItem("Duplicate"))
-                DuplicateNodes();
-            if (ImGui::MenuItem("Delete"))
-                ed::DeleteNode(m_ContextNodeId);
-            ImGui::EndPopup();
-        }
-        
-        if (ImGui::BeginPopup("Pin Context Menu"))
-        {
-            auto pin = FindPin(m_ContextPinId);
-        
-            ImGui::TextUnformatted("Pin Context Menu");
-            ImGui::Separator();
-            if (pin)
-            {
-                ImGui::Text("ID: %p", pin->ID.AsPointer());
-                if (pin->Node)
-                    ImGui::Text("Node: %p", pin->Node->ID.AsPointer());
-                else
-                    ImGui::Text("Node: %s", "<none>");
-                ImGui::Separator();
-                if (pin->Data.Type != PinType::Flow)
-                    if (ImGui::MenuItem("Promote To Variable"))
-                    {
-                        std::vector<std::string> vec;
-                        for (auto& var : m_Variables)
-                            vec.push_back(var.Name);
-                        m_Variables.push_back({ GetNextId(), Dymatic::String::GetNextNameWithIndex(vec, pin->Name.empty() ? "NewVar" : pin->Name), pin->Data.Type });
-
-                        auto pinId = pin->ID;
-
-                        CheckLinkSafety(nullptr, pin);
-
-                        bool in = pin->Kind == PinKind::Input;
-                        ImVec2 pos = ed::GetNodePosition(pin->Node->ID) + ImVec2(in ? -250.0f : 250.0f, 0.0f);
-                        Node* node;
-                        if (in)
-						    node = SpawnGetVariableNode({ m_Variables.back().ID });
-                        else
-						    node = SpawnSetVariableNode({ m_Variables.back().ID });
-						ed::SetNodePosition(node->ID, pos);
-
-						m_Links.emplace_back(Link(GetNextLinkId(), (in ? node->Outputs[0] : node->Inputs[1]).ID, pinId));
-						m_Links.back().Color = GetIconColor(m_Variables.back().Data.Type);
-
-                        BuildNodes();
-                    }
-                if (pin->Deletable)
-                    if (ImGui::MenuItem("Remove Pin"))
-                    {
-                        for (auto& link : m_Links)
-                            if (link.StartPinID == pin->ID || link.EndPinID == pin->ID)
-                                ed::DeleteLink(link.ID);
-
-                        auto& outputs = pin->Node->Outputs;
-                        auto& inputs = pin->Node->Inputs;
-                        auto& node = pin->Node;
-                        if (pin->Kind == PinKind::Output)
-                            for (int i = 0; i < outputs.size(); i++)
-                            {
-                                if (outputs[i].ID == pin->ID)
+                            builder.Begin(node.ID);
+                                if (!isSimple)
                                 {
-                                    outputs.erase(outputs.begin() + i);
-                                    break;
+                                    builder.Header(node.Color);
+                                        ImGui::Spring(0);
+
+                                        if (node.Icon != nullptr)
+                                            ImGui::Image((ImTextureID)node.Icon->GetRendererID(), ImVec2(ImGui::GetTextLineHeight() * 1.25f, ImGui::GetTextLineHeight() * 1.25f), { 0, 1 }, { 1, 0 }, node.IconColor);
+
+                                        ImGui::TextUnformatted((node.DisplayName == "" ? node.Name : node.DisplayName).c_str());
+                                        ImGui::Spring(1);
+                                        ImGui::Dummy(ImVec2(0, 28));
+                                        if (hasOutputDelegates)
+                                        {
+                                            ImGui::BeginVertical("delegates", ImVec2(0, 28));
+                                            ImGui::Spring(1, 0);
+                                            for (auto& output : node.Outputs)
+                                            {
+                                                if (output.Data.Type != PinType::Delegate)
+                                                    continue;
+                    
+                                                auto alpha = ImGui::GetStyle().Alpha;
+                                                if (m_NewLinkPin && !CanCreateLink(m_NewLinkPin, &output) && &output != m_NewLinkPin)
+                                                    alpha = alpha * (48.0f / 255.0f);
+                    
+                                                ed::BeginPin(output.ID, ed::PinKind::Output);
+                                                ed::PinPivotAlignment(ImVec2(1.0f, 0.5f));
+                                                ed::PinPivotSize(ImVec2(0, 0));
+                                                ImGui::BeginHorizontal(output.ID.AsPointer());
+                                                ImGui::PushStyleVar(ImGuiStyleVar_Alpha, alpha);
+                                                auto& pinName = output.GetName();
+                                                if (pinName.empty())
+                                                {
+                                                    ImGui::TextUnformatted(pinName.c_str());
+                                                    ImGui::Spring(0);
+                                                }
+                                                DrawPinIcon(output.Data, PinKind::Output, IsPinLinked(output.ID), (int)(alpha * 255));
+                                                ImGui::Spring(0, ImGui::GetStyle().ItemSpacing.x / 2);
+                                                ImGui::EndHorizontal();
+                                                ImGui::PopStyleVar();
+                                                ed::EndPin();
+                    
+                                                //DrawItemRect(ImColor(255, 0, 0));
+                                            }
+                                            ImGui::Spring(1, 0);
+                                            ImGui::EndVertical();
+                                            ImGui::Spring(0, ImGui::GetStyle().ItemSpacing.x / 2);
+                                        }
+                                        else
+                                            ImGui::Spring(0);
+                                    builder.EndHeader();
                                 }
-                            }
-                        else
-							for (int i = 0; i < inputs.size(); i++)
-							{
-								if (inputs[i].ID == pin->ID)
-								{
-                                    inputs.erase(inputs.begin() + i);
-									break;
-								}
-							}
-
-                        if (node->Name == "Sequence")
-                            for (int i = 0; i < node->Outputs.size(); i++)
-                                node->Outputs[i].Name = std::to_string(i);
-
-                        BuildNodes();
-                    }
-
-            }
-            else
-                ImGui::Text("Unknown pin: %p", m_ContextPinId.AsPointer());
-        
-            ImGui::EndPopup();
-        }
-        
-        if (ImGui::BeginPopup("Link Context Menu"))
-        {
-            auto link = FindLink(m_ContextLinkId);
-        
-            ImGui::TextUnformatted("Link Context Menu");
-            ImGui::Separator();
-            if (link)
-            {
-                ImGui::Text("ID: %p", link->ID.AsPointer());
-                ImGui::Text("From: %p", link->StartPinID.AsPointer());
-                ImGui::Text("To: %p", link->EndPinID.AsPointer());
-            }
-            else
-                ImGui::Text("Unknown link: %p", m_ContextLinkId.AsPointer());
-            ImGui::Separator();
-            if (ImGui::MenuItem("Delete"))
-                ed::DeleteLink(m_ContextLinkId);
-            ImGui::EndPopup();
-        }
-        
-        ImGui::SetNextWindowSize(ImVec2(400.0f, 400.0f));
-        if (ImGui::BeginPopup("Create New Node"))
-        {
-            Node* node = nullptr;
-        
-            ImGui::Text("All Actions for this File");
-            ImGui::SameLine();
-            ImGui::Dummy(ImVec2(100.0f, 0.0f));
-            ImGui::SameLine();
-            if (ImGui::Custom::Checkbox("##NodeSearchPopupContextSensitiveCheckbox", &m_ContextSensitive))
-                UpdateSearchData();
-            ImGui::SameLine();
-            ImGui::Text("Context Sensitive");
-        
-            static bool SetKeyboardFocus = false;
-        
-            if (SetKeyboardFocus)
-            {
-                ImGui::SetKeyboardFocusHere();
-                SetKeyboardFocus = false;
-            }
-        
-            if (m_ResetSearchArea)
-            {
-                SetKeyboardFocus = true;
-            }
-        
-            // Search bar Input
-			char buffer[256];
-			memset(buffer, 0, sizeof(buffer));
-			std::strncpy(buffer, m_SearchBuffer.c_str(), sizeof(buffer));
-        
-            ImGui::SetNextItemWidth(ImGui::GetContentRegionAvailWidth());
-            if (ImGui::InputTextWithHint("##NodeEditorSearchBar", "Search:", buffer, sizeof(buffer)))
-            {
-                m_SearchBuffer = std::string(buffer);
-                UpdateSearchData();
-            }
-        
-            if (((m_SearchBuffer != m_PreviousSearchBuffer) || m_ResetSearchArea))
-            {
-                if (m_SearchBuffer == "") CloseSearchList(&m_SearchData);
-                else OpenSearchList(&m_SearchData);
-            }
-        
-            //node = DisplaySearchData(&m_SearchData, m_SearchBuffer);
-
-            //ImGui::BeginChild("##NewNodeSearchDisplay", ImVec2(), false, ImGuiWindowFlags_NoNav);
-            SearchResultData* data = DisplaySearchData(m_SearchData);
-            if (data != nullptr)
-            {
-                if (data->Function)
-                    node = (this->*(data->Function))(data->SpawnData);
-                else
-                {
-                    for (auto& library : m_NodeLibraries)
-                        for (auto& Function : library.m_FunctionDeclarations)
-                            if (Function.ID == data->ID)
-                            {
-								m_Nodes.emplace_back(GetNextId(), Function.GetName().c_str(), Function.FUNC_Pure ? ImColor(170, 242, 172) : ImColor(128, 195, 248), NodeFunction::Node);
-                                m_Nodes.back().Icon = m_FunctionIcon;
-                                m_Nodes.back().IconColor = Function.FUNC_Pure ? ImColor(170, 242, 172) : ImColor(128, 195, 248);
-                                m_Nodes.back().FunctionID = Function.ID;
-                                m_Nodes.back().DisplayName = Function.FUNC_NodeDisplayName;
-                                m_Nodes.back().Pure = Function.FUNC_Pure;
-                                if (Function.FUNC_CompactNode) m_Nodes.back().Type = NodeType::Simple;
-
-                                if (!Function.FUNC_Pure)
+                    
+                                for (auto& input : node.Inputs)
                                 {
-                                    m_Nodes.back().Inputs.emplace_back(GetNextId(), "", PinType::Flow);
-                                    m_Nodes.back().Outputs.emplace_back(GetNextId(), "", PinType::Flow);
-                                }
-
-                                if (Function.FUNC_Return.Data.Type != PinType::Void)
-                                {
-                                    m_Nodes.back().Outputs.emplace_back(GetNextId(), Function.FUNC_NoPinLabels ? "" : "Return Value", Function.FUNC_Return.Data.Type);
-                                    m_Nodes.back().Outputs.back().ArgumentID = Function.FUNC_Return.ArgumentID;
-                                }
-                                for (auto& param : Function.FUNC_Params)
-                                    if (param.Kind == PinKind::Input)
+                                    if (!m_HideUnconnected || IsPinLinked(input.ID))
                                     {
-                                        auto& input = m_Nodes.back().Inputs.emplace_back(param);
-                                        input.ID = GetNextId();
-                                        input.ArgumentID = param.ArgumentID;
-                                        if (Function.FUNC_NoPinLabels) input.Name = "";
+                                        auto alpha = ImGui::GetStyle().Alpha;
+                                        if (m_NewLinkPin && !CanCreateLink(m_NewLinkPin, &input) && &input != m_NewLinkPin)
+                                            alpha = alpha * (48.0f / 255.0f);
+
+                                        builder.Input(input.ID);
+                                        ImGui::PushStyleVar(ImGuiStyleVar_Alpha, alpha);
+                                        DrawPinIcon(input.Data, PinKind::Input, IsPinLinked(input.ID), (int)(alpha * 255));
+                                        ImGui::Spring(0);
+                                        auto& pinName = input.GetName();
+                                        if (!pinName.empty())
+                                        {
+                                            ImGui::TextUnformatted(pinName.c_str());
+                                            ImGui::Spring(0);
+                                        }
+
+                                        if (!IsPinLinked(input.ID))
+                                        {
+                                            ImGui::PushID(input.ID.Get());
+                                            DefaultValueInput(input.Data, true);
+                                            ImGui::PopID();
+                                        }
+                                        ImGui::PopStyleVar();
+                                        builder.EndInput();
+
+                                        if (ImGui::IsItemHovered() && ImGui::IsMouseDown(0))
+                                            m_CurrentLinkColor = GetIconColor(input.Data.Type);
+
+                                        // Drag Drop Variable Inputs
+                                        if (ImGui::BeginDragDropTarget())
+                                        {
+                                            auto payload = ImGui::GetDragDropPayload();
+                                            if (strcmp(payload->DataType, "NODE_EDITOR_VARIABLE") == 0)
+                                                if (m_Variables[*(int*)payload->Data].Data.Type == input.Data.Type || input.Data.Type == PinType::Flow)
+                                                    if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("NODE_EDITOR_VARIABLE"))
+                                                    {
+                                                        payloadVariable = &m_Variables[*(int*)payload->Data];
+                                                        payloadPin = &input;
+                                                    }
+                                            ImGui::EndDragDropTarget();
+                                        }
                                     }
-                                    else
-									{
-										auto& output = m_Nodes.back().Outputs.emplace_back(param);
-										output.ID = GetNextId();
-										output.ArgumentID = param.ArgumentID;
-										if (Function.FUNC_NoPinLabels) output.Name = "";
-									}
+                                }
+                    
+                                if (isSimple)
+                                {
+                                    builder.Middle();
+                    
+                                    ImGui::Spring(1, 0);
 
-								BuildNode(&m_Nodes.back());
-
-								node = &m_Nodes.back();
-                                break;
-                            }
-                }
-            }
-            //ImGui::EndChild();
-        
-            m_ResetSearchArea = false;
-            m_PreviousSearchBuffer = m_SearchBuffer;
-        
-            if (node)
-            {
-                BuildNodes();
-        
-                m_CreateNewNode = false;
-
-                if (node->Type != NodeType::Comment || selectedNodes.empty())
-                    ed::SetNodePosition(node->ID, m_NewNodePosition);
-        
-                if (auto startPin = m_NewNodeLinkPin)
-                {
-                    auto& pins = startPin->Kind == PinKind::Input ? node->Outputs : node->Inputs;
-        
-                    if (startPin->Data.Type != PinType::Flow)
-                        for (auto& pin : (startPin->Kind == PinKind::Input ? startPin->Node->Inputs : startPin->Node->Outputs))
-                            if (pin.Data.Type == PinType::Flow)
-                            {
-                                for (auto& otherPin : pins)
-                                    if (otherPin.Data.Type == PinType::Flow)
+                                    if (node.DisplayName == "->")
                                     {
-										CheckLinkSafety(&pin, &otherPin);
-
-										m_Links.emplace_back(Link(GetNextLinkId(), pin.ID, otherPin.ID));
-										m_Links.back().Color = GetIconColor(pin.Data.Type);
-                                        break;
+                                        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+                                        ImGui::Bullet();
+                                        ImGui::PopStyleColor();
                                     }
-                                break;
+									else
+                                        ImGui::TextUnformatted((node.DisplayName == "" ? node.Name : node.DisplayName).c_str());
+                                    ImGui::Spring(1, 0);
+                                }
+                    
+                                for (auto& output : node.Outputs)
+		            			{
+                                    if (!m_HideUnconnected || IsPinLinked(output.ID))
+                                    {
+                                        if (!isSimple && output.Data.Type == PinType::Delegate)
+                                            continue;
+
+                                        auto alpha = ImGui::GetStyle().Alpha;
+                                        if (m_NewLinkPin && !CanCreateLink(m_NewLinkPin, &output) && &output != m_NewLinkPin)
+                                            alpha = alpha * (48.0f / 255.0f);
+
+                                        ImGui::PushStyleVar(ImGuiStyleVar_Alpha, alpha);
+                                        builder.Output(output.ID);
+                                        auto& pinName = output.GetName();
+                                        if (!pinName.empty())
+                                        {
+                                            ImGui::Spring(0);
+                                            ImGui::TextUnformatted(pinName.c_str());
+                                        }
+                                        ImGui::Spring(0);
+                                        DrawPinIcon(output.Data, PinKind::Output, IsPinLinked(output.ID), (int)(alpha * 255));
+                                        ImGui::PopStyleVar();
+                                        builder.EndOutput();
+
+                                        if (ImGui::IsItemHovered() && ImGui::IsMouseDown(0))
+                                            m_CurrentLinkColor = GetIconColor(output.Data.Type);
+
+                                        // Drag Drop Variable Outputs
+                                        if (ImGui::BeginDragDropTarget())
+                                        {
+                                            auto payload = ImGui::GetDragDropPayload();
+                                            if (strcmp(payload->DataType, "NODE_EDITOR_VARIABLE") == 0)
+                                                if (m_Variables[*(int*)payload->Data].Data.Type == output.Data.Type || output.Data.Type == PinType::Flow)
+                                                    if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("NODE_EDITOR_VARIABLE"))
+                                                    {
+                                                        payloadVariable = &m_Variables[*(int*)payload->Data];
+                                                        payloadPin = &output;
+                                                    }
+                                            ImGui::EndDragDropTarget();
+                                        }
+                                    }
+                                }
+                    
+    	            			if (node.AddOutputs || node.AddInputs)
+    	            			{
+                                    ImGui::Spring(0);
+                    
+    	            				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{ 0.0f, 0.0f, 0.0f, 0.0f });
+    	            				ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4{ 0.0f, 0.0f, 0.0f, 0.0f });
+    	            				ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4{ 0.0f, 0.0f, 0.0f, 0.0f });
+    	            				bool newPin = ImGui::Button("Add Pin +");
+    	            				ImGui::PopStyleColor(3);
+                                    
+                                    if (newPin)
+                                    {
+                                        if (node.AddOutputs)
+                                        {
+                                            std::string pinName = "0";
+                                            if (!node.Outputs.empty())
+                                                pinName = std::to_string((int)std::stof(node.Outputs[node.Outputs.size() - 1].Name) + 1);
+                                            node.Outputs.emplace_back(GetNextId(), pinName.c_str(), PinType::Flow);
+                                            node.Outputs.back().Deletable = true;
+                                        }
+                                        else if (node.AddInputs)
+                                        {
+                                            node.Inputs.emplace_back(GetNextId(), "", node.Inputs.back().Data.Type).Deletable = true;
+                                        }
+
+                                        BuildNode(&node);
+                                    }
+    	            			}    
+
+                                // Error Message
+                                if (node.Error)
+		            			{
+                                    auto& nodePos = ed::GetNodePosition(node.ID);
+                                    auto& nodeSize = ed::GetNodeSize(node.ID);
+                                    auto fontSize = ImGui::GetFontSize();
+
+                                    ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(nodePos.x + 2.5f, nodePos.y + nodeSize.y - fontSize), ImVec2(nodePos.x + 2.5f, nodePos.y + nodeSize.y) + ImVec2(nodeSize.x - 5.0f, 0.0f), ImColor(255, 0, 0), 5.0f);
+                                    ImGui::GetWindowDrawList()->AddText(ImVec2(nodePos.x + (nodeSize.x - ImGui::CalcTextSize("ERROR!").x) * 0.5f, nodePos.y + nodeSize.y - fontSize), ImColor(255, 255, 255), "ERROR!");
+                                }
+
+                            builder.End();
+
+                            // Drawing shadows beneath nodes
+		            		auto& pos = ed::GetNodePosition(node.ID) - ImVec2(10.0f, 10.0f);
+		            		auto& size = ed::GetNodeSize(node.ID) + ImVec2(20.0f, 20.0f);
+		            		auto drawList = ImGui::GetWindowDrawList();
+
+		            		const int vert_start_idx = drawList->VtxBuffer.Size;
+		            		drawList->AddRect(pos, pos + size, ImColor(0, 0, 0, 75), ed::GetStyle().NodeRounding + 5.0f, 15, 20.0f);
+		            		const int vert_end_idx = drawList->VtxBuffer.Size;
+		            		ImDrawVert* vert_start = drawList->VtxBuffer.Data + vert_start_idx;
+		            		ImDrawVert* vert_end = drawList->VtxBuffer.Data + vert_end_idx;
+		            		for (ImDrawVert* vert = vert_start; vert < vert_end; vert++)
+		            			if (vert->pos.x < pos.x || vert->pos.y < pos.y || vert->pos.x > pos.x + size.x || vert->pos.y > pos.y + size.y || (pos.y + size.y - vert->pos.y) > size.y * 0.5f)
+		            				vert->col = ImGui::ColorConvertFloat4ToU32(ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+
+                            // Comments for Blueprint Nodes (Based off code for comments)
+                            ImGui::PushID(node.ID.AsPointer());
+                            if (node.CommentEnabled)
+		            		{
+
+		            			auto bgAlpha = static_cast<int>(ImGui::GetStyle().Alpha * 255);
+
+		            			auto zoom = node.CommentPinned ? ed::GetCurrentZoom() : 1.0f;
+		            			auto padding = ImVec2(2.5f, 2.5f);
+
+                                auto min = ed::GetNodePosition(node.ID) - ImVec2(0, padding.y * zoom * 2.0f);
+
+                                auto originalScale = ImGui::GetFont()->Scale;
+                                ImGui::GetFont()->Scale = zoom;
+                                ImGui::PushFont(ImGui::GetFont());
+
+		            			ImGui::SetCursorScreenPos(min - ImVec2(-8, ImGui::GetTextLineHeightWithSpacing() + 4));
+		            			ImGui::BeginGroup();
+		            			//ImGui::TextUnformatted(node.Comment.c_str());
+
+		            			char buffer[256];
+		            			memset(buffer, 0, sizeof(buffer));
+		            			std::strncpy(buffer, node.Comment.c_str(), sizeof(buffer));
+                                bool input, clicked = ImGui::SelectableInput("##NodeComment", node.Comment.empty() ? 1.0f : ImGui::CalcTextSize(buffer).x, false, NULL, buffer, sizeof(buffer), input, ImGuiInputTextFlags_NoHorizontalScroll);
+                                if (input) node.Comment = std::string(buffer);
+
+                                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4());
+                                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+		            			ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4());
+		            			ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 5.0f * zoom);
+
+                                ImGui::SameLine();
+                                if (ImGui::ImageButton((ImTextureID)(node.CommentPinned ? m_PinnedIcon : m_PinIcon)->GetRendererID(), ImVec2(15.0f, 15.0f) * zoom, { 0, 1 }, {1, 0}, 2 * zoom)) node.CommentPinned = !node.CommentPinned;
+                                ImGui::SameLine();
+                                if (ImGui::ImageButton((ImTextureID)m_CommentIcon->GetRendererID(), ImVec2(15.0f, 15.0f) * zoom, { 0, 1 }, { 1, 0 }, 2 * zoom)) node.CommentEnabled = false;
+
+                                ImGui::PopStyleVar();
+                                ImGui::PopStyleColor(3);
+
+		            			ImGui::EndGroup();
+
+                                ImGui::GetFont()->Scale = originalScale;
+                                ImGui::PopFont();
+
+                                auto drawList = ImGui::GetWindowDrawList();
+
+		            			auto hintBounds = ImGui_GetItemRect();
+		            			auto hintFrameBounds = ImRect_Expanded(hintBounds, 8, 4);
+
+		            			drawList->AddRectFilled(
+		            				hintFrameBounds.GetTL() - padding * zoom,
+                                    hintFrameBounds.GetBR() + padding * zoom,//hintFrameBounds.GetTL() + (hintFrameBounds.GetSize() * ed::GetCurrentZoom()),
+		            				IM_COL32(255, 255, 255, 64 * bgAlpha / 255), 4.0f * zoom);
+
+		            			drawList->AddRect(
+		            				hintFrameBounds.GetTL() - padding * zoom,
+		            				hintFrameBounds.GetBR() + padding * zoom,//hintFrameBounds.GetTL() + (hintFrameBounds.GetSize() * ed::GetCurrentZoom()),
+		            				IM_COL32(255, 255, 255, 128 * bgAlpha / 255), 4.0f * zoom, ImDrawCornerFlags_All, zoom);
+		            		}
+                            else if (ImGui::IsItemHovered() || (window.CommentOpacity > -1.0f && window.HoveredCommentID == node.ID))
+                            {
+                                bool nodeHovered = ImGui::IsItemHovered();
+                                if (nodeHovered)
+                                    window.HoveredCommentID = node.ID;
+
+		            			auto zoom = node.CommentPinned ? ed::GetCurrentZoom() : 1.0f;
+		            			auto padding = ImVec2(2.5f, 2.5f);
+
+                                auto min = ed::GetNodePosition(node.ID) - ImVec2(0, padding.y * zoom * 2.0f);
+
+
+                                ImGui::SetCursorScreenPos(min - ImVec2(-8, ImGui::GetTextLineHeightWithSpacing() + 4));
+                                ImGui::PushStyleVar(ImGuiStyleVar_Alpha, window.CommentOpacity);
+                                if (ImGui::ImageButton((ImTextureID)m_CommentIcon->GetRendererID(), ImVec2(15.0f, 15.0f) * zoom, { 0, 1 }, { 1, 0 }, 2 * zoom)) { window.CommentOpacity = -2.5f; node.CommentEnabled = true; }
+                                ImGui::PopStyleVar();
+
+		            			if (ImGui::IsItemHovered() || nodeHovered)
+		            				window.CommentOpacity = std::min(window.CommentOpacity + 0.1f, 1.0f);
+		            			else
+		            				window.CommentOpacity = std::max(window.CommentOpacity - 0.1f, -2.5f);
                             }
 
-                    for (auto& pin : pins)
-                    {
-                        if (CanCreateLink(startPin, &pin))
-                        {
-                            spawnNodeFunction Function;
-                            ConversionAvalible(startPin, &pin, Function);
-                            if (Function == nullptr)
+                            ImGui::PopID();
+
+                            if (payloadVariable != nullptr)
                             {
+                                auto nodeId = node.ID;
 
-                                auto endPin = &pin;
-                                if (startPin->Kind == PinKind::Input)
-                                    std::swap(startPin, endPin);
+                                CheckLinkSafety(nullptr, payloadPin);
 
-                                CheckLinkSafety(startPin, endPin);
+                                if (payloadPin->Kind == PinKind::Output || payloadPin->Data.Type == PinType::Flow)
+                                {
+                                    auto variableNode = SpawnSetVariableNode({ payloadVariable->ID });
+                                    ImplicitExecuteableLinks(graph, payloadPin, variableNode);
+                                }
+                                else
+                                    SpawnGetVariableNode({ payloadVariable->ID });
 
-                                m_Links.emplace_back(Link(GetNextLinkId(), startPin->ID, endPin->ID));
-                                m_Links.back().Color = GetIconColor(startPin->Data.Type);
-
-                                break;
-                            }
-                            else
-                            {
-                                auto endPin = &pin;
-								if (startPin->Kind == PinKind::Input)
-									std::swap(endPin, startPin);
-                            
-								auto startNodeId = startPin->Node->ID;
-								auto endNodeId = endPin->Node->ID;
-                            
-                                CheckLinkSafety(startPin, endPin);
-                            
-								Node* node = (this->*Function)({});
-								ed::SetNodePosition(node->ID, (ed::GetNodePosition(startNodeId) + ed::GetNodePosition(endNodeId)) / 2);
-                            
-								m_Links.emplace_back(Link(GetNextLinkId(), startPin->ID, node->Inputs[0].ID));
-								m_Links.back().Color = GetIconColor(startPin->Data.Type);
-                                
-								m_Links.emplace_back(Link(GetNextLinkId(), node->Outputs[0].ID, endPin->ID));
-								m_Links.back().Color = GetIconColor(endPin->Data.Type);
+                                ed::SetNodePosition(graph.Nodes.back().ID, ImVec2(ed::GetNodePosition(nodeId).x + (payloadPin->Kind == PinKind::Input ? -250.0f : 250.0f), ImGui::GetMousePos().y));
+                                CreateLink(graph, &(payloadPin->Kind == PinKind::Input ? (graph.Nodes.back().Outputs[0]) : (graph.Nodes.back().Inputs[payloadPin->Data.Type == PinType::Flow ? 0 : 1])), payloadPin);
 
                                 BuildNodes();
-
-                                break;
                             }
                         }
+
+                    
+                        for (auto& node : graph.Nodes)
+                        {
+                            if (node.Type != NodeType::Tree)
+                                continue;
+                    
+                            const float rounding = 5.0f;
+                            const float padding  = 12.0f;
+                    
+                            const auto pinBackground = ed::GetStyle().Colors[ed::StyleColor_NodeBg];
+                    
+                            ed::PushStyleColor(ed::StyleColor_NodeBg,        ImColor(128, 128, 128, 200));
+                            ed::PushStyleColor(ed::StyleColor_NodeBorder,    ImColor( 32,  32,  32, 200));
+                            ed::PushStyleColor(ed::StyleColor_PinRect,       ImColor( 60, 180, 255, 150));
+                            ed::PushStyleColor(ed::StyleColor_PinRectBorder, ImColor( 60, 180, 255, 150));
+                    
+                            ed::PushStyleVar(ed::StyleVar_NodePadding,  ImVec4(0, 0, 0, 0));
+                            ed::PushStyleVar(ed::StyleVar_NodeRounding, rounding);
+                            ed::PushStyleVar(ed::StyleVar_SourceDirection, ImVec2(0.0f,  1.0f));
+                            ed::PushStyleVar(ed::StyleVar_TargetDirection, ImVec2(0.0f, -1.0f));
+                            ed::PushStyleVar(ed::StyleVar_LinkStrength, 0.0f);
+                            ed::PushStyleVar(ed::StyleVar_PinBorderWidth, 1.0f);
+                            ed::PushStyleVar(ed::StyleVar_PinRadius, 5.0f);
+                            ed::BeginNode(node.ID);
+                    
+                            ImGui::BeginVertical(node.ID.AsPointer());
+                            ImGui::BeginHorizontal("inputs");
+                            ImGui::Spring(0, padding * 2);
+                    
+                            ImRect inputsRect;
+                            int inputAlpha = 200;
+                            if (!node.Inputs.empty())
+                            {
+                                    auto& pin = node.Inputs[0];
+                                    ImGui::Dummy(ImVec2(0, padding));
+                                    ImGui::Spring(1, 0);
+                                    inputsRect = ImGui_GetItemRect();
+                    
+                                    ed::PushStyleVar(ed::StyleVar_PinArrowSize, 10.0f);
+                                    ed::PushStyleVar(ed::StyleVar_PinArrowWidth, 10.0f);
+                                    ed::PushStyleVar(ed::StyleVar_PinCorners, 12);
+                                    ed::BeginPin(pin.ID, ed::PinKind::Input);
+                                    ed::PinPivotRect(inputsRect.GetTL(), inputsRect.GetBR());
+                                    ed::PinRect(inputsRect.GetTL(), inputsRect.GetBR());
+                                    ed::EndPin();
+                                    ed::PopStyleVar(3);
+                    
+                                    if (m_NewLinkPin && !CanCreateLink(m_NewLinkPin, &pin) && &pin != m_NewLinkPin)
+                                        inputAlpha = (int)(255 * ImGui::GetStyle().Alpha * (48.0f / 255.0f));
+                            }
+                            else
+                                ImGui::Dummy(ImVec2(0, padding));
+                    
+                            ImGui::Spring(0, padding * 2);
+                            ImGui::EndHorizontal();
+                    
+                            ImGui::BeginHorizontal("content_frame");
+                            ImGui::Spring(1, padding);
+                    
+                            ImGui::BeginVertical("content", ImVec2(0.0f, 0.0f));
+                            ImGui::Dummy(ImVec2(160, 0));
+                            ImGui::Spring(1);
+                            ImGui::TextUnformatted(node.Name.c_str());
+                            ImGui::Spring(1);
+                            ImGui::EndVertical();
+                            auto contentRect = ImGui_GetItemRect();
+                    
+                            ImGui::Spring(1, padding);
+                            ImGui::EndHorizontal();
+                    
+                            ImGui::BeginHorizontal("outputs");
+                            ImGui::Spring(0, padding * 2);
+                    
+                            ImRect outputsRect;
+                            int outputAlpha = 200;
+                            if (!node.Outputs.empty())
+                            {
+                                auto& pin = node.Outputs[0];
+                                ImGui::Dummy(ImVec2(0, padding));
+                                ImGui::Spring(1, 0);
+                                outputsRect = ImGui_GetItemRect();
+                    
+                                ed::PushStyleVar(ed::StyleVar_PinCorners, 3);
+                                ed::BeginPin(pin.ID, ed::PinKind::Output);
+                                ed::PinPivotRect(outputsRect.GetTL(), outputsRect.GetBR());
+                                ed::PinRect(outputsRect.GetTL(), outputsRect.GetBR());
+                                ed::EndPin();
+                                ed::PopStyleVar();
+                    
+                                if (m_NewLinkPin && !CanCreateLink(m_NewLinkPin, &pin) && &pin != m_NewLinkPin)
+                                    outputAlpha = (int)(255 * ImGui::GetStyle().Alpha * (48.0f / 255.0f));
+                            }
+                            else
+                                ImGui::Dummy(ImVec2(0, padding));
+                    
+                            ImGui::Spring(0, padding * 2);
+                            ImGui::EndHorizontal();
+                    
+                            ImGui::EndVertical();
+                    
+                            ed::EndNode();
+                            ed::PopStyleVar(7);
+                            ed::PopStyleColor(4);
+                    
+                            auto drawList = ed::GetNodeBackgroundDrawList(node.ID);
+                    
+                            //const auto fringeScale = ImGui::GetStyle().AntiAliasFringeScale;
+                            //const auto unitSize    = 1.0f / fringeScale;
+                    
+                            //const auto ImDrawList_AddRect = [](ImDrawList* drawList, const ImVec2& a, const ImVec2& b, ImU32 col, float rounding, int rounding_corners, float thickness)
+                            //{
+                            //    if ((col >> 24) == 0)
+                            //        return;
+                            //    drawList->PathRect(a, b, rounding, rounding_corners);
+                            //    drawList->PathStroke(col, true, thickness);
+                            //};
+                    
+                            drawList->AddRectFilled(inputsRect.GetTL() + ImVec2(0, 1), inputsRect.GetBR(),
+                                IM_COL32((int)(255 * pinBackground.x), (int)(255 * pinBackground.y), (int)(255 * pinBackground.z), inputAlpha), 4.0f, 12);
+                            //ImGui::PushStyleVar(ImGuiStyleVar_AntiAliasFringeScale, 1.0f);
+                            drawList->AddRect(inputsRect.GetTL() + ImVec2(0, 1), inputsRect.GetBR(),
+                                IM_COL32((int)(255 * pinBackground.x), (int)(255 * pinBackground.y), (int)(255 * pinBackground.z), inputAlpha), 4.0f, 12);
+                            //ImGui::PopStyleVar();
+                            drawList->AddRectFilled(outputsRect.GetTL(), outputsRect.GetBR() - ImVec2(0, 1),
+                                IM_COL32((int)(255 * pinBackground.x), (int)(255 * pinBackground.y), (int)(255 * pinBackground.z), outputAlpha), 4.0f, 3);
+                            //ImGui::PushStyleVar(ImGuiStyleVar_AntiAliasFringeScale, 1.0f);
+                            drawList->AddRect(outputsRect.GetTL(), outputsRect.GetBR() - ImVec2(0, 1),
+                                IM_COL32((int)(255 * pinBackground.x), (int)(255 * pinBackground.y), (int)(255 * pinBackground.z), outputAlpha), 4.0f, 3);
+                            //ImGui::PopStyleVar();
+                            drawList->AddRectFilled(contentRect.GetTL(), contentRect.GetBR(), IM_COL32(24, 64, 128, 200), 0.0f);
+                            //ImGui::PushStyleVar(ImGuiStyleVar_AntiAliasFringeScale, 1.0f);
+                            drawList->AddRect(
+                                contentRect.GetTL(),
+                                contentRect.GetBR(),
+                                IM_COL32(48, 128, 255, 100), 0.0f);
+                            //ImGui::PopStyleVar();
+                        }
+                    
+                        for (auto& node : graph.Nodes)
+                        {
+                            if (node.Type != NodeType::Houdini)
+                                continue;
+                    
+                            const float rounding = 10.0f;
+                            const float padding  = 12.0f;
+                    
+                            ed::PushStyleColor(ed::StyleColor_NodeBg,        ImColor(229, 229, 229, 200));
+                            ed::PushStyleColor(ed::StyleColor_NodeBorder,    ImColor(125, 125, 125, 200));
+                            ed::PushStyleColor(ed::StyleColor_PinRect,       ImColor(229, 229, 229, 60));
+                            ed::PushStyleColor(ed::StyleColor_PinRectBorder, ImColor(125, 125, 125, 60));
+                    
+                            const auto pinBackground = ed::GetStyle().Colors[ed::StyleColor_NodeBg];
+                    
+                            ed::PushStyleVar(ed::StyleVar_NodePadding,  ImVec4(0, 0, 0, 0));
+                            ed::PushStyleVar(ed::StyleVar_NodeRounding, rounding);
+                            ed::PushStyleVar(ed::StyleVar_SourceDirection, ImVec2(0.0f,  1.0f));
+                            ed::PushStyleVar(ed::StyleVar_TargetDirection, ImVec2(0.0f, -1.0f));
+                            ed::PushStyleVar(ed::StyleVar_LinkStrength, 0.0f);
+                            ed::PushStyleVar(ed::StyleVar_PinBorderWidth, 1.0f);
+                            ed::PushStyleVar(ed::StyleVar_PinRadius, 6.0f);
+                            ed::BeginNode(node.ID);
+                    
+                            ImGui::BeginVertical(node.ID.AsPointer());
+                            if (!node.Inputs.empty())
+                            {
+                                ImGui::BeginHorizontal("inputs");
+                                ImGui::Spring(1, 0);
+                    
+                                ImRect inputsRect;
+                                int inputAlpha = 200;
+                                for (auto& pin : node.Inputs)
+                                {
+                                    ImGui::Dummy(ImVec2(padding, padding));
+                                    inputsRect = ImGui_GetItemRect();
+                                    ImGui::Spring(1, 0);
+                                    inputsRect.Min.y -= padding;
+                                    inputsRect.Max.y -= padding;
+                    
+                                    //ed::PushStyleVar(ed::StyleVar_PinArrowSize, 10.0f);
+                                    //ed::PushStyleVar(ed::StyleVar_PinArrowWidth, 10.0f);
+                                    ed::PushStyleVar(ed::StyleVar_PinCorners, 15);
+                                    ed::BeginPin(pin.ID, ed::PinKind::Input);
+                                    ed::PinPivotRect(inputsRect.GetCenter(), inputsRect.GetCenter());
+                                    ed::PinRect(inputsRect.GetTL(), inputsRect.GetBR());
+                                    ed::EndPin();
+                                    //ed::PopStyleVar(3);
+                                    ed::PopStyleVar(1);
+                    
+                                    auto drawList = ImGui::GetWindowDrawList();
+                                    drawList->AddRectFilled(inputsRect.GetTL(), inputsRect.GetBR(),
+                                        IM_COL32((int)(255 * pinBackground.x), (int)(255 * pinBackground.y), (int)(255 * pinBackground.z), inputAlpha), 4.0f, 15);
+                                    drawList->AddRect(inputsRect.GetTL(), inputsRect.GetBR(),
+                                        IM_COL32((int)(255 * pinBackground.x), (int)(255 * pinBackground.y), (int)(255 * pinBackground.z), inputAlpha), 4.0f, 15);
+                    
+                                    if (m_NewLinkPin && !CanCreateLink(m_NewLinkPin, &pin) && &pin != m_NewLinkPin)
+                                        inputAlpha = (int)(255 * ImGui::GetStyle().Alpha * (48.0f / 255.0f));
+                                }
+                    
+                                //ImGui::Spring(1, 0);
+                                ImGui::EndHorizontal();
+                            }
+                    
+                            ImGui::BeginHorizontal("content_frame");
+                            ImGui::Spring(1, padding);
+                    
+                            ImGui::BeginVertical("content", ImVec2(0.0f, 0.0f));
+                            ImGui::Dummy(ImVec2(160, 0));
+                            ImGui::Spring(1);
+                            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 0.0f, 0.0f, 1.0f));
+                            ImGui::TextUnformatted(node.Name.c_str());
+                            ImGui::PopStyleColor();
+                            ImGui::Spring(1);
+                            ImGui::EndVertical();
+                            auto contentRect = ImGui_GetItemRect();
+                    
+                            ImGui::Spring(1, padding);
+                            ImGui::EndHorizontal();
+                    
+                            if (!node.Outputs.empty())
+                            {
+                                ImGui::BeginHorizontal("outputs");
+                                ImGui::Spring(1, 0);
+                    
+                                ImRect outputsRect;
+                                int outputAlpha = 200;
+                                for (auto& pin : node.Outputs)
+                                {
+                                    ImGui::Dummy(ImVec2(padding, padding));
+                                    outputsRect = ImGui_GetItemRect();
+                                    ImGui::Spring(1, 0);
+                                    outputsRect.Min.y += padding;
+                                    outputsRect.Max.y += padding;
+                    
+                                    ed::PushStyleVar(ed::StyleVar_PinCorners, 3);
+                                    ed::BeginPin(pin.ID, ed::PinKind::Output);
+                                    ed::PinPivotRect(outputsRect.GetCenter(), outputsRect.GetCenter());
+                                    ed::PinRect(outputsRect.GetTL(), outputsRect.GetBR());
+                                    ed::EndPin();
+                                    ed::PopStyleVar();
+                    
+                                    auto drawList = ImGui::GetWindowDrawList();
+                                    drawList->AddRectFilled(outputsRect.GetTL(), outputsRect.GetBR(),
+                                        IM_COL32((int)(255 * pinBackground.x), (int)(255 * pinBackground.y), (int)(255 * pinBackground.z), outputAlpha), 4.0f, 15);
+                                    drawList->AddRect(outputsRect.GetTL(), outputsRect.GetBR(),
+                                        IM_COL32((int)(255 * pinBackground.x), (int)(255 * pinBackground.y), (int)(255 * pinBackground.z), outputAlpha), 4.0f, 15);
+                    
+                    
+                                    if (m_NewLinkPin && !CanCreateLink(m_NewLinkPin, &pin) && &pin != m_NewLinkPin)
+                                        outputAlpha = (int)(255 * ImGui::GetStyle().Alpha * (48.0f / 255.0f));
+                                }
+                    
+                                ImGui::EndHorizontal();
+                            }
+                    
+                            ImGui::EndVertical();
+                    
+                            ed::EndNode();
+                            ed::PopStyleVar(7);
+                            ed::PopStyleColor(4);
+                    
+                            auto drawList = ed::GetNodeBackgroundDrawList(node.ID);
+                    
+                            //const auto fringeScale = ImGui::GetStyle().AntiAliasFringeScale;
+                            //const auto unitSize    = 1.0f / fringeScale;
+                    
+                            //const auto ImDrawList_AddRect = [](ImDrawList* drawList, const ImVec2& a, const ImVec2& b, ImU32 col, float rounding, int rounding_corners, float thickness)
+                            //{
+                            //    if ((col >> 24) == 0)
+                            //        return;
+                            //    drawList->PathRect(a, b, rounding, rounding_corners);
+                            //    drawList->PathStroke(col, true, thickness);
+                            //};
+                    
+                            //drawList->AddRectFilled(inputsRect.GetTL() + ImVec2(0, 1), inputsRect.GetBR(),
+                            //    IM_COL32((int)(255 * pinBackground.x), (int)(255 * pinBackground.y), (int)(255 * pinBackground.z), inputAlpha), 4.0f, 12);
+                            //ImGui::PushStyleVar(ImGuiStyleVar_AntiAliasFringeScale, 1.0f);
+                            //drawList->AddRect(inputsRect.GetTL() + ImVec2(0, 1), inputsRect.GetBR(),
+                            //    IM_COL32((int)(255 * pinBackground.x), (int)(255 * pinBackground.y), (int)(255 * pinBackground.z), inputAlpha), 4.0f, 12);
+                            //ImGui::PopStyleVar();
+                            //drawList->AddRectFilled(outputsRect.GetTL(), outputsRect.GetBR() - ImVec2(0, 1),
+                            //    IM_COL32((int)(255 * pinBackground.x), (int)(255 * pinBackground.y), (int)(255 * pinBackground.z), outputAlpha), 4.0f, 3);
+                            ////ImGui::PushStyleVar(ImGuiStyleVar_AntiAliasFringeScale, 1.0f);
+                            //drawList->AddRect(outputsRect.GetTL(), outputsRect.GetBR() - ImVec2(0, 1),
+                            //    IM_COL32((int)(255 * pinBackground.x), (int)(255 * pinBackground.y), (int)(255 * pinBackground.z), outputAlpha), 4.0f, 3);
+                            ////ImGui::PopStyleVar();
+                            //drawList->AddRectFilled(contentRect.GetTL(), contentRect.GetBR(), IM_COL32(24, 64, 128, 200), 0.0f);
+                            //ImGui::PushStyleVar(ImGuiStyleVar_AntiAliasFringeScale, 1.0f);
+                            //drawList->AddRect(
+                            //    contentRect.GetTL(),
+                            //    contentRect.GetBR(),
+                            //    IM_COL32(48, 128, 255, 100), 0.0f);
+                            //ImGui::PopStyleVar();
+                        }
+                    
+                        for (auto& node : graph.Nodes)
+                        {
+                            if (node.Type != NodeType::Comment)
+                                continue;
+                    
+                            const float commentAlpha = 0.75f;
+                    
+                            ImGui::PushStyleVar(ImGuiStyleVar_Alpha, commentAlpha);
+                            ed::PushStyleColor(ed::StyleColor_NodeBg, ImColor(255, 255, 255, 64));
+                            ed::PushStyleColor(ed::StyleColor_NodeBorder, ImColor(255, 255, 255, 64));
+                            ed::BeginNode(node.ID);
+                            ImGui::PushID(node.ID.AsPointer());
+                            ImGui::BeginVertical("content");
+                            ImGui::BeginHorizontal("horizontal");
+                            ImGui::Spring(1);
+                            //ImGui::TextUnformatted(node.Name.c_str());
+
+                            //bool input;
+		            		char buffer[256];
+		            		memset(buffer, 0, sizeof(buffer));
+		            		std::strncpy(buffer, node.Name.c_str(), sizeof(buffer));
+                            ImGui::SetNextItemWidth(ImGui::GetItemRectSize().x);
+                            //bool tree, ret = ImGui::TreeNodeInput("##CommentName", ImGuiTreeNodeFlags_Leaf, buffer, sizeof(buffer), tree, input);
+                            bool input, clicked = ImGui::SelectableInput("##CommentName", node.Name.empty() ? 1.0f : ImGui::CalcTextSize(buffer).x, false, NULL, buffer, sizeof(buffer), input, ImGuiInputTextFlags_NoHorizontalScroll);
+                            //if (tree) ImGui::TreePop();
+		            		if (input) node.Name = std::string(buffer);
+
+
+                            ImGui::Spring(1);
+                            ImGui::EndHorizontal();
+                            const ImVec2 size = node.GroupBounds.Max - node.GroupBounds.Min;
+                            ed::Group(size.x != 0.0f ? size : node.Size);
+                            ImGui::EndVertical();
+                            ImGui::PopID();
+                            ed::EndNode();if (ed::BeginGroupHint(node.ID))
+                            {
+                                //auto alpha   = static_cast<int>(commentAlpha * ImGui::GetStyle().Alpha * 255);
+                                auto bgAlpha = static_cast<int>(ImGui::GetStyle().Alpha * 255);
+                    
+                                //ImGui::PushStyleVar(ImGuiStyleVar_Alpha, commentAlpha * ImGui::GetStyle().Alpha);
+                    
+                                auto min = ed::GetGroupMin();
+                                //auto max = ed::GetGroupMax();
+                    
+                                ImGui::SetCursorScreenPos(min - ImVec2(-8, ImGui::GetTextLineHeightWithSpacing() + 4));
+                                ImGui::BeginGroup();
+                                ImGui::TextUnformatted(node.Name.c_str());
+                                ImGui::EndGroup();
+                    
+                                auto drawList = ed::GetHintBackgroundDrawList();
+                    
+                                auto hintBounds      = ImGui_GetItemRect();
+                                auto hintFrameBounds = ImRect_Expanded(hintBounds, 8, 4);
+                    
+                                drawList->AddRectFilled(
+                                    hintFrameBounds.GetTL(),
+                                    hintFrameBounds.GetBR(),
+                                    IM_COL32(255, 255, 255, 64 * bgAlpha / 255), 4.0f);
+                    
+                                drawList->AddRect(
+                                    hintFrameBounds.GetTL(),
+                                    hintFrameBounds.GetBR(),
+                                    IM_COL32(255, 255, 255, 128 * bgAlpha / 255), 4.0f);
+                    
+                                //ImGui::PopStyleVar();
+                            }
+                            ed::EndGroupHint();
+                            ed::PopStyleColor(2);
+                            ImGui::PopStyleVar();
+                    
+		            		// Drawing shadows beneath nodes
+		            		auto& pos = ed::GetNodePosition(node.ID) - ImVec2(10.0f, 10.0f);
+		            		auto& shadowSize = ed::GetNodeSize(node.ID) + ImVec2(20.0f, 20.0f);
+		            		auto drawList = ImGui::GetWindowDrawList();
+
+		            		const int vert_start_idx = drawList->VtxBuffer.Size;
+		            		drawList->AddRect(pos, pos + shadowSize, ImColor(0, 0, 0, 75), ed::GetStyle().NodeRounding + 5.0f, 15, 20.0f);
+		            		const int vert_end_idx = drawList->VtxBuffer.Size;
+		            		ImDrawVert* vert_start = drawList->VtxBuffer.Data + vert_start_idx;
+		            		ImDrawVert* vert_end = drawList->VtxBuffer.Data + vert_end_idx;
+		            		for (ImDrawVert* vert = vert_start; vert < vert_end; vert++)
+		            			if (vert->pos.x < pos.x || vert->pos.y < pos.y || vert->pos.x > pos.x + shadowSize.x || vert->pos.y > pos.y + shadowSize.y || (pos.y + shadowSize.y - vert->pos.y) > shadowSize.y * 0.5f)
+		            				vert->col = ImGui::ColorConvertFloat4ToU32(ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+                            
+                        }
+                    
+                        for (auto& link : graph.Links)
+                            ed::Link(link.ID, link.StartPinID, link.EndPinID, link.Color, 2.0f);
+                    
+                        if (!m_CreateNewNode)
+                        {
+                            ed::BeginCreate(m_CurrentLinkColor, 10.0f);
+                            ed::EndCreate();
+
+                            if (ed::BeginCreate(m_CurrentLinkColor, 2.0f))
+                            {
+                                auto showLabel = [](const char* label, ImColor color)
+                                {
+                                    ImGui::SetCursorPosY(ImGui::GetCursorPosY() - ImGui::GetTextLineHeight());
+                                    auto size = ImGui::CalcTextSize(label);
+                    
+                                    auto padding = ImGui::GetStyle().FramePadding;
+                                    auto spacing = ImGui::GetStyle().ItemSpacing;
+                    
+                                    ImGui::SetCursorPos(ImGui::GetCursorPos() + ImVec2(spacing.x, -spacing.y));
+                    
+                                    auto rectMin = ImGui::GetCursorScreenPos() - padding;
+                                    auto rectMax = ImGui::GetCursorScreenPos() + size + padding;
+                    
+                                    auto drawList = ImGui::GetWindowDrawList();
+                                    drawList->AddRectFilled(rectMin, rectMax, color, size.y * 0.15f);
+                                    ImGui::TextUnformatted(label);
+                                };
+
+                                ed::PinId startPinId = 0, endPinId = 0;
+                                if (ed::QueryNewLink(&startPinId, &endPinId))
+                                {
+                                    if (startPinId.Get() == 0)
+                                        DY_ASSERT(false);
+
+                                    auto startPin = FindPin(startPinId);
+                                    auto endPin   = FindPin(endPinId);
+                    
+                                    m_NewLinkPin = startPin ? startPin : endPin;
+                    
+                                    if (startPin->Kind == PinKind::Input)
+                                    {
+                                        std::swap(startPin, endPin);
+                                        std::swap(startPinId, endPinId);
+                                    }
+                    
+                                    if (startPin && endPin)
+                                    {
+                                        if (endPin == startPin)
+                                        {
+                                            ed::RejectNewItem(ImColor(255, 0, 0), 2.0f);
+                                        }
+                                        else if (endPin->Kind == startPin->Kind)
+                                        {
+                                            showLabel("x Incompatible Pin Kind", ImColor(45, 32, 32, 180));
+                                            ed::RejectNewItem(ImColor(255, 0, 0), 2.0f);
+                                        }
+                                        else if (endPin->Node == startPin->Node)
+                                        {
+                                            showLabel("x Cannot connect to self", ImColor(45, 32, 32, 180));
+                                            ed::RejectNewItem(ImColor(255, 0, 0), 1.0f);
+                                        }
+                                        else if (endPin->Data.Type != startPin->Data.Type || endPin->Data.Container != startPin->Data.Container)
+                                        {
+                                            if (auto convertFunction = GetConversionAvalible(startPin, endPin))
+                                            {
+                                                showLabel("+ Create Conversion", ImColor(32, 45, 32, 180));
+                                                if (ed::AcceptNewItem(ImColor(128, 206, 244), 4.0f))
+                                                {
+                                                    auto startNodeId = startPin->Node->ID;
+                                                    auto endNodeId = endPin->Node->ID;
+
+                                                    CheckLinkSafety(startPin, endPin);
+
+                                                    Node* node = SpawnNodeFromLibrary(convertFunction, graph);
+
+                                                    ImVec2 pos = (ed::GetNodePosition(startNodeId) + ed::GetNodePosition(endNodeId)) / 2;
+                                                    ed::SetNodePosition(node->ID, pos);
+                                                    
+                                                    CreateLink(graph, startPin, &node->Inputs[0]);
+                                                    CreateLink(graph, &node->Outputs[0], endPin);
+
+                                                    BuildNodes();
+                                                }
+                                            }
+                                            else if (endPin->Data.Type != startPin->Data.Type)
+                                            {
+                                                showLabel("x Incompatible Pin Type", ImColor(45, 32, 32, 180));
+                                                ed::RejectNewItem(ImColor(255, 128, 128), 1.0f);
+                                            }
+                                            else
+                                            {
+                                                showLabel("x Incompatible Pin Container", ImColor(45, 32, 32, 180));
+                                                ed::RejectNewItem(ImColor(255, 0, 0), 1.0f);
+                                            }
+                                        }
+                                        else
+                                        {
+                                            showLabel("+ Create Link", ImColor(32, 45, 32, 180));
+                                            if (ed::AcceptNewItem(ImColor(128, 255, 128), 4.0f))
+                                                CreateLink(graph, startPin, endPin);
+                                        }
+                                    }
+                                }
+                    
+                                ed::PinId pinId = 0;
+                                if (ed::QueryNewNode(&pinId))
+                                {
+                                    m_NewLinkPin = FindPin(pinId);
+                                    if (m_NewLinkPin)
+                                        showLabel("+ Create Node", ImColor(32, 45, 32, 180));
+                    
+                                    if (ed::AcceptNewItem())
+                                    {
+                                        ResetSearchArea();
+                                        m_CreateNewNode  = true;
+                                        m_NewNodeLinkPin = FindPin(pinId);
+                                        m_NewLinkPin = nullptr;
+                                        ed::Suspend();
+                                        ImGui::OpenPopup("Create New Node");
+		            					UpdateSearchData();
+                                        ed::Resume();
+                                        m_NewNodePosition = ed::ScreenToCanvas(ImGui::GetMousePos());
+                                    }
+                                }
+                            }
+                            else
+                            m_NewLinkPin = nullptr;
+                    
+                            ed::EndCreate();
+                    
+                            if (ed::BeginDelete())
+                            {
+                                ed::LinkId linkId = 0;
+                                while (ed::QueryDeletedLink(&linkId))
+                                {
+                                    if (ed::AcceptDeletedItem())
+                                    {
+                                        auto id = std::find_if(graph.Links.begin(), graph.Links.end(), [linkId](auto& link) { return link.ID == linkId; });
+                                        if (id != graph.Links.end())
+                                            graph.Links.erase(id);
+                                    }
+                                }
+                    
+                                ed::NodeId nodeId = 0;
+                                while (ed::QueryDeletedNode(&nodeId))
+                                {
+                                    if (ed::AcceptDeletedItem())
+                                    {
+                                        auto id = std::find_if(graph.Nodes.begin(), graph.Nodes.end(), [nodeId](auto& node) { return node.ID == nodeId; });
+                                        if (id != graph.Nodes.end())
+                                            graph.Nodes.erase(id);
+                                    }
+                                }
+                            }
+                            ed::EndDelete();
+                        }
+                    
+                        ImGui::SetCursorScreenPos(cursorTopLeft);
                     }
-                }
-                BuildNodes();
-            }
-        
-            ImGui::EndPopup();
-        }
-        else
-        m_CreateNewNode = false;
-        ImGui::PopStyleVar();
-        ed::Resume();
+                    
+# if 1
+                    ed::Suspend();
+                    if (ed::ShowNodeContextMenu(&m_ContextNodeId))
+                        ImGui::OpenPopup("Node Context Menu");
+                    else if (ed::ShowPinContextMenu(&m_ContextPinId))
+                        ImGui::OpenPopup("Pin Context Menu");
+                    else if (ed::ShowLinkContextMenu(&m_ContextLinkId))
+                        ImGui::OpenPopup("Link Context Menu");
+                    else if (ed::ShowBackgroundContextMenu())
+                    {
+
+                        ImGui::OpenPopup("Create New Node");
+                        ResetSearchArea();
+                        UpdateSearchData();
+                        m_NewNodeLinkPin = nullptr;
+                        m_NewNodePosition = ed::ScreenToCanvas(ImGui::GetMousePos());
+                    }
+                    ed::Resume();
+                    
+                    ed::Suspend();
+                    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 8));
+                    if (ImGui::BeginPopup("Node Context Menu"))
+                    {
+                        auto node = FindNode(m_ContextNodeId);
+                    
+                        ImGui::TextUnformatted("Node Context Menu");
+                        ImGui::Separator();
+                        if (node)
+                        {
+                            ImGui::Text("ID: %p", node->ID.AsPointer());
+                            ImGui::Text("Type: %s", node->Type == NodeType::Blueprint ? "Blueprint" : (node->Type == NodeType::Tree ? "Tree" : "Comment"));
+                            ImGui::Text("Inputs: %d", (int)node->Inputs.size());
+                            ImGui::Text("Outputs: %d", (int)node->Outputs.size());
+                        }
+                        else
+                            ImGui::Text("Unknown node: %p", m_ContextNodeId.AsPointer());
+                        ImGui::Separator();
+                        if (ImGui::MenuItem("Find References"))
+                        {
+                            ImGui::SetWindowFocus("Find Results");
+                            FindResultsSearch(node->Name);
+                        }
+
+                        if (ImGui::MenuItem("Duplicate"))
+                            DuplicateNodes();
+                        if (ImGui::MenuItem("Delete"))
+                            ed::DeleteNode(m_ContextNodeId);
+                        ImGui::EndPopup();
+                    }
+                    
+                    if (ImGui::BeginPopup("Pin Context Menu"))
+                    {
+                        auto pin = FindPin(m_ContextPinId);
+                    
+                        ImGui::TextUnformatted("Pin Context Menu");
+                        ImGui::Separator();
+                        if (pin)
+                        {
+                            ImGui::Text("ID: %p", pin->ID.AsPointer());
+                            if (pin->Node)
+                                ImGui::Text("Node: %p", pin->Node->ID.AsPointer());
+                            else
+                                ImGui::Text("Node: %s", "<none>");
+                            ImGui::Separator();
+                            if (pin->Data.Type != PinType::Flow)
+                                if (ImGui::MenuItem("Promote To Variable"))
+                                {
+                                    AddVariable(pin->Name == "Return Value" ? "" : pin->Name, pin->Data.Type);
+
+                                    CheckLinkSafety(nullptr, pin);
+
+                                    bool in = pin->Kind == PinKind::Input;
+                                    ImVec2 pos = ed::GetNodePosition(pin->Node->ID) + ImVec2(in ? -250.0f : 250.0f, 0.0f);
+                                    Node* node;
+                                    if (in)
+		            				    node = SpawnGetVariableNode({ m_Variables.back().ID });
+                                    else
+                                    {
+		            				    node = SpawnSetVariableNode({ m_Variables.back().ID });
+                                        ImplicitExecuteableLinks(graph, pin, node);
+                                    }
+		            				ed::SetNodePosition(node->ID, pos);
+
+                                    CreateLink(graph, &(in ? node->Outputs[0] : node->Inputs[1]), pin);
+
+                                    BuildNodes();
+                                }
+                            if (pin->Deletable)
+                                if (ImGui::MenuItem("Remove Pin"))
+                                {
+                                    for (auto& link : graph.Links)
+                                        if (link.StartPinID == pin->ID || link.EndPinID == pin->ID)
+                                            ed::DeleteLink(link.ID);
+
+                                    auto& outputs = pin->Node->Outputs;
+                                    auto& inputs = pin->Node->Inputs;
+                                    auto& node = pin->Node;
+                                    if (pin->Kind == PinKind::Output)
+                                        for (int i = 0; i < outputs.size(); i++)
+                                        {
+                                            if (outputs[i].ID == pin->ID)
+                                            {
+                                                outputs.erase(outputs.begin() + i);
+                                                break;
+                                            }
+                                        }
+                                    else
+		            					for (int i = 0; i < inputs.size(); i++)
+		            					{
+		            						if (inputs[i].ID == pin->ID)
+		            						{
+                                                inputs.erase(inputs.begin() + i);
+		            							break;
+		            						}
+		            					}
+
+                                    if (node->Name == "Sequence")
+                                        for (int i = 0; i < node->Outputs.size(); i++)
+                                            node->Outputs[i].Name = std::to_string(i);
+
+                                    BuildNodes();
+                                }
+
+                        }
+                        else
+                            ImGui::Text("Unknown pin: %p", m_ContextPinId.AsPointer());
+                    
+                        ImGui::EndPopup();
+                    }
+                    
+                    if (ImGui::BeginPopup("Link Context Menu"))
+                    {
+                        auto link = FindLink(m_ContextLinkId);
+                    
+                        ImGui::TextUnformatted("Link Context Menu");
+                        ImGui::Separator();
+                        if (link)
+                        {
+                            ImGui::Text("ID: %p", link->ID.AsPointer());
+                            ImGui::Text("From: %p", link->StartPinID.AsPointer());
+                            ImGui::Text("To: %p", link->EndPinID.AsPointer());
+                        }
+                        else
+                            ImGui::Text("Unknown link: %p", m_ContextLinkId.AsPointer());
+                        ImGui::Separator();
+                        if (ImGui::MenuItem("Delete"))
+                            ed::DeleteLink(m_ContextLinkId);
+                        ImGui::EndPopup();
+                    }
+				    
+                    if (m_DefaultColorPickerPosition.x != FLT_MAX)
+                    {
+                        ImGui::OpenPopup("###DefaultValueColorPicker");
+                        ImGui::SetNextWindowPos(m_DefaultColorPickerPosition);
+                        m_DefaultColorPickerPosition = { FLT_MAX, FLT_MAX };
+                    }
+				    if (ImGui::BeginPopup("###DefaultValueColorPicker"))
+				    {
+
+				    	ImGuiContext& g = *GImGui;
+				    	const float square_sz = ImGui::GetFrameHeight();
+
+				    	ImGuiColorEditFlags picker_flags_to_forward = ImGuiColorEditFlags__DataTypeMask | ImGuiColorEditFlags__PickerMask | ImGuiColorEditFlags__InputMask | ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_AlphaBar;
+				    	ImGuiColorEditFlags picker_flags = (ImGuiColorEditFlags_NoInputs & picker_flags_to_forward) | ImGuiColorEditFlags__DisplayMask | ImGuiColorEditFlags_NoLabel | ImGuiColorEditFlags_AlphaPreviewHalf;
+				        ImGui::SetNextItemWidth(square_sz * 12.0f); // Use 256 + bar sizes?
+                        if (m_DefaultColorPickerValue != nullptr)
+				    	    ImGui::ColorPicker4("##picker", m_DefaultColorPickerValue, picker_flags, &g.ColorPickerRef.x);
+				    	ImGui::EndPopup();
+				    }
+                    
+                    ImGui::SetNextWindowSize(ImVec2(400.0f, 400.0f));
+                    if (ImGui::BeginPopup("Create New Node"))
+                    {
+                        Node* node = nullptr;
+                    
+                        ImGui::Text("All Actions for this File");
+                        ImGui::SameLine();
+                        ImGui::Dummy(ImVec2(100.0f, 0.0f));
+                        ImGui::SameLine();
+                        if (ImGui::Custom::Checkbox("##NodeSearchPopupContextSensitiveCheckbox", &m_ContextSensitive))
+                            UpdateSearchData();
+                        ImGui::SameLine();
+                        ImGui::Text("Context Sensitive");
+                    
+                        static bool SetKeyboardFocus = false;
+                    
+                        if (SetKeyboardFocus)
+                        {
+                            ImGui::SetKeyboardFocusHere();
+                            SetKeyboardFocus = false;
+                        }
+                    
+                        if (m_ResetSearchArea)
+                        {
+                            SetKeyboardFocus = true;
+                        }
+                    
+                        // Search bar Input
+		            	char buffer[256];
+		            	memset(buffer, 0, sizeof(buffer));
+		            	std::strncpy(buffer, m_SearchBuffer.c_str(), sizeof(buffer));
+                    
+                        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvailWidth());
+                        if (ImGui::InputTextWithHint("##NodeEditorSearchBar", "Search:", buffer, sizeof(buffer)))
+                        {
+                            m_SearchBuffer = std::string(buffer);
+                            UpdateSearchData();
+                        }
+                    
+                        if (((m_SearchBuffer != m_PreviousSearchBuffer) || m_ResetSearchArea))
+                        {
+                            if (m_SearchBuffer == "") CloseSearchList(&m_SearchData);
+                            else OpenSearchList(&m_SearchData);
+                        }
+                    
+                        //node = DisplaySearchData(&m_SearchData, m_SearchBuffer);
+
+                        //ImGui::BeginChild("##NewNodeSearchDisplay", ImVec2(), false, ImGuiWindowFlags_NoNav);
+                        SearchResultData* data = DisplaySearchData(m_SearchData);
+                        //ImGui::EndChild();
+                        if (data != nullptr)
+                        {
+                            if (data->Function)
+                            {
+                                data->SpawnData.GraphID = graph.ID;
+                                node = (this->*(data->Function))(data->SpawnData);
+                            }
+                            else
+                                node = SpawnNodeFromLibrary(data->ID, graph);
+                        }
+                    
+                        m_ResetSearchArea = false;
+                        m_PreviousSearchBuffer = m_SearchBuffer;
+                    
+                        if (node)
+                        {
+                            BuildNodes();
+                    
+                            m_CreateNewNode = false;
+
+                            if (node->Type != NodeType::Comment || ed::GetSelectedObjectCount() == 0)
+                                ed::SetNodePosition(node->ID, m_NewNodePosition);
+                    
+                            if (auto startPin = m_NewNodeLinkPin)
+                            {
+                                auto& pins = startPin->Kind == PinKind::Input ? node->Outputs : node->Inputs;
+
+                                ImplicitExecuteableLinks(graph, startPin, node);
+
+                                for (auto& pin : pins)
+                                {
+                                    if (CanCreateLink(startPin, &pin))
+                                    {
+                                        auto convertFunction = GetConversionAvalible(startPin, &pin);
+                                        if (!convertFunction)
+                                        {
+                                            CreateLink(graph, startPin, &pin);
+                                            break;
+                                        }
+                                        else
+                                        {
+                                            auto endPin = &pin;
+		            						if (startPin->Kind == PinKind::Input)
+		            							std::swap(endPin, startPin);
+                                        
+		            						auto startNodeId = startPin->Node->ID;
+		            						auto endNodeId = endPin->Node->ID;
+                                        
+                                            CheckLinkSafety(startPin, endPin);
+                                        
+		            						Node* node = SpawnNodeFromLibrary(convertFunction, graph);
+		            						ed::SetNodePosition(node->ID, (ed::GetNodePosition(startNodeId) + ed::GetNodePosition(endNodeId)) / 2);
+                                            
+                                            CreateLink(graph, startPin, &node->Inputs[0]);
+                                            CreateLink(graph, &node->Outputs[0], endPin);
+                                            
+                                            BuildNodes();
+
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                            BuildNodes();
+                        }
+                    
+                        ImGui::EndPopup();
+                    }
+                    else
+                        m_CreateNewNode = false;
+                    ImGui::PopStyleVar();
+                    ed::Resume();
 # endif
-        
-    /*  
-        cubic_bezier_t c;
-        c.p0 = pointf(100, 600);
-        c.p1 = pointf(300, 1200);
-        c.p2 = pointf(500, 100);
-        c.p3 = pointf(900, 600);
-        
-        auto drawList = ImGui::GetWindowDrawList();
-        auto offset_radius = 15.0f;
-        auto acceptPoint = [drawList, offset_radius](const bezier_subdivide_result_t& r)
-        {
-            drawList->AddCircle(to_imvec(r.point), 4.0f, IM_COL32(255, 0, 255, 255));
-        
-            auto nt = r.tangent.normalized();
-            nt = pointf(-nt.y, nt.x);
-        
-            drawList->AddLine(to_imvec(r.point), to_imvec(r.point + nt * offset_radius), IM_COL32(255, 0, 0, 255), 1.0f);
-        };
-        
-        drawList->AddBezierCurve(to_imvec(c.p0), to_imvec(c.p1), to_imvec(c.p2), to_imvec(c.p3), IM_COL32(255, 255, 255, 255), 1.0f);
-        cubic_bezier_subdivide(acceptPoint, c);
-    */
+                    
+        /*          
+                    cubic_bezier_t c;
+                    c.p0 = pointf(100, 600);
+                    c.p1 = pointf(300, 1200);
+                    c.p2 = pointf(500, 100);
+                    c.p3 = pointf(900, 600);
+                    
+                    auto drawList = ImGui::GetWindowDrawList();
+                    auto offset_radius = 15.0f;
+                    auto acceptPoint = [drawList, offset_radius](const bezier_subdivide_result_t& r)
+                    {
+                        drawList->AddCircle(to_imvec(r.point), 4.0f, IM_COL32(255, 0, 255, 255));
+                    
+                        auto nt = r.tangent.normalized();
+                        nt = pointf(-nt.y, nt.x);
+                    
+                        drawList->AddLine(to_imvec(r.point), to_imvec(r.point + nt * offset_radius), IM_COL32(255, 0, 0, 255), 1.0f);
+                    };
+                    
+                    drawList->AddBezierCurve(to_imvec(c.p0), to_imvec(c.p1), to_imvec(c.p2), to_imvec(c.p3), IM_COL32(255, 255, 255, 255), 1.0f);
+                    cubic_bezier_subdivide(acceptPoint, c);
+        */
 
-        ed::End();
+                    // Update Node Position and Size (using group bounds) for all windows.
 
-        ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[2]);
-        ImGui::GetWindowDrawList()->AddText(ImGui::GetWindowPos() + ImGui::GetWindowSize() - ImGui::CalcTextSize("SCRIPTING") - ImVec2(20.0f, 20.0f), IM_COL32(255, 255, 255, 50), "SCRIPTING");
-        ImGui::PopFont();
+				    for (auto& node : graph.Nodes)
+				    {
+				    	auto& nodePos = ed::GetNodePosition(node.ID);
+				    	if ((nodePos.x != node.Position.x || nodePos.y != node.Position.y) && (nodePos.x != FLT_MAX && nodePos.y != FLT_MAX))
+				    	{
+							// Updating Bounds held internally
+                            if (node.Type == NodeType::Comment)
+                            {
+                                ImVec2 min, max;
+                                ed::GetNodeBounds(node.ID, min, max);
+							    node.GroupBounds = ImRect(min, max);
+                            }
 
-		// Shadows
-		auto drawList = ImGui::GetWindowDrawList();
-		const ImVec4& borderCol = ImGui::GetStyleColorVec4(ImGuiCol_BorderShadow);
-		const ImU32& minColor = ImGui::ColorConvertFloat4ToU32({ borderCol.x, borderCol.y, borderCol.z, 0.0f });
-		const ImU32& maxColor = ImGui::ColorConvertFloat4ToU32({ borderCol.x, borderCol.y, borderCol.z, 0.25f });
-        const float size = 75.0f;
-		drawList->AddRectFilledMultiColor(ImGui::GetWindowPos(), ImGui::GetWindowPos() + ImVec2(size, ImGui::GetWindowSize().y), maxColor, minColor, minColor, maxColor);
-		drawList->AddRectFilledMultiColor(ImGui::GetWindowPos(), ImGui::GetWindowPos() + ImVec2(ImGui::GetWindowSize().x, size), maxColor, maxColor, minColor, minColor);
-		drawList->AddRectFilledMultiColor(ImGui::GetWindowPos() + ImGui::GetWindowSize(), ImGui::GetWindowPos() + ImGui::GetWindowSize() - ImVec2(size, ImGui::GetWindowSize().y), maxColor, minColor, minColor, maxColor);
-		drawList->AddRectFilledMultiColor(ImGui::GetWindowPos() + ImGui::GetWindowSize(), ImGui::GetWindowPos() + ImGui::GetWindowSize() - ImVec2(ImGui::GetWindowSize().x, size), maxColor, maxColor, minColor, minColor);
+				    		node.Position = nodePos;
+				    		for (auto& otherWindow : m_Windows)
+				    			if (otherWindow.GraphID == graph.ID && window.ID != otherWindow.ID)
+				    			{
+				    				ed::SetCurrentEditor(otherWindow.InternalEditor);
+				    				ed::SetNodePosition(node.ID, nodePos);
+				    				ed::SetCurrentEditor(window.InternalEditor);
+				    			}
+				    	}
+                        if (node.Type == NodeType::Comment)
+                        {
+                            auto& nodeSize = ed::GetNodeSize(node.ID);
+                            if ((nodeSize.x != node.Size.x || nodeSize.y != node.Size.y) && (nodeSize.x != 0 && nodeSize.y != 0))
+                            {
+                                // Updating Bounds held internally
+								ImVec2 min, max;
+								ed::GetNodeBounds(node.ID, min, max);
+								node.GroupBounds = ImRect(min, max);
 
-        ImGui::End();
+                                node.Size = nodeSize;
+                                for (auto& otherWindow : m_Windows)
+                                    if (otherWindow.GraphID == graph.ID && window.ID != otherWindow.ID)
+                                    {
+                                        ed::SetCurrentEditor(otherWindow.InternalEditor);
+                                        ed::SetNodeBounds(node.ID, min, max);
+                                        ed::SetCurrentEditor(window.InternalEditor);
+                                    }
+                            }
+                        }
+				    }
+
+
+                    ed::End();
+
+                    ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[2]);
+                    ImGui::GetWindowDrawList()->AddText(ImGui::GetWindowPos() + ImGui::GetWindowSize() - ImGui::CalcTextSize("SCRIPTING") - ImVec2(20.0f, 20.0f), IM_COL32(255, 255, 255, 50), "SCRIPTING");
+                    ImGui::PopFont();
+
+		            // Shadows
+		            auto drawList = ImGui::GetWindowDrawList();
+		            const ImVec4& borderCol = ImGui::GetStyleColorVec4(ImGuiCol_BorderShadow);
+		            const ImU32& minColor = ImGui::ColorConvertFloat4ToU32({ borderCol.x, borderCol.y, borderCol.z, 0.0f });
+		            const ImU32& maxColor = ImGui::ColorConvertFloat4ToU32({ borderCol.x, borderCol.y, borderCol.z, 0.25f });
+                    const float size = 75.0f;
+		            drawList->AddRectFilledMultiColor(ImGui::GetWindowPos(), ImGui::GetWindowPos() + ImVec2(size, ImGui::GetWindowSize().y), maxColor, minColor, minColor, maxColor);
+		            drawList->AddRectFilledMultiColor(ImGui::GetWindowPos(), ImGui::GetWindowPos() + ImVec2(ImGui::GetWindowSize().x, size), maxColor, maxColor, minColor, minColor);
+		            drawList->AddRectFilledMultiColor(ImGui::GetWindowPos() + ImGui::GetWindowSize(), ImGui::GetWindowPos() + ImGui::GetWindowSize() - ImVec2(size, ImGui::GetWindowSize().y), maxColor, minColor, minColor, maxColor);
+		            drawList->AddRectFilledMultiColor(ImGui::GetWindowPos() + ImGui::GetWindowSize(), ImGui::GetWindowPos() + ImGui::GetWindowSize() - ImVec2(ImGui::GetWindowSize().x, size), maxColor, maxColor, minColor, minColor);
+                }
+
+                ImGui::End();
+                ImGui::PopID();
+
+                if (!open)
+                    m_Windows.erase(m_Windows.begin() + i);
+            }
+        }
     
     	ImGui::SetNextWindowClass(&windowClass);
     	ImGui::Begin("Nodes", NULL, ImGuiWindowFlags_NoNavFocus);
@@ -5563,87 +5924,125 @@ void NodeEditorInternal::OnImGuiRender()
 		const ImGuiTreeNodeFlags treeNodeFlags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_AllowItemOverlap | ImGuiTreeNodeFlags_FramePadding;
 		ImVec2 contentRegionAvailable = ImGui::GetContentRegionAvail();
 
-		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2{ 4, 4 });
-		float lineHeight = GImGui->Font->FontSize + GImGui->Style.FramePadding.y * 2.0f;
-		bool open = ImGui::TreeNodeEx("##VariablesList", treeNodeFlags, "VARIABLES");
-		ImGui::PopStyleVar();
-		ImGui::SameLine(contentRegionAvailable.x - lineHeight * 0.5f);
-		if (ImGui::Button("+", ImVec2{ lineHeight, lineHeight }))
-		{
-			std::vector<std::string> vec;
-			for (auto& var : m_Variables)
-				vec.push_back(var.Name);
-
-            m_Variables.emplace_back(Variable(GetNextId(), Dymatic::String::GetNextNameWithIndex(vec, "NewVar"), PinType::Bool));
-		}
-        if (open)
         {
-			for (int i = 0; i < m_Variables.size(); i++)
-		    {
-                auto& variable = m_Variables[i];
+            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2{ 4, 4 });
+            float lineHeight = GImGui->Font->FontSize + GImGui->Style.FramePadding.y * 2.0f;
+            bool open = ImGui::TreeNodeEx("##VariablesList", treeNodeFlags, "VARIABLES");
+            ImGui::PopStyleVar();
+            ImGui::SameLine(contentRegionAvailable.x - lineHeight * 0.5f);
+            if (ImGui::Button("+", ImVec2{ lineHeight, lineHeight }))
+                AddVariable();
+            if (open)
+            {
+                for (int i = 0; i < m_Variables.size(); i++)
+                {
+                    auto& variable = m_Variables[i];
+                    bool isDeleted = false, isDuplicated = false;
 
-		        ImGui::PushID(variable.ID);
-		    	ImGuiTreeNodeFlags flags = ((variable.ID == m_SelectedVariable) ? ImGuiTreeNodeFlags_Selected : 0) | ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_SpanAvailWidth;
-		    
-		    	char buffer[256];
-		    	memset(buffer, 0, sizeof(buffer));
-		    	std::strncpy(buffer, variable.Name.c_str(), sizeof(buffer));
-		        bool input;
+                    ImGui::PushID(variable.ID);
 
-				bool clicked = ImGui::SelectableInput("##VariableTree", ImGui::GetContentRegionAvail().x, m_SelectedVariable == variable.ID, flags, buffer, sizeof(buffer), input);
-                
-                if (ImGui::IsItemHovered() && variable.Tooltip != "")
-                    ImGui::SetTooltip(variable.Tooltip.c_str());
-		        if (input) variable.Name = std::string(buffer);
+                    char buffer[256];
+                    memset(buffer, 0, sizeof(buffer));
+                    std::strncpy(buffer, variable.Name.c_str(), sizeof(buffer));
+                    bool input;
 
-				if (ImGui::BeginDragDropSource())
-				{
-					ImGui::SetDragDropPayload("NODE_EDITOR_VARIABLE", &i, sizeof(i), ImGuiCond_Once);
-					ImGui::Text(variable.Name.c_str());
-					ImGui::EndDragDropSource();
-				}
+                    bool clicked = ImGui::SelectableInput("##VariableTree", ImGui::GetContentRegionAvail().x, m_SelectedVariable == variable.ID, ImGuiSelectableFlags_None, buffer, sizeof(buffer), input);
 
-                if (clicked) m_SelectedVariable = variable.ID;
-		    
-		    	if (ImGui::BeginPopupContextItem())
-		    	{
-		            if (ImGui::MenuItem("Duplicate"))
-		            {
-		                m_Variables.push_back(variable);
-		                m_Variables.back().ID = GetNextId();
-		    
-		                int index = 1;
-		                std::string newName;
-		                bool looking = true;
-		                while (looking)
-		                {
-		                    std::string modName = m_Variables[i].Name;
-		                    if (modName.find_last_of("_") != std::string::npos) { if (true) { modName = modName.substr(0, modName.find_last_of("_")); } }
-		                    newName = modName + "_" + (index < 10 ? "0" : "") + std::to_string(index);
-		                    looking = false;
-		                    for (int y = 0; y < m_Variables.size(); y++)
-		                    {
-		                        if (m_Variables[y].Name == newName) { looking = true; }
-		                    }
-		                    index++;
-		                }
-		    
-		                m_Variables.back().Name = newName;
-		            }
-                    if (ImGui::MenuItem("Delete")) { m_Variables.erase(m_Variables.begin() + i); m_SelectedVariable = 0; }
-		    
-		    		ImGui::EndPopup();
-		    	}
+                    if (ImGui::IsItemHovered() && variable.Tooltip != "")
+                        ImGui::SetTooltip(variable.Tooltip.c_str());
+                    if (input) variable.Name = std::string(buffer);
 
-				ImGui::SameLine();
-				DrawTypeIcon(variable.Data.Container, variable.Data.Type);
-				ImGui::Dummy(ImVec2(m_PinIconSize, m_PinIconSize));
+					if (ImGui::BeginDragDropSource())
+					{
+						ImGui::SetDragDropPayload("NODE_EDITOR_VARIABLE", &i, sizeof(i), ImGuiCond_Once);
+						ImGui::Text(variable.Name.c_str());
+						ImGui::EndDragDropSource();
+					}
 
-		        ImGui::PopID();
-		    }
+                    if (clicked) m_SelectedVariable = variable.ID;
 
-            ImGui::TreePop();
+                    if (ImGui::BeginPopupContextItem())
+                    {
+                        if (ImGui::MenuItem("Duplicate")) isDuplicated = true;
+                        if (ImGui::MenuItem("Delete")) isDeleted = true;
+
+                        ImGui::EndPopup();
+                    }
+
+                    //ImGui::SameLine();
+                    //DrawTypeIcon(variable.Data.Container, variable.Data.Type);
+                    //ImGui::Dummy(ImVec2(m_PinIconSize, m_PinIconSize));
+
+                    ImGui::PopID();
+
+                    if (isDeleted) { m_Variables.erase(m_Variables.begin() + i); m_SelectedVariable = 0; }
+                    if (isDuplicated)
+                    {
+                        m_Variables.push_back(variable);
+                        m_Variables.back().ID = GetNextId();
+                        std::vector<std::string> variableNames;
+                        for (auto& variable : m_Variables)
+                            variableNames.push_back(variable.Name);
+                        m_Variables.back().Name = String::GetNextNameWithIndex(variableNames, m_Variables.back().Name);
+                    }
+                }
+
+                ImGui::TreePop();
+            }
         }
+
+        {
+            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2{ 4, 4 });
+            float lineHeight = GImGui->Font->FontSize + GImGui->Style.FramePadding.y * 2.0f;
+            bool open = ImGui::TreeNodeEx("##GraphsList", treeNodeFlags, "GRAPHS");
+            ImGui::PopStyleVar();
+            ImGui::SameLine(contentRegionAvailable.x - lineHeight * 0.5f);
+            if (ImGui::Button("+", ImVec2{ lineHeight, lineHeight }))
+            {
+                std::vector<std::string> vec;
+                for (auto& graph : m_Graphs)
+                    vec.push_back(graph.Name);
+
+                m_Graphs.emplace_back(GetNextId(), Dymatic::String::GetNextNameWithIndex(vec, "NewEventGraph"));
+            }
+            if (open)
+            {
+                for (int i = 0; i < m_Graphs.size(); i++)
+                {
+                    auto& graph = m_Graphs[i];
+                    bool isDeleted = false, isDuplicated = false;
+
+                    ImGui::PushID(graph.ID);
+
+                    if (graph.Editable)
+                    {
+                        char buffer[256];
+                        memset(buffer, 0, sizeof(buffer));
+                        std::strncpy(buffer, graph.Name.c_str(), sizeof(buffer));
+
+                        bool input, clicked = ImGui::SelectableInput("##GraphTree", ImGui::GetContentRegionAvail().x, false, ImGuiSelectableFlags_None, buffer, sizeof(buffer), input);
+                        if (input) graph.Name = std::string(buffer);
+                        if (clicked);
+                    }
+                    else
+                        ImGui::Selectable(graph.Name.c_str());
+					if (ImGui::BeginPopupContextItem())
+					{
+						if (ImGui::MenuItem("Open Graph")) OpenGraph(graph.ID);
+						if (ImGui::MenuItem("Open Graph In New Tab")) OpenGraphInNewTab(graph.ID);
+
+						ImGui::EndPopup();
+					}
+
+                    ImGui::PopID();
+                }
+
+                ImGui::TreePop();
+            }
+        }
+
+        if (ImGui::TreeNodeEx("##StructsList", treeNodeFlags, "STRUCTS")) ImGui::TreePop();
+        if (ImGui::TreeNodeEx("##EnumsList", treeNodeFlags, "ENUMS")) ImGui::TreePop();
 
 		ImGui::End();
 
@@ -5767,10 +6166,7 @@ void NodeEditorInternal::OnImGuiRender()
                 ImGui::SameLine();
                 ImGui::Selectable(result.Message.c_str());
                 if (ImGui::IsItemClicked() && ImGui::IsMouseDoubleClicked(0) && result.ID.Get())
-                {
-                    ed::SelectNode(result.ID);
-                    ed::NavigateToSelection();
-                }
+                    NavigateToNode(result.ID);
             }
 
             ImGui::End();
@@ -5794,55 +6190,101 @@ void NodeEditorInternal::OnImGuiRender()
             if (m_FindResultsData.empty())
                 ImGui::Text("No Results found");
             else
-                for (auto& Function : m_FindResultsData)
+            {
+                const float lineHeight = ImGui::GetTextLineHeight();
+                for (auto& graph : m_FindResultsData)
                 {
-                    ImGui::PushID(Function.ID.Get());
-
-					auto& cursorPos = ImGui::GetCursorScreenPos();
-				    auto fontSize = ImGui::GetFontSize();
-
+                    ImGui::PushID(graph.ID);
+                    if (ImGui::Selectable(graph.Name.c_str())) OpenGraph(graph.ID);
                     ImGui::Indent();
-                    if (ImGui::TreeNodeEx("##FindResultsItem", ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth | (Function.SubData.empty() ? ImGuiTreeNodeFlags_Leaf : ImGuiTreeNodeFlags_None), Function.Name.c_str()))
+                    for (auto& node : graph.SubData)
                     {
-                        for (auto& pin : Function.SubData)
+                        ImGui::PushID(node.ID);
+                        if (node.Icon != nullptr)
                         {
-                            ImGui::PushID(pin.ID.Get());
-
-							auto& cursorPos = ImGui::GetCursorScreenPos();
-							auto fontSize = ImGui::GetFontSize();
-
-                            if (ImGui::TreeNodeEx("##FindResultsItem", ImGuiTreeNodeFlags_Leaf, pin.Name.c_str()))
-                                ImGui::TreePop();
-
-                            if (ImGui::IsItemClicked() && ImGui::IsMouseDoubleClicked(0))
-                            {
-                                ed::ClearSelection();
-                                ed::SelectNode(pin.ID);
-                                ed::NavigateToSelection();
-                            }
-
-							drawList->AddCircleFilled(cursorPos + ImVec2(fontSize / 2.0f, fontSize / 2.0f), fontSize / 4.0f, pin.Color);
-
+                            ImGui::Image((ImTextureID)node.Icon->GetRendererID(), ImVec2(lineHeight, lineHeight), { 0, 1 }, { 1, 0 }, node.Color);
+                            ImGui::SameLine();
+                        }
+                        if (ImGui::Selectable(node.Name.c_str())) NavigateToNode(node.ID);
+                        ImGui::Indent();
+                        for (auto& pin : node.SubData)
+                        {
+                            ImGui::PushID(node.ID);
+                            ImGui::GetWindowDrawList()->AddCircleFilled(ImGui::GetCursorScreenPos() + ImVec2(lineHeight / 2.0f, lineHeight / 2.0f), lineHeight / 2.5f, pin.Color);
+                            ImGui::Dummy(ImVec2(lineHeight / 2.0f, lineHeight / 2.0f));
+                            ImGui::SameLine();
+                            if (ImGui::Selectable(pin.Name.c_str())) NavigateToNode(node.ID);
                             ImGui::PopID();
                         }
-                        ImGui::TreePop();
-                    }
-                    if (ImGui::IsItemClicked() && ImGui::IsMouseDoubleClicked(0))
-                    {
-                        ed::ClearSelection();
-                        ed::SelectNode(Function.ID);
-                        ed::NavigateToSelection();
+                        ImGui::Unindent();
+                        ImGui::PopID();
                     }
                     ImGui::Unindent();
-
-                    drawList->AddRectFilled(cursorPos + ImVec2(fontSize * 0.15f, fontSize * 0.25f), cursorPos + ImVec2(fontSize * 0.85f, fontSize * 0.85f), Function.Color, fontSize / 4.0f);
-
                     ImGui::PopID();
                 }
+            }
+
+                //for (auto& graph : m_FindResultsData)
+                //{
+                //    ImGui::PushID(graph.ID);
+                //    if (ImGui::TreeNodeEx("##FindResultsItem", ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth | (graph.SubData.empty() ? ImGuiTreeNodeFlags_Leaf : 0), graph.Name.c_str()))
+                //    {
+                //        for (auto& Function : graph.SubData)
+                //        {
+                //            ImGui::PushID(Function.ID);
+                //
+                //            auto& cursorPos = ImGui::GetCursorScreenPos();
+                //            auto fontSize = ImGui::GetFontSize();
+                //
+                //            ImGui::Indent();
+                //            if (ImGui::TreeNodeEx("##FindResultsItem", ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth | (Function.SubData.empty() ? ImGuiTreeNodeFlags_Leaf : 0), Function.Name.c_str()))
+                //            {
+                //                for (auto& pin : Function.SubData)
+                //                {
+                //                    ImGui::PushID(pin.ID);
+                //
+                //                    auto& cursorPos = ImGui::GetCursorScreenPos();
+                //                    auto fontSize = ImGui::GetFontSize();
+                //
+                //                    if (ImGui::TreeNodeEx("##FindResultsItem", ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_SpanAvailWidth, pin.Name.c_str()))
+                //                        ImGui::TreePop();
+                //
+                //                    if (ImGui::IsItemClicked() && ImGui::IsMouseDoubleClicked(0))
+                //                        NavigateToNode(pin.ID);
+                //
+                //                    drawList->AddCircleFilled(cursorPos + ImVec2(fontSize / 2.0f, fontSize / 2.0f), fontSize / 4.0f, pin.Color);
+                //
+                //                    ImGui::PopID();
+                //                }
+                //                ImGui::TreePop();
+                //            }
+                //            if (ImGui::IsItemClicked() && ImGui::IsMouseDoubleClicked(0))
+                //                NavigateToNode(Function.ID);
+                //            ImGui::Unindent();
+                //
+                //            drawList->AddRectFilled(cursorPos + ImVec2(fontSize * 0.15f, fontSize * 0.25f), cursorPos + ImVec2(fontSize * 0.85f, fontSize * 0.85f), Function.Color, fontSize / 4.0f);
+                //
+                //            ImGui::PopID();
+                //        }
+                //        ImGui::TreePop();
+                //    }
+                //    if (ImGui::IsItemClicked() && ImGui::IsMouseDoubleClicked(0))
+                //        OpenGraph(graph.ID);
+                //
+                //    ImGui::PopID();
+                //}
 
             ImGui::End();
         }
     }
+}
+
+void NodeEditorInternal::AddVariable(std::string name, PinType type)
+{
+	std::vector<std::string> vec;
+	for (auto& variable : m_Variables)
+		vec.push_back(variable.Name);
+	m_Variables.push_back({ GetNextId(), Dymatic::String::GetNextNameWithIndex(vec, name.empty() ? "NewVar" : name), (type == PinType::Void ? m_RecentPinType : type) });
 }
 
 Variable* NodeEditorInternal::GetVariableById(unsigned int id)
@@ -5855,10 +6297,13 @@ Variable* NodeEditorInternal::GetVariableById(unsigned int id)
 
 void NodeEditorInternal::SetVariableType(Variable* variable, PinType type)
 {
+    m_RecentPinType = type;
+
     if (variable != nullptr)
     {
         variable->Data.Type = type;
-            for (auto& node : m_Nodes)
+        for (auto& graph : m_Graphs)
+            for (auto& node : graph.Nodes)
                 if (node.VariableId == variable->ID)
                 {
                     for (auto& input : node.Inputs) if (input.Data.Type != PinType::Flow) input.Data.Type = type;
@@ -5872,12 +6317,13 @@ void NodeEditorInternal::SetVariableName(Variable* variable, const std::string n
 	if (variable != nullptr)
 	{
 		variable->Name = name;
-		for (auto& node : m_Nodes)
-			if (node.VariableId == variable->ID)
-			{
-                node.Name =         (node.Type == NodeType::Simple ? "DymaticVariable_Get " : "DymaticVariable_Set ") + name;
-                node.DisplayName =  (node.Type == NodeType::Simple ? "Get " : "Set ") + name;
-			}
+        for (auto& graph : m_Graphs)
+			for (auto& node : graph.Nodes)
+				if (node.VariableId == variable->ID)
+				{
+					node.Name = (node.Type == NodeType::Simple ? "DymaticVariable_Get " : "DymaticVariable_Set ") + name;
+					node.DisplayName = (node.Type == NodeType::Simple ? "Get " : "Set ") + name;
+				}
 	}
 }
 
@@ -5886,20 +6332,58 @@ void NodeEditorInternal::FindResultsSearch(const std::string& search)
 	m_FindResultsSearchBar = search;
 	m_FindResultsData.clear();
 
-	for (auto& node : m_Nodes)
-	{
-		bool created = node.Name.find(m_FindResultsSearchBar) != std::string::npos || node.DisplayName.find(m_FindResultsSearchBar) != std::string::npos;
-		if (created)
-			m_FindResultsData.push_back({ node.Name, node.Color, node.ID });
+    for (auto& graph : m_Graphs)
+    {
+        bool graphCreated = graph.Name.find(m_FindResultsSearchBar) != std::string::npos;
+        if (graphCreated)
+            m_FindResultsData.emplace_back( graph.Name, ImColor(255, 255, 255), graph.ID );
+        for (auto& node : graph.Nodes)
+        {
+            bool created = node.Name.find(m_FindResultsSearchBar) != std::string::npos || node.DisplayName.find(m_FindResultsSearchBar) != std::string::npos;
+            if (created)
+            {
+                if (!graphCreated)
+                {
+					m_FindResultsData.emplace_back(graph.Name, ImColor(255, 255, 255), graph.ID);
+                    graphCreated = true;
+                }
+                auto& nodeData = m_FindResultsData.back().SubData.emplace_back( node.Name, node.IconColor, node.ID.Get() );
+                nodeData.Icon = node.Icon;
+            }
 
-		for (auto& pin : node.Inputs, node.Outputs)
-			if (pin.Name.find(m_FindResultsSearchBar) != std::string::npos)
-			{
-				if (!created)
-					m_FindResultsData.push_back({ node.Name, node.Color, node.ID });
-				m_FindResultsData.back().SubData.push_back({ pin.Name, GetIconColor(pin.Data.Type), node.ID });
-			}
-	}
+            for (auto& pin : node.Inputs)
+                if (pin.GetName().find(m_FindResultsSearchBar) != std::string::npos)
+                {
+                    if (!graphCreated)
+                    {
+						m_FindResultsData.emplace_back( graph.Name, ImColor(255, 255, 255), graph.ID );
+                        graphCreated = true;
+                    }
+                    if (!created)
+                    {
+                        m_FindResultsData.back().SubData.emplace_back( node.Name, node.Color, node.ID.Get() );
+                        created = true;
+                    }
+                    m_FindResultsData.back().SubData.back().SubData.emplace_back( pin.GetName(), GetIconColor(pin.Data.Type), node.ID.Get() );
+                }
+
+			for (auto& pin : node.Outputs)
+				if (pin.GetName().find(m_FindResultsSearchBar) != std::string::npos)
+				{
+					if (!graphCreated)
+					{
+						m_FindResultsData.emplace_back(graph.Name, ImColor(255, 255, 255), graph.ID);
+						graphCreated = true;
+					}
+					if (!created)
+					{
+                        m_FindResultsData.back().SubData.emplace_back(node.Name, node.Color, node.ID.Get());
+						created = true;
+					}
+					m_FindResultsData.back().SubData.back().SubData.emplace_back(pin.GetName(), GetIconColor(pin.Data.Type), node.ID.Get());
+				}
+        }
+    }
 }
 
 void NodeEditorInternal::LoadNodeLibrary(const std::filesystem::path& path)
@@ -5992,6 +6476,8 @@ void NodeEditorInternal::LoadNodeLibrary(const std::filesystem::path& path)
 	// Function Declaration
 	bool readingFunction = false;
 	bool openArgs = false;
+    bool paramOpen = false;
+    int paramBracketScope = 0;
 
     // Args
     bool markedArgName = false;
@@ -6111,9 +6597,10 @@ void NodeEditorInternal::LoadNodeLibrary(const std::filesystem::path& path)
                         else if (word == "Category") { Dymatic::String::EraseAllOfCharacter(value, '"'); Function.FUNC_Category = value; }
                         else if (word == "Pure") { Function.FUNC_Pure = true; }
                         else if (word == "DisplayName") { Dymatic::String::EraseAllOfCharacter(value, '"'); Function.FUNC_DisplayName = value; }
-                        else if (word == "CompactNodeTitle") { Dymatic::String::EraseAllOfCharacter(value, '"'); Function.FUNC_NodeDisplayName = value; Function.FUNC_CompactNode = true; }
-                        else if (word == "NoPinLabels") { Dymatic::String::EraseAllOfCharacter(value, '"'); Function.FUNC_NoPinLabels = true; }
-                        else DY_WARN("DYFUNCTION keyword '{0}' is undefined", word);
+                        else if (word == "CompactNodeTitle") { Dymatic::String::EraseAllOfCharacter(value, '"'); Function.FUNC_NodeDisplayName = value; Function.FUNC_CompactNode = true; Function.FUNC_NoPinLabels = true; }
+						else if (word == "NoPinLabels") { Dymatic::String::EraseAllOfCharacter(value, '"'); Function.FUNC_NoPinLabels = true; }
+                        else if (word == "ConversionAutocast") { Function.FUNC_ConversionAutocast = true; }
+                        else DY_WARN("DYFUNCTION metadata keyword '{0}' is undefined", word);
                     }
 
                     if (word.find(")") != std::string::npos)
@@ -6126,72 +6613,135 @@ void NodeEditorInternal::LoadNodeLibrary(const std::filesystem::path& path)
                 }
                 else if (openArgs)
                 {
-					if (word.find(")") != std::string::npos)
-						openArgs = false;
-                    else if (word.find(",") != std::string::npos)
+                    // Check for DYPARAMS
+                    if (word.find("DYPARAM") != std::string::npos)
                     {
-                        Function.FUNC_Params.push_back({});
-                        Function.FUNC_Params.back().ArgumentID = GetNextId();
-                        markedArgName = false;
-                    }
-                    else if (!markedArgName && (words[i + 1].find(",") != std::string::npos || words[i + 1].find(")") != std::string::npos || words[i + 1].find("=") != std::string::npos))
-                    {
-                        auto& param = Function.FUNC_Params.back();
-                        markedArgName = true;
-
-                        // Set Parameter Name
-                        param.Name = word;
-
-                        // Set Parameter Type
-						int typeOffset = 1;
-						while (true)
-						{
-							if (words[i - typeOffset] == "&")
-							{
-                                param.Data.Reference = true;
-								typeOffset++;
-							}
-							else if (words[i - typeOffset] == "*")
-							{
-								param.Data.Pointer = true;
-								typeOffset++;
-							}
-							else if (!isalnum(words[i - typeOffset][0]))
-								typeOffset++;
-							else
-								break;
-						}
-                        param.Data.Type = ConvertStringToPinType(words[i - typeOffset]);
-
-                        // Get Default Value
-                        if (words[i + 1] == "=")
+                        if (words[i + 1] == "(")
                         {
-                            int offset = 2;
-                            std::string defaultValue = "";
-                            while (true)
-                            {
-                                if (words[i + offset].find(",") == std::string::npos && words[i + offset].find(")") == std::string::npos)
-                                {
-                                    defaultValue += words[i + offset];
-                                    offset++;
-                                }
-                                else break;
-                            }
-                            param.Data.Value = ConvertStringToPinValue(param.Data.Type, defaultValue);
+                            paramOpen = true;
+                            paramBracketScope = -1;
+
+							if (Function.FUNC_Params.empty())
+							{
+								Function.FUNC_Params.push_back({});
+								Function.FUNC_Params.back().ArgumentID = GetNextId();
+							}
+
+                            continue;
                         }
                     }
-                    else if (word.length() > 1)
+					if (paramOpen)
+					{
+                        auto& Param = Function.FUNC_Params.back();
+
+						if (word.find("(") != std::string::npos)
+							paramBracketScope++;
+
+						if (words[i - 1].find(",") != std::string::npos || words[i - 1].find("(") != std::string::npos)
+						{
+							// Current word is keyword
+							std::string value;
+							if (words[i + 1].find("=") != std::string::npos)
+							{
+								i += 2;
+								for (; i < words.size(); i++)
+								{
+									if (words[i].find("(") != std::string::npos)
+										paramBracketScope++;
+									if ((words[i].find(",") != std::string::npos || words[i].find(")") != std::string::npos) && !paramBracketScope)
+										break;
+									if (words[i].find(")") != std::string::npos)
+										paramBracketScope--;
+									value += words[i];
+								}
+								i--;
+							}
+
+							// Execute Action Based on command
+                            if (word == "DisplayName") { Dymatic::String::EraseAllOfCharacter(value, '"'); Param.DisplayName = value; }
+                            else if (word == "Ref") { Dymatic::String::EraseAllOfCharacter(value, '"'); Param.Kind = PinKind::Input; }
+                            else DY_WARN("DYPARAM metadata keyword '{0}' is undefined", word);
+						}
+
+						if (word.find(")") != std::string::npos)
+						{
+							if (!paramBracketScope)
+								paramOpen = false;
+							else
+                                paramBracketScope--;
+						}
+					}
+                    else
                     {
-                        if (Function.FUNC_Params.empty())
+
+                        // Main Open Arguments Section
+                        if (word.find(")") != std::string::npos)
+                            openArgs = false;
+                        else if (word.find(",") != std::string::npos)
                         {
                             Function.FUNC_Params.push_back({});
                             Function.FUNC_Params.back().ArgumentID = GetNextId();
                             markedArgName = false;
                         }
+                        else if (!markedArgName && (words[i + 1].find(",") != std::string::npos || words[i + 1].find(")") != std::string::npos || words[i + 1].find("=") != std::string::npos))
+                        {
+                            auto& param = Function.FUNC_Params.back();
+                            markedArgName = true;
 
-                        auto& param = Function.FUNC_Params.back();
-                        if (word == "static") param.Data.Static = true;
-                        if (word == "const") param.Data.Const = true;
+                            // Set Parameter Name
+                            param.Name = word;
+
+                            // Set Parameter Type
+                            int typeOffset = 1;
+                            while (true)
+                            {
+                                if (words[i - typeOffset] == "&")
+                                {
+                                    param.Data.Reference = true;
+                                    typeOffset++;
+                                }
+                                else if (words[i - typeOffset] == "*")
+                                {
+                                    param.Data.Pointer = true;
+                                    typeOffset++;
+                                }
+                                else if (!isalnum(words[i - typeOffset][0]))
+                                    typeOffset++;
+                                else
+                                    break;
+                            }
+                            param.Data.Type = ConvertStringToPinType(words[i - typeOffset]);
+
+                            // Get Default Value
+                            if (words[i + 1] == "=")
+                            {
+                                int offset = 2;
+                                std::string defaultValue = "";
+                                while (true)
+                                {
+                                    if (words[i + offset].find(",") == std::string::npos && words[i + offset].find(")") == std::string::npos)
+                                    {
+                                        defaultValue += words[i + offset];
+                                        offset++;
+                                    }
+                                    else break;
+                                }
+                                param.Data.Value = ConvertStringToPinValue(param.Data.Type, defaultValue);
+                            }
+                        }
+                        else if (word.length() > 1)
+                        {
+                            if (Function.FUNC_Params.empty())
+                            {
+                                Function.FUNC_Params.push_back({});
+                                Function.FUNC_Params.back().ArgumentID = GetNextId();
+                                markedArgName = false;
+                            }
+
+                            auto& param = Function.FUNC_Params.back();
+                            if (word == "static") param.Data.Static = true;
+                            if (word == "const") param.Data.Const = true;
+                        }
                     }
                 }
                 else
@@ -6232,12 +6782,19 @@ void NodeEditorInternal::LoadNodeLibrary(const std::filesystem::path& path)
                     if (word.find(";") != std::string::npos)
                     {
                         for (auto& param : Function.FUNC_Params)
-                            if (param.Data.Reference && !param.Data.Const)
+                            if (param.Data.Reference && !param.Data.Const && param.Kind != PinKind::Input)
                                 param.Kind = PinKind::Output;
                             else
                                 param.Kind = PinKind::Input;
                         // Commit Function
                         readingFunction = false;
+
+                        if (Function.FUNC_ConversionAutocast)
+                            if (Function.FUNC_Params.size() == 1 && Function.FUNC_Return.Data.Type != PinType::Void)
+                                m_PinTypeConversions[Function.FUNC_Params[0].Data.Type][Function.FUNC_Return.Data.Type] = Function.ID;
+                            else
+                                DY_WARN("Function '{0}' does not meet specifications for node conversion autocast", Function.FUNC_Name);
+
 
                         // Write Meta Data
                         for (auto& meta : paramMetaList)

@@ -379,6 +379,20 @@ ImVec2 ax::NodeEditor::GetNodeSize(NodeId nodeId)
     return s_Editor->GetNodeSize(nodeId);
 }
 
+// IMGUI CUSTOM: //
+void ax::NodeEditor::GetNodeBounds(NodeId nodeId, ImVec2& min, ImVec2& max)
+{
+	auto& bounds = s_Editor->GetNodeBounds(nodeId);
+    min = bounds.Min;
+    max = bounds.Max;
+}
+
+void ax::NodeEditor::SetNodeBounds(NodeId nodeId, const ImVec2& min, const ImVec2& max)
+{
+	return s_Editor->SetNodeBounds(nodeId, ImRect(min, max));
+}
+// ------------- //
+
 void ax::NodeEditor::CenterNodeOnScreen(NodeId nodeId)
 {
     if (auto node = s_Editor->FindNode(nodeId))

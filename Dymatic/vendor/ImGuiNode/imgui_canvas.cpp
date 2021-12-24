@@ -267,6 +267,7 @@ void ImGuiEx::Canvas::Resume()
     IM_ASSERT(m_DrawList->_Splitter._Current == m_ExpectedChannel);
 
     // Check: Number of calls to Resume() do not match calls to Suspend(). Please check your code.
+    if (m_SuspendCounter <= 0)
     IM_ASSERT(m_SuspendCounter > 0);
     if (--m_SuspendCounter == 0)
         EnterLocalSpace();

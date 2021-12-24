@@ -1517,6 +1517,34 @@ ImVec2 ed::EditorContext::GetNodeSize(NodeId nodeId)
     return node->m_Bounds.GetSize();
 }
 
+// IMGUI CUSTOM: //
+ImRect ed::EditorContext::GetNodeBounds(NodeId nodeId)
+{
+	auto node = FindNode(nodeId);
+    if (!node)
+        return ImRect(ImVec2(FLT_MAX, FLT_MAX), ImVec2(FLT_MAX, FLT_MAX));
+
+	return node->m_GroupBounds;
+}
+
+void ed::EditorContext::SetNodeBounds(NodeId nodeId, const ImRect& bounds)
+{
+	auto node = FindNode(nodeId);
+	if (!node)
+	{
+		node = CreateNode(nodeId);
+		node->m_IsLive = false;
+	}
+
+	if (node->m_GroupBounds.Min != bounds.Min || node->m_GroupBounds.Max != bounds.Max)
+	{
+        node->m_GroupBounds = bounds;
+		node->m_GroupBounds.Floor();
+		MakeDirty(NodeEditor::SaveReasonFlags::Size, node);
+	}
+}
+// ------------- //
+
 void ed::EditorContext::MarkNodeToRestoreState(Node* node)
 {
     node->m_RestoreState = true;
@@ -4929,9 +4957,9 @@ void ed::NodeBuilder::Group(const ImVec2& size)
 
     m_IsGroup = true;
 
-    if (IsGroup(m_CurrentNode))
-        ImGui::Dummy(m_CurrentNode->m_GroupBounds.GetSize());
-    else
+	if (IsGroup(m_CurrentNode))
+		ImGui::Dummy(m_CurrentNode->m_GroupBounds.GetSize());
+	else
         ImGui::Dummy(size);
 
     m_GroupBounds = ImGui_GetItemRect();

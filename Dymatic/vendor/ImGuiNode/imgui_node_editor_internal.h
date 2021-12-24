@@ -1277,6 +1277,10 @@ struct EditorContext
     void SetNodePosition(NodeId nodeId, const ImVec2& screenPosition);
     ImVec2 GetNodePosition(NodeId nodeId);
     ImVec2 GetNodeSize(NodeId nodeId);
+    // IMGUI CUSTOM: //
+    ImRect GetNodeBounds(NodeId nodeId);
+    void SetNodeBounds(NodeId nodeId, const ImRect& bounds);
+    // ------------- //
 
     void MarkNodeToRestoreState(Node* node);
     void RestoreNodeState(Node* node);

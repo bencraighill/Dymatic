@@ -283,6 +283,10 @@ void EndDelete();
 void SetNodePosition(NodeId nodeId, const ImVec2& editorPosition);
 ImVec2 GetNodePosition(NodeId nodeId);
 ImVec2 GetNodeSize(NodeId nodeId);
+// IMGUI CUSTOM: //
+void GetNodeBounds(NodeId nodeId, ImVec2& min, ImVec2& max);
+void SetNodeBounds(NodeId nodeId, const ImVec2& min, const ImVec2& max);
+// ------------- //
 void CenterNodeOnScreen(NodeId nodeId);
 
 void RestoreNodeState(NodeId nodeId);

@@ -3176,7 +3176,7 @@ const TextEditor::LanguageDefinition& TextEditor::LanguageDefinition::CPlusPlus(
 			"abort", "abs", "acos", "asin", "atan", "atexit", "atof", "atoi", "atol", "atoll", "ceil", "clock", "cosh", "ctime", "div", "exit", "fabs", "floor", "fmod", "getchar", "getenv", "isalnum", "isalpha", "isdigit", "isgraph",
 			"ispunct", "isspace", "isupper", "kbhit", "log10", "log2", "log", "memcmp", "modf", "pow", "printf", "sprintf", "snprintf", "putchar", "putenv", "puts", "rand", "remove", "rename", "sinh", "sqrt", "srand", "strcat", "strcmp", "strerror", "time", "tolower", "toupper",
 			"std", "string", "wstring", "vector", "map", "unordered_map", "set", "unordered_set", "min", "max",
-			"Dymatic", "DY_CORE_TRACE", "DY_CORE_INFO", "DY_CORE_WARN", "DY_CORE_ERROR", "DY_CORE_CRITICAL", "DY_TRACE", "DY_INFO", "DY_WARN", "DY_ERROR", "DY_CRITICAL",
+			"Dymatic", "DY_CORE_TRACE", "DY_CORE_INFO", "DY_CORE_WARN", "DY_CORE_ERROR", "DY_CORE_CRITICAL", "DY_TRACE", "DY_INFO", "DY_WARN", "DY_ERROR", "DY_CRITICAL", "DYCLASS", "DYFUNCTION", "DYPARAM",
 			"glm", "ImGui"
 		};
 		static const char* const declarations[] = {
@@ -3255,6 +3255,9 @@ const TextEditor::LanguageDefinition& TextEditor::LanguageDefinition::CPlusPlus(
 			/*DY_WARN*/			 "Outputs message with a varying number of arguments to the APPLICATION [Dymatic] Log.\n\n'Warning' severity.",
 			/*DY_ERROR*/		 "Outputs message with a varying number of arguments to the APPLICATION [Dymatic] Log.\n\n'Error' severity.",
 			/*DY_CRITICAL*/		 "Outputs message with a varying number of arguments to the APPLICATION [Dymatic] Log.\n\n'Critical' severity.",
+			/*DYCLASS*/		 "Marks the following class to be interpreted by the Dymatic Parser and imported into the node editor.\nMetadata can be passed in using the format: {data_name} = {data_value}",
+			/*DYFUNCTION*/		 "Marks the following function to be interpreted by the Dymatic Parser and imported into the node editor.\nMetadata can be passed in using the format: {data_name} = {data_value}",
+			/*DYPARAM*/		 "Marks the following parameter to be interpreted by the Dymatic Parser and imported into the node editor.\nMetadata can be passed in using the format: {data_name} = {data_value}",
 			/*glm*/ "OpenGL Mathematics [namespace].",
 			/*ImGui*/ "Dear ImGui [namespace].\n\GUI used internally to render [Dymatic] tools."
 		};
