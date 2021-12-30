@@ -1,3 +1,6 @@
 [submodule "Dymatic/vendor/Box2D"]
 	path = Dymatic/vendor/Box2D
 	url = https://github.com/BenC25/box2d
+[submodule "Dymatic/vendor/yaml-cpp"]
+	path = Dymatic/vendor/yaml-cpp
+	url = https://github.com/BenC25/yaml-cpp.git
