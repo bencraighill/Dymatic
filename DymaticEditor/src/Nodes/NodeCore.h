@@ -24,7 +24,10 @@ enum ParamMeta
 #define DYCLASS(...)
 #define DYFUNCTION(...)
 #define DYPARAM(...)
+
 #define DYENUM(...)
+#define DYSTRUCT(...)
+#define DYPROPERTY(...)
 
 #define check(condition) DY_ASSERT(condition);
 
@@ -50,5 +53,5 @@ typedef int Int;
 typedef float Float;
 typedef std::string String;
 typedef glm::vec3 Vector;
-typedef glm::vec4 Vector4;
 typedef glm::vec4 Color;
+typedef unsigned char Byte;

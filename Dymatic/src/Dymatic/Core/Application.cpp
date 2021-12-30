@@ -114,7 +114,7 @@ namespace Dymatic {
 				}
 
 			}
-			//OnImGuiRender used to be reliant on being not minimized, but this meant unlocked windows wouldn't work when GLFW was minimized.
+			// OnImGuiRender used to be reliant on being not minimized, but this meant unlocked windows wouldn't work when GLFW was minimized.
 				m_ImGuiLayer->Begin();
 				{
 					DY_PROFILE_SCOPE("LayerStack OnImGuiRender");

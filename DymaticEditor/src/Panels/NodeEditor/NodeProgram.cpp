@@ -82,6 +82,7 @@ enum class PinType
     String,
     Vector,
     Color,
+    Byte,
     Object,
     Function,
     Delegate,
@@ -104,6 +105,7 @@ enum class NodeFunction
 enum class NodeType
 {
     Blueprint,
+    Point,
     Simple,
     Tree,
     Comment,
@@ -126,6 +128,7 @@ struct TypeValue
     std::string String = "";
     glm::vec3 Vector = { 0.0f, 0.0f, 0.0f };
     glm::vec4 Color{};
+    unsigned char Byte = 0;
 };
 
 struct Node;
@@ -164,6 +167,10 @@ struct Pin
     // Compile Time Data
     bool Written = false;
     int ArgumentID = -1;
+
+    // Split Structs
+    ed::PinId ParentID = 0;
+    bool SplitPin = false;
 
     Pin() = default;
 	Pin(int id, std::string name, PinType type) :
@@ -417,6 +424,8 @@ class NodeCompiler;
 class NodeLibrary;
 class NodeGraph;
 class GraphWindow;
+class FunctionDeclaration;
+
 
 class NodeEditorInternal
 {
@@ -580,7 +589,7 @@ public:
 	Node* SpawnForLoopNode(SpawnNodeData in);
 	Node* SpawnForLoopWithBreakNode(SpawnNodeData in);
     Node* SpawnSequenceNode(SpawnNodeData in);
-    Node* SpawnWhileLoopNode(SpawnNodeData in);
+    Node* SpawnRerouteNode(SpawnNodeData in);
 
 	// Variables
 	Node* SpawnGetVariableNode(SpawnNodeData in);
@@ -590,10 +599,15 @@ public:
     Node* SpawnComment(SpawnNodeData in);
 
     // Via Function Library
+    Pin* AddPinToNodeFromParam(FunctionDeclaration& function, Pin& param, Node& node, int index = -1);
     Node* SpawnNodeFromLibrary(unsigned int id, NodeGraph& graph);
+    void SplitStructPin(Pin* pin);
+    void RecombineStructPins(Pin* pin);
 
     int GetConversionAvalible(Pin* A, Pin* B);
     int GetConversionAvalible(PinData& A, PinData& B);
+    inline int GetMakeFunction(PinType type) { return m_NativeMakeFunctions[type]; }
+    inline int GetBreakFunction(PinType type) { return m_NativeBreakFunctions[type]; }
 
     void ConversionAvalible(Pin* A, Pin* B, spawnNodeFunction& Function);
     void ConversionAvalible(PinData& A, PinData& B, spawnNodeFunction& Function);
@@ -612,11 +626,13 @@ public:
 
     // Node Compilation
 	void CompileNodes();
-    void RecursiveNodeWrite(Node& node, NodeCompiler& source, NodeCompiler& header, NodeCompiler& ubergraphBody, std::vector<ed::NodeId>& pureNodeList, std::vector<ed::NodeId>& localNodeList);
-    void RecursivePinWrite(Pin& pin, NodeCompiler& source, NodeCompiler& header, NodeCompiler& ubergraphBody, std::string& line, std::vector<ed::NodeId>& pureNodeList, std::vector<ed::NodeId>& localNodeList);
+    void RecursivePinWrite(Pin& pin, NodeCompiler& source, NodeCompiler& header, NodeCompiler& ubergraphBody, std::string& line, std::vector<ed::NodeId>& node_errors, std::vector<ed::NodeId>& pureNodeList, std::vector<ed::NodeId>& localNodeList);
+    void RecursiveNodeWrite(Node& node, NodeCompiler& source, NodeCompiler& header, NodeCompiler& ubergraphBody, std::vector<ed::NodeId>& node_errors, std::vector<ed::NodeId>& pureNodeList, std::vector<ed::NodeId>& localNodeList);
     bool IsPinGlobal(Pin& pin, int ubergraphID);
     void RecursiveUbergraphOrganisation(Node& node, std::vector<Ubergraph>& ubergraphs, unsigned int& currentId);
     Node& GetNextExecNode(Pin& node);
+
+    FunctionDeclaration* FindFunctionByID(unsigned int id);
 
     static std::string ConvertNodeFunctionToString(const NodeFunction& nodeFunction);
     static NodeFunction ConvertStringToNodeFunction(const std::string& string);
@@ -664,6 +680,7 @@ public:
     void CloseSearchList(SearchData* searchData);
     SearchResultData* DisplaySearchData(SearchData& searchData, bool origin = true);
 
+    void DeleteAllPinLinkAttachments(Pin* pin);
     void CheckLinkSafety(Pin* startPin, Pin* endPin);
     void CreateLink(NodeGraph& graph, Pin* a, Pin* b);
 
@@ -704,6 +721,8 @@ private:
     PinType m_RecentPinType = PinType::Bool;
 
 	std::map<PinType, std::map<PinType, int>> m_PinTypeConversions;
+	std::map<PinType, int> m_NativeMakeFunctions;
+	std::map<PinType, int> m_NativeBreakFunctions;
 
     bool m_HideUnconnected = false;
 
@@ -891,6 +910,8 @@ public:
     bool FUNC_CompactNode = false;
     bool FUNC_NoPinLabels = false;
     bool FUNC_ConversionAutocast = false;
+    bool FUNC_NativeMakeFunc = false;
+    bool FUNC_NativeBreakFunc = false;
 
     bool FUNC_Internal = false;
 };
@@ -1856,13 +1877,12 @@ Node* NodeEditorInternal::SpawnSequenceNode(SpawnNodeData in)
 	return &node;
 }
 
-Node* NodeEditorInternal::SpawnWhileLoopNode(SpawnNodeData in)
+Node* NodeEditorInternal::SpawnRerouteNode(SpawnNodeData in)
 {
-    auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "While Loop");
-	node.Inputs.emplace_back(GetNextId(), "", PinType::Flow);
-	node.Inputs.emplace_back(GetNextId(), "Condition", PinType::Bool);
-	node.Outputs.emplace_back(GetNextId(), "Loop Body", PinType::Flow);
-	node.Outputs.emplace_back(GetNextId(), "Completed", PinType::Flow);
+	auto& node = (in.GraphID ? FindGraphByID(in.GraphID) : GetCurrentGraph())->Nodes.emplace_back(GetNextId(), "Reroute");
+	node.Type = NodeType::Point;
+	node.Inputs.emplace_back(GetNextId(), "", PinType::Bool);
+	node.Outputs.emplace_back(GetNextId(), "", PinType::Bool);
 
 	BuildNode(&node);
 
@@ -1889,6 +1909,41 @@ Node* NodeEditorInternal::SpawnComment(SpawnNodeData in)
 
 
     return &node;
+}
+
+Pin* NodeEditorInternal::AddPinToNodeFromParam(FunctionDeclaration& function, Pin& param, Node& node, int index)
+{
+	if (param.Kind == PinKind::Input)
+	{
+		//auto& input = node.Inputs.emplace_back(param);
+        auto i = (index == -1 ? node.Inputs.size() : index);
+        node.Inputs.insert(node.Inputs.begin() + i, param);
+        auto& input = node.Inputs[i];
+
+
+		input.ID = GetNextId();
+		input.Name = ConvertToDisplayString(param.GetName());
+		input.DisplayName = param.DisplayName;
+		input.ArgumentID = param.ArgumentID;
+		if (function.FUNC_NoPinLabels) input.Name = "";
+
+        return &input;
+	}
+	else
+	{
+		//auto& output = node.Outputs.emplace_back(param);
+		auto i = (index == -1 ? node.Outputs.size() : index);
+		node.Outputs.insert(node.Outputs.begin() + i, param);
+		auto& output = node.Outputs[i];
+
+		output.ID = GetNextId();
+		output.Name = ConvertToDisplayString(param.GetName());
+        output.DisplayName = param.DisplayName;
+		output.ArgumentID = param.ArgumentID;
+		if (function.FUNC_NoPinLabels) output.Name = "";
+
+        return &output;
+	}
 }
 
 Node* NodeEditorInternal::SpawnNodeFromLibrary(unsigned int id, NodeGraph& graph)
@@ -1919,30 +1974,113 @@ Node* NodeEditorInternal::SpawnNodeFromLibrary(unsigned int id, NodeGraph& graph
 					newNode.Outputs.emplace_back(GetNextId(), Function.FUNC_NoPinLabels ? "" : "Return Value", Function.FUNC_Return.Data.Type);
 					newNode.Outputs.back().ArgumentID = Function.FUNC_Return.ArgumentID;
 				}
-				for (auto& param : Function.FUNC_Params)
-					if (param.Kind == PinKind::Input)
-					{
-						auto& input = newNode.Inputs.emplace_back(param);
-						input.ID = GetNextId();
-						input.Name = ConvertToDisplayString(param.GetName());
-						input.DisplayName = param.DisplayName;
-						input.ArgumentID = param.ArgumentID;
-						if (Function.FUNC_NoPinLabels) input.Name = "";
-					}
-					else
-					{
-						auto& output = newNode.Outputs.emplace_back(param);
-						output.ID = GetNextId();
-						output.Name = ConvertToDisplayString(param.GetName());
-						output.ArgumentID = param.ArgumentID;
-						if (Function.FUNC_NoPinLabels) output.Name = "";
-					}
+                for (auto& param : Function.FUNC_Params)
+                    AddPinToNodeFromParam(Function, param, newNode);
 
 				BuildNode(&newNode);
 
 				return &newNode;
 			}
     return nullptr;
+}
+
+void NodeEditorInternal::SplitStructPin(Pin* inPin)
+{
+    if (auto functionID = inPin->Kind == PinKind::Input ? GetMakeFunction(inPin->Data.Type) : GetBreakFunction(inPin->Data.Type))
+    {
+        auto& node = *inPin->Node;
+        auto& pins = inPin->Kind == PinKind::Input ? node.Inputs : node.Outputs;
+        for (size_t i = 0; i < pins.size(); i++)
+        {
+            auto& pin = pins[i];
+            if (pin.ID == inPin->ID)
+            {
+                // Set current pin to hidden
+                inPin->SplitPin = true;
+
+                // Create New Pins
+                auto function = FindFunctionByID(functionID);
+
+                auto pinID = inPin->ID;
+                auto pinKind = inPin->Kind;
+
+                if (function != nullptr)
+                {
+					if (inPin->Kind == PinKind::Output && function->FUNC_Return.Data.Type != PinType::Void)
+					{
+						auto newPin = AddPinToNodeFromParam(*function, function->FUNC_Return, node, i);
+						newPin->ParentID = pinID;
+					}
+                    for (size_t p = 0; p < function->FUNC_Params.size(); p++)
+                    {
+                        auto& param = function->FUNC_Params[p];
+                        if (param.Kind == pinKind)
+                        {
+                            auto newPin = AddPinToNodeFromParam(*function, param, node, i + p);
+                            newPin->ParentID = pinID;
+                        }
+                    }
+                }
+
+                BuildNode(&node);
+                break;
+            }
+
+        }
+    }
+}
+
+void NodeEditorInternal::RecombineStructPins(Pin* pin)
+{
+    auto& node = *pin->Node;
+    auto parentId = pin->ParentID;
+
+    if (pin->Kind == PinKind::Input)
+    {
+        for (auto& input : node.Inputs)
+            if (input.ParentID == parentId)
+				for (auto& l_input : node.Inputs)
+					if (l_input.ParentID == input.ID)
+						RecombineStructPins(&l_input);
+
+        for (size_t i = 0; i < node.Inputs.size(); i++)
+        {
+            auto& input = node.Inputs[i];
+            if (input.ParentID == parentId)
+            {
+                DeleteAllPinLinkAttachments(&input);
+                node.Inputs.erase(node.Inputs.begin() + i);
+                i--;
+            }
+			else if (input.ID == parentId)
+			{
+				input.SplitPin = false;
+			}
+        }
+    }
+    else
+    {
+		for (auto& output : node.Outputs)
+			if (output.ParentID == parentId)
+				for (auto& l_output : node.Outputs)
+					if (l_output.ParentID == output.ID)
+						RecombineStructPins(&l_output);
+
+		for (size_t i = 0; i < node.Outputs.size(); i++)
+		{
+			auto& output = node.Outputs[i];
+			if (output.ParentID == parentId)
+			{
+                DeleteAllPinLinkAttachments(&output);
+				node.Outputs.erase(node.Outputs.begin() + i);
+				i--;
+			}
+			else if (output.ID == parentId)
+			{
+				output.SplitPin = false;
+			}
+		}
+    }
 }
 
 int NodeEditorInternal::GetConversionAvalible(Pin* A, Pin* B)
@@ -2014,7 +2152,8 @@ ImColor NodeEditorInternal::GetIconColor(PinType type)
         case PinType::Float:    return ImColor(147, 226,  74);
         case PinType::String:   return ImColor(218,   0, 183);
         case PinType::Vector:   return ImColor(242, 192,  33);
-        case PinType::Color:    return ImColor(0  , 87,  200);
+        case PinType::Color:    return ImColor(  0,  87, 200);
+        case PinType::Byte:     return ImColor(  6, 100,  92);
         case PinType::Object:   return ImColor( 51, 150, 215);
         case PinType::Function: return ImColor(218,   0, 183);
         case PinType::Delegate: return ImColor(255,  48,  48);
@@ -2035,6 +2174,7 @@ void NodeEditorInternal::DrawPinIcon(const PinData& data, const PinKind& kind, b
         case PinType::String:   iconType = IconType::Circle; break;
         case PinType::Vector:   iconType = IconType::Circle; break;
         case PinType::Color:    iconType = IconType::Circle; break;
+        case PinType::Byte:     iconType = IconType::Circle; break;
         case PinType::Object:   iconType = IconType::Circle; break;
         case PinType::Function: iconType = IconType::Circle; break;
         case PinType::Delegate: iconType = IconType::Square; break;
@@ -2334,6 +2474,7 @@ std::string NodeCompiler::ConvertPinValueToCompiledString(const PinType& type, T
 	case PinType::String: { Dymatic::String::ReplaceAll(value.String, "\\", "\\\\"); Dymatic::String::ReplaceAll(value.String, "\"", "\\\""); return "\"" + value.String + "\""; }
 	case PinType::Vector: {return "{ " + std::to_string(value.Vector.x) + ", " + std::to_string(value.Vector.y) + ", " + std::to_string(value.Vector.z) + " }"; }
 	case PinType::Color: {return "{ " + std::to_string(value.Color.x) + ", " + std::to_string(value.Color.y) + ", " + std::to_string(value.Color.z) + ", " + std::to_string(value.Color.w) + " }"; }
+	case PinType::Byte: { return std::to_string(value.Byte); }
 	}
 	DY_CORE_ASSERT("Node value conversion to string not found");
 }
@@ -2349,6 +2490,7 @@ std::string NodeCompiler::ConvertPinTypeToCompiledString(const PinType& pinType,
 	case PinType::String:   return beginCaps ? "String" : "std::string";
 	case PinType::Vector:   return beginCaps ? "Vector" : "glm::vec3";
 	case PinType::Color:    return beginCaps ? "Color" : "glm::vec4";
+	case PinType::Byte:     return beginCaps ? "Byte" :  "unsigned char";
 	}
 	DY_ASSERT("Pin type conversion to string not found");
 }
@@ -2404,24 +2546,29 @@ std::string NodeCompiler::UnderscoreSpaces(std::string inString)
 
 void NodeEditorInternal::CompileNodes()
 {
+	// Clear Previous Compilation
+	m_CompilerResults.clear();
+	for (auto& graph : m_Graphs)
+		for (auto& node : graph.Nodes)
+		{
+			node.Error = false;
+			node.UbergraphID = -1;
+		}
+
+    // Make copy of node graph to roll back to after compilation is complete.
+	std::vector<NodeGraph> graphs_backup = m_Graphs;
+	std::vector<ed::NodeId> node_errors;
+
     BuildNodes();
 
     int compileTimeNextId = m_NextId + 1;
+
 
 	std::string NodeScriptName = "UnrealBlueprintClass";
     NodeCompiler header;
     NodeCompiler source;
 
     ShowFlow();
-
-	// Clear Previous Compilation
-	m_CompilerResults.clear();
-    for (auto& graph : m_Graphs)
-        for (auto& node : graph.Nodes)
-        {
-	    	node.Error = false;
-            node.UbergraphID = -1;
-        }
 
 	// Set Window Focus
 	ImGui::SetWindowFocus("Compiler Results");
@@ -2432,35 +2579,116 @@ void NodeEditorInternal::CompileNodes()
 	m_CompilerResults.push_back({ CompilerResultType::Info, "Initializing Pre Compile Link Checks" });
 	// Invalid Pin Links
     for (auto& graph : m_Graphs)
-		for (auto& link : graph.Links)
+		for (size_t linkIndex = 0; linkIndex < graph.Links.size(); linkIndex++)
 		{
+            auto& link = graph.Links[linkIndex];
+
 			auto startPin = FindPin(link.StartPinID);
 			auto endPin = FindPin(link.EndPinID);
-			if (startPin->Data.Type != endPin->Data.Type)
-			{
-				m_CompilerResults.push_back({ CompilerResultType::Error, "Can't connect pins : Data type is not the same.", startPin->Node->ID });
-				startPin->Node->Error = true;
-				endPin->Node->Error = true;
-			}
-			if (startPin->Data.Container != endPin->Data.Container)
-			{
-				m_CompilerResults.push_back({ CompilerResultType::Error, "Can't connect pins : Container type is not the same.", startPin->Node->ID });
-				startPin->Node->Error = true;
-				endPin->Node->Error = true;
-			}
+            if (startPin != nullptr && endPin != nullptr)
+            {
+                if (startPin->Data.Type != endPin->Data.Type)
+                {
+                    m_CompilerResults.push_back({ CompilerResultType::Error, "Can't connect pins : Data type is not the same.", startPin->Node->ID });
+                    node_errors.emplace_back(startPin->Node->ID);
+                    node_errors.emplace_back(endPin->Node->ID);
+                }
+                if (startPin->Data.Container != endPin->Data.Container)
+                {
+                    m_CompilerResults.push_back({ CompilerResultType::Error, "Can't connect pins : Container type is not the same.", startPin->Node->ID });
+                    node_errors.emplace_back(startPin->Node->ID);
+                    node_errors.emplace_back(endPin->Node->ID);
+                }
+            }
+            else
+            {
+                graph.Links.erase(graph.Links.begin() + linkIndex);
+                linkIndex--;
+            }
 		}
 
     // Pre Compile Node Checks
     m_CompilerResults.push_back({ CompilerResultType::Info, "Initializing Pre Compile Node Checks" });
     for (auto& graph : m_Graphs)
-		for (auto& node : graph.Nodes)
-			for (auto& pin : node.Inputs)
-				if (pin.Data.Reference)
-					if (!IsPinLinked(pin.ID))
-					{
-						m_CompilerResults.push_back({ CompilerResultType::Error, "The pin '" + pin.Name + "' in node '" + node.Name + "' is a reference and expects a linked input.", node.ID });
-						node.Error = true;
-					}
+        for (int nodeIndex = 0; nodeIndex < graph.Nodes.size(); nodeIndex++)
+        {
+            {
+                auto& node = graph.Nodes[nodeIndex];
+                for (int pinIndex = 0; pinIndex < node.Inputs.size(); pinIndex++)
+                {
+                    {
+                        auto& pin = node.Inputs[pinIndex];
+                        if (pin.SplitPin)
+                            if (auto function = GetMakeFunction(pin.Data.Type))
+                            {
+                                auto newNode = SpawnNodeFromLibrary(function, graph);
+                                CreateLink(graph, &newNode->Outputs[0], &pin);
+
+                                // Redefine node in case of vector reallocation.
+                                auto& node = graph.Nodes[nodeIndex];
+
+                                int index = 0;
+                                for (int innerPinIndex = 0; innerPinIndex < node.Inputs.size(); innerPinIndex++)
+                                {
+                                    auto& input = node.Inputs[innerPinIndex];
+                                    if (input.ParentID == pin.ID)
+                                    {
+                                        newNode->Inputs[index].Data.Value = input.Data.Value;
+
+                                        auto& pinLinks = GetPinLinks(input.ID);
+                                        for (auto& link : pinLinks)
+                                            (link->StartPinID == input.ID ? link->StartPinID : link->EndPinID) = newNode->Inputs[index].ID;
+                                        index++;
+
+                                    }
+                                }
+                            }
+                    }
+                    {
+                        auto& node = graph.Nodes[nodeIndex];
+                        auto& pin = node.Inputs[pinIndex];
+                        if (pin.Data.Reference)
+                            if (!IsPinLinked(pin.ID))
+                            {
+                                m_CompilerResults.push_back({ CompilerResultType::Error, "The pin '" + pin.Name + "' in node '" + node.Name + "' is a reference and expects a linked input.", node.ID });
+                                node_errors.emplace_back(node.ID);
+                            }
+                    }
+                }
+            }
+            {
+                auto& node = graph.Nodes[nodeIndex];
+                for (int pinIndex = node.Outputs.size() - 1; pinIndex >= 0; pinIndex--)
+                {
+                    auto& pin = node.Outputs[pinIndex];
+                    if (pin.SplitPin)
+						if (auto function = GetBreakFunction(pin.Data.Type))
+						{
+							auto newNode = SpawnNodeFromLibrary(function, graph);
+							CreateLink(graph, &newNode->Inputs[0], &pin);
+
+							// Redefine node in case of vector reallocation.
+							auto& node = graph.Nodes[nodeIndex];
+
+							int index = 0;
+							for (auto& output : node.Outputs)
+								if (output.ParentID == pin.ID)
+								{
+									newNode->Outputs[index].Data.Value = output.Data.Value;
+
+									auto& pinLinks = GetPinLinks(output.ID);
+									for (auto& link : pinLinks)
+										(link->StartPinID == output.ID ? link->StartPinID : link->EndPinID) = newNode->Outputs[index].ID;
+									index++;
+
+								}
+						}
+                }
+            }
+        }
+
+    // Rebuild nodes after alterations have been made by the precompiler
+    BuildNodes();
 
 	header.WriteLine("#pragma once");
 	header.WriteLine("//Dymatic C++ Node Script - Header - V1.2.2");
@@ -2664,7 +2892,7 @@ void NodeEditorInternal::CompileNodes()
                             std::string line;
                             std::vector<ed::NodeId> pureList;
                             std::vector<ed::NodeId> localList;
-                            RecursivePinWrite(node.Inputs[1], source, header, ubergraphBody, line, pureList, localList);
+                            RecursivePinWrite(node.Inputs[1], source, header, ubergraphBody, line, node_errors, pureList, localList);
 
                             ubergraphBody.WriteLine("if (!" + line + ")");
                             ubergraphBody.OpenScope();
@@ -2793,7 +3021,7 @@ void NodeEditorInternal::CompileNodes()
                                 std::string line;
                                 std::vector<ed::NodeId> pureList;
                                 std::vector<ed::NodeId> localList;
-                                RecursivePinWrite(node.Inputs[1], source, header, ubergraphBody, line, pureList, localList);
+                                RecursivePinWrite(node.Inputs[1], source, header, ubergraphBody, line, node_errors, pureList, localList);
 
                                 ubergraphBody.WriteLine(ubergraphBody.UnderscoreSpaces("bpv__" + variable.Name + "_" + std::to_string(variable.ID) + "__pf") + " = " + line + ";");
                             }
@@ -2852,7 +3080,7 @@ void NodeEditorInternal::CompileNodes()
                         // Node Execution Code
                         std::vector<ed::NodeId> pureList;
                         std::vector<ed::NodeId> localList;
-                        RecursiveNodeWrite(node, source, header, ubergraphBody, pureList, localList);
+                        RecursiveNodeWrite(node, source, header, ubergraphBody, node_errors, pureList, localList);
 
                         if (IsPinLinked(node.Outputs[0].ID))
                         {
@@ -2934,6 +3162,17 @@ void NodeEditorInternal::CompileNodes()
     header.CloseScope();
     source.CloseScope();
 
+    // Restore changes to editor that took place during compilation
+    m_Graphs = graphs_backup;
+    BuildNodes();
+
+    for (auto& nodeId : node_errors)
+    {
+        auto p_node = FindNode(nodeId);
+        if (p_node != nullptr)
+            p_node->Error = true;
+    }
+
 	std::string filepath = "src/Nodes/" + NodeScriptName;
 
 	unsigned int warningCount = 0;
@@ -2956,7 +3195,7 @@ void NodeEditorInternal::CompileNodes()
 		m_CompilerResults.push_back({ CompilerResultType::Info, "Compile of " + NodeScriptName + " failed [C++] - " + std::to_string(errorCount) + " Error(s) " + std::to_string(warningCount) + " Warnings(s) - Dymatic Nodes V1.2.2 (" + filepath + ")" });
 }
 
-void NodeEditorInternal::RecursivePinWrite(Pin& pin, NodeCompiler& source,NodeCompiler& header, NodeCompiler& ubergraphBody, std::string& line, std::vector<ed::NodeId>& pureNodeList, std::vector<ed::NodeId>& localNodeList)
+void NodeEditorInternal::RecursivePinWrite(Pin& pin, NodeCompiler& source,NodeCompiler& header, NodeCompiler& ubergraphBody, std::string& line, std::vector<ed::NodeId>& node_errors, std::vector<ed::NodeId>& pureNodeList, std::vector<ed::NodeId>& localNodeList)
 {
 	if (IsPinLinked(pin.ID))
 	{
@@ -2975,12 +3214,11 @@ void NodeEditorInternal::RecursivePinWrite(Pin& pin, NodeCompiler& source,NodeCo
             }
         else
         {
-
             if (otherNode->Pure)
             {
                 std::vector<ed::NodeId> newList = pureNodeList;
                 newList.push_back(pin.Node->ID);
-                RecursiveNodeWrite(*otherNode, source, header, ubergraphBody, newList, localNodeList);
+                RecursiveNodeWrite(*otherNode, source, header, ubergraphBody, node_errors, newList, localNodeList);
             }
 
             // Lookup function of node
@@ -3011,13 +3249,13 @@ void NodeEditorInternal::RecursivePinWrite(Pin& pin, NodeCompiler& source,NodeCo
                         if (!found)
                         {
                             m_CompilerResults.push_back({ CompilerResultType::Error, "Couldn't find associated argument for pin '" + otherPin->Name + "' of node '" + otherNode->Name + "'", otherNode->ID });
-                            otherNode->Error = true;
+                            node_errors.emplace_back(otherNode->ID);
                         }
                     }
             if (!found)
             {
                 m_CompilerResults.push_back({ CompilerResultType::Error, "Couldn't find associated function for '" + otherNode->Name + "'", otherNode->ID });
-                otherNode->Error = true;
+                node_errors.emplace_back(otherNode->ID);
             }
         }
 	}
@@ -3025,7 +3263,7 @@ void NodeEditorInternal::RecursivePinWrite(Pin& pin, NodeCompiler& source,NodeCo
 		line += ubergraphBody.ConvertPinValueToCompiledString(pin.Data.Type, pin.Data.Value);
 }
 
-void NodeEditorInternal::RecursiveNodeWrite(Node& node, NodeCompiler& source, NodeCompiler& header, NodeCompiler& ubergraphBody, std::vector<ed::NodeId>& pureNodeList, std::vector<ed::NodeId>& localNodeList)
+void NodeEditorInternal::RecursiveNodeWrite(Node& node, NodeCompiler& source, NodeCompiler& header, NodeCompiler& ubergraphBody, std::vector<ed::NodeId>& node_errors, std::vector<ed::NodeId>& pureNodeList, std::vector<ed::NodeId>& localNodeList)
 {
     std::string line;
 
@@ -3039,7 +3277,7 @@ void NodeEditorInternal::RecursiveNodeWrite(Node& node, NodeCompiler& source, No
 		{
 			auto node = FindNode(nodeId);
 			m_CompilerResults.push_back({ CompilerResultType::Error, "Dependency cycle detected, preventing node '" + node->Name + "' from being scheduled.", nodeId });
-			node->Error = true;
+            node_errors.emplace_back(nodeId);
 		}
 
     // Check that pure nodes are not being called more than once per non pure function
@@ -3104,7 +3342,7 @@ void NodeEditorInternal::RecursiveNodeWrite(Node& node, NodeCompiler& source, No
                             else line += ", ";
 
                             if (pin.Kind == PinKind::Input)
-                                RecursivePinWrite(pin, source, header, ubergraphBody, line, pureNodeList, localNodeList);
+                                RecursivePinWrite(pin, source, header, ubergraphBody, line, node_errors, pureNodeList, localNodeList);
                             else
                             {
                                 auto name = "b0l__CallFunc_" + Function.FUNC_Name + "_" + std::to_string(node.ID.Get()) + "_" + param.Name + "__pf";
@@ -3119,7 +3357,7 @@ void NodeEditorInternal::RecursiveNodeWrite(Node& node, NodeCompiler& source, No
                         else
                         {
                             m_CompilerResults.push_back({ CompilerResultType::Error, "Couldn't find associated pin for argument '" + param.Name + "' of function '" + Function.GetName() + "'", node.ID });
-                            node.Error = true;
+                            node_errors.emplace_back(node.ID);
                         }
                     }
                     line += ");";
@@ -3131,7 +3369,7 @@ void NodeEditorInternal::RecursiveNodeWrite(Node& node, NodeCompiler& source, No
         if (!found)
         {
             m_CompilerResults.push_back({ CompilerResultType::Error, "Couldn't find associated function for '" + node.Name + "'", node.ID });
-            node.Error = true;
+            node_errors.emplace_back(node.ID);
         }
     }
 }
@@ -3221,6 +3459,15 @@ Node& NodeEditorInternal::GetNextExecNode(Pin& pin)
 	auto link = GetPinLinks(pin.ID)[0];
 	auto& id = pin.ID.Get() == link->StartPinID.Get() ? link->EndPinID : link->StartPinID;
 	return *FindPin(id)->Node;
+}
+
+FunctionDeclaration* NodeEditorInternal::FindFunctionByID(unsigned int id)
+{
+    for (auto& library : m_NodeLibraries)
+        for (auto& function : library.m_FunctionDeclarations)
+            if (function.ID == id)
+                return &function;
+    return nullptr;
 }
 
 std::string NodeCompiler::GenerateFunctionSignature(Node& node, const std::string& Namespace)
@@ -3344,6 +3591,7 @@ std::string NodeEditorInternal::ConvertPinTypeToString(const PinType& pinType)
 	case PinType::String:   return "String";
 	case PinType::Vector:   return "Vector";
 	case PinType::Color:    return "Color";
+	case PinType::Byte:     return "Byte";
 	}
 	DY_ASSERT(false, "Pin type conversion to string not found");
 }
@@ -3358,6 +3606,7 @@ PinType NodeEditorInternal::ConvertStringToPinType(const std::string& string)
     else if (string == "String" || string == "string")   return PinType::String;
     else if (string == "Vector" || string == "vector")   return PinType::Vector;
     else if (string == "Color" || string == "color")   return PinType::Color;
+    else if (string == "Byte" || string == "byte")   return PinType::Byte;
     else
         DY_ASSERT(false, "String conversion to pin type not found");
 }
@@ -3391,6 +3640,7 @@ std::string NodeEditorInternal::ConvertPinValueToString(const PinType& type, con
 	case PinType::String: { return value.String; }
 	case PinType::Vector: { return std::to_string(value.Vector.x) + ", " + std::to_string(value.Vector.y) + ", " + std::to_string(value.Vector.z); }
 	case PinType::Color: { return std::to_string(value.Color.x) + ", " + std::to_string(value.Color.y) + ", " + std::to_string(value.Color.z) + ", " + std::to_string(value.Color.w); }
+	case PinType::Byte: { return std::to_string(value.Byte); }
 	}
 	DY_CORE_ASSERT(false, "Node Value conversion to string not found");
 }
@@ -3407,6 +3657,7 @@ TypeValue NodeEditorInternal::ConvertStringToPinValue(const PinType& type, const
     case PinType::String: { value.String = string; break; }
     case PinType::Vector: { value.Vector.x = std::stof(string.substr(0, Dymatic::String::Find_nth_of(string, ",", 1))); DY_ASSERT("Finish This"); break; }
     case PinType::Color: { value.Color.x = std::stof(string.substr(0, Dymatic::String::Find_nth_of(string, ",", 1))); DY_ASSERT("Finish This"); break; }
+    case PinType::Byte: { value.Byte = std::stoi(string); break; }
     default: DY_CORE_ASSERT(false, "String conversion to Node Value not found");
 	}
     return value;
@@ -4012,6 +4263,14 @@ void NodeEditorInternal::DefaultValueInput(PinData& data, bool spring)
                 ImGui::ColorEdit4("##NodeEditorColor", glm::value_ptr(data.Value.Color), ImGuiColorEditFlags_NoInputs);
             break;
         }
+        case PinType::Byte: {
+			ImGui::SetNextItemWidth(std::clamp(ImGui::CalcTextSize((std::to_string(data.Value.Byte)).c_str()).x + 20, 50.0f, 300.0f));
+            int value = data.Value.Byte;
+            if (ImGui::DragInt("##NodeEditorIntSlider", &value, 0.1f, 0, 255))
+                data.Value.Byte = std::clamp(value, 0, 255);
+			if (spring) ImGui::Spring(0);
+			break;
+        }
         }
     }
 }
@@ -4066,10 +4325,18 @@ SearchResultData* NodeEditorInternal::DisplaySearchData(SearchData& searchData, 
 	return data;
 }
 
+void NodeEditorInternal::DeleteAllPinLinkAttachments(Pin* pin)
+{
+    for (auto& graph : m_Graphs)
+        for (auto& link : graph.Links)
+            if (link.StartPinID == pin->ID || link.EndPinID == pin->ID)
+                ed::DeleteLink(link.ID);
+}
+
 void NodeEditorInternal::CheckLinkSafety(Pin* startPin, Pin* endPin)
 {
-    if (startPin != nullptr)
-    {
+	if (startPin != nullptr)
+	{
         if (startPin->Kind == PinKind::Input)
             std::swap(startPin, endPin);
     }
@@ -4082,14 +4349,12 @@ void NodeEditorInternal::CheckLinkSafety(Pin* startPin, Pin* endPin)
     for (auto& graph : m_Graphs)
 		for (auto& link : graph.Links)
 		{
-			bool endPinCheck = false;
-			bool startPinCheck = false;
 			if (endPin != nullptr)
-				endPinCheck = (link.EndPinID == endPin->ID || link.StartPinID == endPin->ID) && endPin->Data.Type != PinType::Flow;
+				if ((link.EndPinID == endPin->ID || link.StartPinID == endPin->ID) && endPin->Data.Type != PinType::Flow)
+				    ed::DeleteLink(link.ID);
 			if (startPin != nullptr)
-				startPinCheck = (link.EndPinID == startPin->ID || link.StartPinID == startPin->ID) && startPin->Data.Type == PinType::Flow;
-			if (endPinCheck || startPinCheck)
-				ed::DeleteLink(link.ID);
+				if ((link.EndPinID == startPin->ID || link.StartPinID == startPin->ID) && startPin->Data.Type == PinType::Flow)
+				    ed::DeleteLink(link.ID);
 		}
 }
 
@@ -4115,6 +4380,7 @@ void NodeEditorInternal::UpdateSearchData()
     
     AddSearchData("Branch", "Utilities|Flow Control", { "if" }, { {{ PinType::Bool }, PinKind::Input} }, {}, false, &NodeEditorInternal::SpawnBranchNode);
     AddSearchData("Sequence", "Utilities|Flow Control", { "series" }, {}, {}, false, &NodeEditorInternal::SpawnSequenceNode);
+    AddSearchData("Add reroute node...", "", {}, {}, {}, false, &NodeEditorInternal::SpawnRerouteNode);
     if (m_NewNodeLinkPin == nullptr || !m_ContextSensitive) AddSearchData(ed::GetSelectedObjectCount() > 0 ? "Add Comment to Selection" : "Add Comment...", "", { "label" }, {}, {}, true, &NodeEditorInternal::SpawnComment);
 
     AddSearchData("On Create", "Add Event", { "begin" }, {}, {}, false, &NodeEditorInternal::SpawnOnCreateNode);
@@ -4642,6 +4908,55 @@ void NodeEditorInternal::OnImGuiRender()
                             ImGui::EndPopup();
                         }
                         ed::Resume();
+
+                        for (auto& node : graph.Nodes)
+                        {
+                            if (node.Type != NodeType::Point)
+                                continue;
+
+                            ed::PushStyleColor(ed::StyleColor_NodeBg, {});
+                            ed::PushStyleColor(ed::StyleColor_NodeBorder, {});
+                            builder.Begin(node.ID);
+
+                            bool showInput = true;
+                            if (m_NewLinkPin != nullptr)
+                                if (m_NewLinkPin->Kind == PinKind::Input)
+                                    showInput = false;
+                            {
+                                auto& input = node.Inputs[0];
+                                builder.Input(input.ID);
+                                auto alpha = ImGui::GetStyle().Alpha;
+                                if (m_NewLinkPin && !CanCreateLink(m_NewLinkPin, &input) && &input != m_NewLinkPin)
+                                    alpha = alpha * (48.0f / 255.0f);
+                                if (showInput)
+                                {
+                                    auto cpos = ImGui::GetCursorPosX();
+                                    ImGui::SetCursorPosX(cpos + 10.0f);
+                                    DrawPinIcon(input.Data, PinKind::Input, IsPinLinked(input.ID), (int)(alpha * 255));
+                                    ImGui::SetCursorPosX(cpos);
+                                    ImGui::Spring(0);
+                                }
+                                ImGui::Dummy({ 1, 1 });
+                                builder.EndInput();
+                            }
+                            {
+                                auto& output = node.Outputs[0];
+                                builder.Output(output.ID);
+								auto alpha = ImGui::GetStyle().Alpha;
+								if (m_NewLinkPin && !CanCreateLink(m_NewLinkPin, &output) && &output != m_NewLinkPin)
+									alpha = alpha * (48.0f / 255.0f);
+                                if (!showInput)
+                                {
+                                    DrawPinIcon(output.Data, PinKind::Input, IsPinLinked(output.ID), (int)(alpha * 255));
+                                    ImGui::Spring(0);
+                                }
+                                ImGui::Dummy({ 1, 1 });
+                                builder.EndOutput();
+                            }
+
+                            builder.End();
+                            ed::PopStyleColor(2);
+                        }
                     
                         for (auto& node : graph.Nodes)
                         {
@@ -4713,7 +5028,7 @@ void NodeEditorInternal::OnImGuiRender()
                     
                                 for (auto& input : node.Inputs)
                                 {
-                                    if (!m_HideUnconnected || IsPinLinked(input.ID))
+                                    if ((!m_HideUnconnected || IsPinLinked(input.ID)) && !input.SplitPin)
                                     {
                                         auto alpha = ImGui::GetStyle().Alpha;
                                         if (m_NewLinkPin && !CanCreateLink(m_NewLinkPin, &input) && &input != m_NewLinkPin)
@@ -4777,7 +5092,7 @@ void NodeEditorInternal::OnImGuiRender()
                     
                                 for (auto& output : node.Outputs)
 		            			{
-                                    if (!m_HideUnconnected || IsPinLinked(output.ID))
+                                    if ((!m_HideUnconnected || IsPinLinked(output.ID)) && !output.SplitPin)
                                     {
                                         if (!isSimple && output.Data.Type == PinType::Delegate)
                                             continue;
@@ -5641,7 +5956,12 @@ void NodeEditorInternal::OnImGuiRender()
 
                                     BuildNodes();
                                 }
-
+                            if (pin->Kind == PinKind::Input ? GetMakeFunction(pin->Data.Type) : GetBreakFunction(pin->Data.Type))
+                                if (ImGui::MenuItem("Split Struct Pin"))
+                                    SplitStructPin(pin);
+                            if (pin->ParentID)
+                                if (ImGui::MenuItem("Recombine Struct Pin"))
+                                    RecombineStructPins(pin);
                         }
                         else
                             ImGui::Text("Unknown pin: %p", m_ContextPinId.AsPointer());
@@ -6089,6 +6409,7 @@ void NodeEditorInternal::OnImGuiRender()
 						if (ImGui::MenuItem("    String"))  SetVariableType(variable, PinType::String);
 						if (ImGui::MenuItem("    Vector"))  SetVariableType(variable, PinType::Vector);
 						if (ImGui::MenuItem("    Color"))   SetVariableType(variable, PinType::Color);
+						if (ImGui::MenuItem("    Byte"))   SetVariableType(variable, PinType::Byte);
                         ImGui::EndCombo();
                     }
                     auto& cpos2 = ImGui::GetCursorPos(); ImGui::SetCursorPos(cpos1); DrawTypeIcon(variable->Data.Container, variable->Data.Type); ImGui::SetCursorPos(cpos2);
@@ -6600,6 +6921,8 @@ void NodeEditorInternal::LoadNodeLibrary(const std::filesystem::path& path)
                         else if (word == "CompactNodeTitle") { Dymatic::String::EraseAllOfCharacter(value, '"'); Function.FUNC_NodeDisplayName = value; Function.FUNC_CompactNode = true; Function.FUNC_NoPinLabels = true; }
 						else if (word == "NoPinLabels") { Dymatic::String::EraseAllOfCharacter(value, '"'); Function.FUNC_NoPinLabels = true; }
                         else if (word == "ConversionAutocast") { Function.FUNC_ConversionAutocast = true; }
+                        else if (word == "NativeMakeFunc") { Function.FUNC_NativeMakeFunc = true; }
+                        else if (word == "NativeBreakFunc") { Function.FUNC_NativeBreakFunc = true; }
                         else DY_WARN("DYFUNCTION metadata keyword '{0}' is undefined", word);
                     }
 
@@ -6789,11 +7112,39 @@ void NodeEditorInternal::LoadNodeLibrary(const std::filesystem::path& path)
                         // Commit Function
                         readingFunction = false;
 
+                        // Check for functions metadata that requires the function to be added to a library.
                         if (Function.FUNC_ConversionAutocast)
                             if (Function.FUNC_Params.size() == 1 && Function.FUNC_Return.Data.Type != PinType::Void)
                                 m_PinTypeConversions[Function.FUNC_Params[0].Data.Type][Function.FUNC_Return.Data.Type] = Function.ID;
                             else
                                 DY_WARN("Function '{0}' does not meet specifications for node conversion autocast", Function.FUNC_Name);
+
+						if (Function.FUNC_NativeMakeFunc)
+						{
+							int inputCount = 0;
+                            bool asReturn = Function.FUNC_Return.Data.Type != PinType::Void;
+                            int outputCount = asReturn;
+							for (auto& param : Function.FUNC_Params)
+								(param.Kind == PinKind::Input ? inputCount : outputCount)++;
+
+							if (outputCount == 1 && inputCount && Function.FUNC_Pure)
+								m_NativeMakeFunctions[(asReturn ? Function.FUNC_Return : Function.FUNC_Params[0]).Data.Type] = Function.ID;
+							else
+								DY_WARN("Function '{0}' does not meet specifications for a native make function", Function.FUNC_Name);
+						}
+
+                        if (Function.FUNC_NativeBreakFunc)
+                        {
+                            int inputCount = 0;
+							int outputCount = Function.FUNC_Return.Data.Type != PinType::Void;;
+                            for (auto& param : Function.FUNC_Params)
+                                (param.Kind == PinKind::Input ? inputCount : outputCount)++;
+
+                            if (inputCount == 1 && outputCount && Function.FUNC_Pure)
+                                m_NativeBreakFunctions[Function.FUNC_Params[0].Data.Type] = Function.ID;
+                            else
+                                DY_WARN("Function '{0}' does not meet specifications for a native break function", Function.FUNC_Name);
+                        }
 
 
                         // Write Meta Data

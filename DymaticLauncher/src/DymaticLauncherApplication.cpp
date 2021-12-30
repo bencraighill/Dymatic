@@ -19,7 +19,7 @@ namespace Dymatic {
 		}
 	};
 
-	Application* CreateApplication()
+	Application* CreateApplication(ApplicationCommandLineArgs args)
 	{
 		return new DymaticLauncher();
 	}

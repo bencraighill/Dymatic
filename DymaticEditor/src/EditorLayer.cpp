@@ -27,6 +27,40 @@
 
 namespace Dymatic {
 
+	PROCESS_INFORMATION crash_manager_pi;
+
+	VOID LoadApplicationCrashManager()
+	{
+		// additional information
+		STARTUPINFO si;
+
+		// set the size of the structures
+		ZeroMemory(&si, sizeof(si));
+		si.cb = sizeof(si);
+		ZeroMemory(&crash_manager_pi, sizeof(crash_manager_pi));
+
+		WCHAR path[MAX_PATH];
+		GetModuleFileName(GetModuleHandle(NULL), path, sizeof(path));
+
+		TCHAR s[100];
+		swprintf_s(s, (L"%X %s %S"), GetCurrentProcessId(), path, "Dymatic.log");
+
+		// start the program up
+		CreateProcess(L"../bin/Debug-windows-x86_64/CrashManager/CrashManager.exe",   // the path
+			s,        // Command line
+			NULL,           // Process handle not inheritable
+			NULL,           // Thread handle not inheritable
+			FALSE,          // Set handle inheritance to FALSE
+			0,              // No creation flags
+			NULL,           // Use parent's environment block
+			NULL,           // Use parent's starting directory 
+			&si,            // Pointer to STARTUPINFO structure
+			&crash_manager_pi             // Pointer to PROCESS_INFORMATION structure (removed extra parentheses)
+		);
+
+		// Handles are closed and destroyed when the engine terminates
+	}
+
 	extern const std::filesystem::path g_AssetPath;
 
 	EditorLayer::EditorLayer()
@@ -37,6 +71,8 @@ namespace Dymatic {
 	void EditorLayer::OnAttach()
 	{
 		DY_PROFILE_FUNCTION();
+
+		LoadApplicationCrashManager();
 
 		OpenWindowLayout("saved/presets/GeneralWorkspace.layout");
 		OpenWindowLayout("saved/SavedLayout.layout");
@@ -132,11 +168,22 @@ namespace Dymatic {
 	{
 		DY_PROFILE_FUNCTION();
 		SaveWindowLayout("saved/SavedLayout.layout");
+
+
+		// Close crash manager process and thread handles.
+		TerminateProcess(crash_manager_pi.hProcess, 1);
+		TerminateProcess(crash_manager_pi.hThread, 1);
+
+		CloseHandle(crash_manager_pi.hProcess);
+		CloseHandle(crash_manager_pi.hThread);
 	}
 
 	void EditorLayer::OnUpdate(Timestep ts)
 	{
 		DY_PROFILE_FUNCTION();
+
+		if (Input::IsKeyPressed(Key::Q))
+			abort();
 
 		static bool created = false;
 		if (Input::IsKeyPressed(Key::B) && !created)
