@@ -1473,8 +1473,6 @@
     <ClInclude Include="vendor\stb_image\stb_image_write.h">
       <Filter>vendor\stb_image</Filter>
     </ClInclude>
-    <ClInclude Include="vendor\CSplash\Splash.h" />
-    <ClInclude Include="vendor\CSplash\StdAfx.h" />
     <ClInclude Include="vendor\ImGuiNode\crude_json.h" />
     <ClInclude Include="vendor\ImGuiNode\imgui_bezier_math.h" />
     <ClInclude Include="vendor\ImGuiNode\imgui_canvas.h" />
@@ -1482,6 +1480,8 @@
     <ClInclude Include="vendor\ImGuiNode\imgui_node_editor.h" />
     <ClInclude Include="vendor\ImGuiNode\imgui_node_editor_internal.h" />
     <ClInclude Include="vendor\ImGuiNode\ScopeGuard.h" />
+    <ClInclude Include="vendor\CSplash\Splash.h" />
+    <ClInclude Include="vendor\CSplash\StdAfx.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Dymatic\Core\Application.cpp">
@@ -1613,13 +1613,13 @@
     <ClCompile Include="vendor\stb_image\stb_image.cpp">
       <Filter>vendor\stb_image</Filter>
     </ClCompile>
-    <ClCompile Include="vendor\CSplash\Splash.cpp" />
-    <ClCompile Include="vendor\CSplash\SplashClient.cpp" />
-    <ClCompile Include="vendor\CSplash\StdAfx.cpp" />
     <ClCompile Include="vendor\ImGuiNode\crude_json.cpp" />
     <ClCompile Include="vendor\ImGuiNode\imgui_canvas.cpp" />
     <ClCompile Include="vendor\ImGuiNode\imgui_node_editor.cpp" />
     <ClCompile Include="vendor\ImGuiNode\imgui_node_editor_api.cpp" />
+    <ClCompile Include="vendor\CSplash\Splash.cpp" />
+    <ClCompile Include="vendor\CSplash\SplashClient.cpp" />
+    <ClCompile Include="vendor\CSplash\StdAfx.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="vendor\ImGuiNode\imgui_bezier_math.inl" />
