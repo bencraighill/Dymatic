@@ -4,3 +4,6 @@
 [submodule "Dymatic/vendor/yaml-cpp"]
 	path = Dymatic/vendor/yaml-cpp
 	url = https://github.com/BenC25/yaml-cpp
+[submodule "Dymatic/vendor/glfw"]
+	path = Dymatic/vendor/glfw
+	url = https://github.com/BenC25/glfw
