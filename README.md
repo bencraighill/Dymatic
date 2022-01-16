@@ -1,7 +1,7 @@
 # Dymatic [![License](https://img.shields.io/github/license/BenC25/Dymatic.svg)](https://github.com/BenC25/Dymatic/blob/master/LICENSE)
 
-![Dymatic_Logo_Light](/Resources/Branding/Dymatic_Logo_Light.png#gh-light-mode-only?raw=true "Dymatic")
-![Dymatic_Logo_Dark](/Resources/Branding/Dymatic_Logo_Dark.png#gh-dark-mode-only?raw=true "Dymatic")
+![Dymatic_Logo_Dark](/Resources/Branding/Dymatic_Logo_Dark.png#gh-dark-mode-only)
+![Dymatic_Logo_Light](/Resources/Branding/Dymatic_Logo_Light.png#gh-light-mode-only)
 
 Dymatic is a basic, open source, WIP game engine created using C++.
 Currently, Microsoft Visual Studio is required to build, and only officially supports Windows.
