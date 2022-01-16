@@ -1,46 +1,30 @@
-Dymatic is a basic open source game engine created using C++.
+# Dymatic [![License](https://img.shields.io/github/license/BenC25/Dymatic.svg)](https://github.com/BenC25/Dymatic/blob/master/LICENSE)
 
-Currently, Microsoft Visual Studio required, and only officially supports V2019.
-The dyamtic.sln file allows access to all project, engine and external vendor code.
+![Dymatic_Logo_Light](/Resources/Branding/Dymatic_Logo_Light.png#gh-light-mode-only?raw=true "Dymatic")
+![Dymatic_Logo_Dark](/Resources/Branding/Dymatic_Logo_Dark.png#gh-dark-mode-only?raw=true "Dymatic")
 
+Dymatic is a basic, open source, WIP game engine created using C++.
+Currently, Microsoft Visual Studio is required to build, and only officially supports Windows.
 
+<h4>Latest Build:</h4>
+<i>Dymatic V1.2.2 - Development</i>
 
+## Building Source
+#### Downloading the Repository
+Clone this GitHub repository using: <pre><code>git clone --recursive https://github.com/BenC25/Dymatic.git</code></pre>
+If previously cloned non-recursively, clone the necessary submodules using:
+<pre><code>git submodule update --init</code></pre>
 
-To clone source, have github installed to your computer and clone the repository.
-Run the Win-GenProjects.bat file under the scripts folder to generate all content. 
-Currently you will need to compile the solution yourself, open the soltuion file with
-MCVS2019, change the settings to your platform, and debug settings. Then build and 
-run the solution file.
+#### Dependencies
 
-Your newly generated engine build will be located under:
+1. Run the [`Setup.bat`](https://github.com/BenC25/Dymatic/Public/scripts/Setup.bat) file inside the `scripts` directory which will install any necessary submodules.
 
-bin/{plaform, debug type}/{project name}/{project name}.exe
+2. If the Vulkan SDK, is not installed, `VulaknSDK.exe` will be launched via the script and will prompt the user to install the SDK. After installation run [`Setup.bat`](https://github.com/BenC25/Dymatic/Public/scripts/Setup.bat) again, and if the previous step was successful, this will lead to the Vulkan SDK debug libraries being downloaded and un-zipped automatically.
 
+3. Submodules are updated automatically.
+
+4. The [`Win-GenProjects.bat`](https://github.com/BenC25/Dymatic/Public/scripts/Win-GenProjects.bat) script file will get executed automatically, and will use `premake` to generate project files and configure them to the specifications of the included lua file.
+
+5. If any future changes are made, use [`Win-GenProjects.bat`](https://github.com/BenC25/Dymatic/Public/scripts/Win-GenProjects.bat) to regenerate the project.
+  
 Enjoy using dymatic.
-
-
-
-
-
-Where To Get Help
-
-Anyone can get help on our documentation page, GitHub wiki, forums or on GitHub.
-Just label as #help and anyone in the community can respond. Make sure that your question 
-is descriptive and include screenshot and log information where necessary.
-
-How You Can Help
-
-Feel free to respond to anyone online and make changes to code and share them. 
-If you have any recommendations or bug fixes needed, share them. Any code that you think 
-should be a part of the engine mark with #intergration. When suggesting code avoid having too 
-many changes in one document and upload them separately as one change that we do not like, 
-will mean that the whole commit will be turned down.
-
-Contacts
-
-You can contact us at:
-
-dymatic.tk
-dymaticengineuser@gmail.com
-
-Happy coding!
