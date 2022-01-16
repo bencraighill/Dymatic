@@ -41,7 +41,7 @@ namespace ImGui::Custom {
 		if (!ItemAdd(bb, id))
 			return false;
 
-		if (window->DC.ItemFlags & ImGuiItemFlags_ButtonRepeat)
+		if (g.LastItemData.InFlags & ImGuiItemFlags_ButtonRepeat)
 			flags |= ImGuiButtonFlags_Repeat;
 		bool hovered, held;
 		bool pressed = ButtonBehavior(bb, id, &hovered, &held, flags);
@@ -112,7 +112,7 @@ namespace ImGui::Custom {
 		RenderNavHighlight(total_bb, id);
 		RenderFrame(check_bb.Min, check_bb.Max, GetColorU32((*v && hovered) ? ImGuiCustomColors[ImGuiCol_CheckboxBgHoveredTicked] : (*v) ? ImGuiCustomColors[ImGuiCol_CheckboxBgTicked] : (held && hovered) ? ImGuiCustomColors[ImGuiCol_CheckboxBgActive] : hovered ? ImGuiCustomColors[ImGuiCol_CheckboxBgHovered] : ImGuiCustomColors[ImGuiCol_CheckboxBg]), true, rounding);
 		ImU32 check_col = GetColorU32(ImGuiCol_CheckMark);
-		if (window->DC.ItemFlags & ImGuiItemFlags_MixedValue)
+		if (g.LastItemData.InFlags & ImGuiItemFlags_MixedValue)
 		{
 			// Undocumented tristate/mixed/indeterminate checkbox (#2644)
 			ImVec2 pad(ImMax(1.0f, IM_FLOOR(square_sz / 3.6f)), ImMax(1.0f, IM_FLOOR(square_sz / 3.6f)));

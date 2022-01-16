@@ -203,7 +203,7 @@ namespace Dymatic {
 			if (m_ScrollToTop)
 			{
 				m_ScrollToTop = false;
-				ImGui::SetScrollHere();
+				ImGui::SetScrollHereY();
 			}
 
 			//Hack to only detect clicking on empty space.

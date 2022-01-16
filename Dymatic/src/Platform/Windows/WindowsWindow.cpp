@@ -68,7 +68,7 @@ namespace Dymatic {
 			++s_GLFWWindowCount;
 
 			GLFWimage images[1];
-			images[0].pixels = stbi_load("assets/icons/DymaticLogo.png", &images[0].width, &images[0].height, 0, 4); //rgba channels 
+			images[0].pixels = stbi_load("assets/icons/DymaticLogo_Larger.png", &images[0].width, &images[0].height, 0, 4); //rgba channels 
 			glfwSetWindowIcon(m_Window, 2, images);
 			stbi_image_free(images[0].pixels);
 		}

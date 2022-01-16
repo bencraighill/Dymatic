@@ -156,7 +156,7 @@ namespace Dymatic {
 			if (ImGui::BeginMenu("Filter"))
 			{
 				static float blurAmount = 1.0f;
-				ImGui::InputFloat("Blur Amount", &blurAmount, 1.0f, 0.1f, 4);
+				ImGui::InputFloat("Blur Amount", &blurAmount, 1.0f, 0.1f, "%.4f");
 				if (ImGui::MenuItem("Blur")) {
 					if (m_SelectedLayer != NULL)
 					{
@@ -511,7 +511,7 @@ namespace Dymatic {
 				{
 					ImVec2 pos_after = window->DC.CursorPos;
 					window->DC.CursorPos = pos_before;
-					ret = ImGui::TempInputText(window->DC.LastItemRect, id, "##Input", buf, (int)buf_size, ImGuiInputTextFlags_None);
+					ret = ImGui::TempInputText(g.LastItemData.Rect, id, "##Input", buf, (int)buf_size, ImGuiInputTextFlags_None);
 					window->DC.CursorPos = pos_after;
 				}
 				else

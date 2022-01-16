@@ -59,7 +59,7 @@ namespace Dymatic {
 						ImGui::SetCursorPos(cursorPos);
 					}
 					ImGui::Text(m_LogList[i].c_str());
-					ImGui::SetScrollHere(0.5f);
+					ImGui::SetScrollHereY(0.5f);
 					ImGui::PopStyleColor();
 				}
 

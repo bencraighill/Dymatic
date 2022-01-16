@@ -4254,7 +4254,7 @@ void NodeEditorInternal::DefaultValueInput(PinData& data, bool spring)
 				{
 					// Store current color and open a picker
 				    g.ColorPickerRef = col_v4;
-					m_DefaultColorPickerPosition = ed::CanvasToScreen(window->DC.LastItemRect.GetBL() + ImVec2(-1, style.ItemSpacing.y));
+					m_DefaultColorPickerPosition = ed::CanvasToScreen(g.LastItemData.Rect.GetBL() + ImVec2(-1, style.ItemSpacing.y));
 				}
 
                 if (spring) ImGui::Spring(0);
@@ -6001,8 +6001,8 @@ void NodeEditorInternal::OnImGuiRender()
 				    	ImGuiContext& g = *GImGui;
 				    	const float square_sz = ImGui::GetFrameHeight();
 
-				    	ImGuiColorEditFlags picker_flags_to_forward = ImGuiColorEditFlags__DataTypeMask | ImGuiColorEditFlags__PickerMask | ImGuiColorEditFlags__InputMask | ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_AlphaBar;
-				    	ImGuiColorEditFlags picker_flags = (ImGuiColorEditFlags_NoInputs & picker_flags_to_forward) | ImGuiColorEditFlags__DisplayMask | ImGuiColorEditFlags_NoLabel | ImGuiColorEditFlags_AlphaPreviewHalf;
+				    	ImGuiColorEditFlags picker_flags_to_forward = ImGuiColorEditFlags_DataTypeMask_ | ImGuiColorEditFlags_PickerMask_ | ImGuiColorEditFlags_InputMask_ | ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_AlphaBar;
+				    	ImGuiColorEditFlags picker_flags = (ImGuiColorEditFlags_NoInputs & picker_flags_to_forward) | ImGuiColorEditFlags_DisplayMask_ | ImGuiColorEditFlags_NoLabel | ImGuiColorEditFlags_AlphaPreviewHalf;
 				        ImGui::SetNextItemWidth(square_sz * 12.0f); // Use 256 + bar sizes?
                         if (m_DefaultColorPickerValue != nullptr)
 				    	    ImGui::ColorPicker4("##picker", m_DefaultColorPickerValue, picker_flags, &g.ColorPickerRef.x);

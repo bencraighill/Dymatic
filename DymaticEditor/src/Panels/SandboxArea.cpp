@@ -531,10 +531,10 @@ namespace Dymatic::Sandbox {
 		if (ImGui::Button("Reset")) { m_Points.clear(); m_Sticks.clear(); joinPoint = nullptr; }
 		ImGui::SameLine();
 		ImGui::SetNextItemWidth(100.0f);
-		ImGui::InputFloat("Cutting Tolerance", &m_CuttingTollerance, 0.1f, 0.2f, 4);
+		ImGui::InputFloat("Cutting Tolerance", &m_CuttingTollerance, 0.1f, 0.2f, "%.4f");
 		ImGui::SameLine();
 		ImGui::SetNextItemWidth(100.0f);
-		ImGui::InputFloat("Breaking Point", &m_BreakingPoint, 0.1f, 0.2f, 1);
+		ImGui::InputFloat("Breaking Point", &m_BreakingPoint, 0.1f, 0.2f, "%.1f");
 		ImGui::SameLine();
 		ImGui::Checkbox("Floor", &m_Floor);
 		ImGui::SameLine();
