@@ -7,7 +7,9 @@ Dymatic is a basic, open source, WIP game engine created using C++.
 Currently, Microsoft Visual Studio is required to build, and only officially supports Windows.
 
 <h4>Latest Build:</h4>
-<i>Dymatic V1.2.2 - Development</i>
+<i>Dymatic V1.2.4 - Development</i>
+
+![Dymatic_Editor_Screenshot](/Resources/Branding/Screenshots/EditorScreenshot.png)
 
 ## Building Source
 #### Downloading the Repository
