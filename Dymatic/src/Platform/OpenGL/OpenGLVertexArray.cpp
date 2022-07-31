@@ -116,17 +116,6 @@ namespace Dymatic {
 				}
 				break;
 			}
-			
-			{
-				glEnableVertexAttribArray(m_VertexBufferIndex);
-				glVertexAttribIPointer(m_VertexBufferIndex,
-					element.GetComponentCount(),
-					ShaderDataTypeToOpenGLBaseType(element.Type),
-					layout.GetStride(),
-					(const void*)element.Offset);
-				m_VertexBufferIndex++;
-				break;
-			}
 			default:
 				DY_CORE_ASSERT(false, "Unknown ShaderDataType!");
 			}

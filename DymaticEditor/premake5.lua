@@ -20,6 +20,8 @@ project "DymaticEditor"
 		"%{wks.location}/Dymatic/vendor",
 		"%{IncludeDir.glm}",
 		"%{IncludeDir.entt}",
+		"%{IncludeDir.assimp}",
+		"%{IncludeDir.yaml_cpp}",
 		"%{IncludeDir.ImGuizmo}",
 		"%{IncludeDir.ImGuiNode}"
 	}

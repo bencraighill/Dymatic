@@ -9,8 +9,6 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include <imgui/imgui_internal.h>
 
-#include "../ImGuiCustom.h"
-
 #include "../../TextSymbols.h"
 
 #include <glm/gtc/type_ptr.hpp>
@@ -4183,7 +4181,7 @@ void NodeEditorInternal::DefaultValueInput(PinData& data, bool spring)
         switch (data.Type)
         {
         case PinType::Bool: {
-            ImGui::Custom::Checkbox("##NodeEditorBoolCheckbox", &data.Value.Bool);
+            ImGui::Checkbox("##NodeEditorBoolCheckbox", &data.Value.Bool);
             if (spring) ImGui::Spring(0);
             break;
         }
@@ -6018,7 +6016,7 @@ void NodeEditorInternal::OnImGuiRender()
                         ImGui::SameLine();
                         ImGui::Dummy(ImVec2(100.0f, 0.0f));
                         ImGui::SameLine();
-                        if (ImGui::Custom::Checkbox("##NodeSearchPopupContextSensitiveCheckbox", &m_ContextSensitive))
+                        if (ImGui::Checkbox("##NodeSearchPopupContextSensitiveCheckbox", &m_ContextSensitive))
                             UpdateSearchData();
                         ImGui::SameLine();
                         ImGui::Text("Context Sensitive");

@@ -1,4 +1,5 @@
 #include "dypch.h"
+
 #include "Platform/Windows/WindowsWindow.h"
 
 #include "Dymatic/Core/Input.h"
@@ -102,9 +103,7 @@ namespace Dymatic {
 			WindowData& data = *(WindowData*)glfwGetWindowUserPointer(window);
 			std::vector<std::string> pathsList;
 			for (int i = 0; i < count; i++)
-			{
 				pathsList.push_back(paths[i]);
-			}
 			WindowDropEvent event(pathsList);
 			data.EventCallback(event);
 		});

@@ -1,0 +1,216 @@
+- Bind: New Scene
+  Enabled: true
+  Key: N
+  Repeats: false
+  Ctrl: true
+  Alt: false
+  Shift: false
+- Bind: Open Scene
+  Enabled: true
+  Key: O
+  Repeats: false
+  Ctrl: true
+  Alt: false
+  Shift: false
+- Bind: Save Scene
+  Enabled: true
+  Key: S
+  Repeats: false
+  Ctrl: true
+  Alt: false
+  Shift: false
+- Bind: Save Scene As
+  Enabled: true
+  Key: S
+  Repeats: false
+  Ctrl: true
+  Alt: false
+  Shift: true
+- Bind: Quit
+  Enabled: true
+  Key: Q
+  Repeats: false
+  Ctrl: true
+  Alt: false
+  Shift: false
+- Bind: Mouse Picking
+  Enabled: true
+  Mouse Button: Button Right
+  Ctrl: false
+  Alt: false
+  Shift: false
+- Bind: Scene Start
+  Enabled: true
+  Key: P
+  Repeats: false
+  Ctrl: false
+  Alt: true
+  Shift: false
+- Bind: Scene Stop
+  Enabled: true
+  Key: Escape
+  Repeats: false
+  Ctrl: false
+  Alt: false
+  Shift: false
+- Bind: Gizmo None
+  Enabled: true
+  Key: Q
+  Repeats: false
+  Ctrl: false
+  Alt: false
+  Shift: false
+- Bind: Gizmo Translate
+  Enabled: true
+  Key: G
+  Repeats: false
+  Ctrl: false
+  Alt: false
+  Shift: false
+- Bind: Gizmo Rotate
+  Enabled: true
+  Key: R
+  Repeats: false
+  Ctrl: false
+  Alt: false
+  Shift: false
+- Bind: Gizmo Scale
+  Enabled: true
+  Key: S
+  Repeats: false
+  Ctrl: false
+  Alt: false
+  Shift: false
+- Bind: Create
+  Enabled: true
+  Key: A
+  Repeats: true
+  Ctrl: false
+  Alt: false
+  Shift: true
+- Bind: Duplicate
+  Enabled: true
+  Key: D
+  Repeats: true
+  Ctrl: false
+  Alt: false
+  Shift: true
+- Bind: Delete
+  Enabled: true
+  Key: Delete
+  Repeats: false
+  Ctrl: false
+  Alt: false
+  Shift: false
+- Bind: Shading Type Wireframe
+  Enabled: true
+  Key: F1
+  Repeats: false
+  Ctrl: false
+  Alt: false
+  Shift: false
+- Bind: Shading Type Unlit
+  Enabled: true
+  Key: F2
+  Repeats: false
+  Ctrl: false
+  Alt: false
+  Shift: false
+- Bind: Shading Type Solid
+  Enabled: true
+  Key: F3
+  Repeats: false
+  Ctrl: false
+  Alt: false
+  Shift: false
+- Bind: Shading Type Rendered
+  Enabled: true
+  Key: F4
+  Repeats: false
+  Ctrl: false
+  Alt: false
+  Shift: false
+- Bind: Toggle Shading Type
+  Enabled: true
+  Key: Z
+  Repeats: false
+  Ctrl: false
+  Alt: false
+  Shift: true
+- Bind: View Front
+  Enabled: true
+  Key: Key Pad 1
+  Repeats: false
+  Ctrl: false
+  Alt: false
+  Shift: false
+- Bind: View Side
+  Enabled: true
+  Key: Key Pad 3
+  Repeats: false
+  Ctrl: false
+  Alt: false
+  Shift: false
+- Bind: View Top
+  Enabled: true
+  Key: Key Pad 7
+  Repeats: false
+  Ctrl: false
+  Alt: false
+  Shift: false
+- Bind: View Flip
+  Enabled: true
+  Key: Key Pad 9
+  Repeats: false
+  Ctrl: false
+  Alt: false
+  Shift: false
+- Bind: View Projection
+  Enabled: true
+  Key: Key Pad 5
+  Repeats: false
+  Ctrl: false
+  Alt: false
+  Shift: false
+- Bind: Rename
+  Enabled: true
+  Key: F2
+  Repeats: false
+  Ctrl: false
+  Alt: false
+  Shift: false
+- Bind: Close Popup
+  Enabled: true
+  Key: Escape
+  Repeats: false
+  Ctrl: false
+  Alt: false
+  Shift: false
+- Bind: Text Editor Duplicate
+  Enabled: true
+  Key: D
+  Repeats: true
+  Ctrl: true
+  Alt: false
+  Shift: false
+- Bind: Text Editor Swap Line Up
+  Enabled: true
+  Key: Up
+  Repeats: true
+  Ctrl: false
+  Alt: true
+  Shift: false
+- Bind: Text Editor Swap Line Down
+  Enabled: true
+  Key: Down
+  Repeats: true
+  Ctrl: false
+  Alt: true
+  Shift: false
+- Bind: Text Editor Switch Header
+  Enabled: true
+  Key: O
+  Repeats: false
+  Ctrl: false
+  Alt: true
+  Shift: false

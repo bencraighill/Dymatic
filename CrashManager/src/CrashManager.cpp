@@ -188,6 +188,11 @@ namespace Dymatic {
 		colors[ImGuiCol_ResizeGripHovered] = ImVec4{ 0.26, 0.59, 0.98, 0.67 };
 		colors[ImGuiCol_ResizeGripActive] = ImVec4{ 0.26, 0.59, 0.98, 0.95 };
 		colors[ImGuiCol_CheckMark] = ImVec4{ 1.0, 1.0, 1.0, 1.0 };
+		colors[ImGuiCol_Checkbox] = ImVec4{ 1.0, 1.0, 1.0, 1.0 };
+		colors[ImGuiCol_CheckboxHovered] = ImVec4{ 1.0, 1.0, 1.0, 1.0 };
+		colors[ImGuiCol_CheckboxActive] = ImVec4{ 1.0, 1.0, 1.0, 1.0 };
+		colors[ImGuiCol_CheckboxTicked] = ImVec4{ 1.0, 1.0, 1.0, 1.0 };
+		colors[ImGuiCol_CheckboxHoveredTicked] = ImVec4{ 1.0, 1.0, 1.0, 1.0 };
 		colors[ImGuiCol_DockingPreview] = ImVec4{ 0.15, 0.1505, 0.151, 0.7 };
 		colors[ImGuiCol_DockingEmptyBg] = ImVec4{ 0.2, 0.2, 0.2, 1.0 };
 		colors[ImGuiCol_PlotLines] = ImVec4{ 0.61, 0.61, 0.61, 1.0 };

@@ -5,11 +5,9 @@
 #include "Panels/ContentBrowserPanel.h"
 
 #include "Panels/PopupsAndNotifications.h"
-#include "Panels/ContentBrowser.h"
 #include "Panels/PreferencesPanel.h"
 #include "Panels/NodeEditor/NodeProgram.h"
 #include "Panels/TextEditor.h"
-#include "Panels/FilePrompt.h"
 #include "Panels/CurveEditor.h"
 #include "Panels/ImageEditor.h"
 #include "Panels/MemoryEditor.h"
@@ -35,11 +33,14 @@ namespace Dymatic {
 		void OnUpdate(Timestep ts) override;
 		virtual void OnImGuiRender() override;
 		void OnEvent(Event& e) override;
-		void UpdateKeys(BindCatagory bindCatagory);
+		void UpdateKeymapEvents(std::vector<Preferences::Keymap::KeyBindEvent> event);
 	private:
 		bool OnKeyPressed(KeyPressedEvent& e);
 		bool OnMouseButtonPressed(MouseButtonPressedEvent& e);
 		bool OnDropped(WindowDropEvent& e);
+		bool OnDragEnter(WindowDragEnterEvent& e);
+		bool OnDragLeave(WindowDragLeaveEvent& e);
+		bool OnDragOver(WindowDragOverEvent& e);
 		bool OnClosed(WindowCloseEvent& e);
 
 		void OnOverlayRender();
@@ -72,9 +73,6 @@ namespace Dymatic {
 
 		void SetShadingIndex(int index);
 
-		bool KeyBindCheck(KeyBindEvent bindEvent, BindCatagory bindCatagory);
-		std::string GetBindAsString(KeyBindEvent bindEvent);
-
 		std::string GetCurrentFileName();
 
 		void OpenWindowLayout(const std::filesystem::path& path);
@@ -90,8 +88,7 @@ namespace Dymatic {
 
 		float m_DeltaTime;
 
-		KeyPressedEvent& m_KeyPressed = KeyPressedEvent(Key::A, 0);
-		MouseButtonPressedEvent& m_MouseButtonPressed = MouseButtonPressedEvent(Mouse::Button0);
+		bool m_IsDragging = false;
 
 		// Temp
 		Ref<VertexArray> m_SquareVA;
@@ -107,6 +104,7 @@ namespace Dymatic {
 
 		Entity m_HoveredEntity;
 
+
 		EditorCamera m_EditorCamera;
 
 		//Textures
@@ -116,6 +114,8 @@ namespace Dymatic {
 
 		//Ref<Texture2D> m_DymaticLogo = Texture2D::Create("assets/icons/DymaticLogoTransparent.png");
 		Ref<Texture2D> m_DymaticSplash = Texture2D::Create("assets/icons/DymaticSplash.png");
+		Ref<Texture2D> m_QuestionMarkIcon = Texture2D::Create("assets/icons/General/QuestionMark.png");
+		Ref<Texture2D> m_ErrorIcon = Texture2D::Create("assets/icons/General/Error.png");
 
 		//Shader Icons
 		//Ref<Texture2D> m_IconShaderWireframe = Texture2D::Create("assets/icons/Viewport/ShaderIconWireframe.png");
@@ -155,7 +155,6 @@ namespace Dymatic {
 		bool m_UpdateAngles = false;
 
 		bool m_ProjectionToggled = 0;
-		glm::mat4 m_PreviousCameraProjection;
 
 		// Runtime
 		enum class SceneState
@@ -169,15 +168,13 @@ namespace Dymatic {
 		ContentBrowserPanel m_ContentBrowserPanel;
 
 		PreferencesPannel m_PreferencesPannel;
-		PopupsAndNotifications m_PopupsAndNotifications = PopupsAndNotifications(&m_PreferencesPannel.GetPreferences());
-		ContentBrowser m_ContentBrowser = ContentBrowser(&m_PreferencesPannel.GetPreferences(), &m_TextEditor);
+		NotificationsPannel m_NotificationsPannel;
 		NodeEditorPannel m_NodeEditorPannel;
 		TextEditorPannel m_TextEditor;
 		CurveEditor m_CurveEditor;
 		ImageEditor m_ImageEditor;
 		MemoryEditor m_MemoryEditor;
 		ConsoleWindow m_ConsoleWindow;
-		FilePrompt m_FilePrompt = FilePrompt(&m_PreferencesPannel.GetPreferences());
 		PerformanceAnalyser m_PerformanceAnalyser;
 
 		//Sandbox::AgentSimulation m_AgentSimulation;
@@ -185,11 +182,12 @@ namespace Dymatic {
 		//Sandbox::SandSimulation m_SandSimulation;
 		//Sandbox::RopeSimulation m_RopeSimulation;
 		//Sandbox::ChessAI m_ChessAI;
+		//Sandbox::GPUSIM::GPUSimulation gpusim;
 
 		// Editor Resources
 		Ref<Texture2D> m_IconPlay, m_IconStop;
 
-		bool m_ShowSplash = m_PreferencesPannel.GetPreferences().m_PreferenceData.showSplash;
+		bool m_ShowSplash;
 	};
 
 }

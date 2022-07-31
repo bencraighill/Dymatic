@@ -67,4 +67,24 @@ namespace Dymatic {
 		return m_Shaders.find(name) != m_Shaders.end();
 	}
 
+	std::vector<Ref<Shader>> ShaderManager::s_Shaders;
+
+	void ShaderManager::Add(Ref<Shader> shader)
+	{
+		s_Shaders.push_back(shader);
+	}
+
+	Ref<Shader> ShaderManager::Get(const std::string& name)
+	{
+		for (auto& shader : s_Shaders)
+			if (shader->GetName() == name)
+				return shader;
+		return Ref<Shader>();
+	}
+
+	void ShaderManager::Clean()
+	{
+		s_Shaders.clear();
+	}
+
 }

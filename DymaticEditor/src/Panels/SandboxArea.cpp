@@ -6,6 +6,8 @@
 
 #include "Dymatic/Math/Math.h"
 
+#include "Dymatic/Renderer/ShaderStorageBuffer.h"
+
 namespace Dymatic::Sandbox {
 
 	AgentSimulation::AgentSimulation()
@@ -19,7 +21,7 @@ namespace Dymatic::Sandbox {
 				m_TrailMap[x][y] = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
 			}
 		}
-		
+
 		int angleChange = 1;
 		for (int i = 0; i < (360 / angleChange) * 1 + 1; i++)
 		{
@@ -97,10 +99,10 @@ namespace Dymatic::Sandbox {
 			{
 				m_Agents[i].angle += randomSteerStrength * m_TurnSpeed * ts.GetSeconds();
 			}
-		
+
 			glm::vec2 direction = glm::vec2(std::cos(agent.angle), std::sin(agent.angle));
 			glm::vec2 newPos = agent.position + direction * m_MoveSpeed * ts.GetSeconds();
-		
+
 			if (newPos.x < 0 || newPos.x >= m_Width || newPos.y < 0 || newPos.y >= m_Height)
 			{
 				newPos.x = std::min(m_Trail->GetWidth() - 0.01f, std::max(0.0f, newPos.x));
@@ -109,7 +111,7 @@ namespace Dymatic::Sandbox {
 				double pi = 2 * acos(0.0);
 				m_Agents[i].angle = random * 2 * pi;
 			}
-		
+
 			m_Agents[i].position = newPos;
 			m_TrailMap[(int)newPos.x][(int)newPos.y] = agent.color;
 		}
@@ -161,7 +163,7 @@ namespace Dymatic::Sandbox {
 		//delete[] data;
 
 		ImGui::Begin("Agent Simulation");
-		
+
 		//int dataSize = m_Trail->GetWidth() * m_Trail->GetHeight() * 4;
 		//char* data = new char[dataSize];
 		//for (int i = 0; i < dataSize; i += 4)
@@ -171,7 +173,7 @@ namespace Dymatic::Sandbox {
 		//	data[i + 2] = 0.0f;
 		//	data[i + 3] = 255.0f;
 		//}
-		
+
 		ImGui::GetWindowDrawList()->AddRectFilled(ImGui::GetWindowPos(), ImGui::GetWindowPos() + ImVec2(m_Width, m_Height) * 1.5f, ImGui::ColorConvertFloat4ToU32(ImVec4(0.0f, 0.0f, 0.0f, 1.0f)));
 		for (int x = 0; x < m_Width; x++)
 		{
@@ -218,7 +220,7 @@ namespace Dymatic::Sandbox {
 
 		return sum;
 	}
-	
+
 
 	MandelbrotSet::MandelbrotSet()
 	{
@@ -309,7 +311,7 @@ namespace Dymatic::Sandbox {
 				float click_X_pcent = (click_posX - ImGui::GetWindowPos().x) / m_Width;
 				float current_Y_pcent = 1.0f - (((Input::GetMouseY() - ImGui::GetWindowPos().y)) / m_Height);
 				float click_Y_pcent = 1.0f - ((click_posY - ImGui::GetWindowPos().y) / m_Height);
-				
+
 				minR = minR + ((maxR - minR) * (m_ZoomUniform ? (click_X_pcent > click_Y_pcent ? click_X_pcent : click_Y_pcent) : click_X_pcent));
 				maxR = minR + ((maxR - minR) * (m_ZoomUniform ? (current_X_pcent > current_Y_pcent ? current_X_pcent : current_Y_pcent) : current_X_pcent));
 				minI = minI + ((maxI - minI) * (m_ZoomUniform ? (click_X_pcent > click_Y_pcent ? click_X_pcent : click_Y_pcent) : click_Y_pcent));
@@ -600,7 +602,7 @@ namespace Dymatic::Sandbox {
 
 		// Point Draw Call happens later
 
-		for (auto const & point : m_Points)
+		for (auto const& point : m_Points)
 		{
 			auto centre = ImGui::GetWindowPos() + ImVec2(point.position.x, point.position.y);
 			float radius = 5.0f;
@@ -649,7 +651,7 @@ namespace Dymatic::Sandbox {
 
 		for (int i = 0; i < m_InterationNumber; i++)
 			for (auto& stick : m_Sticks)
-			 {
+			{
 				glm::vec2 stickCentre = (stick.pointA->position + stick.pointB->position) / 2.0f;
 				glm::vec2 stickDir = glm::normalize(stick.pointA->position - stick.pointB->position);
 				if (!stick.pointA->locked)
@@ -714,213 +716,148 @@ namespace Dymatic::Sandbox {
 		}
 	}
 
-	// Chess Simulation
-	
-	//void ChessAI::OnImGuiRender(Timestep ts)
-	//{
-	//	ImGui::Begin("Chess AI");
-	//	auto drawList = ImGui::GetWindowDrawList();
-	//	auto& startPos = ImVec2(ImGui::GetWindowPos().x, ImGui::GetWindowPos().y + ImGui::GetWindowSize().y);
-	//	const float squareSize = 80.0f;
-	//	auto cursorPos = ImGui::GetMousePos();
-	//	
-	//	for (int file = 0; file < 8; file++)
-	//	{
-	//		for (int rank = 0; rank < 8; rank++)
-	//		{
-	//			auto index = rank * 8 + file;
-	//			auto& currentSquare = m_Board.Square[index];
-	//
-	//			bool isLightSquare = std::fmod((file + rank), 2) != 0;
-	//			auto squareColor = (isLightSquare) ? ImColor(240, 209, 186) : ImColor(159, 110, 90);
-	//			auto min = startPos + ImVec2(file * squareSize, rank * -squareSize - squareSize);
-	//			auto max = startPos + ImVec2(file * squareSize + squareSize, rank * -squareSize);
-	//
-	//			// Drag n Drop Code
-	//			if (currentSquare != None)
-	//			{
-	//				if (m_StartDrag)
-	//				{
-	//					if (cursorPos.x > min.x && cursorPos.y > min.y && cursorPos.x < max.x && cursorPos.y < max.y)
-	//						m_DragIndex = rank * 8 + file;
-	//				}
-	//			}
-	//
-	//			if (m_StopDrag)
-	//			{
-	//				if (cursorPos.x > min.x && cursorPos.y > min.y && cursorPos.x < max.x && cursorPos.y < max.y && m_DragIndex != -1)
-	//				{
-	//					currentSquare = m_Board.Square[m_DragIndex];
-	//					m_Board.Square[m_DragIndex] = None;
-	//				}
-	//			}
-	//
-	//			// Draw Code
-	//	
-	//			drawList->AddRectFilled(min, max, squareColor);
-	//			if (index != m_DragIndex)
-	//			{
-	//				auto piece = currentSquare;
-	//
-	//				if (piece)
-	//				{
-	//					bool white = true;
-	//					if (piece >= 16) { piece -= 16; white = false; }
-	//					else piece -= 8;
-	//
-	//					auto& texture = GetPieceTexture(piece);
-	//
-	//					drawList->AddImage((ImTextureID)((white ? texture->GetRendererID() : texture->GetRendererID())), min, max, { 0, 1 }, { 1, 0 }, white ? ImColor(255, 255, 255) : ImColor(0, 0, 0));
-	//				}
-	//			}
-	//		}
-	//	}
-	//
-	//	if (m_DragIndex != -1)
-	//	{
-	//		auto piece = m_Board.Square[m_DragIndex];
-	//		if (piece)
-	//		{
-	//			bool white = true;
-	//			if (piece >= 16) { piece -= 16; white = false; }
-	//			else piece -= 8;
-	//
-	//			auto& texture = GetPieceTexture(piece);
-	//
-	//			drawList->AddImage((ImTextureID)((white ? texture->GetRendererID() : texture->GetRendererID())), cursorPos - ImVec2(squareSize * 0.5f, squareSize * 0.5f), cursorPos + ImVec2(squareSize * 0.5f, squareSize * 0.5f), { 0, 1 }, { 1, 0 }, white ? ImColor(255, 255, 255) : ImColor(0, 0, 0));
-	//		}
-	//	}
-	//
-	//	ImGui::End();
-	//
-	//	if (m_StopDrag)
-	//		m_DragIndex = -1;
-	//	m_StartDrag = false;
-	//	m_StopDrag = false;
-	//}
-	//
-	//ChessAI::ChessAI()
-	//{
-	//	m_TextureWKing = Texture2D::Create("assets/icons/ChessPieces/wKing.png");
-	//	m_TextureWPawn = Texture2D::Create("assets/icons/ChessPieces/wPawn.png");
-	//	m_TextureWKnight = Texture2D::Create("assets/icons/ChessPieces/wKnight.png");
-	//	m_TextureWBishop = Texture2D::Create("assets/icons/ChessPieces/wBishop.png");
-	//	m_TextureWRook = Texture2D::Create("assets/icons/ChessPieces/wRook.png");
-	//	m_TextureWQueen = Texture2D::Create("assets/icons/ChessPieces/wQueen.png");
-	//
-	//	PrecomputedMoveData();
-	//}
-	//
-	//void ChessAI::OnEvent(Event& e)
-	//{
-	//	EventDispatcher dispatcher(e);
-	//
-	//	dispatcher.Dispatch<MouseButtonPressedEvent>(DY_BIND_EVENT_FN(ChessAI::OnMouseButtonPressed));
-	//	dispatcher.Dispatch<MouseButtonReleasedEvent>(DY_BIND_EVENT_FN(ChessAI::OnMouseButtonReleased));
-	//}
-	//
-	//bool ChessAI::OnMouseButtonPressed(MouseButtonPressedEvent& e)
-	//{
-	//	if (e.GetMouseButton() == Mouse::ButtonLeft)
-	//	{
-	//		m_StartDrag = true;
-	//	}
-	//	return false;
-	//}
-	//
-	//bool ChessAI::OnMouseButtonReleased(MouseButtonReleasedEvent& e)
-	//{
-	//	if (e.GetMouseButton() == Mouse::ButtonLeft)
-	//	{
-	//		m_StopDrag = true;
-	//	}
-	//	return false;
-	//}
-	//
-	//Ref<Texture2D> ChessAI::GetPieceTexture(int piece)
-	//{
-	//	switch (piece)
-	//	{
-	//	case Piece::King: return m_TextureWKing;
-	//	case Piece::Pawn: return m_TextureWPawn;
-	//	case Piece::Knight: return m_TextureWKnight;
-	//	case Piece::Bishop: return m_TextureWBishop;
-	//	case Piece::Rook: return m_TextureWRook;
-	//	case Piece::Queen: return m_TextureWQueen;
-	//	}
-	//}
-	//
-	//void Board::LoadPositionFromFen(std::string fen)
-	//{
-	//	std::map<char, int> pieceTypeFromSymbol = {
-	//		{ 'k', Piece::King }, { 'p', Piece::Pawn }, { 'n', Piece::Knight },
-	//		{ 'b', Piece::Bishop }, { 'r', Piece::Rook }, { 'q', Piece::Queen },
-	//	};
-	//
-	//	std::string fenBoard = fen.substr(0, fen.find(' '));
-	//	int file = 0, rank = 7;
-	//
-	//	for (char symbol : fenBoard)
-	//	{
-	//		if (symbol == '/')
-	//		{
-	//			file = 0;
-	//			rank--;
-	//		}
-	//		else
-	//		{
-	//			if (isdigit(symbol))
-	//				file += symbol - '0';
-	//			else
-	//			{
-	//				int pieceColour = isupper(symbol) ? Piece::White : Piece::Black;
-	//				int pieceType = pieceTypeFromSymbol[tolower(symbol)];
-	//				Square[rank * 8 + file] = pieceType | pieceColour;
-	//				file++;
-	//			}
-	//		}
-	//	}
-	//}
-	//
-	//void ChessAI::PrecomputedMoveData()
-	//{
-	//	for (int file = 0; file < 8; file++)
-	//	{
-	//		for (int rank = 0; rank < 8; rank++)
-	//		{
-	//			int numNorth = 7 - rank;
-	//			int numSouth = rank;
-	//			int numWest = file;
-	//			int numEast = 7 - file;
-	//
-	//			int squareIndex = rank * 8 + file;
-	//
-	//			NumSquaresToEdge[squareIndex][0] = numNorth;
-	//			NumSquaresToEdge[squareIndex][1] = numSouth;
-	//			NumSquaresToEdge[squareIndex][2] = numEast;
-	//			NumSquaresToEdge[squareIndex][3] = numWest;
-	//			NumSquaresToEdge[squareIndex][4] = std::min(numNorth, numWest);
-	//			NumSquaresToEdge[squareIndex][5] = std::min(numSouth, numEast);
-	//			NumSquaresToEdge[squareIndex][6] = std::min(numNorth, numEast);
-	//			NumSquaresToEdge[squareIndex][7] = std::min(numSouth, numWest);
-	//		}
-	//	}
-	//}
-	//
-	//std::vector<Move> ChessAI::GenerateMoves()
-	//{
-	//	std::vector<Move> moves;
-	//
-	//	for (int startSquare = 0; startSquare < 64; startSquare++)
-	//	{
-	//		int piece = m_Board.Square[startSquare];
-	//		if (Piece::IsColour(piece, Board::ColorToMove))
-	//		{
-	//			if (Piece::IsSlidingPiece(piece))
-	//				GenerateSlidingMoves(startSquare, piece);
-	//		}
-	//	}
-	//
-	//	return moves;
-	//}
+	namespace GPUSIM {
+
+		Ref<Shader> g_ComputeUpdate;
+		Ref<Shader> g_ComputeProcess;
+		Ref<Shader> g_ComputeColor;
+
+		Ref<Texture2D> g_BaseTexture;
+		Ref<Texture2D> g_ProcessedTexture;
+		Ref<Texture2D> g_ColorTexture;
+
+#define PI 3.1415926535897932384626433832795
+
+		static const int WIDTH = 2560; 
+		static const int HEIGHT = 1080;
+		static const int AGENT_COUNT = 819200;
+		static const int NUM_SPECIES = 4;
+		static int itterations_per_frame = 1;
+
+		struct Agent
+		{
+			glm::vec2 position;
+			float angle;
+			float BUFF_DISCARD;
+			glm::ivec4 speciesMask;
+		};
+
+		struct SpeciesSettings
+		{
+			glm::vec4 color;
+		};
+
+		// Agent Bindings
+		struct Bindings
+		{
+			Agent agents[AGENT_COUNT];
+			SpeciesSettings speciesSettings[NUM_SPECIES];
+		};
+		Bindings BindingsBuffer;
+		Ref<ShaderStorageBuffer> BindingsSSBO;
+
+		// Frame Bindings
+		struct FrameInfo
+		{
+			float u_DeltaTime = 0.0f;
+			float u_MoveSpeed = 20.0f;
+			float u_EvaporateSpeed = 0.2f;
+			float u_DiffuseSpeed = 3.0f;
+			float u_TrailWeight = 60.0f;
+			int u_SensorOffsetDst = 35;
+			int u_SensorSize = 1;
+			float u_SensorAngleSpacing = 30.0f;
+			float u_TurnSpeed = 2.0f;
+			float BLK[3];
+			// add blur range here
+		};
+		FrameInfo FrameInfoBuffer;
+		Ref<UniformBuffer> FrameInfoUniformBuffer;
+
+		GPUSimulation::GPUSimulation()
+		{
+			g_ComputeUpdate = Shader::Create("assets/shaders//GPUSimulation/GPUSimulationUpdate.glsl");
+			g_ComputeProcess = Shader::Create("assets/shaders//GPUSimulation/GPUSimulationProcess.glsl");
+			g_ComputeColor = Shader::Create("assets/shaders//GPUSimulation/GPUSimulationColor.glsl");
+			g_BaseTexture = Texture2D::Create(WIDTH, HEIGHT);
+			g_ProcessedTexture = Texture2D::Create(WIDTH, HEIGHT);
+			g_ColorTexture = Texture2D::Create(WIDTH, HEIGHT);
+			BindingsSSBO = ShaderStorageBuffer::Create(sizeof(Bindings), 9, ShaderStorageBufferUsage::DYNAMIC_READ);
+			FrameInfoUniformBuffer = UniformBuffer::Create(sizeof(FrameInfo), 10);
+
+			glm::vec2 pos;
+			float radius = glm::min(WIDTH * 0.45f, HEIGHT * 0.45f);
+			glm::vec2 middle = glm::vec2(WIDTH * 0.5f, HEIGHT * 0.5f);
+
+			for (size_t i = 0; i < AGENT_COUNT; i++)
+			{
+				while (true)
+				{
+					pos = middle + glm::vec2(Math::RandomRange(-radius, radius), Math::RandomRange(-radius, radius));
+					const float distance = std::sqrt(std::pow((middle.x - pos.x), 2) + std::pow((middle.y - pos.y), 2));
+					if (distance < radius)
+					{
+						break;
+					}
+				}
+
+				BindingsBuffer.agents[i].position = pos;
+				BindingsBuffer.agents[i].angle = atan2(pos.y - middle.y, pos.x - middle.x) * 180.0f / PI;
+				int num = std::floor(Math::RandomRange(1, 4.9999999999));
+				switch (num)
+				{
+				case 1: BindingsBuffer.agents[i].speciesMask = glm::ivec4(1, 0, 0, 0); break;
+				case 2: BindingsBuffer.agents[i].speciesMask = glm::ivec4(0, 1, 0, 0); break;
+				case 3: BindingsBuffer.agents[i].speciesMask = glm::ivec4(0, 0, 1, 0); break;
+				case 4: BindingsBuffer.agents[i].speciesMask = glm::ivec4(0, 0, 0, 1); break;
+				}
+			}
+
+			BindingsBuffer.speciesSettings[0].color = glm::vec4(0.1f, 0.6f, 0.8f, 1.0f);
+			BindingsBuffer.speciesSettings[1].color = glm::vec4(0.1f, 0.2f, 0.5f, 1.0f);
+			BindingsBuffer.speciesSettings[2].color = glm::vec4(0.2f, 0.7f, 0.55f, 1.0f);
+			BindingsBuffer.speciesSettings[3].color = glm::vec4(0.3f, 0.5f, 0.7f, 1.0f);
+
+			BindingsSSBO->SetData(&BindingsBuffer, sizeof(Bindings));
+		}
+
+		void GPUSimulation::OnImGuiRender(Timestep ts)
+		{
+			for (size_t i = 0; i < itterations_per_frame; i++)
+			{
+				// Provide Frame info Time
+				FrameInfoBuffer.u_DeltaTime = ts;
+				FrameInfoUniformBuffer->SetData(&FrameInfoBuffer, sizeof(FrameInfo));
+
+				// Run the compute shaders
+				g_BaseTexture->BindTexture(0);
+				g_ComputeUpdate->Dispatch(AGENT_COUNT / 16 + 0, 1, 1);
+				g_ProcessedTexture->BindTexture(1);
+				g_ComputeProcess->Dispatch((WIDTH / 8) + 1, (HEIGHT / 8) + 1, 1);
+
+				std::swap(g_BaseTexture, g_ProcessedTexture);
+			}
+
+			// Compute Color
+			{
+				g_ProcessedTexture->BindTexture(0);
+				g_ColorTexture->BindTexture(1);
+				g_ComputeColor->Dispatch((WIDTH / 8) + 1, (HEIGHT / 8) + 1, 1);
+			}
+
+			ImGui::Begin("GPU Simulation");
+			auto width = glm::min(ImGui::GetContentRegionAvail().x, (float)WIDTH);
+			auto height = HEIGHT * (width / WIDTH);
+			ImGui::Image((ImTextureID)g_ColorTexture->GetRendererID(), { width, height }, { 0, 1 }, { 1, 0 });
+			ImGui::End();
+
+			ImGui::Begin("Simulation Controls");
+			ImGui::InputFloat("Move Speed", &FrameInfoBuffer.u_MoveSpeed);
+			ImGui::InputFloat("Evaporate Speed", &FrameInfoBuffer.u_EvaporateSpeed);
+			ImGui::InputFloat("Diffuse Speed", &FrameInfoBuffer.u_DiffuseSpeed);
+			ImGui::InputInt("Frame Iterations", &itterations_per_frame);
+			ImGui::End();
+		}
+	}
+
 }

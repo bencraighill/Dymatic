@@ -1,1 +1,8 @@
-<AutosavePreferences> {true}<AutosaveEnabled> {true}<AutosaveTime> {5}<RecentFiles> {10}<ShowSplash> {true}<FileColors> {,}<DoubleClickSpeed> {300}<EmulateNumpad> {false}<NotificationPreset> {0}<NotificationToastEnabled> {00}<NotificationEnabled> {11}
+Autosave Preferences: true
+Autosave Enabled: true
+Autosave Time: 5
+Recent Files: 10
+Show Splash: true
+Double Click Speed: 300
+Emulate Numpad: false
+devenv Path: ""

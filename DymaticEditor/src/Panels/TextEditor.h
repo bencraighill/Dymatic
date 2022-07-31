@@ -9,7 +9,8 @@
 #include <map>
 #include <regex>
 
-#include "PopupsAndNotifications.h"
+#include <imgui/imgui.h>
+#include "Dymatic.h"
 
 namespace TextEditorInternal {
 
@@ -423,9 +424,9 @@ namespace Dymatic {
 		void OnEvent(Event& e);
 		bool OnMouseScrolled(MouseScrolledEvent& e);
 
-		void Duplicate() { if (m_SelectedEditor != NULL && m_TextEditorVisible) { if (!m_SelectedEditor->textEditor.IsReadOnly()) { m_SelectedEditor->textEditor.Duplicate(); } } }
-		void SwapLineUp() { if (m_SelectedEditor != NULL && m_TextEditorVisible) { if (!m_SelectedEditor->textEditor.IsReadOnly()) { m_SelectedEditor->textEditor.SwapLineUp(); } } }
-		void SwapLineDown() { if (m_SelectedEditor != NULL && m_TextEditorVisible) { if (!m_SelectedEditor->textEditor.IsReadOnly()) { m_SelectedEditor->textEditor.SwapLineDown(); } } }
+		void Duplicate() { if (m_SelectedEditor != nullptr && m_TextEditorVisible) { if (!m_SelectedEditor->textEditor.IsReadOnly()) { m_SelectedEditor->textEditor.Duplicate(); } } }
+		void SwapLineUp() { if (m_SelectedEditor != nullptr && m_TextEditorVisible) { if (!m_SelectedEditor->textEditor.IsReadOnly()) { m_SelectedEditor->textEditor.SwapLineUp(); } } }
+		void SwapLineDown() { if (m_SelectedEditor != nullptr && m_TextEditorVisible) { if (!m_SelectedEditor->textEditor.IsReadOnly()) { m_SelectedEditor->textEditor.SwapLineDown(); } } }
 		void SwitchCStyleHeader();
 
 		void Zoom(float offset) { m_Zoom = std::clamp(m_Zoom + offset * 0.025f, 0.1f, 1.0f); }
@@ -450,7 +451,7 @@ namespace Dymatic {
 		bool m_TextEditorVisible = false;
 
 		std::vector<TextEditorInformation> m_TextEditors;
-		TextEditorInformation* m_SelectedEditor = NULL;
+		TextEditorInformation* m_SelectedEditor = nullptr;
 		unsigned int nextID = 0;
 		bool m_ShowWhitespaces = true;
 		int m_CloseToRightIndex = -1;

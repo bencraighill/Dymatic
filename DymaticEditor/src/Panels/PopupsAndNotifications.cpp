@@ -9,355 +9,371 @@
 
 #include "../Preferences.h"
 
-#include <string>
-#include <sstream>
+#include <iomanip>
 #include <ctime>
+#include <sstream>
 
 #include "../TextSymbols.h"
 
 namespace Dymatic {
 
-	PopupsAndNotifications::PopupsAndNotifications(Preferences* preferencesRef)
+	static std::vector<Popup> s_PopupList;
+	static std::vector<Notification> s_NotificationList;
+	static Ref<Texture2D> s_DymaticLogo;
+
+	void Popup::Create(const std::string& title, const std::string& message, std::vector<ButtonData> buttons, Ref<Texture2D> icon, bool loading)
 	{
-		m_PreferencesReference = preferencesRef;
+		s_PopupList.emplace_back(title, message, buttons, icon, loading);
 	}
 
-	void PopupsAndNotifications::Popup(std::string title, std::string message, std::vector<ButtonData> buttons, bool loading)
+	Popup::Popup(const std::string& title, const std::string& message, const std::vector<ButtonData>& buttons, Ref<Texture2D> icon, bool loading)
+		: m_Title(title), m_Message(message), m_Buttons(buttons), m_Icon(icon), m_Loading(loading)
 	{
-		PopupData data;
-		data.title = title;
-		data.message = message;
-		if (data.message[data.message.size() - 1] != '\n') { data.message += '\n'; }
-		data.buttons = buttons;
-
-		data.id = GetNextNotificationId();
-		data.loading = loading;
-
-		m_PopupList.push_back(data);
 	}
 
-	void PopupsAndNotifications::RemoveTopmostPopup()
+	void Popup::RemoveTopmostPopup()
 	{
-		if (m_PopupList.size() > 0)
+		if(!s_PopupList.empty())
+			s_PopupList.erase(s_PopupList.begin());
+	}
+
+	void Popup::OnImGuiRender(Timestep ts)
+	{
+		if (s_PopupList.empty())
+			return;
+
+		auto& style = ImGui::GetStyle();
+
+		auto& popup = s_PopupList.front();
+
+		auto id = (popup.m_Title + "##" + std::to_string(popup.m_ID));
+
+		const ImVec2 window_pos = ImGui::GetWindowPos();
+		const ImVec2 window_size = ImGui::GetWindowSize();
+
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 5.0f);
+		ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(25.0f, 25.0f));
+		ImGui::OpenPopup(id.c_str());
+		if (ImGui::BeginPopupModal(id.c_str(), nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse))
 		{
-			m_PopupList.erase(m_PopupList.begin());
-		}
-	}
+			const float min_width = 300.0f;
+			const float min_button_width = 50.0f;
 
-	void PopupsAndNotifications::PopupUpdate()
-	{
-		//Popup Update Code
+			// Constants for this popup
+			static float button_width = 0.0f;
+			static float width = 0.0f;
+			static float image_width = 0.0f;
 
-		if (!m_PopupList.empty())
-		{
-			auto data = m_PopupList[0];
-			m_PopupOpen = true;
-			m_PreviousPopupOpen = true;
-			ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 5.0f);
-			ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);
-			ImGui::OpenPopup(data.title.c_str());
-			if (ImGui::BeginPopupModal(data.title.c_str(), NULL, ImGuiWindowFlags_AlwaysAutoResize))
+			if (ImGui::IsWindowAppearing())
 			{
-				float totalWidth = 0;
-				float additionalPadding = 20.0f;
-				for (int i = 0; i < data.buttons.size(); i++)
+				button_width = 0.0f;
+
+				for (auto& button : popup.m_Buttons)
+					if (ImGui::CalcTextSize(button.Name.c_str()).x > button_width)
+						button_width = ImGui::CalcTextSize(button.Name.c_str()).x;
+				button_width += style.FramePadding.x * 2.0f;
+				button_width = std::max(button_width, min_button_width);
+				width = style.WindowPadding.x * 2.0f + button_width * popup.m_Buttons.size();
+				width = std::max(width, min_width);
+
 				{
-					totalWidth += ImGui::CalcTextSize(data.buttons[i].name.c_str()).x + additionalPadding;
-				}
-				float totalTextWidth = ImGui::CalcTextSize(data.message.c_str()).x;
-
-				float popupWidth = 400;
-				float popupHeight = 134.5;
-
-				if (totalTextWidth > totalWidth && totalTextWidth > popupWidth)
-					popupWidth = totalTextWidth;
-
-				if (totalWidth > totalTextWidth && totalWidth > popupWidth)
-					popupWidth = totalWidth;
-
-				if (m_CurrentTitle != data.title)
-				{
-					m_CurrentTitle = data.title;
-					ImGui::SetWindowPos(ImVec2((((io.DisplaySize.x * 0.5f) - (popupWidth / 2)) + dockspaceWindowPosition.x), (((io.DisplaySize.y * 0.5f) - (popupHeight / 2)) + dockspaceWindowPosition.y)));
-				}
-
-				ImGui::Dummy(ImVec2{ popupWidth, 10 });
-
-				size_t numberOfLines = std::count(data.message.begin(), data.message.end(), '\n');
-
-				std::stringstream test(data.message);
-				std::string segment;
-				std::vector<std::string> seglist;
-
-				while (std::getline(test, segment, '\n'))
-				{
-					seglist.push_back(segment);
-				}
-
-				for (int i = 0; i < numberOfLines; i++)
-				{
-					ImGui::Spacing();
-					const char* messageText = seglist[i].c_str();
-					ImGui::SameLine((popupWidth / 2) - ImGui::CalcTextSize(messageText).x / 2);
-					ImGui::Text(messageText);
-				}
-
-				ImGui::Dummy(ImVec2{ 0, 10 });
-
-				if (data.loading)
-				{
-					static float barThickness = 10.0f;
-					static float padding = 25.0f;
-					static float size = 100.0f;
-				
-					double time = (ImGui::GetTime() - std::floor(ImGui::GetTime()));
-					ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(ImGui::GetWindowPos().x + padding, ImGui::GetCursorScreenPos().y), ImVec2(ImGui::GetWindowPos().x + ImGui::GetWindowSize().x - padding, ImGui::GetCursorScreenPos().y + barThickness), ImGui::GetColorU32(ImGuiCol_ProgressBarBg));
-					ImGui::GetWindowDrawList()->AddRect(ImVec2(ImGui::GetWindowPos().x + padding, ImGui::GetCursorScreenPos().y), ImVec2(ImGui::GetWindowPos().x + ImGui::GetWindowSize().x - padding, ImGui::GetCursorScreenPos().y + barThickness), ImGui::GetColorU32(ImGuiCol_ProgressBarBorder));
-					
-					double minX = ImGui::GetWindowPos().x - size + padding + (ImGui::GetWindowSize().x + size) * (time);
-					double maxX = ImGui::GetWindowPos().x - size - padding + (ImGui::GetWindowSize().x + size) * (time) + size;
-
-					if (minX > (ImGui::GetWindowPos().x + ImGui::GetWindowSize().x - padding)) { minX = (ImGui::GetWindowPos().x + ImGui::GetWindowSize().x - padding); }
-					if (maxX > (ImGui::GetWindowPos().x + ImGui::GetWindowSize().x - padding)) { maxX = (ImGui::GetWindowPos().x + ImGui::GetWindowSize().x - padding); }
-
-					if (minX < (ImGui::GetWindowPos().x + padding)) { minX = (ImGui::GetWindowPos().x + padding); }
-					if (maxX < (ImGui::GetWindowPos().x + padding)) { maxX = (ImGui::GetWindowPos().x + padding); }
-
-					ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(minX, ImGui::GetCursorScreenPos().y), ImVec2(maxX, ImGui::GetCursorScreenPos().y + barThickness), ImGui::GetColorU32(ImGuiCol_ProgressBarFill));
-					
-					ImGui::Dummy(ImVec2(0, barThickness));
-				}
-
-				ImGui::Dummy(ImVec2{ 0, 10 });
-
-				ImGui::Spacing();
-				ImVec2 size{ 70, 23 };
-				ImGui::SameLine((popupWidth / 2) - ((totalWidth) / 2));
-
-				for (int i = 0; i < data.buttons.size(); i++)
-				{
-					ImGui::PushID(data.buttons[i].id);
-					if (ImGui::Button(data.buttons[i].name.c_str(), ImVec2(ImGui::CalcTextSize(data.buttons[i].name.c_str()).x + additionalPadding, size.y)))
-					{
-						m_PopupList.erase(m_PopupList.begin());
-						data.buttons[i].func();
-						m_CurrentTitle = "";
-					}
-					ImGui::SameLine();
-					ImGui::PopID();
-				}
-				ImGui::EndPopup();
-				ImGui::PopStyleVar(2);
-			}
-		}
-	}
-
-	void PopupsAndNotifications::Notification(int notificationIndex, std::string title, std::string message, std::vector<ButtonData> buttons, bool loading, float displayTime)
-	{
-		if (m_PreferencesReference->m_PreferenceData.NotificationEnabled[notificationIndex])
-		{
-			NotificationData data;
-			data.title = title;
-			data.message = message;
-			data.buttons = buttons;
-			data.loading = loading;
-
-			data.id = GetNextNotificationId();
-			data.time = m_ProgramTime;
-			data.displayTime = displayTime;
-
-			//Calculate Time Executed
-			time_t tt;
-			time(&tt);
-			tm TM = *localtime(&tt);
-
-			int Hours = TM.tm_hour + 0;
-			int Minutes = TM.tm_min + 0;
-			int Seconds = TM.tm_sec + 0;
-
-			std::string Hours_S = std::to_string(Hours);
-			Hours_S = Hours_S.length() == 1 ? "0" + Hours_S : Hours_S;
-			std::string Minutes_S = std::to_string(Minutes);
-			Minutes_S = Minutes_S.length() == 1 ? "0" + Minutes_S : Minutes_S;
-			std::string Seconds_S = std::to_string(Seconds);
-			Seconds_S = Seconds_S.length() == 1 ? "0" + Seconds_S : Seconds_S;
-
-			data.executedTime = ("{ " + Hours_S + " : " + Minutes_S + " : " + Seconds_S + " }");
-
-			m_NotificationList.push_back(data);
-		}
-	}
-
-	void PopupsAndNotifications::NotificationUpdate(Timestep ts, float programTime)
-	{
-		// Show Notification Popups
-		bool visible = !ImGui::GetTopMostPopupModal();
-		{
-			for (int i = (int)m_NotificationList.size() - 1; i >= 0; i--)
-			{
-				auto titleSize = ImGui::CalcTextSize(m_NotificationList[i].title.c_str());
-				auto messageSize = ImGui::CalcTextSize(m_NotificationList[i].message.c_str());
-				auto buttonSize = 100.0f; for (auto button : m_NotificationList[i].buttons) { buttonSize += ImGui::CalcTextSize(button.name.c_str()).x + 5.0f; }
-				auto maxTextWidth = (titleSize.x > messageSize.x) ? (titleSize.x) : (messageSize.x); if (buttonSize > maxTextWidth) { maxTextWidth = buttonSize; }
-				auto WindowPosMax = ImVec2(ImGui::GetWindowPos().x + ImGui::GetContentRegionMax().x - 10.0f, ImGui::GetWindowPos().y + ImGui::GetContentRegionMax().y - 10);
-				auto yMin = ImGui::GetWindowPos().y + ImGui::GetContentRegionMax().y - messageSize.y - titleSize.y * 2 - 20.0f - (m_NotificationList[i].buttons.size() > 0 ? 40.0f : 0.0f);
-				yMin = (WindowPosMax.y - std::max(WindowPosMax.y - yMin, 100.0f));
-				auto WindowPosMin = ImVec2(ImGui::GetWindowPos().x + ImGui::GetContentRegionMax().x - 120.0f -  maxTextWidth, yMin);
-
-				m_NotificationList[i].height = WindowPosMax.y - WindowPosMin.y;
-				for (int n = i + 1; n < m_NotificationList.size(); n++)
-				{
-					if (m_NotificationList[n].id != m_NotificationList[i].id) { WindowPosMin = ImVec2(WindowPosMin.x, WindowPosMin.y - m_NotificationList[n].height - 10.0f); WindowPosMax = ImVec2(WindowPosMax.x, WindowPosMax.y - m_NotificationList[n].height - 10.0f); }
-				}
-
-				//Lerping Between Positions
-				m_NotificationList[i].offsetMin = glm::lerp(m_NotificationList[i].offsetMin, ImGui::GetWindowPos().y + ImGui::GetWindowSize().y - WindowPosMin.y, /*0.1f*/ 6.0f * ts);
-				m_NotificationList[i].offsetMax = m_NotificationList[i].offsetMin - (WindowPosMax.y - WindowPosMin.y);
-				
-				WindowPosMin = ImVec2(WindowPosMin.x, ImGui::GetWindowPos().y + ImGui::GetWindowSize().y - m_NotificationList[i].offsetMin);
-				WindowPosMax = ImVec2(WindowPosMax.x, ImGui::GetWindowPos().y + ImGui::GetWindowSize().y - m_NotificationList[i].offsetMax);
-
-				//Setting Colors
-				auto& OverallOpacity = m_NotificationList[i].currentOpacity;
-				if (m_NotificationList[i].fadeIn) { OverallOpacity += /*0.0375*/ (2.25f * ts); if (OverallOpacity >= 1.0f) { m_NotificationList[i].fadeIn = false; } }
-				else if (m_NotificationList[i].fadeOut) { OverallOpacity -= /*0.0375*/ (2.25f * ts); }
-				else { OverallOpacity = glm::lerp(OverallOpacity, ((i > (int)m_NotificationList.size() - 6)? 1.0f : 0.0f), /*0.15f*/(9.0f * ts)); }
-				auto textCol = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-				auto popupBgCol = ImGui::GetStyleColorVec4(ImGuiCol_PopupBg);
-				auto borderCol = ImGui::GetStyleColorVec4(ImGuiCol_Border);
-				textCol.w *= OverallOpacity; popupBgCol.w *= OverallOpacity; borderCol.w *= OverallOpacity;
-				auto popupOpacity = 1.0f - ImGui::GetStyleColorVec4(ImGuiCol_ModalWindowDimBg).w;
-				if (!visible) { textCol.w *= popupOpacity; popupBgCol.w *= popupOpacity; borderCol.w *= popupOpacity; }
-
-				//Drawing Elements
-				{
-					ImGui::GetForegroundDrawList()->AddRectFilled(WindowPosMin, WindowPosMax, ImGui::ColorConvertFloat4ToU32(popupBgCol), 5.0f);
-					ImGui::GetForegroundDrawList()->AddRect(WindowPosMin, WindowPosMax, ImGui::ColorConvertFloat4ToU32(borderCol), 5.0f, 15, 3.0f);
-					auto imageAndCirclePos = ImVec2((WindowPosMin.x + 50.0f), ((WindowPosMin.y + 30.0f) + (WindowPosMax.y - 30.0f)) / 2.0f);
-					float imageWidth = 30.0f;
-					ImGui::GetForegroundDrawList()->AddImage(reinterpret_cast<void*>(m_DymaticLogo->GetRendererID()), ImVec2(imageAndCirclePos.x - imageWidth, imageAndCirclePos.y - imageWidth), ImVec2(imageAndCirclePos.x + imageWidth, imageAndCirclePos.y + imageWidth), ImVec2{ 0, 1 }, ImVec2{ 1, 0 }, ImGui::ColorConvertFloat4ToU32(textCol));
-					float circleRadius = 40.0f * (((std::sin(ImGui::GetTime() * 5.0f) + 1.0f) / 2.0f) * 0.25f + 0.8f);
-					ImGui::GetForegroundDrawList()->AddCircle(imageAndCirclePos, circleRadius, ImGui::ColorConvertFloat4ToU32(textCol), (int)circleRadius - 1);
-
-					auto textPos = ImVec2(WindowPosMin.x + 100.0f, WindowPosMin.y + 10.0f);
-					ImGui::GetForegroundDrawList()->AddText(ImGui::GetIO().Fonts->Fonts[0], 18, textPos, ImGui::ColorConvertFloat4ToU32(textCol), m_NotificationList[i].title.c_str());
-					ImGui::GetForegroundDrawList()->AddText(ImVec2(textPos.x, textPos.y + 22.0f), ImGui::ColorConvertFloat4ToU32(textCol), m_NotificationList[i].message.c_str());
-
-					
-					ImGuiContext& g = *GImGui;
-					bool windowHovered = true;
-					// Filter by viewport
-					if (ImGui::GetCurrentWindow()->Viewport != g.MouseViewport)
-						if (g.MovingWindow == NULL || ImGui::GetCurrentWindow()->RootWindow != g.MovingWindow->RootWindow)
-							windowHovered = false;
-
-					float currentXPos = 100.0f;
-					for (int b = 0; b < m_NotificationList[i].buttons.size(); b++)
-					{
-						auto& button = m_NotificationList[i].buttons[b];
-
-						float textLength = ImGui::CalcTextSize(button.name.c_str()).x + 5.0f;
-
-						const ImRect bb = ImRect(ImVec2(WindowPosMin.x + currentXPos, WindowPosMax.y - 35.0f), ImVec2(WindowPosMin.x + currentXPos + textLength, WindowPosMax.y - 15.0f));
-						currentXPos += textLength + 5.0f;
-
-						auto offsetMousePos = ImGui::GetMousePos();
-						bool hovered = windowHovered && ImGui::GetWindowViewport() && (offsetMousePos.x > bb.Min.x && offsetMousePos.y > bb.Min.y && offsetMousePos.x < bb.Max.x&& offsetMousePos.y < bb.Max.y);
-						bool held = hovered && Input::IsMouseButtonPressed(Mouse::ButtonLeft);
-						bool pressed = hovered && ImGui::IsMouseReleased(ImGuiMouseButton_Left);
-
-						ImVec4 buttonColor = ImGui::GetStyleColorVec4((held && hovered) ? ImGuiCol_ButtonActive : hovered ? ImGuiCol_ButtonHovered : ImGuiCol_Button);
-						buttonColor.w *= OverallOpacity;
-						if (!visible) { buttonColor.w *= popupOpacity; }
-
-						ImGui::GetForegroundDrawList()->AddRectFilled(bb.Min, bb.Max, ImGui::ColorConvertFloat4ToU32(buttonColor), 3.0f);
-						ImGui::GetForegroundDrawList()->AddText(ImVec2(bb.Min.x + 2.5f, bb.Min.y), ImGui::ColorConvertFloat4ToU32(textCol), button.name.c_str());
-						if (pressed && visible)
+					std::string buf;
+					for (auto& character : popup.m_Message)
+						if (character == '\n')
 						{
-							// Button Pressed Code
-							m_NotificationList[i].fadeOut = true;
-							button.func();
+							if (ImGui::CalcTextSize(buf.c_str()).x + style.FramePadding.x * 2.0f > width)
+								width = ImGui::CalcTextSize(buf.c_str()).x + style.FramePadding.x * 2.0f + style.WindowPadding.x * 2.0f;
+							buf.clear();
 						}
+						else
+							buf += character;
+					if (ImGui::CalcTextSize(buf.c_str()).x + style.FramePadding.x * 2.0f > width)
+						width = ImGui::CalcTextSize(buf.c_str()).x + style.FramePadding.x * 2.0f + style.WindowPadding.x * 2.0f;
+				}
+
+				button_width = (width - style.WindowPadding.x * 2.0f) / (float)popup.m_Buttons.size() - style.FramePadding.x * 2.0f;
+
+				const float message_height = ImGui::CalcTextSize(popup.m_Message.c_str(), nullptr, false, width).y;
+				const float height = style.WindowPadding.y * 2.0f + message_height + style.FramePadding.y * 2.0f + 55.0f;
+				
+				if (popup.m_Icon)
+					image_width = std::min(height - (ImGui::GetTextLineHeight() + style.FramePadding.y * 2.0f) - style.WindowPadding.y * 2.0f, (float)popup.m_Icon->GetHeight()) * ((float)popup.m_Icon->GetWidth() / (float)popup.m_Icon->GetHeight());
+				else
+					image_width = 0.0f;
+
+				const ImVec2 size = { width + image_width,  height};
+
+				ImGui::SetWindowSize(size);
+				ImGui::SetWindowPos(window_pos + (window_size - size) * 0.5f);
+			}
+
+			if (popup.m_Icon)
+			{
+				ImGui::Image((ImTextureID)popup.m_Icon->GetRendererID(), ImVec2(image_width, image_width / ((float)popup.m_Icon->GetWidth() / (float)popup.m_Icon->GetHeight())), { 0, 1 }, { 1, 0 });
+				ImGui::SameLine();
+			}
+
+			ImGui::BeginGroup();
+			ImGui::PushTextWrapPos(ImGui::GetWindowContentRegionMax().x);
+			ImGui::TextWrapped(popup.m_Message.c_str());
+			ImGui::PopTextWrapPos();
+
+			if (popup.m_Loading)
+			{
+				const float barThickness = 10.0f;
+				const float padding = 25.0f;
+				const float size = 100.0f;
+
+				float time = (ImGui::GetTime() - std::floor(ImGui::GetTime()));
+				ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(ImGui::GetWindowPos().x + padding, ImGui::GetCursorScreenPos().y), ImVec2(ImGui::GetWindowPos().x + ImGui::GetWindowSize().x - padding, ImGui::GetCursorScreenPos().y + barThickness), ImGui::GetColorU32(ImGuiCol_ProgressBarBg));
+				ImGui::GetWindowDrawList()->AddRect(ImVec2(ImGui::GetWindowPos().x + padding, ImGui::GetCursorScreenPos().y), ImVec2(ImGui::GetWindowPos().x + ImGui::GetWindowSize().x - padding, ImGui::GetCursorScreenPos().y + barThickness), ImGui::GetColorU32(ImGuiCol_ProgressBarBorder));
+
+				double minX = ImGui::GetWindowPos().x - size + padding + (ImGui::GetWindowSize().x + size) * (time);
+				double maxX = ImGui::GetWindowPos().x - size - padding + (ImGui::GetWindowSize().x + size) * (time)+size;
+
+				if (minX > (ImGui::GetWindowPos().x + ImGui::GetWindowSize().x - padding)) { minX = (ImGui::GetWindowPos().x + ImGui::GetWindowSize().x - padding); }
+				if (maxX > (ImGui::GetWindowPos().x + ImGui::GetWindowSize().x - padding)) { maxX = (ImGui::GetWindowPos().x + ImGui::GetWindowSize().x - padding); }
+
+				if (minX < (ImGui::GetWindowPos().x + padding)) { minX = (ImGui::GetWindowPos().x + padding); }
+				if (maxX < (ImGui::GetWindowPos().x + padding)) { maxX = (ImGui::GetWindowPos().x + padding); }
+
+				ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(minX, ImGui::GetCursorScreenPos().y), ImVec2(maxX, ImGui::GetCursorScreenPos().y + barThickness), ImGui::GetColorU32(ImGuiCol_ProgressBarFill));
+
+				ImGui::Dummy(ImVec2(0, barThickness));
+			}
+
+			ImGui::Dummy(ImVec2{ 0, 10 });
+
+			size_t index = 0;
+			for (auto& button : popup.m_Buttons)
+			{
+				ImGui::PushID(index);
+				if (ImGui::Button(button.Name.c_str(), ImVec2(button_width, 0)))
+				{
+					button.OnPressedFunction();
+					s_PopupList.erase(s_PopupList.begin());
+					ImGui::PopID();
+					break;
+				}
+				ImGui::SameLine();
+				ImGui::PopID();
+
+				index++;
+			}
+			ImGui::EndGroup();
+
+			ImGui::EndPopup();
+		}
+		ImGui::PopStyleVar(3);
+	}
+
+	void Notification::Init()
+	{
+		s_DymaticLogo = Texture2D::Create("assets/icons/DymaticLogoTransparent.png");
+	}
+
+	void Notification::Create(const std::string& title, const std::string& message, const std::vector<ButtonData>& buttons, float displayTime, bool loading)
+	{
+		s_NotificationList.emplace_back(title, message, buttons,  displayTime, loading);
+	}
+
+	Notification::Notification(const std::string& title, const std::string& message, const std::vector<ButtonData>& buttons, float displayTime, bool loading)
+		: m_Title(title), m_Message(message), m_Buttons(buttons), m_DisplayTime(displayTime), m_Loading(loading)
+	{
+		// Get Time String
+		auto t = std::time(nullptr);
+		auto tm = *std::localtime(&t);
+
+		std::ostringstream oss;
+		oss << std::put_time(&tm, "%H-%M-%S");
+		m_Timestamp = oss.str();
+
+		m_Time = ImGui::GetTime();
+	}
+
+	void Notification::Clear()
+	{
+		for (auto& notification : s_NotificationList)
+			notification._fadeOut = true;
+	}
+
+	void Notification::OnImGuiRender(Timestep ts)
+	{
+		if (s_NotificationList.empty())
+			return;
+
+		bool visible = !ImGui::GetTopMostPopupModal();
+		auto& style = ImGui::GetStyle();
+
+		for (int i = s_NotificationList.size() - 1; i >= 0; i--)
+		{
+			auto& notification = s_NotificationList[i];
+
+			const auto titleSize = ImGui::CalcTextSize(notification.m_Title.c_str());
+			const auto messageSize = ImGui::CalcTextSize(notification.m_Message.c_str());
+			float buttonSize = 100.0f;
+			for (auto button : notification.m_Buttons)
+				buttonSize += ImGui::CalcTextSize(button.Name.c_str()).x + style.FramePadding.x * 2.0f;
+			auto maxTextWidth = (titleSize.x > messageSize.x) ? (titleSize.x) : (messageSize.x); if (buttonSize > maxTextWidth) { maxTextWidth = buttonSize; }
+			auto WindowPosMax = ImVec2(ImGui::GetWindowPos().x + ImGui::GetContentRegionMax().x - 10.0f, ImGui::GetWindowPos().y + ImGui::GetContentRegionMax().y - 10.0f);
+			auto yMin = ImGui::GetWindowPos().y + ImGui::GetContentRegionMax().y - messageSize.y - titleSize.y * 2.0f - 20.0f - (notification.m_Buttons.size() > 0 ? 40.0f : 0.0f);
+			yMin = (WindowPosMax.y - std::max(WindowPosMax.y - yMin, 100.0f));
+			auto WindowPosMin = ImVec2(ImGui::GetWindowPos().x + ImGui::GetContentRegionMax().x - 120.0f - maxTextWidth, yMin);
+
+			notification._height = WindowPosMax.y - WindowPosMin.y;
+			for (size_t n = i + 1; n < s_NotificationList.size(); n++)
+				if (s_NotificationList[n].m_ID != notification.m_ID)
+				{
+					WindowPosMin = ImVec2(WindowPosMin.x, WindowPosMin.y - s_NotificationList[n]._height - 10.0f);
+					WindowPosMax = ImVec2(WindowPosMax.x, WindowPosMax.y - s_NotificationList[n]._height - 10.0f);
+				}
+
+			//Lerping Between Positions
+			s_NotificationList[i]._offsetMin = glm::lerp(s_NotificationList[i]._offsetMin, ImGui::GetWindowPos().y + ImGui::GetWindowSize().y - WindowPosMin.y, 6.0f * ts);
+			s_NotificationList[i]._offsetMax = s_NotificationList[i]._offsetMin - (WindowPosMax.y - WindowPosMin.y);
+
+			WindowPosMin = ImVec2(WindowPosMin.x, ImGui::GetWindowPos().y + ImGui::GetWindowSize().y - s_NotificationList[i]._offsetMin);
+			WindowPosMax = ImVec2(WindowPosMax.x, ImGui::GetWindowPos().y + ImGui::GetWindowSize().y - s_NotificationList[i]._offsetMax);
+
+			//Setting Colors
+			auto& OverallOpacity = notification._currentOpacity;
+			if (notification._fadeIn) { OverallOpacity += /*0.0375*/ (2.25f * ts); if (OverallOpacity >= 1.0f) { notification._fadeIn = false; } }
+			else if (notification._fadeOut) { OverallOpacity -= (2.25f * ts); }
+			else
+				OverallOpacity = glm::lerp(OverallOpacity, ((i > ((int)s_NotificationList.size()) - 6) ? 1.0f : 0.0f), (9.0f * ts));
+			auto textCol = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+			auto popupBgCol = ImGui::GetStyleColorVec4(ImGuiCol_PopupBg);
+			auto borderCol = ImGui::GetStyleColorVec4(ImGuiCol_Border);
+
+			textCol.w *= OverallOpacity;
+			popupBgCol.w *= OverallOpacity;
+			borderCol.w *= OverallOpacity;
+
+			auto popupOpacity = 1.0f - ImGui::GetStyleColorVec4(ImGuiCol_ModalWindowDimBg).w;
+			if (!visible)
+			{
+				textCol.w *= popupOpacity;
+				popupBgCol.w *= popupOpacity;
+				borderCol.w *= popupOpacity;
+			}
+
+			//Drawing Elements
+			{
+				ImGui::GetForegroundDrawList()->AddRectFilled(WindowPosMin, WindowPosMax, ImGui::ColorConvertFloat4ToU32(popupBgCol), 5.0f);
+				ImGui::GetForegroundDrawList()->AddRect(WindowPosMin, WindowPosMax, ImGui::ColorConvertFloat4ToU32(borderCol), 5.0f, 15, 3.0f);
+				auto imageAndCirclePos = ImVec2((WindowPosMin.x + 50.0f), ((WindowPosMin.y + 30.0f) + (WindowPosMax.y - 30.0f)) / 2.0f);
+				float imageWidth = 30.0f;
+				ImGui::GetForegroundDrawList()->AddImage(reinterpret_cast<void*>(s_DymaticLogo->GetRendererID()), ImVec2(imageAndCirclePos.x - imageWidth, imageAndCirclePos.y - imageWidth), ImVec2(imageAndCirclePos.x + imageWidth, imageAndCirclePos.y + imageWidth), ImVec2{ 0, 1 }, ImVec2{ 1, 0 }, ImGui::ColorConvertFloat4ToU32(textCol));
+				float circleRadius = 40.0f * (((std::sin(ImGui::GetTime() * 5.0f) + 1.0f) / 2.0f) * 0.25f + 0.8f);
+				ImGui::GetForegroundDrawList()->AddCircle(imageAndCirclePos, circleRadius, ImGui::ColorConvertFloat4ToU32(textCol), (int)circleRadius - 1);
+
+				auto textPos = ImVec2(WindowPosMin.x + 100.0f, WindowPosMin.y + 10.0f);
+				ImGui::GetForegroundDrawList()->AddText(ImGui::GetIO().Fonts->Fonts[0], 18, textPos, ImGui::ColorConvertFloat4ToU32(textCol), notification.m_Title.c_str());
+				ImGui::GetForegroundDrawList()->AddText(ImVec2(textPos.x, textPos.y + 22.0f), ImGui::ColorConvertFloat4ToU32(textCol), notification.m_Message.c_str());
+
+				ImGuiContext& g = *GImGui;
+				bool windowHovered = true;
+				// Filter by viewport
+				if (ImGui::GetCurrentWindow()->Viewport != g.MouseViewport)
+					if (g.MovingWindow == NULL || ImGui::GetCurrentWindow()->RootWindow != g.MovingWindow->RootWindow)
+						windowHovered = false;
+
+				float currentXPos = 100.0f;
+				for (auto& button : notification.m_Buttons)
+				{
+					float textLength = ImGui::CalcTextSize(button.Name.c_str()).x + style.FramePadding.x * 2.0f;
+
+					const ImRect bb = ImRect(ImVec2(WindowPosMin.x + currentXPos, WindowPosMax.y - 35.0f), ImVec2(WindowPosMin.x + currentXPos + textLength, WindowPosMax.y - 15.0f));
+					currentXPos += textLength + 5.0f;
+
+					auto offsetMousePos = ImGui::GetMousePos();
+					bool hovered = windowHovered && ImGui::GetWindowViewport() && (offsetMousePos.x > bb.Min.x && offsetMousePos.y > bb.Min.y && offsetMousePos.x < bb.Max.x&& offsetMousePos.y < bb.Max.y);
+					bool held = hovered && ImGui::IsMouseClicked(0);
+					bool pressed = hovered && ImGui::IsMouseReleased(ImGuiMouseButton_Left);
+
+					ImVec4 buttonColor = ImGui::GetStyleColorVec4((held && hovered) ? ImGuiCol_ButtonActive : hovered ? ImGuiCol_ButtonHovered : ImGuiCol_Button);
+					buttonColor.w *= OverallOpacity;
+					if (!visible) { buttonColor.w *= popupOpacity; }
+
+					ImGui::GetForegroundDrawList()->AddRectFilled(bb.Min, bb.Max, ImGui::ColorConvertFloat4ToU32(buttonColor), 3.0f);
+					ImGui::GetForegroundDrawList()->AddText(ImVec2(bb.Min.x + 2.5f, bb.Min.y), ImGui::ColorConvertFloat4ToU32(textCol), button.Name.c_str());
+					if (pressed && visible)
+					{
+						notification._fadeOut = true;
+						button.OnPressedFunction();
 					}
 				}
 			}
 		}
 
-		//Update Popup Stuff
-		if (m_PreviousPopupOpen == false)
-			m_PopupOpen = false;
-		m_PreviousPopupOpen = false;
-
-		io = ImGui::GetIO();
-		dockspaceWindowPosition = ImGui::GetWindowPos();
-		m_ProgramTime = programTime;
-
-		unsigned int count = 0;
-		for (int i = 0; i < m_NotificationList.size(); i++)
+		size_t index = 0;
+		for (auto& notification : s_NotificationList)
 		{
-			if (((m_ProgramTime - m_NotificationList[i].time) > m_NotificationList[i].displayTime) && (m_NotificationList[i].displayTime != 0))
-			{
-				m_NotificationList[i].fadeOut = true;
-			}
-			if (m_NotificationList[i].fadeOut)
-			{
-				if (m_NotificationList[i].currentOpacity <= 0.1f)
-				{
-					m_NotificationList.erase(m_NotificationList.begin() + i);
-					i--;
-				}
-			}
-			else { count++; }
+			if (ImGui::GetTime() - notification.m_Time > notification.m_DisplayTime && notification.m_DisplayTime != 0.0f)
+				notification._fadeOut = true;
+
+			if (notification._fadeOut && notification._currentOpacity <= 0.1f)
+				s_NotificationList.erase(s_NotificationList.begin() + index);
+			else
+				index++;
 		}
+	}
 
-		if (m_NotificationsVisible)
+	void NotificationsPannel::OnImGuiRender(Timestep ts)
+	{
+		if (!m_NotificationPannelVisible)
+			return;
+
+		auto& style = ImGui::GetStyle();
+
+		ImGui::Begin((std::string(CHARACTER_WINDOW_ICON_NOTIFICATIONS) + " Notifications").c_str(), &m_NotificationPannelVisible);
+		ImGui::Text("Number: %d", s_NotificationList.size());
+
+		ImGui::SameLine(ImGui::GetContentRegionAvailWidth() - ImGui::CalcTextSize("Clear").x - style.FramePadding.x * 2.0f);
+		if (ImGui::Button("Clear"))
+			Notification::Clear();
+
+		if (!s_NotificationList.empty())
 		{
-			ImGui::Begin((std::string(CHARACTER_WINDOW_ICON_NOTIFICATIONS) + " Notifications").c_str(), &m_NotificationsVisible);
-			ImGui::Text("Number: %d", count);
-
-
-			ImGui::SameLine(ImGui::GetContentRegionAvailWidth() - ImGui::CalcTextSize("Clear").x - 5);
-			if (ImGui::Button("Clear"))
+			for (int i = s_NotificationList.size() - 1; i >= 0; i--)
 			{
-				ClearNotificationList();
-			}
-
-			for (int i = m_NotificationList.size() - 1; i >= 0; i = i - 1)
-			{
-				if (!m_NotificationList[i].fadeOut)
+				if (!s_NotificationList[i]._fadeOut)
 				{
-					ImGui::PushID(m_NotificationList[i].id);
+					auto& notification = s_NotificationList[i];
+
+					ImGui::PushID(notification.m_ID);
 					const ImGuiTreeNodeFlags treeNodeFlags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_AllowItemOverlap | ImGuiTreeNodeFlags_FramePadding;
 					ImVec2 contentRegionAvailable = ImGui::GetContentRegionAvail();
 					ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2{ 4, 4 });
 					float lineHeight = GImGui->Font->FontSize + GImGui->Style.FramePadding.y * 2.0f;
 					ImGui::Spacing();
-					bool open = ImGui::TreeNodeEx((void*)(m_NotificationList[i].id), treeNodeFlags, (m_NotificationList[i].executedTime + "  -  " + m_NotificationList[i].title).c_str());
+					bool open = ImGui::TreeNodeEx("##NotificationTreeNode", treeNodeFlags, (notification.m_Timestamp + "  -  " + notification.m_Title).c_str());
 					ImGui::PopStyleVar();
 
 					ImGui::SameLine(contentRegionAvailable.x - lineHeight * 0.5f);
-					if (ImGui::Button("X", ImVec2{ lineHeight, lineHeight })/* || removeNotification*/)
-					{
-						m_NotificationList[i].fadeOut = true;
-					}
+					if (ImGui::Button("X", ImVec2{ lineHeight, lineHeight }))
+						notification._fadeOut = true;
 					if (open)
 					{
 						ImGui::Dummy(ImVec2{ 0, 5 });
-						ImGui::Text(m_NotificationList[i].message.c_str());
+						ImGui::Text(notification.m_Message.c_str());
 						ImGui::Dummy(ImVec2{ 0, 2 });
-						for (int b = 0; b < m_NotificationList[i].buttons.size(); b++)
+						size_t index = 0;
+						for (auto& button : notification.m_Buttons)
 						{
-							ImGui::PushID(m_NotificationList[i].buttons[b].id);
+							ImGui::PushID(index);
 							ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);
-							if (ImGui::Button(m_NotificationList[i].buttons[b].name.c_str()))
+							if (ImGui::Button(button.Name.c_str()))
 							{
-								// Button Pressed Code
-								m_NotificationList[i].fadeOut = true;
-								m_NotificationList[i].buttons[b].func();
+								notification._fadeOut = true;
+								button.OnPressedFunction();
 							}
 							ImGui::SameLine();
 							ImGui::PopStyleVar();
 							ImGui::PopID();
+
+							index++;
 						}
 						ImGui::Dummy(ImVec2{ 0, 5 });
 						ImGui::TreePop();
@@ -365,13 +381,7 @@ namespace Dymatic {
 					ImGui::PopID();
 				}
 			}
-			ImGui::End();
 		}
+		ImGui::End();
 	}
-
-	void PopupsAndNotifications::ClearNotificationList()
-	{
-		for (auto& notification : m_NotificationList) { notification.fadeOut = true; }
-	}
-
 }

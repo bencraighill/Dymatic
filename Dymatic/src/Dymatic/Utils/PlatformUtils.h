@@ -12,4 +12,10 @@ namespace Dymatic {
 		static std::string SaveFile(const char* filter);
 	};
 
+	class Process
+	{
+	public:
+		static void CreateApplicationProcess(const std::filesystem::path& path, std::vector<std::string> args);
+	};
+
 }

@@ -1,4 +1,8 @@
+#define _AFXDLL
+#include "afxwin.h"
+
 #include "EditorLayer.h"
+
 
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include <imgui/imgui.h>
@@ -24,6 +28,13 @@
 #include <shellapi.h>
 
 #include "Nodes/UnrealBlueprintClass.h"
+
+#include "Dymatic/Core/Memory.h"
+
+#include "Dymatic/Scene/ScriptEngine.h"
+#include "Plugins/PluginLoader.h"
+
+#include <imgui/imgui_neo_sequencer.h>
 
 namespace Dymatic {
 
@@ -74,12 +85,13 @@ namespace Dymatic {
 
 		LoadApplicationCrashManager();
 
+		PluginLoader::Init();
+
+		Notification::Init();
+			
 		OpenWindowLayout("saved/presets/GeneralWorkspace.layout");
 		OpenWindowLayout("saved/SavedLayout.layout");
 		m_NodeEditorPannel.Application_Initialize();
-
-		//Add Preference Data load in here
-		auto& preferencesData = m_PreferencesPannel.GetPreferences().m_PreferenceData;
 
 		//m_CheckerboardTexture = Texture2D::Create("assets/textures/Checkerboard.png");
 		m_IconPlay = Texture2D::Create("Resources/Icons/PlayButton.png");
@@ -93,10 +105,15 @@ namespace Dymatic {
 		Application::Get().GetImGuiLayer()->AddIconFont("assets/fonts/IconsFont.ttf", 10.0f, 0xF7, 0xF8); // Division Symbol
 
 		FramebufferSpecification fbSpec;
-		fbSpec.Attachments = { FramebufferTextureFormat::RGBA8, FramebufferTextureFormat::RED_INTEGER, FramebufferTextureFormat::Depth };
+		// Color, EntityID, Depth, Normal, Metallic
+		fbSpec.Attachments = { FramebufferTextureFormat::RGBA16F, FramebufferTextureFormat::RED_INTEGER, FramebufferTextureFormat::Depth, FramebufferTextureFormat::RGBA16F, FramebufferTextureFormat::RGBA8 };
+
+
 		fbSpec.Width = 1600;
 		fbSpec.Height = 900;
+		fbSpec.Samples = 1;
 		m_Framebuffer = Framebuffer::Create(fbSpec);
+		Renderer3D::SetActiveFramebuffer(m_Framebuffer);
 
 		m_ActiveScene = CreateRef<Scene>();
 
@@ -108,67 +125,15 @@ namespace Dymatic {
 			serializer.Deserialize(sceneFilePath);
 		}
 
-		m_EditorCamera = EditorCamera(30.0f, 1.778f, 0.1f, 1000.0f);
-#if 0
-		// Entity
-		auto square = m_ActiveScene->CreateEntity("Green Square");
-		square.AddComponent<SpriteRendererComponent>(glm::vec4{ 0.0f, 1.0f, 0.0f, 1.0f });
+		m_EditorCamera = EditorCamera(/*30.0f*/45.0f, 1.778f, 0.1f, 1000.0f);
 
-		auto redSquare = m_ActiveScene->CreateEntity("Red Square");
-		redSquare.AddComponent<SpriteRendererComponent>(glm::vec4{ 1.0f, 0.0f, 0.0f, 1.0f });
-
-		m_SquareEntity = square;
-
-		m_CameraEntity = m_ActiveScene->CreateEntity("Camera A");
-		m_CameraEntity.AddComponent<CameraComponent>();
-
-		m_SecondCamera = m_ActiveScene->CreateEntity("Camera B");
-		auto& cc = m_SecondCamera.AddComponent<CameraComponent>();
-		cc.Primary = false;
-
-		class CameraController : public ScriptableEntity
-		{
-		public:
-			virtual void OnCreate() override
-			{
-				auto& translation = GetComponent<TransformComponent>().Translation;
-				translation.x = rand() % 10 - 5.0f;
-			}
-
-			virtual void OnDestroy() override
-			{
-			}
-
-			virtual void OnUpdate(Timestep ts) override
-			{
-				auto& translation = GetComponent<TransformComponent>().Translation;
-
-				float speed = 5.0f;
-
-				if (Input::IsKeyPressed(Key::A))
-					translation.x -= speed * ts;
-				if (Input::IsKeyPressed(Key::D))
-					translation.x += speed * ts;
-				if (Input::IsKeyPressed(Key::W))
-					translation.y += speed * ts;
-				if (Input::IsKeyPressed(Key::S))
-					translation.y -= speed * ts;
-			}
-		};
-
-		m_CameraEntity.AddComponent<NativeScriptComponent>().Bind<CameraController>();
-		m_SecondCamera.AddComponent<NativeScriptComponent>().Bind<CameraController>();
-#endif
-
-		auto entity = m_ActiveScene->CreateEntity("Entity");
-		entity.AddComponent<NativeScriptComponent>().Bind<Dymatic::UnrealBlueprintClass>();
+		m_ShowSplash = Preferences::GetData().ShowSplashStartup;
 	}
 
 	void EditorLayer::OnDetach()
 	{
 		DY_PROFILE_FUNCTION();
 		SaveWindowLayout("saved/SavedLayout.layout");
-
 
 		// Close crash manager process and thread handles.
 		TerminateProcess(crash_manager_pi.hProcess, 1);
@@ -182,42 +147,26 @@ namespace Dymatic {
 	{
 		DY_PROFILE_FUNCTION();
 
-		if (Input::IsKeyPressed(Key::Q))
-			abort();
-
-		static bool created = false;
-		if (Input::IsKeyPressed(Key::B) && !created)
-		{
-			auto entity = m_ActiveScene->CreateEntity("Entity");
-			entity.AddComponent<NativeScriptComponent>().Bind<Dymatic::UnrealBlueprintClass>();
-			created = true;
-		}
+		PluginLoader::OnUpdate(ts);
 
 		m_DeltaTime = ts;
+		m_ProgramTime += ts;
+		m_LastSaveTime += ts;
 
-		if (m_PopupsAndNotifications.GetPopupOpen() == false) {
-			m_ProgramTime += ts;
-			m_LastSaveTime += ts;
-		}
-
-		if (m_PreferencesPannel.GetPreferences().m_PreferenceData.autosaveEnabled)
+		if (Preferences::GetData().AutosaveEnabled)
 		{
 			//AutoSave
-			if (m_LastSaveTime >= m_PreferencesPannel.GetPreferences().m_PreferenceData.autosaveTime * 60.0f && !m_EditorScenePath.empty())
+			if (m_LastSaveTime >= Preferences::GetData().AutosaveTime * 60.0f && !m_EditorScenePath.empty())
 			{
 				SaveScene();
 				DY_CORE_INFO("Autosave Complete: Program Time - {0}", m_ProgramTime);
-				//Add Autosave Complete Notification
-				{
-					m_PopupsAndNotifications.Notification(1, "Autosave Completed", ("Autosaved current scene at program time: \n" + std::to_string((int)m_ProgramTime)), { { m_PopupsAndNotifications.GetNextNotificationId(), "Dismiss", [](){} } });
-				}
+
+				Notification::Create("Autosave Completed", ("Autosaved current scene at program time: \n" + std::to_string((int)m_ProgramTime)), { { "Dismiss", [](){} } });
 			}
 
 			//Warning of autosave
-			if (m_LastSaveTime >= (m_PreferencesPannel.GetPreferences().m_PreferenceData.autosaveTime * 60.0f) - 10 && m_LastSaveTime <= (m_PreferencesPannel.GetPreferences().m_PreferenceData.autosaveTime * 60.0f) - 10 + ts && !m_EditorScenePath.empty())
-			{
-				m_PopupsAndNotifications.Notification(0, "Autosave pending...", "Autosave of current scene will commence\n in 10 seconds.", { { m_PopupsAndNotifications.GetNextNotificationId(), "Cancel", [&]() { m_LastSaveTime = 1.0f; } }, { m_PopupsAndNotifications.GetNextNotificationId(), "Save Now", [&]() { m_LastSaveTime = m_PreferencesPannel.GetPreferences().m_PreferenceData.autosaveTime * 60; } } }, false, 10.0f);
-			}
+			if (m_LastSaveTime >= (Preferences::GetData().AutosaveTime * 60.0f) - 10 && m_LastSaveTime <= (Preferences::GetData().AutosaveTime * 60.0f) - 10 + ts && !m_EditorScenePath.empty())
+				Notification::Create("Autosave pending...", "Autosave of current scene will commence\n in 10 seconds.", { { "Cancel", [&]() { m_LastSaveTime = 1.0f; } }, { "Save Now", [&]() { m_LastSaveTime = Preferences::GetData().AutosaveTime * 60; } } }, 10.0f, false);
 		}
 
 		// Resize
@@ -226,6 +175,7 @@ namespace Dymatic {
 			(spec.Width != m_ViewportSize.x || spec.Height != m_ViewportSize.y))
 		{
 			m_Framebuffer->Resize((uint32_t)m_ViewportSize.x, (uint32_t)m_ViewportSize.y);
+			Renderer3D::Resize();
 			m_CameraController.OnResize(m_ViewportSize.x, m_ViewportSize.y);
 			m_EditorCamera.SetViewportSize(m_ViewportSize.x, m_ViewportSize.y);
 			m_ActiveScene->OnViewportResize((uint32_t)m_ViewportSize.x, (uint32_t)m_ViewportSize.y);
@@ -234,23 +184,29 @@ namespace Dymatic {
 		// Render
 		Renderer2D::ResetStats();
 		m_Framebuffer->Bind();
+		
 		//RenderCommand::SetClearColor({ 0.1f, 0.1f, 0.1f, 1 });
-		RenderCommand::SetClearColor({ 0.28f, 0.28f, 0.28f, 1.0f });
+		//RenderCommand::SetClearColor({ 0.28f, 0.28f, 0.28f, 1.0f });
+		RenderCommand::SetClearColor({ 0.0f, 0.0f, 0.0f, 1.0f });
 		RenderCommand::Clear();
 
 		//Clear entity ID attachment to -1
-		m_Framebuffer->ClearAttachment(1, -1);
+		int value = -1;
+		m_Framebuffer->ClearAttachment(1, &value);
 
 		switch (m_SceneState)
 		{
 			case SceneState::Edit:
 			{
+				// Update Selected Entity
+				Renderer3D::SetSelectedEntity((uint32_t)m_SceneHierarchyPanel.GetSelectedEntity());
+
 				if (m_ViewportFocused)
 					m_CameraController.OnUpdate(ts);
 
 				m_EditorCamera.OnUpdate(ts);
 
-				m_ActiveScene->OnUpdateEditor(ts, m_EditorCamera);
+				m_ActiveScene->OnUpdateEditor(ts, m_EditorCamera, m_SceneHierarchyPanel.GetSelectedEntity());
 				break;
 			}
 			case SceneState::Play:
@@ -270,7 +226,8 @@ namespace Dymatic {
 
 		if (mouseX >= 0 && mouseY >= 0 && mouseX < (int)viewportSize.x && mouseY < (int)viewportSize.y)
 		{
-			int pixelData = m_Framebuffer->ReadPixel(1, mouseX, mouseY);
+			int pixelData;
+			m_Framebuffer->ReadPixel(1, mouseX, mouseY, &pixelData);
 			m_HoveredEntity = pixelData == -1 ? Entity() : Entity((entt::entity)pixelData, m_ActiveScene.get());
 		}
 
@@ -290,6 +247,15 @@ namespace Dymatic {
 		static ImGuiDockNodeFlags dockspace_flags = ImGuiDockNodeFlags_None;
 
 		bool maximized = Application::Get().GetWindow().IsWindowMaximized();
+		
+		// Set Rounding Frame
+		const float window_rounding = 25.0f;
+		const float window_border_thickness = 3.0f;
+		auto& window = Application::Get().GetWindow();
+		if (maximized)
+			SetWindowRgn(GetActiveWindow(), 0, false);
+		else
+			SetWindowRgn(GetActiveWindow(), CreateRoundRectRgn(0, 0, window.GetWidth(), window.GetHeight(), window_rounding, window_rounding), false);
 
 		// We are using the ImGuiWindowFlags_NoDocking flag to make the parent window not dockable into,
 		// because it would be confusing to have two docking targets within each others.
@@ -301,7 +267,7 @@ namespace Dymatic {
 			ImGui::SetNextWindowSize(viewport->Size);
 			ImGui::SetNextWindowViewport(viewport->ID);
 			ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
-			ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, maximized ? 0.0f : 3.0f);
+			ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
 			window_flags |= ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
 			window_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
 		}
@@ -320,6 +286,16 @@ namespace Dymatic {
 		ImGui::Begin("Dymatic Editor Dockspace Window", &dockspaceOpen, window_flags);
 		ImVec2 dockspaceWindowPosition = ImGui::GetWindowPos();
 		ImGui::PopStyleVar(1);
+
+		// Draw Window Border
+		if (!maximized)
+		{
+			const ImVec2 pos = ImGui::GetWindowPos();
+			const ImVec2 size = ImGui::GetWindowSize();
+
+			const float half_thickness = window_border_thickness * 0.5f;
+			ImGui::GetForegroundDrawList()->AddRect({ pos.x + half_thickness, pos.y + half_thickness }, { pos.x + size.x - half_thickness, pos.y + size.y - half_thickness }, ImGui::GetColorU32(ImGuiCol_MainWindowBorder), 15.0f, 0, window_border_thickness);
+		}
 
 		if (opt_fullscreen)
 			ImGui::PopStyleVar(2);
@@ -462,10 +438,10 @@ namespace Dymatic {
 			if (ImGui::BeginMenu(CHARACTER_ICON_DYMATIC))
 			{
 				if (ImGui::MenuItem("Splash Screen")) { m_ShowSplash = true; }
-				if (ImGui::MenuItem("About Dymatic")) { m_PopupsAndNotifications.Popup("Engine Information", "Dymatic Engine\nV1.2.2 (Development)\n\n\nDate: 2021 / 07 / 25\nHash: #D65Y4h11QR\nBranch: Development\n\n\n Dymatic Engine is a free, open source software developed by BAS Solutions.\nView source files for licenses from vendor libraries.", { { m_PopupsAndNotifications.GetNextNotificationId(), "Learn More", []() { ShellExecute(0, 0, L"https://github.com/benc25/dymatic", 0, 0, SW_SHOW); } }, { m_PopupsAndNotifications.GetNextNotificationId(), "Ok", []() {} } }); }
+				if (ImGui::MenuItem("About Dymatic")) { Popup::Create("Engine Information", "Dymatic Engine\nV1.2.4 (Development)\n\n\nBranch Publication Date: 28/5/2022\nBranch: Development\n\n\n Dymatic Engine is a free, open source engine developed by Dymatic Technologies.\nView source files for licenses from vendor libraries.", { { "Learn More", []() { ShellExecute(0, 0, L"https://github.com/benc25/dymatic", 0, 0, SW_SHOW); } }, { "Ok", []() {} } }); }
 				ImGui::Separator();
 				if (ImGui::MenuItem("Github")) { ShellExecute(0, 0, L"https://github.com/benc25/dymatic", 0, 0 , SW_SHOW ); }
-				if (ImGui::MenuItem("Uninstall")) { m_PopupsAndNotifications.Popup("Uninstall Message", "Current Version:\nV1.2.2 (Development)\n\n\nUnfortunately Dymatic doesn't currently have an uninstaller.\nAll files must be deleted manually from the root directory.", { { m_PopupsAndNotifications.GetNextNotificationId(), "Ok", [](){} } }); }
+				if (ImGui::MenuItem("Uninstall")) { Popup::Create("Uninstall Message", "Current Version:\nV1.2.4 (Development)\n\n\nUnfortunately Dymatic doesn't currently have an uninstaller.\nAll files must be deleted manually from the root directory.", { { "Ok", [](){} } }); }
 				ImGui::Separator();
 				if (ImGui::BeginMenu("System"))
 				{
@@ -480,28 +456,20 @@ namespace Dymatic {
 				// Disabling fullscreen would allow the window to be moved to the front of other windows, 
 				// which we can't undo at the moment without finer window depth/z control.
 				//ImGui::MenuItem("Fullscreen", NULL, &opt_fullscreen_persistant);1
-				if (ImGui::MenuItem((std::string(CHARACTER_SYSTEM_ICON_NEW_FILE) + " New").c_str(), GetBindAsString(NewSceneBind).c_str())) NewScene();
-				if (ImGui::MenuItem((std::string(CHARACTER_SYSTEM_ICON_OPEN_FILE) + " Open...").c_str(), GetBindAsString(OpenSceneBind).c_str())) OpenScene();
+				if (ImGui::MenuItem((std::string(CHARACTER_SYSTEM_ICON_NEW_FILE) + " New").c_str(), Preferences::Keymap::GetBindString(Preferences::Keymap::KeyBindEvent::NewSceneBind).c_str())) NewScene();
+				if (ImGui::MenuItem((std::string(CHARACTER_SYSTEM_ICON_OPEN_FILE) + " Open...").c_str(), Preferences::Keymap::GetBindString(Preferences::Keymap::KeyBindEvent::OpenSceneBind).c_str())) OpenScene();
 				if (ImGui::BeginMenu((std::string(CHARACTER_SYSTEM_ICON_RECENT) + " Open Recent").c_str(), !GetRecentFiles().empty()))
 				{
-					std::vector<std::filesystem::path> recentFiles = GetRecentFiles();
-					if (!recentFiles.empty())
-					{
-						for (int i = 0; i < recentFiles.size(); i++)
-						{
-							if (ImGui::MenuItem((m_ContentBrowser.GetFullFileNameFromPath(m_ContentBrowser.SwapStringSlashesSingle(recentFiles[i].string()))).c_str()))
-							{
-								OpenScene(recentFiles[i]);
-							}
-						}
-					}
+					for (auto& file : GetRecentFiles())
+						if (ImGui::MenuItem((file.filename()).string().c_str()))
+							OpenScene(file);
 					ImGui::EndMenu();
 				}
 
 				ImGui::Separator();
 
-				if (ImGui::MenuItem((std::string(CHARACTER_SYSTEM_ICON_SAVE) + " Save").c_str(), GetBindAsString(SaveSceneBind).c_str())) SaveScene();
-				if (ImGui::MenuItem((std::string(CHARACTER_SYSTEM_ICON_SAVE_AS) + " Save As...").c_str(), GetBindAsString(SaveSceneAsBind).c_str())) SaveSceneAs();
+				if (ImGui::MenuItem((std::string(CHARACTER_SYSTEM_ICON_SAVE) + " Save").c_str(), Preferences::Keymap::GetBindString(Preferences::Keymap::KeyBindEvent::SaveSceneBind).c_str())) SaveScene();
+				if (ImGui::MenuItem((std::string(CHARACTER_SYSTEM_ICON_SAVE_AS) + " Save As...").c_str(), Preferences::Keymap::GetBindString(Preferences::Keymap::KeyBindEvent::SaveSceneAsBind).c_str())) SaveSceneAs();
 
 				ImGui::Separator();
 
@@ -520,7 +488,15 @@ namespace Dymatic {
 
 				ImGui::Separator();
 
-				if (ImGui::MenuItem((std::string(CHARACTER_SYSTEM_ICON_QUIT) + " Quit").c_str(), GetBindAsString(QuitBind).c_str())) SaveAndExit();
+				if (ImGui::MenuItem("Restart", ""))
+				{
+					WCHAR filename[MAX_PATH];
+					GetModuleFileName(GetModuleHandle(NULL), filename, sizeof(filename));
+					Process::CreateApplicationProcess(filename, {});
+					Application::Get().Close();
+				}
+
+				if (ImGui::MenuItem((std::string(CHARACTER_SYSTEM_ICON_QUIT) + " Quit").c_str(), Preferences::Keymap::GetBindString(Preferences::Keymap::KeyBindEvent::QuitBind).c_str())) SaveAndExit();
 				ImGui::EndMenu();
 			}
 
@@ -540,8 +516,8 @@ namespace Dymatic {
 				ImGui::MenuItem(		(std::string(CHARACTER_WINDOW_ICON_NODE_EDITOR)			+ " Node Editor").c_str(), "",			&m_NodeEditorPannel.GetNodeEditorVisible());
 				ImGui::MenuItem(		(std::string(CHARACTER_WINDOW_ICON_SCENE_HIERARCHY)		+ " Scene Hierarchy").c_str(), "",		&m_SceneHierarchyPanel.GetSceneHierarchyVisible());
 				ImGui::MenuItem(		(std::string(CHARACTER_WINDOW_ICON_PROPERTIES)			+ " Properties").c_str(), "",			&m_SceneHierarchyPanel.GetPropertiesVisible());
-				ImGui::MenuItem(		(std::string(CHARACTER_WINDOW_ICON_NOTIFICATIONS)		+ " Notifications").c_str(), "",		&m_PopupsAndNotifications.GetNotificationsVisible());
-				ImGui::MenuItem(		(std::string(CHARACTER_WINDOW_ICON_CONTENT_BROWSER)		+ " Content Browser").c_str(), "",		&m_ContentBrowser.GetContentBrowserVisible());
+				ImGui::MenuItem(		(std::string(CHARACTER_WINDOW_ICON_NOTIFICATIONS)		+ " Notifications").c_str(), "",		&m_NotificationsPannel.GetNotificationPannelVisible());
+				ImGui::MenuItem(		(std::string(CHARACTER_WINDOW_ICON_CONTENT_BROWSER)		+ " Content Browser").c_str(), "",		&m_ContentBrowserPanel.GetContentBrowserVisible());
 				ImGui::MenuItem(		(std::string(CHARACTER_WINDOW_ICON_TEXT_EDITOR)			+ " Text Editor").c_str(), "",			&m_TextEditor.GetTextEditorVisible());
 				ImGui::MenuItem(		(std::string(CHARACTER_WINDOW_ICON_CURVE_EDITOR)		+ " Curve Editor").c_str(), "",			&m_CurveEditor.GetCurveEditorVisible());
 				ImGui::MenuItem(		(std::string(CHARACTER_WINDOW_ICON_IMAGE_EDITOR)		+ " Image Editor").c_str(), "",			&m_ImageEditor.GetImageEditorVisible());
@@ -561,19 +537,32 @@ namespace Dymatic {
 
 			if (ImGui::BeginMenu("View"))
 			{
-				if (ImGui::MenuItem("Perspective/Orthographic", GetBindAsString(ViewProjectionBind).c_str())) { m_ProjectionToggled = !m_EditorCamera.GetProjectionType(); m_EditorCamera.SetProjectionType(m_ProjectionToggled); }
+				if (ImGui::MenuItem("Perspective/Orthographic", Preferences::Keymap::GetBindString(Preferences::Keymap::KeyBindEvent::ViewProjectionBind).c_str())) { m_ProjectionToggled = !m_EditorCamera.GetProjectionType(); m_EditorCamera.SetProjectionType(m_ProjectionToggled); }
 
 				if (ImGui::BeginMenu("Set Perspective"))
 				{
-					if (ImGui::MenuItem("Front", GetBindAsString(ViewFrontBind).c_str())) { m_YawUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360; m_PitchUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360; m_UpdateAngles = true; m_EditorCamera.SetProjectionType(1); }
-					if (ImGui::MenuItem("Side", GetBindAsString(ViewSideBind).c_str())) { m_YawUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360 - 90.0f; m_PitchUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360; m_UpdateAngles = true; m_EditorCamera.SetProjectionType(1); }
-					if (ImGui::MenuItem("Top", GetBindAsString(ViewTopBind).c_str())) { m_YawUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360; m_PitchUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360 + 90; m_UpdateAngles = true; m_EditorCamera.SetProjectionType(1); }
+					if (ImGui::MenuItem("Front", Preferences::Keymap::GetBindString(Preferences::Keymap::KeyBindEvent::ViewFrontBind).c_str())) { m_YawUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360; m_PitchUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360; m_UpdateAngles = true; m_EditorCamera.SetProjectionType(1); }
+					if (ImGui::MenuItem("Side", Preferences::Keymap::GetBindString(Preferences::Keymap::KeyBindEvent::ViewSideBind).c_str())) { m_YawUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360 - 90.0f; m_PitchUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360; m_UpdateAngles = true; m_EditorCamera.SetProjectionType(1); }
+					if (ImGui::MenuItem("Top", Preferences::Keymap::GetBindString(Preferences::Keymap::KeyBindEvent::ViewTopBind).c_str())) { m_YawUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360; m_PitchUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360 + 90; m_UpdateAngles = true; m_EditorCamera.SetProjectionType(1); }
 					ImGui::Separator();
-					if (ImGui::MenuItem("Flip", GetBindAsString(ViewFlipBind).c_str())) { m_YawUpdate = glm::degrees(m_EditorCamera.GetYaw()) + 180.0f; m_PitchUpdate = glm::degrees(m_EditorCamera.GetPitch()); m_UpdateAngles = true; m_EditorCamera.SetProjectionType(1); }
+					if (ImGui::MenuItem("Flip", Preferences::Keymap::GetBindString(Preferences::Keymap::KeyBindEvent::ViewFlipBind).c_str())) { m_YawUpdate = glm::degrees(m_EditorCamera.GetYaw()) + 180.0f; m_PitchUpdate = glm::degrees(m_EditorCamera.GetPitch()); m_UpdateAngles = true; m_EditorCamera.SetProjectionType(1); }
 
 					ImGui::EndMenu();
 				}
 
+				ImGui::EndMenu();
+			}
+
+			if (ImGui::BeginMenu("Script"))
+			{
+				if (ImGui::MenuItem("Compile", "", false, m_SceneState == SceneState::Edit)) { if (!ScriptEngine::Compile(Preferences::GetData().devenvPath, "../../DymaticScriptingEnvironment/DymaticTestProject")) { Popup::Create("Compilation Failure", ScriptEngine::GetCompilationMessage(), { { "Ok", []() {} } }, m_ErrorIcon); } }
+				if (ImGui::MenuItem("Reload Assembly", "", false, m_SceneState == SceneState::Edit)) { if (!ScriptEngine::LoadScriptLibrary()) { Popup::Create("Compilation Failure", ScriptEngine::GetCompilationMessage(), { { "Ok", []() {} } }, m_ErrorIcon); } }
+				if (ImGui::MenuItem("Clean Assembly", "", false, m_SceneState == SceneState::Edit)) { ScriptEngine::CleanLibraryAssembly(); }
+				ImGui::EndMenu();
+			}
+
+			if (ImGui::BeginMenu("Help"))
+			{
 				ImGui::EndMenu();
 			}
 
@@ -787,7 +776,7 @@ namespace Dymatic {
 			ImGui::Begin((std::string(CHARACTER_WINDOW_ICON_INFO) + " Info").c_str(), &m_InfoVisible, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
 			ImGui::TextDisabled(GetCurrentFileName().c_str());
 			ImGui::SameLine();
-			std::string text = "1.2.2 - (Development)";
+			std::string text = "1.2.4 - (Development)";
 			ImGui::Dummy(ImVec2{ ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize(text.c_str()).x - 5, 0 });
 			ImGui::SameLine();
 			ImGui::TextDisabled(text.c_str());
@@ -798,23 +787,32 @@ namespace Dymatic {
 		m_PreferencesPannel.OnImGuiRender();
 
 		//Content Browser Window
-		m_ContentBrowser.OnImGuiRender(m_DeltaTime);
-		auto& contentFileToOpen = m_ContentBrowser.GetFileToOpen();
-		if (contentFileToOpen != "")
-		{
-			if (m_ContentBrowser.GetFileFormat(contentFileToOpen) == ".dymatic") { OpenScene(contentFileToOpen); }
-			if (m_ContentBrowser.GetFileFormat(contentFileToOpen) == ".dytheme") { m_PopupsAndNotifications.Popup("Install Theme", "File: " + m_ContentBrowser.GetFullFileNameFromPath(contentFileToOpen) + "\n\nDo you wish to install this dytheme file? It will override you current theme.\nTo save your current theme, export it from Preferences.\n", { { m_PopupsAndNotifications.GetNextNotificationId(), "Cancel", [](){} }, { m_PopupsAndNotifications.GetNextNotificationId(), "Install", [&]() { m_PreferencesPannel.RetryDythemeFile(); } } }); m_PreferencesPannel.SetRecentDythemePath(contentFileToOpen); }
-			contentFileToOpen = "";
-		}
+		//m_ContentBrowser.OnImGuiRender(m_DeltaTime);
+		//auto& contentFileToOpen = m_ContentBrowser.GetFileToOpen();
+		//if (contentFileToOpen != "")
+		//{
+		//	if (m_ContentBrowser.GetFileFormat(contentFileToOpen) == ".dymatic") { OpenScene(contentFileToOpen); }
+		//	if (m_ContentBrowser.GetFileFormat(contentFileToOpen) == ".dytheme") { m_PopupsAndNotifications.Popup("Install Theme", "File: " + m_ContentBrowser.GetFullFileNameFromPath(contentFileToOpen) + "\n\nDo you wish to install this dytheme file? It will override you current theme.\nTo save your current theme, export it from Preferences.\n", { { m_PopupsAndNotifications.GetNextNotificationId(), "Cancel", [](){} }, { m_PopupsAndNotifications.GetNextNotificationId(), "Install", [&]() { m_PreferencesPannel.RetryDythemeFile(); } } }); m_PreferencesPannel.SetRecentDythemePath(contentFileToOpen); }
+		//	contentFileToOpen = "";
+		//}
 
 		//Scene Hierarchy and properties pannel
 		m_SceneHierarchyPanel.OnImGuiRender();
-		//m_ContentBrowserPanel.OnImGuiRender();
+
+		// Check for external drag drop sources
+		m_ContentBrowserPanel.OnImGuiRender(m_IsDragging);
 
 		m_PerformanceAnalyser.OnImGuiRender(m_DeltaTime);
 
 		m_CurveEditor.OnImGuiRender();
 		m_ImageEditor.OnImGuiRender();
+
+		Notification::OnImGuiRender(m_DeltaTime);
+		Popup::OnImGuiRender(m_DeltaTime);
+		m_NotificationsPannel.OnImGuiRender(m_DeltaTime);
+
+		// Plugin Engine UI Update
+		PluginLoader::OnUIRender();
 
 		if (m_MemoryEditorVisible)
 		{
@@ -854,16 +852,10 @@ namespace Dymatic {
 		//m_SandSimulation.OnImGuiRender();
 		//m_RopeSimulation.OnImGuiRender(m_DeltaTime);
 		//m_ChessAI.OnImGuiRender(m_DeltaTime);
+		//gpusim.OnImGuiRender(m_DeltaTime);
 		
 		m_TextEditor.OnImGuiRender();
 		m_NodeEditorPannel.OnImGuiRender();
-
-		
-		m_PopupsAndNotifications.NotificationUpdate(m_DeltaTime, m_ProgramTime);
-
-		//Notifications Pannel Event Check
-		m_PopupsAndNotifications.PopupUpdate();
-
 
 		if (m_StatsVisible)
 		{
@@ -887,6 +879,27 @@ namespace Dymatic {
 			if ((entt::entity)m_HoveredEntity != entt::null)
 				name = m_HoveredEntity.GetComponent<TagComponent>().Tag;
 			ImGui::Text("Hovered Entity: %s", name.c_str());
+			ImGui::End();
+
+			ImGui::Begin("Memory");
+			for (auto& allocation : Memory::GetMemoryAllocationStats())
+				ImGui::Text("%s: %d", allocation.first, allocation.second.TotalAllocated - allocation.second.TotalFreed);
+
+			for (auto& allocation : Memory::GetMemoryAllocations())
+			{
+				std::stringstream sstream;
+				sstream << std::hex << allocation.second.Memory;
+				std::string result = sstream.str();
+				ImGui::Text("%s : %s", result.c_str(), std::to_string(allocation.second.Size).c_str());
+			}
+
+			ImGui::Separator();
+
+			auto& allocStats = Memory::GetAllocationStats();
+			ImGui::Text("Total Allocated: %d", allocStats.TotalAllocated);
+			ImGui::Text("Total Freed: %d", allocStats.TotalFreed);
+			ImGui::Text("Current Usage: %d", allocStats.TotalAllocated - allocStats.TotalFreed);
+
 			ImGui::End();
 
 			ImGui::Begin("Settings");
@@ -919,11 +932,72 @@ namespace Dymatic {
 
 			if (ImGui::BeginDragDropTarget())
 			{
+
+				// If the payload is accepted
 				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_ITEM"))
 				{
-					const wchar_t* path = (const wchar_t*)payload->Data;
-					OpenScene(std::filesystem::path(g_AssetPath) / path);
+					const wchar_t* w_path = (const wchar_t*)payload->Data;
+					auto path = std::filesystem::path(g_AssetPath) / w_path;
+					if (path.extension() == ".dymatic")
+						OpenScene(path);
+					else if (ContentBrowserPanel::GetFileType(path) == ContentBrowserPanel::TextureAsset)
+					{
+						auto entity = m_ActiveScene->CreateEntity(path.filename().stem().string());
+						auto texture = Texture2D::Create(path.string());
+						entity.AddComponent<SpriteRendererComponent>(texture);
+
+						float image_width = texture->GetWidth();
+						float image_height = texture->GetHeight();
+						if (image_width > image_height)
+						{
+							image_width /= image_height;
+							image_height = 1.0f;
+						}
+						else
+						{
+							image_height /= image_width;
+							image_width = 1.0f;
+						}
+
+						entity.GetComponent<TransformComponent>().Scale = glm::vec3(image_width, image_height, 1.0f);
+					}
+					else if (ContentBrowserPanel::GetFileType(path) == ContentBrowserPanel::MeshAsset)
+					{
+						// Create a new entity with a static mesh
+						auto entity = m_ActiveScene->CreateEntity(path.filename().stem().string());
+						entity.AddComponent<StaticMeshComponent>(path.string());
+
+						// Calculate mouse pixel position
+						auto [mx, my] = ImGui::GetMousePos();
+						mx -= m_ViewportBounds[0].x;
+						my -= m_ViewportBounds[0].y;
+						glm::vec2 viewportSize = m_ViewportBounds[1] - m_ViewportBounds[0];
+						my = viewportSize.y - my;
+						int mouseX = (int)mx;
+						int mouseY = (int)my;
+
+						// Read depth from framebuffer
+						m_Framebuffer->Bind();
+						float depth = m_Framebuffer->ReadDepthPixel(mouseX, mouseY);
+						m_Framebuffer->Unbind();
+
+						if (depth == 1.0f)
+							depth = 0.99f;
+
+						// Get position from depth
+						float z = depth * 2.0f - 1.0f;
+						glm::vec2 texCoords = glm::vec2(mouseX, mouseY) / m_ViewportSize;
+						glm::vec4 clipSpacePosition = glm::vec4(texCoords * 2.0f - 1.0f, z, 1.0f);
+						glm::vec4 viewSpacePosition = glm::inverse(m_EditorCamera.GetViewProjection()) * clipSpacePosition;
+						// Perspective division
+						viewSpacePosition /= viewSpacePosition.w;
+
+						// Update entity translation and selection
+						entity.GetComponent<TransformComponent>().Translation = glm::vec3(viewSpacePosition);
+						m_SceneHierarchyPanel.SetSelectedEntity(entity);
+					}
 				}
+
 				ImGui::EndDragDropTarget();
 			}
 
@@ -1163,52 +1237,6 @@ namespace Dymatic {
 				m_EditorCamera.SetProjectionType(m_ProjectionToggled);
 			}
 
-			//static Ref<Texture2D> tempTex = Texture2D::Create(32, 32);
-			//char* data = new char[32 * 32 * 4];
-			//
-			//if (m_ProgramTime > 5.0f)
-			//{
-			//	//CURSORINFO info;
-			//	//info.cbSize = sizeof(CURSORINFO);
-			//	//GetCursorInfo(&info);
-			//	//if ((int)info.hCursor == 0x0000000008e211e1)
-			//	//{
-			//	//	DY_CORE_INFO("Dragging File");
-			//	//	CopyCursor(info.hCursor);
-			//	//}
-			//
-			//	HBITMAP hbitmap;
-			//	BITMAP bitmap;
-			//	BITMAPINFO bmi;
-			//	HDC hdcScreen = GetDC(NULL);
-			//	HDC hdcMem = CreateCompatibleDC(hdcScreen);
-			//
-			//	CURSORINFO cursorInfo = { 0 };
-			//	cursorInfo.cbSize = sizeof(cursorInfo);
-			//
-			//	GetCursorInfo(&cursorInfo);
-			//
-			//	ICONINFO ii = {};
-			//	GetIconInfo(cursorInfo.hCursor, &ii);
-			//
-			//	hbitmap = ii.hbmColor;
-			//	SelectObject(hdcMem, hbitmap);
-			//	GetObject(hbitmap, sizeof(BITMAP), &bitmap);
-			//
-			//	GetDIBits(hdcMem, hbitmap, 0, 32, NULL, &bmi, DIB_RGB_COLORS);
-			//
-			//	for (int i = 0; i < 1024; i++) {
-			//		data[i * 4 + 0] = bmi.bmiColors[i].rgbRed;
-			//		data[i * 4 + 1] = bmi.bmiColors[i].rgbGreen;
-			//		data[i * 4 + 2] = bmi.bmiColors[i].rgbBlue;
-			//		data[i * 4 + 3] = 255.0f;
-			//		//DY_CORE_INFO(a);
-			//	}
-			//}
-			//tempTex->SetData(data, 32 * 32 * 4);
-			//ImGui::Image((ImTextureID)tempTex->GetRendererID(), ImVec2(200.0f, 200.0f));
-			//delete[] data;
-
 			// Gizmos
 			Entity selectedEntity = m_SceneHierarchyPanel.GetSelectedEntity();
 
@@ -1218,8 +1246,6 @@ namespace Dymatic {
 				ImGuizmo::SetDrawlist();
 
 				ImGuizmo::SetRect(m_ViewportBounds[0].x, m_ViewportBounds[0].y, m_ViewportBounds[1].x - m_ViewportBounds[0].x, m_ViewportBounds[1].y - m_ViewportBounds[0].y);
-
-
 				// Camera
 				//Runtime camera from entity
 				//auto cameraEntity = m_ActiveScene->GetPrimaryCameraEntity();
@@ -1233,14 +1259,15 @@ namespace Dymatic {
 
 				// Entity Transform
 				auto& tc = selectedEntity.GetComponent<TransformComponent>();
-				glm::mat4 transform = tc.GetTransform();
+				glm::mat4 transform = m_ActiveScene->GetWorldTransform(selectedEntity);
+				//glm::mat4 transform = tc.GetTransform();
 
 				//Snapping
 				bool snap = m_GizmoType == ImGuizmo::OPERATION::TRANSLATE ? m_TranslationSnap : m_GizmoType == ImGuizmo::OPERATION::ROTATE ? m_RotationSnap : m_ScaleSnap;
 				float snapValue = m_GizmoType == ImGuizmo::OPERATION::TRANSLATE ? m_TranslationSnapValue : m_GizmoType == ImGuizmo::OPERATION::ROTATE ? m_RotationSnapValue : m_ScaleSnapValue;
 
 				float snapValues[3] = { snapValue, snapValue, snapValue };
-
+				//float bounds[6] = { -0.5f, -0.5f, -0.5f, 0.5f, 0.5f, 0.5f };
 
 				ImGuizmo::Manipulate(glm::value_ptr(cameraView), glm::value_ptr(cameraProjection),
 					(ImGuizmo::OPERATION)m_GizmoType, (ImGuizmo::MODE)m_GizmoSpace, glm::value_ptr(transform),
@@ -1249,13 +1276,13 @@ namespace Dymatic {
 				if (ImGuizmo::IsUsing())
 				{
 					glm::vec3 translation, rotation, scale;
-					Math::DecomposeTransform(transform, translation, rotation, scale);
+					Math::DecomposeTransform(m_ActiveScene->WorldToLocalTransform(selectedEntity, transform), translation, rotation, scale);
+					//Math::DecomposeTransform(transform, translation, rotation, scale);
 
 					glm::vec3 deltaRotation = rotation - tc.Rotation;
 					tc.Translation = translation;
 					tc.Rotation += deltaRotation;
 					tc.Scale = scale;
-
 				}
 
 			}
@@ -1269,14 +1296,14 @@ namespace Dymatic {
 			bool focused = false;
 			ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 5.0f);
 			ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 20.0f);
-			ImGui::Begin("Splash", &m_ShowSplash, ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar);
+			ImGui::Begin("Splash", NULL, ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar);
 			if (ImGui::IsWindowFocused()) { focused = true; }
 			ImGui::SetWindowPos(ImVec2((((io.DisplaySize.x * 0.5f) - (ImGui::GetWindowWidth() / 2)) + dockspaceWindowPosition.x), (((io.DisplaySize.y * 0.5f) - (ImGui::GetWindowHeight() / 2)) + dockspaceWindowPosition.y)));
 			ImGui::Image(reinterpret_cast<void*>(m_DymaticSplash->GetRendererID()), ImVec2{ 488, 267 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
 			ImGui::SameLine();
 			ImGui::Dummy(ImVec2{ 0, 40 - (ImGui::CalcTextSize("W").y / 2) });
 			ImGui::SameLine();
-			std::string versionName = "V1.2.2";
+			std::string versionName = "V1.2.4";
 			ImGui::SameLine( 488 -ImGui::CalcTextSize(versionName.c_str()).x);
 			ImGui::Text(versionName.c_str());
 			ImGui::Columns(2);
@@ -1297,17 +1324,12 @@ namespace Dymatic {
 			ImGui::BeginChild("##RecentFilesList");
 			if (ImGui::IsWindowFocused()) { focused = true; }
 			std::vector<std::filesystem::path> recentFiles = GetRecentFiles();
-			if (!recentFiles.empty())
+			for (auto& file : GetRecentFiles())
 			{
-				for (int i = 0; i < recentFiles.size(); i++)
-				{
-					if (ImGui::Selectable((std::string(CHARACTER_SYSTEM_ICON_NEW_FILE) + m_ContentBrowser.GetFullFileNameFromPath(recentFiles[i].string())).c_str()))
-					{
-						focused = false;
-						OpenScene(recentFiles[i]);
-					}
-					if (ImGui::IsItemFocused()) { focused = true; }
-				}
+				
+				if (ImGui::MenuItem((file.filename()).string().c_str()))
+					OpenScene(file);
+				if (ImGui::IsItemFocused()) { focused = true; }
 			}
 			ImGui::EndChild();
 			ImGui::EndColumns();
@@ -1324,6 +1346,7 @@ namespace Dymatic {
 		m_CameraController.OnEvent(e);
 		m_EditorCamera.OnEvent(e);
 		m_NodeEditorPannel.OnEvent(e);
+		m_PreferencesPannel.OnEvent(e);
 		m_CurveEditor.OnEvent(e);
 		m_ConsoleWindow.OnEvent(e);
 		m_ImageEditor.OnEvent(e);
@@ -1334,143 +1357,104 @@ namespace Dymatic {
 		dispatcher.Dispatch<KeyPressedEvent>(DY_BIND_EVENT_FN(EditorLayer::OnKeyPressed));
 		dispatcher.Dispatch<MouseButtonPressedEvent>(DY_BIND_EVENT_FN(EditorLayer::OnMouseButtonPressed));
 		dispatcher.Dispatch<WindowDropEvent>(DY_BIND_EVENT_FN(EditorLayer::OnDropped));
+		dispatcher.Dispatch<WindowDragEnterEvent>(DY_BIND_EVENT_FN(EditorLayer::OnDragEnter));
+		dispatcher.Dispatch<WindowDragLeaveEvent>(DY_BIND_EVENT_FN(EditorLayer::OnDragLeave));
+		dispatcher.Dispatch<WindowDragOverEvent>(DY_BIND_EVENT_FN(EditorLayer::OnDragOver));
 		dispatcher.Dispatch<WindowCloseEvent>(DY_BIND_EVENT_FN(EditorLayer::OnClosed));
 	}
 
-	void EditorLayer::UpdateKeys(BindCatagory bindCatagory)
+	void EditorLayer::UpdateKeymapEvents(std::vector<Preferences::Keymap::KeyBindEvent> events)
 	{
-		if (KeyBindCheck(NewSceneBind, bindCatagory))					{ NewScene(); }
-		else if (KeyBindCheck(OpenSceneBind, bindCatagory))				{ OpenScene(); }
-		else if (KeyBindCheck(SaveSceneBind, bindCatagory))				{ SaveScene(); }
-		else if (KeyBindCheck(SaveSceneAsBind, bindCatagory))			{ SaveSceneAs(); }
-		else if (KeyBindCheck(QuitBind, bindCatagory))					{ SaveAndExit(); }
-		else if (KeyBindCheck(SelectObjectBind, bindCatagory))			{ if (m_ViewportHovered && !ImGuizmo::IsUsing() && !ImGuizmo::IsOver() && !Input::IsKeyPressed(Key::LeftAlt)) m_SceneHierarchyPanel.SetSelectedEntity(m_HoveredEntity); }
-		else if (KeyBindCheck(GizmoNoneBind, bindCatagory))				{ if (ViewportKeyAllowed() && !ImGuizmo::IsUsing()) { m_GizmoType = -1; } }
-		else if (KeyBindCheck(GizmoTranslateBind, bindCatagory))		{ if (ViewportKeyAllowed() && !ImGuizmo::IsUsing()) { m_GizmoType = ImGuizmo::OPERATION::TRANSLATE; } }
-		else if (KeyBindCheck(GizmoRotateBind, bindCatagory))			{ if (ViewportKeyAllowed() && !ImGuizmo::IsUsing()) { m_GizmoType = ImGuizmo::OPERATION::ROTATE; } }
-		else if (KeyBindCheck(GizmoScaleBind, bindCatagory))			{ if (ViewportKeyAllowed() && !ImGuizmo::IsUsing()) { m_GizmoType = ImGuizmo::OPERATION::SCALE; } }
-		else if (KeyBindCheck(ShadingTypeWireframeBind, bindCatagory))	{ if (ViewportKeyAllowed()) SetShadingIndex(0); }
-		else if (KeyBindCheck(ShadingTypeUnlitBind, bindCatagory))		{ if (ViewportKeyAllowed()) SetShadingIndex(1); }
-		else if (KeyBindCheck(ShadingTypeSolidBind, bindCatagory))		{ if (ViewportKeyAllowed()) SetShadingIndex(2); }
-		else if (KeyBindCheck(ShadingTypeRenderedBind, bindCatagory))	{ if (ViewportKeyAllowed()) SetShadingIndex(3); }
-		else if (KeyBindCheck(ToggleShadingTypeBind, bindCatagory))		{ if (ViewportKeyAllowed()) SetShadingIndex(m_ShadingIndex == 0 ? m_PreviousToggleIndex : 0); }
-		else if (KeyBindCheck(ViewFrontBind, bindCatagory))				{ if (ViewportKeyAllowed()) { m_YawUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360; m_PitchUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360; m_UpdateAngles = true; m_EditorCamera.SetProjectionType(1); } }
-		else if (KeyBindCheck(ViewSideBind, bindCatagory))				{ if (ViewportKeyAllowed()) { m_YawUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360 - 90.0f; m_PitchUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360; m_UpdateAngles = true; m_EditorCamera.SetProjectionType(1); } }
-		else if (KeyBindCheck(ViewTopBind, bindCatagory))				{ if (ViewportKeyAllowed()) { m_YawUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360; m_PitchUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360 + 90; m_UpdateAngles = true; m_EditorCamera.SetProjectionType(1); } }
-		else if (KeyBindCheck(ViewFlipBind, bindCatagory))				{ if (ViewportKeyAllowed()) { m_YawUpdate = glm::degrees(m_EditorCamera.GetYaw()) + 180.0f; m_PitchUpdate = glm::degrees(m_EditorCamera.GetPitch()); m_UpdateAngles = true; m_EditorCamera.SetProjectionType(1); } }
-		else if (KeyBindCheck(ViewProjectionBind, bindCatagory))		{ if (ViewportKeyAllowed()) { m_ProjectionToggled = !m_EditorCamera.GetProjectionType(); m_EditorCamera.SetProjectionType(m_ProjectionToggled); } }
-		else if (KeyBindCheck(DuplicateBind, bindCatagory))				{ if (ViewportKeyAllowed() && m_SceneHierarchyPanel.GetSelectedEntity()) { OnDuplicateEntity(); } m_NodeEditorPannel.DuplicateNodes(); }
-		else if (KeyBindCheck(RenameBind, bindCatagory))				{ if (m_ContentBrowser.GetSelectedFile().filename != "") m_ContentBrowser.OpenRenamePopup(m_ContentBrowser.GetSelectedFile()); }
-		else if (KeyBindCheck(ClosePopupBind, bindCatagory))			{ m_PopupsAndNotifications.RemoveTopmostPopup(); }
-		// Text Editor Keybinds
-		else if (KeyBindCheck(TextEditorDuplicate, bindCatagory))		{ m_TextEditor.Duplicate(); }
-		else if (KeyBindCheck(TextEditorSwapLineUp, bindCatagory))		{ m_TextEditor.SwapLineUp(); }
-		else if (KeyBindCheck(TextEditorSwapLineDown, bindCatagory))	{ m_TextEditor.SwapLineDown(); }
-		else if (KeyBindCheck(TextEditorSwitchHeader, bindCatagory))	{ m_TextEditor.SwitchCStyleHeader(); }
-	
-		else if (Input::IsMouseButtonPressed(Mouse::ButtonLeft) && Input::IsKeyPressed(Key::LeftAlt)) { if (m_ProjectionToggled != m_EditorCamera.GetProjectionType()) { m_EditorCamera.SetProjectionType(m_ProjectionToggled); } }
+		for (auto& event : events)
+		{
+			if (event == Preferences::Keymap::KeyBindEvent::INVALID_BIND)
+				return;
+
+			switch (event)
+			{
+			case Preferences::Keymap::INVALID_BIND: return;
+			case Preferences::Keymap::NewSceneBind: NewScene(); break;
+			case Preferences::Keymap::OpenSceneBind: OpenScene(); break;
+			case Preferences::Keymap::SaveSceneBind: SaveScene(); break;
+			case Preferences::Keymap::SaveSceneAsBind: SaveSceneAs(); break;
+			case Preferences::Keymap::QuitBind: SaveAndExit(); break;
+			case Preferences::Keymap::SelectObjectBind: { if (m_ViewportHovered && !ImGuizmo::IsUsing() && !ImGuizmo::IsOver() && !Input::IsKeyPressed(Key::LeftAlt)) { m_SceneHierarchyPanel.SetSelectedEntity(m_HoveredEntity); } } break;
+			case Preferences::Keymap::SceneStartBind: { if (m_SceneState == SceneState::Edit) OnScenePlay(); } break;
+			case Preferences::Keymap::SceneStopBind: { if (m_SceneState == SceneState::Play) OnSceneStop(); } break;
+			case Preferences::Keymap::GizmoNoneBind: { if (ViewportKeyAllowed() && !ImGuizmo::IsUsing()) { m_GizmoType = -1; } } break;
+			case Preferences::Keymap::GizmoTranslateBind: { if (ViewportKeyAllowed() && !ImGuizmo::IsUsing()) { m_GizmoType = ImGuizmo::OPERATION::TRANSLATE; } } break;
+			case Preferences::Keymap::GizmoRotateBind: { if (ViewportKeyAllowed() && !ImGuizmo::IsUsing()) { m_GizmoType = ImGuizmo::OPERATION::ROTATE; } } break;
+			case Preferences::Keymap::GizmoScaleBind: { if (ViewportKeyAllowed() && !ImGuizmo::IsUsing()) { m_GizmoType = ImGuizmo::OPERATION::SCALE; } } break;
+			case Preferences::Keymap::CreateBind: { if (ViewportKeyAllowed()) { m_SceneHierarchyPanel.ShowCreateMenu(); } } break;
+			case Preferences::Keymap::DuplicateBind: { if (ViewportKeyAllowed() && m_SceneHierarchyPanel.GetSelectedEntity()) { OnDuplicateEntity(); } m_NodeEditorPannel.DuplicateNodes(); } break;
+			case Preferences::Keymap::DeleteBind: { if (ViewportKeyAllowed() && m_SceneHierarchyPanel.GetSelectedEntity()) { m_SceneHierarchyPanel.DeleteEntity(m_SceneHierarchyPanel.GetSelectedEntity()); } } break;
+			case Preferences::Keymap::ShadingTypeWireframeBind: { if (ViewportKeyAllowed()) SetShadingIndex(0); } break;
+			case Preferences::Keymap::ShadingTypeUnlitBind: { if (ViewportKeyAllowed()) SetShadingIndex(1); } break;
+			case Preferences::Keymap::ShadingTypeSolidBind: { if (ViewportKeyAllowed()) SetShadingIndex(2); } break;
+			case Preferences::Keymap::ShadingTypeRenderedBind: { if (ViewportKeyAllowed()) SetShadingIndex(3); } break;
+			case Preferences::Keymap::ToggleShadingTypeBind: { if (ViewportKeyAllowed()) SetShadingIndex(m_ShadingIndex == 0 ? m_PreviousToggleIndex : 0); } break;
+			case Preferences::Keymap::ViewFrontBind: { if (ViewportKeyAllowed()) { m_YawUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360; m_PitchUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360; m_UpdateAngles = true; m_EditorCamera.SetProjectionType(1); } } break;
+			case Preferences::Keymap::ViewSideBind: { if (ViewportKeyAllowed()) { m_YawUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360 - 90.0f; m_PitchUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360; m_UpdateAngles = true; m_EditorCamera.SetProjectionType(1); } } break;
+			case Preferences::Keymap::ViewTopBind: { if (ViewportKeyAllowed()) { m_YawUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360; m_PitchUpdate = floor(glm::degrees(m_EditorCamera.GetYaw()) / 360) * 360 + 90; m_UpdateAngles = true; m_EditorCamera.SetProjectionType(1); } } break;
+			case Preferences::Keymap::ViewFlipBind: { if (ViewportKeyAllowed()) { m_YawUpdate = glm::degrees(m_EditorCamera.GetYaw()) + 180.0f; m_PitchUpdate = glm::degrees(m_EditorCamera.GetPitch()); m_UpdateAngles = true; m_EditorCamera.SetProjectionType(1); } } break;
+			case Preferences::Keymap::ViewProjectionBind: { if (ViewportKeyAllowed()) { m_ProjectionToggled = !m_EditorCamera.GetProjectionType(); m_EditorCamera.SetProjectionType(m_ProjectionToggled); } } break;
+			case Preferences::Keymap::RenameBind: { Popup::Create("Rename File", "TODO: Impliment", {}, m_QuestionMarkIcon); } break;
+			case Preferences::Keymap::ClosePopupBind: { Popup::RemoveTopmostPopup(); } break;
+			case Preferences::Keymap::TextEditorDuplicate: { m_TextEditor.Duplicate(); } break;
+			case Preferences::Keymap::TextEditorSwapLineUp: { m_TextEditor.SwapLineUp(); } break;
+			case Preferences::Keymap::TextEditorSwapLineDown: { m_TextEditor.SwapLineDown(); } break;
+			case Preferences::Keymap::TextEditorSwitchHeader: { m_TextEditor.SwitchCStyleHeader(); } break;
+			}
+
+			// TODO: Move to on update
+			if (Input::IsMouseButtonPressed(Mouse::ButtonLeft) && Input::IsKeyPressed(Key::LeftAlt)) { if (m_ProjectionToggled != m_EditorCamera.GetProjectionType()) { m_EditorCamera.SetProjectionType(m_ProjectionToggled); } }
+		}
 	}
 
 	bool EditorLayer::OnKeyPressed(KeyPressedEvent& e)
 	{
-		m_KeyPressed = e;
-		UpdateKeys(Keyboard);
+		UpdateKeymapEvents(Preferences::Keymap::CheckKey(e));
 
 		return false;
-		// Shortcuts
-		//if (e.GetRepeatCount() > 0)
-		//	return false;
-		//
-		//bool control = Input::IsKeyPressed(Key::LeftControl) || Input::IsKeyPressed(Key::RightControl);
-		//bool shift = Input::IsKeyPressed(Key::LeftShift) || Input::IsKeyPressed(Key::RightShift);
-		//bool alt = Input::IsKeyPressed(Key::LeftAlt) || Input::IsKeyPressed(Key::RightAlt);
-		//
-		//
-		//
-		//switch (e.GetKeyCode())
-		//{
-		//	//case Key::N:
-		//	//{
-		//	//	if (control)
-		//	//		NewScene();
-		//	//
-		//	//	break;
-		//	//}
-		////case Key::O:
-		////{
-		////	if (control)
-		////		OpenScene();
-		////
-		////	break;
-		////}
-		//case Key::S:
-		//{
-		//	if (control && shift)
-		//		SaveSceneAs();
-		//	else if (control)
-		//		SaveScene();
-		//
-		//	break;
-		//}
-		//case Key::Q:
-		//{
-		//	if (control)
-		//		SaveAndExit();
-		//	else
-		//		//Blank Gizmo
-		//		m_GizmoType = -1;
-		//
-		//	break;
-		//}
-		//
-		////Gizmos
-		//case Key::W:
-		//	m_GizmoType = ImGuizmo::OPERATION::TRANSLATE;
-		//	break;
-		//case Key::E:
-		//	m_GizmoType = ImGuizmo::OPERATION::ROTATE;
-		//	break;
-		//case Key::R:
-		//	m_GizmoType = ImGuizmo::OPERATION::SCALE;
-		//	break;
-		//case Key::D:
-		//	if (shift)
-		//		if (m_SceneHierarchyPanel.GetSelectedEntity())
-		//			m_SceneHierarchyPanel.SetSelectedEntity(m_ActiveScene->DuplicateEntity(m_SceneHierarchyPanel.GetSelectedEntity()));
-		//	break;
-		//case Key::F2:
-		//{
-		//	if (m_ContentBrowser.GetSelectedFile().filename != "")
-		//	{
-		//		m_ContentBrowser.OpenRenamePopup(m_ContentBrowser.GetSelectedFile());
-		//	}
-		//}
-		//}
 	}
 
 	bool EditorLayer::OnMouseButtonPressed(MouseButtonPressedEvent& e)
 	{
-		m_MouseButtonPressed = e;
-		UpdateKeys(MouseButton);
-		//if (e.GetMouseButton() == Mouse::ButtonLeft && !ImGuizmo::IsUsing() && !ImGuizmo::IsOver() && !Input::IsKeyPressed(Key::LeftAlt))
-		//	m_SceneHierarchyPanel.SetSelectedEntity(m_HoveredEntity);
+		UpdateKeymapEvents(Preferences::Keymap::CheckMouseButton(e));
 
 		return false;
 	}
 
 	bool EditorLayer::OnDropped(WindowDropEvent& e)
 	{
-		auto paths = e.GetPaths();
-		for (auto path : paths)
-		{
-			m_ContentBrowser.CopyFileToDirectory(path, m_ContentBrowser.GetBrowseDirectory() + "\\" + m_ContentBrowser.GetFullFileNameFromPath(path), m_ContentBrowser.IsDirectory(path) ? Folder : File);
-		}
-		m_PopupsAndNotifications.Notification(1, "Files Imported", (std::to_string(paths.size()) + " files have been imported."), { { m_PopupsAndNotifications.GetNextNotificationId(), "Dismiss", []() {} } });
+		auto& filepaths = e.GetFilepaths();
+		m_ContentBrowserPanel.OnExternalFileDrop(filepaths);
+
+		m_IsDragging = false;
+		return false;
+	}
+
+	bool EditorLayer::OnDragEnter(WindowDragEnterEvent& e)
+	{
+		m_IsDragging = true;
+		return false;
+	}
+
+	bool EditorLayer::OnDragLeave(WindowDragLeaveEvent& e)
+	{
+		m_IsDragging = false;
+		return false;
+	}
+
+	bool EditorLayer::OnDragOver(WindowDragOverEvent& e)
+	{
 		return false;
 	}
 
 	bool EditorLayer::OnClosed(WindowCloseEvent& e)
 	{
+		Application::Get().GetWindow().MaximizeWindow();
+
 		SaveAndExit();
 		return true;
 	}
@@ -1539,7 +1523,7 @@ namespace Dymatic {
 		//Reset Scene time values
 		m_LastSaveTime = 0;
 		m_ProgramTime = 0;
-		m_PopupsAndNotifications.ClearNotificationList();
+		Notification::Clear();
 	}
 
 	void EditorLayer::AppendScene()
@@ -1595,7 +1579,7 @@ namespace Dymatic {
 			//Reset Scene time values
 			m_LastSaveTime = 0;
 			m_ProgramTime = 0;
-			m_PopupsAndNotifications.ClearNotificationList();
+			Notification::Clear();
 		}
 	}
 
@@ -1636,7 +1620,12 @@ namespace Dymatic {
 
 	void EditorLayer::SaveAndExit()
 	{
-		m_PopupsAndNotifications.Popup("Unsaved Changes", "Save changes before closing?\nDocument: " + GetCurrentFileName() + "\n", { { m_PopupsAndNotifications.GetNextNotificationId(), "Cancel", [](){}}, { m_PopupsAndNotifications.GetNextNotificationId(), "Discard", [&]() { CloseProgramWindow(); } }, { m_PopupsAndNotifications.GetNextNotificationId(), "Save", [&]() { if (SaveScene()) { CloseProgramWindow(); } } } });
+		Popup::Create("Unsaved Changes", "Save changes before closing?\nDocument: " + GetCurrentFileName() + "\n",
+			{ 
+				{ "Cancel", [](){}}, 
+				{ "Discard", [&]() { CloseProgramWindow(); } }, 
+				{ "Save", [&]() { if (SaveScene()) { CloseProgramWindow(); } } } 
+			}, m_QuestionMarkIcon);
 	}
 
 	void EditorLayer::CloseProgramWindow()
@@ -1703,10 +1692,10 @@ namespace Dymatic {
 			if (fileStr[i] == "\r"[0]) { numberOfSaves++; }
 		}
 
-		if (m_PreferencesPannel.GetPreferences().m_PreferenceData.recentFiles < 1) { fileStr.clear(); }
+		if (Preferences::GetData().RecentFileCount < 1) { fileStr.clear(); }
 		else
 		{
-			while (numberOfSaves > m_PreferencesPannel.GetPreferences().m_PreferenceData.recentFiles)
+			while (numberOfSaves > Preferences::GetData().RecentFileCount)
 			{
 				int secondLastIndex = fileStr.erase(fileStr.find_last_of("\r"), 1).find_last_of("\r");
 				fileStr = fileStr.erase(secondLastIndex, fileStr.find_last_of("\r") - secondLastIndex);
@@ -1767,24 +1756,6 @@ namespace Dymatic {
 		}
 	}
 
-	bool EditorLayer::KeyBindCheck(KeyBindEvent bindEvent, BindCatagory bindCatagory)
-	{
-			bool control = Input::IsKeyPressed(Key::LeftControl) || Input::IsKeyPressed(Key::RightControl);
-			bool shift = Input::IsKeyPressed(Key::LeftShift) || Input::IsKeyPressed(Key::RightShift);
-			bool alt = Input::IsKeyPressed(Key::LeftAlt) || Input::IsKeyPressed(Key::RightAlt);
-
-			auto repeats = m_KeyPressed.GetRepeatCount();
-
-			auto& prefs = m_PreferencesPannel.GetPreferences().m_PreferenceData;
-
-			return (prefs.keyBinds.IsKey(bindEvent, m_KeyPressed.GetKeyCode(), m_MouseButtonPressed.GetMouseButton(), bindCatagory, control, shift, alt, repeats, prefs.emulateNumpad));
-	}
-
-	std::string EditorLayer::GetBindAsString(KeyBindEvent bindEvent)
-	{
-		return m_PreferencesPannel.GetPreferences().m_PreferenceData.keyBinds.GetBindAsString(bindEvent);
-	}
-
 	std::string EditorLayer::GetCurrentFileName()
 	{
 		std::string filename = m_EditorScenePath.string();
@@ -1839,8 +1810,8 @@ namespace Dymatic {
 				else if (CurrentValueName == "Node Editor Open") { m_NodeEditorPannel.GetNodeEditorVisible() = (CurrentValue == "true" ? true : false); }
 				else if (CurrentValueName == "Scene Hierarchy Open") { m_SceneHierarchyPanel.GetSceneHierarchyVisible() = (CurrentValue == "true" ? true : false); }
 				else if (CurrentValueName == "Properties Open") { m_SceneHierarchyPanel.GetPropertiesVisible() = (CurrentValue == "true" ? true : false); }
-				else if (CurrentValueName == "Notifications Open") { m_PopupsAndNotifications.GetNotificationsVisible() = (CurrentValue == "true" ? true : false); }
-				else if (CurrentValueName == "Content Browser Open") { m_ContentBrowser.GetContentBrowserVisible() = (CurrentValue == "true" ? true : false); }
+				else if (CurrentValueName == "Notifications Open") { m_NotificationsPannel.GetNotificationPannelVisible() = (CurrentValue == "true" ? true : false); }
+				else if (CurrentValueName == "Content Browser Open") { m_ContentBrowserPanel.GetContentBrowserVisible() = (CurrentValue == "true" ? true : false); }
 				else if (CurrentValueName == "Text Editor Open") { m_TextEditor.GetTextEditorVisible() = (CurrentValue == "true" ? true : false); }
 				else if (CurrentValueName == "Curve Editor Open") { m_CurveEditor.GetCurveEditorVisible() = (CurrentValue == "true" ? true : false); }
 				else if (CurrentValueName == "Image Editor Open") { m_ImageEditor.GetImageEditorVisible() = (CurrentValue == "true" ? true : false); }
@@ -1863,8 +1834,8 @@ namespace Dymatic {
 		out = out + "<Node Editor Open> {" + (m_NodeEditorPannel.GetNodeEditorVisible() ? "true" : "false") + "}\r";
 		out = out + "<Scene Hierarchy Open> {" + (m_SceneHierarchyPanel.GetSceneHierarchyVisible() ? "true" : "false") + "}\r";
 		out = out + "<Properties Open> {" + (m_SceneHierarchyPanel.GetPropertiesVisible() ? "true" : "false") + "}\r";
-		out = out + "<Notifications Open> {" + (m_PopupsAndNotifications.GetNotificationsVisible() ? "true" : "false") + "}\r";
-		out = out + "<Content Browser Open> {" + (m_ContentBrowser.GetContentBrowserVisible() ? "true" : "false") + "}\r";
+		out = out + "<Notifications Open> {" + (m_NotificationsPannel.GetNotificationPannelVisible() ? "true" : "false") + "}\r";
+		out = out + "<Content Browser Open> {" + (m_ContentBrowserPanel.GetContentBrowserVisible() ? "true" : "false") + "}\r";
 		out = out + "<Text Editor Open> {" + (m_TextEditor.GetTextEditorVisible() ? "true" : "false") + "}\r";
 		out = out + "<Curve Editor Open> {" + (m_CurveEditor.GetCurveEditorVisible() ? "true" : "false") + "}\r";
 		out = out + "<Image Editor Open> {" + (m_ImageEditor.GetImageEditorVisible() ? "true" : "false") + "}\r";

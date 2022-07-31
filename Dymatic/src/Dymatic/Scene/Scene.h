@@ -9,6 +9,10 @@
 #include "entt.hpp"
 
 class b2World;
+namespace physx
+{
+	class PxScene;
+}
 
 namespace Dymatic {
 
@@ -30,7 +34,7 @@ namespace Dymatic {
 		void OnRuntimeStop();
 
 		void OnUpdateRuntime(Timestep ts);
-		void OnUpdateEditor(Timestep ts, EditorCamera& camera);
+		void OnUpdateEditor(Timestep ts, EditorCamera& camera, Entity selectedEntity);
 		void OnViewportResize(uint32_t width, uint32_t height);
 
 		void DuplicateEntity(Entity entity);
@@ -42,19 +46,39 @@ namespace Dymatic {
 		{
 			return m_Registry.view<Components...>();
 		}
+
+		bool IsEntityParented(Entity entity);
+		bool DoesEntityHaveChildren(Entity entity);
+
+		Entity GetEntityParent(Entity entity);
+		std::vector<Entity> GetEntityChildren(Entity entity);
+
+		void SetEntityParent(Entity entity, Entity parent);
+		void RemoveEntityParent(Entity entity);
+
+		// Helper Function
+		glm::mat4 GetWorldTransform(Entity entity);
+		glm::mat4 WorldToLocalTransform(Entity entity, glm::mat4 matrix);
+
 	private:
 		template<typename T>
 		void OnComponentAdded(Entity entity, T& component);
 	private:
+
+		// Icons
+		Ref<Texture2D> m_LightIcon = Texture2D::Create("assets/icons/Scene/LightIcon.png");
+		Ref<Texture2D> m_SoundIcon = Texture2D::Create("assets/icons/Scene/SoundIcon.png");
+
 		UUID m_SceneID;
 		entt::registry m_Registry;
 		uint32_t m_ViewportWidth = 0, m_ViewportHeight = 0;
 
+		std::map<entt::entity, entt::entity> m_Relations;
+
 		entt::entity m_SceneEntity;
 
 		b2World* m_Box2DWorld = nullptr;
-
-		Ref<Texture2D> m_GridTexture = Texture2D::Create("assets/icons/Scene/GridTexture.png");
+		physx::PxScene* m_PhysXScene = nullptr;
 		
 		friend class Entity;
 		friend class SceneSerializer;

@@ -19,6 +19,7 @@ namespace Dymatic {
 		virtual void SetData(void* data, uint32_t size) = 0;
 
 		virtual void Bind(uint32_t slot = 0) const = 0;
+		virtual void BindTexture(uint32_t slot = 0) const = 0;
 
 		virtual bool IsLoaded() const = 0;
 
@@ -30,6 +31,12 @@ namespace Dymatic {
 	public:
 		static Ref<Texture2D> Create(uint32_t width, uint32_t height);
 		static Ref<Texture2D> Create(const std::string& path);
+	};
+
+	class TextureCube : public Texture
+	{
+	public:
+		static Ref<TextureCube> Create(const std::string* files);
 	};
 
 }

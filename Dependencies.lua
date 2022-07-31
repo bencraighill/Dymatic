@@ -16,6 +16,10 @@ IncludeDir["Box2D"] = "%{wks.location}/Dymatic/vendor/Box2D/include"
 IncludeDir["shaderc"] = "%{wks.location}/Dymatic/vendor/shaderc/include"
 IncludeDir["SPIRV_Cross"] = "%{wks.location}/Dymatic/vendor/SPIRV-Cross"
 IncludeDir["VulkanSDK"] = "%{VULKAN_SDK}/Include"
+IncludeDir["assimp"] = "%{wks.location}/Dymatic/vendor/assimp/include"
+IncludeDir["irrKlang"] = "%{wks.location}/Dymatic/vendor/irrKlang/include"
+IncludeDir["PhysX"] = "%{wks.location}/Dymatic/vendor/PhysX/physx/include"
+IncludeDir["PhysXShared"] = "%{wks.location}/Dymatic/vendor/PhysX/pxshared/include"
 
 IncludeDir["ImGuiNode"] = "%{wks.location}/Dymatic/vendor/ImGuiNode"
 IncludeDir["CSplash"] = "%{wks.location}/Dymatic/vendor/CSplash"
@@ -26,6 +30,13 @@ LibraryDir = {}
 LibraryDir["VulkanSDK"] = "%{VULKAN_SDK}/Lib"
 LibraryDir["VulkanSDK_Debug"] = "%{wks.location}/Dymatic/vendor/VulkanSDK/Lib"
 LibraryDir["VulkanSDK_DebugDLL"] = "%{wks.location}/Dymatic/vendor/VulkanSDK/Bin"
+
+LibraryDir["PhysX_Debug"] = "%{wks.location}/Dymatic/vendor/VulkanSDK/Lib/debug"
+LibraryDir["PhysX_DebugDLL"] = "%{wks.location}/Dymatic/vendor/VulkanSDK/Bin/debug"
+LibraryDir["PhysX_Release"] = "%{wks.location}/Dymatic/vendor/VulkanSDK/Lib/release"
+LibraryDir["PhysX_ReleaseDLL"] = "%{wks.location}/Dymatic/vendor/VulkanSDK/Bin/release"
+
+LibraryDir["irrKlang_DLL"] = "%{wks.location}/Dymatic/vendor/irrKlang/Bin"
 
 Library = {}
 Library["Vulkan"] = "%{LibraryDir.VulkanSDK}/vulkan-1.lib"
@@ -39,3 +50,6 @@ Library["SPIRV_Tools_Debug"] = "%{LibraryDir.VulkanSDK_Debug}/SPIRV-Toolsd.lib"
 Library["ShaderC_Release"] = "%{LibraryDir.VulkanSDK}/shaderc_shared.lib"
 Library["SPIRV_Cross_Release"] = "%{LibraryDir.VulkanSDK}/spirv-cross-core.lib"
 Library["SPIRV_Cross_GLSL_Release"] = "%{LibraryDir.VulkanSDK}/spirv-cross-glsl.lib"
+
+Library["assimp"] = "%{wks.location}/Dymatic/vendor/assimp/Lib/assimp.lib"
+Library["irrKlang"] = "%{wks.location}/Dymatic/vendor/irrKlang/Lib/irrKlang.lib"

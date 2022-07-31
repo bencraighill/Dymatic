@@ -7,3 +7,5 @@ You may use relative or full paths, in the format "Preset_Name - Preset_Path"
 <Sunset Gold> {saved/presets/themes/SunsetGold.dytheme}
 <Ocean Blue> {saved/presets/themes/OceanBlue.dytheme}
 <Unreal> {saved/presets/themes/Unreal.dytheme}
+<Dusk> {saved/presets/themes/Dusk.dytheme}
+

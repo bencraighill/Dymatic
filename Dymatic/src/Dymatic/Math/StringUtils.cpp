@@ -74,8 +74,39 @@ namespace Dymatic::String {
 		seglist.push_back(segment);
 	}
 
-	void ToLower(std::string& inString)
+	void TransformLower(std::string& string)
 	{
-		transform(inString.begin(), inString.end(), inString.begin(), ::tolower);
+		transform(string.begin(), string.end(), string.begin(), ::tolower);
 	}
+
+	std::string ToLower(std::string string)
+	{
+		transform(string.begin(), string.end(), string.begin(), ::tolower);
+		return string;
+	}
+
+	std::wstring StringToWideString(const std::string& s)
+	{
+		int len;
+		int slength = (int)s.length() + 1;
+		len = MultiByteToWideChar(CP_ACP, 0, s.c_str(), slength, 0, 0);
+		wchar_t* buf = new wchar_t[len];
+		MultiByteToWideChar(CP_ACP, 0, s.c_str(), slength, buf, len);
+		std::wstring r(buf);
+		delete[] buf;
+		return r;
+	}
+
+	std::string WideStringToString(const std::wstring& s)
+	{
+		int len;
+		int slength = (int)s.length() + 1;
+		len = WideCharToMultiByte(CP_ACP, 0, s.c_str(), slength, 0, 0, 0, 0);
+		char* buf = new char[len];
+		WideCharToMultiByte(CP_ACP, 0, s.c_str(), slength, buf, len, 0, 0);
+		std::string r(buf);
+		delete[] buf;
+		return r;
+	}
+
 }

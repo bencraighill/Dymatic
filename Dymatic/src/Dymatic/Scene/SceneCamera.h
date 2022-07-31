@@ -33,10 +33,12 @@ namespace Dymatic {
 
 		ProjectionType GetProjectionType() const { return m_ProjectionType; }
 		void SetProjectionType(ProjectionType type) { m_ProjectionType = type; RecalculateProjection(); }
-	private:
+
+		float GetAspectRatio() { return m_AspectRatio; }
+	private: 
 		void RecalculateProjection();
 	private:
-		ProjectionType m_ProjectionType = ProjectionType::Orthographic;
+		ProjectionType m_ProjectionType = ProjectionType::Perspective;
 
 		float m_PerspectiveFOV = glm::radians(45.0f);
 		float m_PerspectiveNear = 0.01f, m_PerspectiveFar = 1000.0f;

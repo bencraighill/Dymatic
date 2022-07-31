@@ -9,6 +9,8 @@ namespace Dymatic
 		enum : MouseCode
 		{
 			// From glfw3.h
+			Invalid = -1,
+
 			Button0 = 0,
 			Button1 = 1,
 			Button2 = 2,

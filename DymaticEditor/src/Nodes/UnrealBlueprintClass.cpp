@@ -14,6 +14,7 @@ namespace Dymatic {
 	void UnrealBlueprintClass::OnCreate()
 	{
 		bpf__On_Create_84__pf();
+		bpf__On_Create_92__pf();
 	}
 
 	void UnrealBlueprintClass::OnDestroy()
@@ -23,16 +24,15 @@ namespace Dymatic {
 	void UnrealBlueprintClass::OnUpdate(Timestep ts)
 	{
 		bpf__On_Update_86__pf(ts.GetSeconds());
-		bpf__On_Update_94__pf(ts.GetSeconds());
 	}
 
-	void UnrealBlueprintClass::bpf__ExecuteUbergraph_UnrealBlueprintClass__pf_98(int32_t bpp__EntryPoint__pf)
+	void UnrealBlueprintClass::bpf__ExecuteUbergraph_UnrealBlueprintClass__pf_101(int32_t bpp__EntryPoint__pf)
 	{
 		
 		check(bpp__EntryPoint__pf == 84);
 		return; // Termination end of function
 }
-	void UnrealBlueprintClass::bpf__ExecuteUbergraph_UnrealBlueprintClass__pf_99(int32_t bpp__EntryPoint__pf)
+	void UnrealBlueprintClass::bpf__ExecuteUbergraph_UnrealBlueprintClass__pf_102(int32_t bpp__EntryPoint__pf)
 	{
 		
 		check(bpp__EntryPoint__pf == 86);
@@ -40,23 +40,26 @@ namespace Dymatic {
 }
 	void UnrealBlueprintClass::bpf__On_Create_84__pf()
 	{
-		bpf__ExecuteUbergraph_UnrealBlueprintClass__pf_98(84);
+		bpf__ExecuteUbergraph_UnrealBlueprintClass__pf_101(84);
 	}
 
 	void UnrealBlueprintClass::bpf__On_Update_86__pf(float Delta_Seconds)
 	{
-		bpf__ExecuteUbergraph_UnrealBlueprintClass__pf_99(86);
+		bpf__ExecuteUbergraph_UnrealBlueprintClass__pf_102(86);
 	}
 
-	void UnrealBlueprintClass::bpf__ExecuteUbergraph_UnrealBlueprintClass__pf_100(int32_t bpp__EntryPoint__pf)
+	void UnrealBlueprintClass::bpf__ExecuteUbergraph_UnrealBlueprintClass__pf_103(int32_t bpp__EntryPoint__pf)
 	{
 		
-		check(bpp__EntryPoint__pf == 94);
+		check(bpp__EntryPoint__pf == 92);
+		// Node_bpf__On_Create_92__pf
+		// Node_bpf__Print_String_94__pf
+		DYTestNodeLibrary::PrintString("hello world", { 1.000000, 0.000000, 0.000000, 0.000000 });
 		return; // Termination end of function
 }
-	void UnrealBlueprintClass::bpf__On_Update_94__pf(float Delta_Seconds)
+	void UnrealBlueprintClass::bpf__On_Create_92__pf()
 	{
-		bpf__ExecuteUbergraph_UnrealBlueprintClass__pf_100(94);
+		bpf__ExecuteUbergraph_UnrealBlueprintClass__pf_103(92);
 	}
 
 }

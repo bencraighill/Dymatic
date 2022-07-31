@@ -2,6 +2,8 @@
 
 #include "Dymatic.h"
 #include "Dymatic/Core/Base.h"
+
+#include "../Plugins/PluginLoader.h"
 #include "../Preferences.h"
 
 namespace Dymatic {
@@ -26,59 +28,42 @@ namespace Dymatic {
 	public:
 		PreferencesPannel();
 		void OnImGuiRender();
+		bool KeyBindInputButton(Preferences::Keymap::KeyBindEvent event);
 
-		void EditThemeColor(ColorSchemeType colorSchemeType, std::string tooltip = "");
-		bool KeyBindInputButton(KeyBindEvent keyBindEvent);
-		void NotificationEdit(std::string NotificationName, int varIndex, bool enabled = true);
+		void OnEvent(Event& e);
+		bool OnKeyPressed(KeyPressedEvent& e);
+		bool OnMouseButtonPressed(MouseButtonPressedEvent& e);
 
 		//Themes
 		void ImportTheme();
 		void ExportTheme();
-		void RetryDythemeFile();
-		void OpenThemeByPath(std::string path);
-		std::string RoundFloatString(std::string stringValue);
-		void SaveThemeByPath(std::string path);
-		void SetThemePreferences(ColorScheme colorScheme);
-		void UpdateThemePreferences();
 
 		//Key Binds
-		void ImportKeyBinds();
-		void ExportKeyBinds();
-		void OpenKeyBindsByFilepath(std::string filepath);
-		void SaveKeyBindsByFilepath(std::string filepath);
+		void ImportKeymap();
+		void ExportKeymap();
 
 		//Preferences
 		void ImportPreferences();
 		void ExportPreferences();
-		void OpenPreferencesByFilepath(std::string filepath);
-		void SavePreferencesByFilepath(std::string filepath);
-
-		Preferences& GetPreferences() { return m_Preferences; }
 
 		bool& GetPreferencesPanelVisible() { return m_PreferencesPanelVisible; }
-		void SetRecentDythemePath(std::string filepath) { m_RecentThemePath = filepath; }
-
-		void SetFileColorsFromString(std::string colorString);
-
-		//PopupData m_PreferencesMessage;
-		std::string ToLower(std::string inString);
 
 		void LoadPresetLayout();
 	private:
-		Preferences m_Preferences;
+		void RefreshPlugins();
+		void LoadPluginManifest();
+		void WritePluginManifest();
+	private:
 		bool m_PreferencesPanelVisible = false;
 
-		std::string KeyBindSearchBar;
-		bool SearchByNameKey = true;
+		std::string m_KeyBindSearchBar;
+		bool m_SearchByNameKey = true;
 
-		KeyBindEvent m_ButtonActive = INVALID_BIND;
-		KeyBindEvent m_KeySelectReturn = INVALID_BIND;
+		Preferences::Keymap::KeyBindEvent m_ButtonActive = Preferences::Keymap::KeyBindEvent::INVALID_BIND;
 
 		std::string m_RecentThemePath = "";
 
-		//Splitter Code
-		float variation1 = 0.0f;
-		float variation2 = 0.0f;
+		std::vector<PluginInfo> m_PluginInfo;
 
 		PreferencesCategory m_CurrentCategory = Input;
 

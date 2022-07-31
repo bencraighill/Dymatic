@@ -31,7 +31,7 @@ public:
 	//  Arg    Path of the Bitmap that will be show on the splash screen
 	//  Arg    The color on the bitmap that will be made transparent
 	//  =======================================================================
-	CSplash(LPCTSTR lpszFileName, COLORREF colTrans);
+	CSplash(LPCTSTR lpszFileName, COLORREF colTrans, const int rounding = 0);
 
 	//  =======================================================================
 	//  Func   ~CSplash
@@ -86,7 +86,11 @@ public:
 
 	HWND m_hwnd;
 
+	int m_rounding = 0;
+
 	void DrawLoadText(std::string text, RECT rect, int fontSize, LPCTSTR font = L"Arial");
+
+	void DrawRect(int left, int top, int right, int bottom, COLORREF color);
 
 private:
 	void Init();

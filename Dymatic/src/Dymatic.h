@@ -26,6 +26,7 @@
 // ---Renderer------------------------
 #include "Dymatic/Renderer/Renderer.h"
 #include "Dymatic/Renderer/Renderer2D.h"
+#include "Dymatic/Renderer/Renderer3D.h"
 #include "Dymatic/Renderer/RenderCommand.h"
 
 #include "Dymatic/Renderer/Buffer.h"

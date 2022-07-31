@@ -10,6 +10,9 @@
 #include <regex>
 #include <cmath>
 
+#include <locale>
+#include <codecvt>
+
 #include "Dymatic.h"
 #include "Dymatic/Core/Base.h"
 
@@ -17,6 +20,7 @@
 
 //Opening Files
 #include "Dymatic/Utils/PlatformUtils.h"
+#include "Dymatic/Math/StringUtils.h"
 #include "Dymatic/Core/Input.h"
 
 // TODO
@@ -3736,6 +3740,8 @@ const TextEditor::LanguageDefinition& TextEditor::LanguageDefinition::Lua()
 
 namespace Dymatic {
 
+	extern const std::filesystem::path g_AssetPath;
+
 	static ImU32   TabBarCalcTabID(ImGuiTabBar* tab_bar, const char* label)
 	{
 		if (tab_bar->Flags & ImGuiTabBarFlags_DockNode)
@@ -3915,8 +3921,8 @@ namespace Dymatic {
 			{
 				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_ITEM"))
 				{
-					const char* filepath = (const char*)payload->Data;
-					OpenTextFileByFilepath(filepath);
+					const wchar_t* path = (const wchar_t*)payload->Data;
+					OpenTextFileByFilepath((g_AssetPath / String::WideStringToString(path)).string());
 				}
 				ImGui::EndDragDropTarget();
 			}

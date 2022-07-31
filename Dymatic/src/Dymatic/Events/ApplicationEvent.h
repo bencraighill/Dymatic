@@ -37,16 +37,44 @@ namespace Dymatic {
 		EVENT_CLASS_CATEGORY(EventCategoryApplication)
 	};
 
+	// Drag and Drop Events
+	class WindowDragEnterEvent : public Event
+	{
+	public:
+		WindowDragEnterEvent() {}
+
+		EVENT_CLASS_TYPE(WindowDragEnter)
+		EVENT_CLASS_CATEGORY(EventCategoryApplication)
+	};
+
+	class WindowDragLeaveEvent : public Event
+	{
+	public:
+		WindowDragLeaveEvent() {}
+
+		EVENT_CLASS_TYPE(WindowDragLeave)
+		EVENT_CLASS_CATEGORY(EventCategoryApplication)
+	};
+
+	class WindowDragOverEvent : public Event
+	{
+	public:
+		WindowDragOverEvent() {}
+
+		EVENT_CLASS_TYPE(WindowDragOver)
+		EVENT_CLASS_CATEGORY(EventCategoryApplication)
+	};
+
 	class WindowDropEvent : public Event
 	{
 	public:
 		WindowDropEvent(std::vector<std::string> paths)
 		: m_Paths(paths) {}
 
-		std::vector<std::string> GetPaths() { return m_Paths; }
+		std::vector<std::string> GetFilepaths() { return m_Paths; }
 
 		EVENT_CLASS_TYPE(WindowDrop)
-			EVENT_CLASS_CATEGORY(EventCategoryApplication)
+		EVENT_CLASS_CATEGORY(EventCategoryApplication)
 	private:
 		std::vector<std::string> m_Paths;
 	};

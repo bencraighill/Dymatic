@@ -20,6 +20,3 @@
 	path = Dymatic/vendor/imgui
 	url = https://github.com/BenC25/imgui.git
 	branch = docking
-[submodule "Dymatic/vendor/assimp"]
-	path = Dymatic/vendor/assimp
-	url = https://github.com/BenC25/assimp.git

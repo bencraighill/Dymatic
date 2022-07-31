@@ -8,6 +8,8 @@
 
 #include <yaml-cpp/yaml.h>
 
+#include "Dymatic/Scene/ScriptEngine.h"
+
 namespace YAML {
 
 	template<>
@@ -296,6 +298,41 @@ namespace Dymatic {
 			out << YAML::EndMap; // CircleCollider2DComponent
 		}
 
+		
+
+		if (entity.HasComponent<NativeScriptComponent>())
+		{
+			out << YAML::Key << "NativeScriptComponent";
+			out << YAML::BeginMap; // NativeScriptComponent
+		
+			auto& nsc = entity.GetComponent<NativeScriptComponent>();
+			out << YAML::Key << "Name" << YAML::Value << nsc.ScriptName;
+			out << YAML::Key << "Parameters";
+			out << YAML::BeginSeq;
+			
+			std::vector<ScriptEngine::ParamData> data;
+			ScriptEngine::GetScriptParamData(nsc.ScriptName, data);
+			for (size_t i = 0; i < nsc.Params.size() && i < data.size(); i++)
+			{
+				out << YAML::Value;
+				switch (data[i].type)
+				{
+				case ScriptEngine::ParamData::Boolean:
+					out << nsc.Params[i].Boolean;
+					break;
+				case ScriptEngine::ParamData::Float:
+					out << nsc.Params[i].Float;
+					break;
+				case ScriptEngine::ParamData::Integer:
+					out << nsc.Params[i].Integer;
+					break;
+				}
+			}
+			out << YAML::EndSeq;
+		
+			out << YAML::EndMap; // NativeScriptComponent
+		}
+
 		out << YAML::EndMap; // Entity
 	}
 
@@ -464,6 +501,35 @@ namespace Dymatic {
 					cc2d.Restitution = circleCollider2DComponent["Restitution"].as<float>();
 					cc2d.RestitutionThreshold = circleCollider2DComponent["RestitutionThreshold"].as<float>();
 				}
+
+				auto nativeScriptComponent = entity["NativeScriptComponent"];
+				if (nativeScriptComponent)
+				{
+					auto& nsc = deserializedEntity.AddComponent<NativeScriptComponent>();
+					nsc.ScriptName = nativeScriptComponent["Name"].as<std::string>();
+
+
+					std::vector<ScriptEngine::ParamData> data;
+					ScriptEngine::GetScriptParamData(nsc.ScriptName, data);
+					ScriptEngine::SetupScript(nsc);
+					auto& params = nativeScriptComponent["Parameters"];
+					for (size_t i = 0; i < nsc.Params.size() && i < data.size(); i++)
+					{
+						switch (data[i].type)
+						{
+						case ScriptEngine::ParamData::Boolean:
+							nsc.Params[i].Boolean = params[i].as<bool>();
+							break;
+						case ScriptEngine::ParamData::Float:
+							nsc.Params[i].Float = params[i].as<float>();
+							break;
+						case ScriptEngine::ParamData::Integer:
+							nsc.Params[i].Integer = params[i].as<int>();
+							break;
+						}
+					}
+				}
+
 			}
 		}
 

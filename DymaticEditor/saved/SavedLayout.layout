@@ -1,138 +1,139 @@
-Current Windows Open:<Viewport Open> {true}<Toolbar Open> {true}<Stats Open> {false}<Info Open> {true}<Memory Open> {false}<Node Editor Open> {false}<Scene Hierarchy Open> {true}<Properties Open> {true}<Notifications Open> {false}<Content Browser Open> {false}<Text Editor Open> {true}<Curve Editor Open> {false}<Image Editor Open> {false}<Console Open> {false}<Ini Contents> {[Window][Dymatic Editor Dockspace Window]
+Current Windows Open:<Viewport Open> {true}<Toolbar Open> {true}<Stats Open> {false}<Info Open> {true}<Memory Open> {false}<Node Editor Open> {false}<Scene Hierarchy Open> {true}<Properties Open> {true}<Notifications Open> {false}<Content Browser Open> {true}<Text Editor Open> {false}<Curve Editor Open> {false}<Image Editor Open> {false}<Console Open> {false}<Ini Contents> {[Window][Dymatic Editor Dockspace Window]
 Pos=0,0
-Size=1600,900
+Size=1920,1032
 Collapsed=0
 
 [Window][܊ Toolbar]
-Pos=441,27
-Size=1154,55
+Pos=372,22
+Size=1548,63
 Collapsed=0
 DockId=0x00000007,0
 
 [Window][܅ Content Browser]
-ViewportPos=1923,1031
-ViewportId=0xF87A71F7
-Size=2052,675
+Pos=372,419
+Size=1175,578
 Collapsed=0
+DockId=0x0000001B,0
 
 [Window][܆ Scene Hierarchy]
-Pos=5,27
-Size=434,377
+Pos=0,22
+Size=370,407
 Collapsed=0
-DockId=0x00000005,0
+DockId=0x00000017,0
 
 [Window][܁ Properties]
-Pos=5,406
-Size=434,455
+Pos=0,431
+Size=370,566
 Collapsed=0
-DockId=0x00000006,0
+DockId=0x00000015,0
 
 [Window][Content Browser]
-ViewportPos=2232,572
-ViewportId=0x371352B7
-Size=506,1028
+Pos=372,611
+Size=1548,387
 Collapsed=0
+DockId=0x0000001B,2
 
 [Window][܉ Text Editor]
-Pos=441,84
-Size=1154,777
+Pos=372,87
+Size=2188,507
 Collapsed=0
 DockId=0x00000008,0
 
 [Window][܀ Stats]
-ViewportPos=4101,726
-ViewportId=0xEB8EEC4D
+Pos=1982,663
 Size=365,300
 Collapsed=0
 
 [Window][Settings]
-ViewportPos=4176,68
-ViewportId=0x1C33C293
+Pos=1965,113
 Size=416,702
 Collapsed=0
 
 [Window][܈ Node Editor]
-Pos=436,79
-Size=2124,919
+Pos=372,87
+Size=2188,446
 Collapsed=0
-DockId=0x0000000B,1
+DockId=0x00000008,0
 
 [Window][Node Graph]
 Pos=786,125
 Size=1500,574
 Collapsed=0
-DockId=0x00000006,0
+DockId=0x0000000D,0
 ClassId=0x5D435A06
 
 [Window][Nodes]
-Pos=0,465
-Size=434,533
+Pos=372,131
+Size=433,108
 Collapsed=0
-DockId=0x00000006,1
+DockId=0x0000000D,0
 ClassId=0x5D435A06
 
 [Window][Script Contents]
-Pos=437,335
-Size=459,664
+Pos=372,241
+Size=433,292
 Collapsed=0
+DockId=0x0000000E,0
+ClassId=0x5D435A06
 
 [Window][Details]
-Pos=0,465
-Size=434,533
+Pos=2320,131
+Size=240,402
 Collapsed=0
-DockId=0x00000006,2
+DockId=0x0000000C,0
 ClassId=0x5D435A06
 
 [Window][Compiler Results]
-Pos=436,79
-Size=2124,919
+Pos=807,418
+Size=1511,115
 Collapsed=0
-DockId=0x0000000B,2
+DockId=0x0000000B,1
 ClassId=0x5D435A06
 
 [Window][Find Results]
-Pos=436,79
-Size=2124,919
+Pos=807,418
+Size=1511,115
 Collapsed=0
 DockId=0x0000000B,0
 ClassId=0x5D435A06
 
 [Window][Debug##Default]
-Pos=1164,303
+Pos=14,40
 Size=400,400
 Collapsed=0
 
 [Window][܃ Viewport]
-Pos=441,84
-Size=1154,777
+Pos=372,87
+Size=1548,330
 Collapsed=0
-DockId=0x00000008,1
+DockId=0x00000008,0
 
 [Window][Performance Analyser]
-ViewportPos=498,117
+ViewportPos=2688,518
 ViewportId=0x9C0CE2F1
-Size=880,855
+Size=411,399
 Collapsed=0
 
 [Window][Unsaved Changes]
-Pos=1081,448
+Pos=932,341
 Size=416,143
 Collapsed=0
 
 [Window][܋ Notifications]
-Pos=2349,45
+ViewportPos=588,37
+ViewportId=0x5E202E34
 Size=384,834
 Collapsed=0
 
 [Window][܂ Preferences]
-ViewportPos=2527,182
+ViewportPos=1070,137
 ViewportId=0x831B1FFF
-Size=954,479
+Size=1339,557
 Collapsed=0
 
 [Window][܄ Info]
-Pos=5,863
-Size=1590,32
+Pos=0,999
+Size=1920,33
 Collapsed=0
 DockId=0x0000000A,0
 
@@ -142,14 +143,14 @@ Size=32,32
 Collapsed=0
 
 [Window][Dear ImGui Demo]
-ViewportPos=2426,165
+ViewportPos=1421,259
 ViewportId=0xE927CF2F
 Size=550,680
 Collapsed=0
 
 [Window][܎ Memory]
 Pos=60,60
-Size=387,162
+Size=387,542
 Collapsed=0
 
 [Window][Dear ImGui Metrics]
@@ -209,14 +210,14 @@ Collapsed=0
 Pos=578,130
 Size=859,419
 Collapsed=0
-DockId=0x00000006,1
+DockId=0x0000000D,1
 ClassId=0x5D435A06
 
 [Window][###Construction Script##NodeGraph]
 Pos=578,130
 Size=859,419
 Collapsed=0
-DockId=0x00000006,0
+DockId=0x0000000D,0
 ClassId=0x5D435A06
 
 [Window][###NodeGraph]
@@ -243,84 +244,84 @@ Collapsed=0
 Pos=578,130
 Size=859,419
 Collapsed=0
-DockId=0x00000006,1
+DockId=0x0000000D,1
 ClassId=0x5D435A06
 
 [Window][itleA]
 Pos=578,130
 Size=859,419
 Collapsed=0
-DockId=0x00000006,0
+DockId=0x0000000D,0
 ClassId=0x5D435A06
 
 [Window][###NodeGraph2]
 Pos=1346,139
 Size=789,557
 Collapsed=0
-DockId=0x00000012,0
+DockId=0x00000004,0
 ClassId=0x5D435A06
 
 [Window][###NodeGraph1]
 Pos=19,19
 Size=1388,557
 Collapsed=0
-DockId=0x00000013,0
+DockId=0x00000008,0
 ClassId=0x5D435A06
 
 [Window][###NodeGraph35]
 Pos=786,125
 Size=750,557
 Collapsed=0
-DockId=0x00000013,1
+DockId=0x00000008,1
 ClassId=0x5D435A06
 
 [Window][###NodeGraph36]
 Pos=786,125
 Size=750,557
 Collapsed=0
-DockId=0x00000013,2
+DockId=0x00000008,2
 ClassId=0x5D435A06
 
 [Window][###NodeGraph37]
 Pos=786,125
 Size=750,557
 Collapsed=0
-DockId=0x00000013,3
+DockId=0x00000008,3
 ClassId=0x5D435A06
 
 [Window][###GraphWindow36]
 Pos=898,125
 Size=1388,557
 Collapsed=0
-DockId=0x00000011,0
+DockId=0x00000017,0
 ClassId=0x5D435A06
 
 [Window][###GraphWindow35]
 Pos=898,125
 Size=1388,557
 Collapsed=0
-DockId=0x00000011,1
+DockId=0x00000017,1
 ClassId=0x5D435A06
 
 [Window][###GraphWindow37]
 Pos=1395,66
 Size=835,594
 Collapsed=0
-DockId=0x00000015,0
+DockId=0x00000008,0
 ClassId=0x5D435A06
 
 [Window][###GraphWindow38]
 Pos=898,125
 Size=1388,557
 Collapsed=0
-DockId=0x00000011,3
+DockId=0x00000017,3
 ClassId=0x5D435A06
 
 [Window][###GraphWindow39]
 Pos=898,125
 Size=1388,557
 Collapsed=0
-DockId=0x00000011,2
+DockId=0x00000017,2
 ClassId=0x5D435A06
 
 [Window][###GraphWindow40]
@@ -333,21 +334,21 @@ Collapsed=0
 Pos=555,66
 Size=1675,594
 Collapsed=0
-DockId=0x00000011,0
+DockId=0x00000017,0
 ClassId=0x5D435A06
 
 [Window][###GraphWindow3]
-Pos=436,123
-Size=2124,875
+Pos=807,131
+Size=756,285
 Collapsed=0
-DockId=0xBD4735B3
+DockId=0x00000019,0
 ClassId=0x5D435A06
 
 [Window][###GraphWindow4]
-Pos=436,123
-Size=2124,875
+Pos=807,131
+Size=756,285
 Collapsed=0
-DockId=0xBD4735B3
+DockId=0x00000019,1
 ClassId=0x5D435A06
 
 [Window][###GraphWindow108]
@@ -380,11 +381,11 @@ Collapsed=0
 Pos=1395,66
 Size=835,584
 Collapsed=0
-DockId=0x00000017,0
+DockId=0x0000001B,0
 ClassId=0x5D435A06
 
 [Window][Crash Manager Window]
-Size=2560,1009
+Size=1920,1009
 Collapsed=0
 
 [Window][Style]
@@ -392,17 +393,551 @@ Pos=1610,73
 Size=197,956
 Collapsed=0
 
+[Window][###GraphWindow92]
+Pos=435,66
+Size=942,537
+Collapsed=0
+DockId=0x00000019,1
+ClassId=0x5D435A06
+
+[Window][Dear ImGui Stack Tool]
+Pos=60,60
+Size=631,397
+Collapsed=0
+
+[Window][Memory]
+ViewportPos=60,60
+ViewportId=0xEDC13103
+Size=202,1026
+Collapsed=0
+
+[Window][܌ Console]
+Pos=1980,60
+Size=409,262
+Collapsed=0
+
+[Window][܇ Curve Editor]
+Pos=187,72
+Size=792,479
+Collapsed=0
+
+[Window][###GraphWindow103]
+Pos=1565,120
+Size=753,483
+Collapsed=0
+DockId=0x00000016,0
+ClassId=0x5D435A06
+
+[Window][C++ Compiler]
+Pos=1083,448
+Size=16,38
+Collapsed=0
+
+[Window][Compilation Failure]
+Pos=761,448
+Size=416,123
+Collapsed=0
+
+[Window][Asset Inspector]
+Pos=1549,419
+Size=371,578
+Collapsed=0
+DockId=0x0000001C,0
+
+[Window][##test]
+Pos=60,60
+Size=73,94
+Collapsed=0
+
+[Window][##ScriptSearchWindow]
+Pos=60,60
+Size=73,94
+Collapsed=0
+
+[Window][External Window]
+Pos=694,229
+Size=464,354
+Collapsed=0
+
+[Window][Thingo]
+Pos=5,194
+Size=580,521
+Collapsed=0
+DockId=0x00000015,1
+
+[Window][Thingo##SomePlugin.dll]
+Pos=254,305
+Size=270,222
+Collapsed=0
+
+[Window][Thingo##TestLibrary.dll]
+Pos=488,313
+Size=333,220
+Collapsed=0
+
+[Window][Thingo##WindowButton.dll]
+Pos=720,179
+Size=268,244
+Collapsed=0
+
+[Window][Thingo##TestLibrary1.dll]
+Pos=77,143
+Size=289,167
+Collapsed=0
+
+[Window][Thingo##ColorRedFile.dll]
+Pos=177,267
+Size=336,328
+Collapsed=0
+
+[Window][Unsaved Changes##TextEditor]
+Pos=742,382
+Size=428,207
+Collapsed=0
+
+[Window][Engine Information]
+Pos=735,448
+Size=475,303
+Collapsed=0
+
+[Window][###GraphWindow95]
+Pos=1565,131
+Size=753,285
+Collapsed=0
+DockId=0x0000001A,0
+ClassId=0x5D435A06
+
+[Window][Search Engine##BrowserSearchPlugin.dll]
+Pos=853,392
+Size=350,73
+Collapsed=0
+
+[Window][Search Engine##BrowserStartPlugin.dll]
+Pos=819,333
+Size=347,71
+Collapsed=0
+
+[Window][Uninstall Message]
+Pos=761,448
+Size=416,223
+Collapsed=0
+
+[Window][Simulation Controls]
+Pos=0,299
+Size=370,208
+Collapsed=0
+DockId=0x00000018,0
+
+[Window][GPU Simulation]
+Pos=372,87
+Size=1548,686
+Collapsed=0
+DockId=0x00000008,1
+
+[Window][Rename File]
+Pos=761,448
+Size=416,100
+Collapsed=0
+
+[Window][Unsaved Changes##13126118868121717354]
+Pos=681,394
+Size=161,142
+Collapsed=0
+
+[Window][Unsaved Changes##4711195997771722087]
+Pos=632,3
+Size=161,142
+Collapsed=0
+
+[Window][Unsaved Changes##3819263160388868118]
+Pos=632,3
+Size=161,142
+Collapsed=0
+
+[Window][Unsaved Changes##1516480666185446664]
+Pos=632,3
+Size=161,142
+Collapsed=0
+
+[Window][Unsaved Changes##16113603189958963873]
+Pos=632,3
+Size=161,142
+Collapsed=0
+
+[Window][Unsaved Changes##17960938486045602553]
+Pos=632,3
+Size=161,142
+Collapsed=0
+
+[Window][Unsaved Changes##10593980805459801839]
+Pos=632,3
+Size=161,142
+Collapsed=0
+
+[Window][Unsaved Changes##9978735750522291378]
+Pos=632,3
+Size=161,142
+Collapsed=0
+
+[Window][Unsaved Changes##1820081826104031570]
+Pos=632,3
+Size=161,142
+Collapsed=0
+
+[Window][Unsaved Changes##9787519557002578891]
+Pos=705,3
+Size=169,142
+Collapsed=0
+
+[Window][Unsaved Changes##15264454718710215359]
+Pos=692,162
+Size=169,142
+Collapsed=0
+
+[Window][Unsaved Changes##4400843814640274138]
+Pos=705,3
+Size=169,142
+Collapsed=0
+
+[Window][Unsaved Changes##7956637769951593655]
+Pos=705,3
+Size=169,142
+Collapsed=0
+
+[Window][Unsaved Changes##6795603803942913463]
+Pos=705,3
+Size=169,142
+Collapsed=0
+
+[Window][Unsaved Changes##15741427105724500161]
+Pos=705,3
+Size=169,142
+Collapsed=0
+
+[Window][Unsaved Changes##14525445349326235292]
+Pos=705,3
+Size=169,142
+Collapsed=0
+
+[Window][Unsaved Changes##4314582234676371771]
+Pos=705,407
+Size=169,200
+Collapsed=0
+
+[Window][Unsaved Changes##7378311272437908952]
+Pos=351,255
+Size=169,200
+Collapsed=0
+
+[Window][Unsaved Changes##16200875234650185398]
+Pos=705,407
+Size=169,200
+Collapsed=0
+
+[Window][Unsaved Changes##2440959134049099803]
+Pos=373,232
+Size=169,200
+Collapsed=0
+
+[Window][Unsaved Changes##12278158203672511914]
+Pos=705,407
+Size=169,200
+Collapsed=0
+
+[Window][Unsaved Changes##5249699585399719780]
+Pos=705,407
+Size=169,200
+Collapsed=0
+
+[Window][Unsaved Changes##11989194383376672010]
+Pos=705,407
+Size=169,200
+Collapsed=0
+
+[Window][Unsaved Changes##3988533174724929028]
+Pos=825,482
+Size=169,200
+Collapsed=0
+
+[Window][Unsaved Changes##9478335551176534144]
+Pos=825,482
+Size=169,200
+Collapsed=0
+
+[Window][Unsaved Changes##5124620853544324784]
+Pos=821,564
+Size=228,76
+Collapsed=0
+
+[Window][Unsaved Changes##6721952007023712974]
+Pos=825,482
+Size=228,76
+Collapsed=0
+
+[Window][Unsaved Changes##16183354125836773164]
+Pos=705,407
+Size=228,76
+Collapsed=0
+
+[Window][Unsaved Changes##1444640818633743361]
+Pos=705,407
+Size=400,124
+Collapsed=0
+
+[Window][Compilation Failure##16931142896640685016]
+Pos=705,407
+Size=400,68
+Collapsed=0
+
+[Window][Unsaved Changes##14652972139782644021]
+Pos=705,407
+Size=400,98
+Collapsed=0
+
+[Window][Unsaved Changes##13339701730305465540]
+Pos=705,407
+Size=400,98
+Collapsed=0
+
+[Window][Unsaved Changes##15518328637901725301]
+Pos=542,514
+Size=400,114
+Collapsed=0
+
+[Window][Compilation Failure##98848328494134757]
+Pos=705,407
+Size=400,70
+Collapsed=0
+
+[Window][Compilation Failure##3889380085642063246]
+Pos=705,407
+Size=400,80
+Collapsed=0
+
+[Window][Unsaved Changes##909743108135515743]
+Pos=58,424
+Size=400,142
+Collapsed=0
+
+[Window][Compilation Failure##6314100723844183052]
+Pos=705,407
+Size=400,98
+Collapsed=0
+
+[Window][Compilation Failure##14325767018807827944]
+Pos=705,407
+Size=400,98
+Collapsed=0
+
+[Window][Unsaved Changes##2485189339205941991]
+Pos=705,407
+Size=400,142
+Collapsed=0
+
+[Window][Unsaved Changes##8003941085051926901]
+Pos=705,407
+Size=400,86
+Collapsed=0
+
+[Window][Compilation Failure##4967875550491843037]
+Pos=705,407
+Size=400,54
+Collapsed=0
+
+[Window][Unsaved Changes##3436989990628175722]
+Pos=705,407
+Size=400,112
+Collapsed=0
+
+[Window][Compilation Failure##3230297185089404691]
+Pos=705,407
+Size=400,80
+Collapsed=0
+
+[Window][Unsaved Changes##17606824767023522718]
+Pos=713,3
+Size=182,126
+Collapsed=0
+
+[Window][Unsaved Changes##7372184399570093239]
+Pos=705,407
+Size=228,112
+Collapsed=0
+
+[Window][Unsaved Changes##3137294098219515171]
+Pos=775,444
+Size=371,143
+Collapsed=0
+
+[Window][Compilation Failure##11904968007950613036]
+Pos=783,452
+Size=355,127
+Collapsed=0
+
+[Window][Unsaved Changes##2389691025125669393]
+Pos=775,444
+Size=371,143
+Collapsed=0
+
+[Window][Unsaved Changes##2750680987913939135]
+Pos=775,444
+Size=371,143
+Collapsed=0
+
+[Window][Compilation Failure##7888747423795234176]
+Pos=783,452
+Size=355,127
+Collapsed=0
+
+[Window][Compilation Failure##15404012360753691322]
+Pos=309,252
+Size=1304,527
+Collapsed=0
+
+[Window][Compilation Failure##6889014421174526446]
+Pos=309,252
+Size=1304,527
+Collapsed=0
+
+[Window][Compilation Failure##13647983285370629772]
+Pos=308,252
+Size=1304,527
+Collapsed=0
+
+[Window][Unsaved Changes##16875796648256553712]
+Pos=655,429
+Size=371,143
+Collapsed=0
+
+[Window][Unsaved Changes##1275336709510781324]
+Pos=655,429
+Size=371,143
+Collapsed=0
+
+[Window][Unsaved Changes##11210534320626195073]
+Pos=535,354
+Size=371,143
+Collapsed=0
+
+[Window][Unsaved Changes##2624054504055184198]
+Pos=655,429
+Size=371,143
+Collapsed=0
+
+[Window][Unsaved Changes##3860918338235977018]
+Pos=655,429
+Size=371,143
+Collapsed=0
+
+[Window][Unsaved Changes##16852137373878031531]
+Pos=655,429
+Size=371,143
+Collapsed=0
+
+[Window][Unsaved Changes##10308690557887158334]
+Pos=655,429
+Size=371,143
+Collapsed=0
+
+[Window][Unsaved Changes##7025234560247281691]
+Pos=655,429
+Size=371,143
+Collapsed=0
+
+[Window][Unsaved Changes##8160769684473409241]
+Pos=655,429
+Size=371,143
+Collapsed=0
+
+[Window][Unsaved Changes##5734996553909051802]
+Pos=655,429
+Size=371,143
+Collapsed=0
+
+[Window][Unsaved Changes##10721887700888909840]
+Pos=655,429
+Size=371,143
+Collapsed=0
+
+[Window][Unsaved Changes##2219065335322665610]
+Pos=655,429
+Size=371,143
+Collapsed=0
+
+[Window][Unsaved Changes##8122995936861767436]
+Pos=655,429
+Size=371,143
+Collapsed=0
+
+[Window][Compilation Failure##3718928601110021450]
+Pos=543,362
+Size=355,127
+Collapsed=0
+
+[Window][Unsaved Changes##16187885982659198936]
+Pos=410,354
+Size=621,143
+Collapsed=0
+
+[Window][Engine Information##16468595344884966934]
+Pos=466,290
+Size=509,271
+Collapsed=0
+
+[Window][Unsaved Changes##10541088759246444657]
+Pos=410,354
+Size=621,143
+Collapsed=0
+
+[Window][Unsaved Changes##11242314103940348649]
+Pos=775,444
+Size=371,143
+Collapsed=0
+
+[Window][Unsaved Changes##14892357492463160192]
+Pos=775,444
+Size=371,143
+Collapsed=0
+
+[Window][Unsaved Changes##14027632021339829943]
+Pos=775,444
+Size=371,143
+Collapsed=0
+
+[Table][0x967730D8,2]
+Column 0  Weight=1.0000
+Column 1  Weight=1.0000
+
 [Docking][Data]
-DockNode        ID=0x0000000B Pos=436,79 Size=2124,919 Selected=0x75B7F809
-DockSpace       ID=0xBD4735B3 Pos=436,123 Size=2124,875 CentralNode=1
-DockSpace       ID=0xD7F3C3E6 Window=0xD349C893 Pos=5,27 Size=1590,868 Split=Y
-  DockNode      ID=0x00000009 Parent=0xD7F3C3E6 SizeRef=2560,976 Split=X
-    DockNode    ID=0x00000003 Parent=0x00000009 SizeRef=434,1010 Split=Y Selected=0x6AC41B26
-      DockNode  ID=0x00000005 Parent=0x00000003 SizeRef=434,441 Selected=0x069B0EC8
-      DockNode  ID=0x00000006 Parent=0x00000003 SizeRef=434,533 Selected=0x6AC41B26
-    DockNode    ID=0x00000004 Parent=0x00000009 SizeRef=2124,1010 Split=Y
-      DockNode  ID=0x00000007 Parent=0x00000004 SizeRef=2124,55 Selected=0x61BE6282
-      DockNode  ID=0x00000008 Parent=0x00000004 SizeRef=2124,919 CentralNode=1 Selected=0x1D7828A0
-  DockNode      ID=0x0000000A Parent=0xD7F3C3E6 SizeRef=2560,32 HiddenTabBar=1 Selected=0xFF108EF0
+DockSpace             ID=0xBD4735B3 Pos=2292,131 Size=2188,402 Split=X Selected=0x876938AA
+  DockNode            ID=0x00000005 Parent=0xBD4735B3 SizeRef=1330,790 Split=X
+    DockNode          ID=0x00000006 Parent=0x00000005 SizeRef=433,790 Split=Y Selected=0xDCFC2AF8
+      DockNode        ID=0x0000000D Parent=0x00000006 SizeRef=433,213 Selected=0xDCFC2AF8
+      DockNode        ID=0x0000000E Parent=0x00000006 SizeRef=433,575 Selected=0x7C07E1F2
+    DockNode          ID=0x00000002 Parent=0x00000005 SizeRef=895,790 Split=Y
+      DockNode        ID=0x00000001 Parent=0x00000002 SizeRef=1590,285 Split=X Selected=0x99FFE38E
+        DockNode      ID=0x0000000F Parent=0x00000001 SizeRef=942,537 Split=X Selected=0x876938AA
+          DockNode    ID=0x00000011 Parent=0x0000000F SizeRef=756,483 Split=X Selected=0x190DAD09
+            DockNode  ID=0x00000019 Parent=0x00000011 SizeRef=756,285 CentralNode=1 Selected=0x190DAD09
+            DockNode  ID=0x0000001A Parent=0x00000011 SizeRef=753,285 Selected=0x079B762D
+          DockNode    ID=0x00000016 Parent=0x0000000F SizeRef=753,483 Selected=0x5B6EEC65
+        DockNode      ID=0x00000010 Parent=0x00000001 SizeRef=939,537 Selected=0x190DAD09
+      DockNode        ID=0x0000000B Parent=0x00000002 SizeRef=1590,115 Selected=0x75B7F809
+  DockNode            ID=0x0000000C Parent=0xBD4735B3 SizeRef=240,790 Selected=0xBD9B3216
+DockSpace             ID=0xD7F3C3E6 Window=0xD349C893 Pos=0,22 Size=1920,1010 Split=Y
+  DockNode            ID=0x00000009 Parent=0xD7F3C3E6 SizeRef=1920,795 Split=X
+    DockNode          ID=0x00000003 Parent=0x00000009 SizeRef=370,1010 Split=Y Selected=0x069B0EC8
+      DockNode        ID=0x00000012 Parent=0x00000003 SizeRef=370,332 Split=Y Selected=0x069B0EC8
+        DockNode      ID=0x00000017 Parent=0x00000012 SizeRef=370,275 Selected=0x069B0EC8
+        DockNode      ID=0x00000018 Parent=0x00000012 SizeRef=370,208 Selected=0xCD5DF507
+      DockNode        ID=0x00000015 Parent=0x00000003 SizeRef=370,461 Selected=0x6AC41B26
+    DockNode          ID=0x00000004 Parent=0x00000009 SizeRef=1548,1010 Split=Y
+      DockNode        ID=0x00000013 Parent=0x00000004 SizeRef=2124,395 Split=Y Selected=0x1D7828A0
+        DockNode      ID=0x00000007 Parent=0x00000013 SizeRef=717,63 HiddenTabBar=1 Selected=0x61BE6282
+        DockNode      ID=0x00000008 Parent=0x00000013 SizeRef=717,330 CentralNode=1 Selected=0x1D7828A0
+      DockNode        ID=0x00000014 Parent=0x00000004 SizeRef=2124,578 Split=X Selected=0xF87A71F7
+        DockNode      ID=0x0000001B Parent=0x00000014 SizeRef=993,482 Selected=0xF87A71F7
+        DockNode      ID=0x0000001C Parent=0x00000014 SizeRef=313,482 Selected=0x9291DB99
+  DockNode            ID=0x0000000A Parent=0xD7F3C3E6 SizeRef=1920,33 HiddenTabBar=1 Selected=0xFF108EF0
 
 }

@@ -18,6 +18,8 @@ namespace Dymatic {
 		virtual void Bind() const override;
 		virtual void Unbind() const override;
 
+		virtual void Dispatch(int num_groups_x, int num_groups_y, int num_groups_z) const override;
+
 		virtual void SetInt(const std::string& name, int value) override;
 		virtual void SetIntArray(const std::string& name, int* values, uint32_t count) override;
 		virtual void SetFloat(const std::string& name, float value) override;
@@ -56,5 +58,4 @@ namespace Dymatic {
 
 		std::unordered_map<GLenum, std::string> m_OpenGLSourceCode;
 	};
-
 }

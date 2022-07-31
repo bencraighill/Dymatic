@@ -20,6 +20,10 @@ namespace Dymatic {
 		{
 			if (type == "vertex")
 				return GL_VERTEX_SHADER;
+			if (type == "geometry")
+				return GL_GEOMETRY_SHADER;
+			if (type == "compute")
+				return GL_COMPUTE_SHADER;
 			if (type == "fragment" || type == "pixel")
 				return GL_FRAGMENT_SHADER;
 
@@ -32,6 +36,8 @@ namespace Dymatic {
 			switch (stage)
 			{
 			case GL_VERTEX_SHADER:   return shaderc_glsl_vertex_shader;
+			case GL_GEOMETRY_SHADER: return shaderc_glsl_geometry_shader;
+			case GL_COMPUTE_SHADER: return shaderc_glsl_compute_shader;
 			case GL_FRAGMENT_SHADER: return shaderc_glsl_fragment_shader;
 			}
 			DY_CORE_ASSERT(false);
@@ -43,6 +49,8 @@ namespace Dymatic {
 			switch (stage)
 			{
 			case GL_VERTEX_SHADER:   return "GL_VERTEX_SHADER";
+			case GL_GEOMETRY_SHADER: return "GL_GEOMETRY_SHADER";
+			case GL_COMPUTE_SHADER: return "GL_COMPUTE_SHADER";
 			case GL_FRAGMENT_SHADER: return "GL_FRAGMENT_SHADER";
 			}
 			DY_CORE_ASSERT(false);
@@ -67,6 +75,8 @@ namespace Dymatic {
 			switch (stage)
 			{
 			case GL_VERTEX_SHADER:    return ".cached_opengl.vert";
+			case GL_GEOMETRY_SHADER:  return ".cached_opengl.geom";
+			case GL_COMPUTE_SHADER:  return ".cached_opengl.comp";
 			case GL_FRAGMENT_SHADER:  return ".cached_opengl.frag";
 			}
 			DY_CORE_ASSERT(false);
@@ -78,6 +88,8 @@ namespace Dymatic {
 			switch (stage)
 			{
 			case GL_VERTEX_SHADER:    return ".cached_vulkan.vert";
+			case GL_GEOMETRY_SHADER:  return ".cached_vulkan.geom";
+			case GL_COMPUTE_SHADER:  return ".cached_vulkan.comp";
 			case GL_FRAGMENT_SHADER:  return ".cached_vulkan.frag";
 			}
 			DY_CORE_ASSERT(false);
@@ -244,7 +256,8 @@ namespace Dymatic {
 		}
 
 		for (auto&& [stage, data] : shaderData)
-			Reflect(stage, data);
+			if (stage != GL_COMPUTE_SHADER)
+				Reflect(stage, data);
 	}
 
 	void OpenGLShader::CompileOrGetOpenGLBinaries()
@@ -264,6 +277,9 @@ namespace Dymatic {
 		m_OpenGLSourceCode.clear();
 		for (auto&& [stage, spirv] : m_VulkanSPIRV)
 		{
+			if (spirv.empty())
+				continue;
+
 			std::filesystem::path shaderFilePath = m_FilePath;
 			std::filesystem::path cachedPath = cacheDirectory / (shaderFilePath.filename().string() + Utils::GLShaderStageCachedOpenGLFileExtension(stage));
 
@@ -382,6 +398,19 @@ namespace Dymatic {
 		DY_PROFILE_FUNCTION();
 
 		glUseProgram(0);
+	}
+
+	void OpenGLShader::Dispatch(int num_groups_x, int num_groups_y, int num_groups_z) const
+	{
+		DY_PROFILE_FUNCTION();
+
+		Bind();
+
+		if (m_VulkanSPIRV.find(GL_COMPUTE_SHADER) != m_VulkanSPIRV.end())
+		{
+			glDispatchCompute(num_groups_x, num_groups_y, num_groups_z);
+			glMemoryBarrier(GL_ALL_BARRIER_BITS);
+		}
 	}
 
 	void OpenGLShader::SetInt(const std::string& name, int value)

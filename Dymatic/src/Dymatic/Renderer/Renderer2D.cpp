@@ -88,9 +88,20 @@ namespace Dymatic {
 		struct CameraData
 		{
 			glm::mat4 ViewProjection;
+			glm::vec3 ViewPosition;
 		};
 		CameraData CameraBuffer;
 		Ref<UniformBuffer> CameraUniformBuffer;
+
+		struct MaterialData
+		{
+			glm::vec3 ambient;
+			glm::vec3 diffuse;
+			glm::vec3 specular;
+			float shininess;
+		};
+		MaterialData MaterialBuffer;
+		Ref<UniformBuffer> MaterialUniformBuffer;
 	};
 
 	static Renderer2DData s_Data;
@@ -183,6 +194,8 @@ namespace Dymatic {
 		s_Data.QuadVertexPositions[3] = { -0.5f,  0.5f, 0.0f, 1.0f };
 
 		s_Data.CameraUniformBuffer = UniformBuffer::Create(sizeof(Renderer2DData::CameraData), 0);
+
+		s_Data.MaterialUniformBuffer = UniformBuffer::Create(sizeof(Renderer2DData::MaterialData), 1);
 	}
 
 	void Renderer2D::Shutdown()
@@ -197,6 +210,7 @@ namespace Dymatic {
 		DY_PROFILE_FUNCTION();
 
 		s_Data.CameraBuffer.ViewProjection = camera.GetViewProjectionMatrix();
+		s_Data.CameraBuffer.ViewPosition = camera.GetPosition();
 		s_Data.CameraUniformBuffer->SetData(&s_Data.CameraBuffer, sizeof(Renderer2DData::CameraData));
 
 		StartBatch();
@@ -205,8 +219,9 @@ namespace Dymatic {
 	void Renderer2D::BeginScene(const Camera& camera, const glm::mat4& transform)
 	{
 		DY_PROFILE_FUNCTION();
-
+		
 		s_Data.CameraBuffer.ViewProjection = camera.GetProjection() * glm::inverse(transform);
+		s_Data.CameraBuffer.ViewPosition = transform[3];
 		s_Data.CameraUniformBuffer->SetData(&s_Data.CameraBuffer, sizeof(Renderer2DData::CameraData));
 
 		StartBatch();
@@ -216,7 +231,11 @@ namespace Dymatic {
 	{
 		DY_PROFILE_FUNCTION();
 
+		s_Data.MaterialBuffer.shininess = 1.0f;
+		s_Data.MaterialUniformBuffer->SetData(&s_Data.MaterialBuffer, sizeof(Renderer2DData::MaterialData));
+
 		s_Data.CameraBuffer.ViewProjection = camera.GetViewProjection();
+		s_Data.CameraBuffer.ViewPosition = camera.GetPosition();
 		s_Data.CameraUniformBuffer->SetData(&s_Data.CameraBuffer, sizeof(Renderer2DData::CameraData));
 
 		StartBatch();
@@ -337,6 +356,7 @@ namespace Dymatic {
 			s_Data.QuadVertexBufferPtr->TexIndex = textureIndex;
 			s_Data.QuadVertexBufferPtr->TilingFactor = tilingFactor;
 			s_Data.QuadVertexBufferPtr->EntityID = entityID;
+
 			s_Data.QuadVertexBufferPtr++;
 		}
 
@@ -383,6 +403,7 @@ namespace Dymatic {
 			s_Data.QuadVertexBufferPtr->TexIndex = textureIndex;
 			s_Data.QuadVertexBufferPtr->TilingFactor = tilingFactor;
 			s_Data.QuadVertexBufferPtr->EntityID = entityID;
+
 			s_Data.QuadVertexBufferPtr++;
 		}
 
@@ -504,7 +525,7 @@ namespace Dymatic {
 	{
 		s_Data.LineWidth = width;
 	}
-	
+
 	void Renderer2D::ResetStats()
 	{
 		memset(&s_Data.Stats, 0, sizeof(Statistics));

@@ -3,7 +3,10 @@
 
 #include "Components.h"
 #include "ScriptableEntity.h"
+#include "ScriptEngine.h"
 #include "Dymatic/Renderer/Renderer2D.h"
+#include "Dymatic/Renderer/Renderer3D.h"
+#include "Dymatic/Audio/AudioEngine.h"
 
 #include <glm/glm.hpp>
 
@@ -16,14 +19,22 @@
 #include "box2d/b2_polygon_shape.h"
 #include "box2d/b2_circle_shape.h"
 
-// Included for grid rendering (TODO: Remove + Also remove grid Texture.h from header file)
-#include <glad/glad.h>
+// PhysX
+#include <PxPhysics.h>
+#include <PxPhysicsAPI.h>
+
+#include "Dymatic/Math/Math.h"
 
 namespace Dymatic {
 
+	extern physx::PxPhysics* g_PhysicsEngine;
+	extern physx::PxCooking* g_PhysicsCooking;
+
+	static Ref<Model> s_CameraModel = nullptr;
+
 	static std::unordered_map<UUID, Scene*> s_ActiveScenes;
 
-	static b2BodyType HazelRigidbody2DTypeToBox2D(Rigidbody2DComponent::BodyType bodyType)
+	static b2BodyType DymaticRigidbody2DTypeToBox2D(Rigidbody2DComponent::BodyType bodyType)
 	{
 		switch (bodyType)
 		{
@@ -39,6 +50,9 @@ namespace Dymatic {
 		// Create Scene entity
 		m_SceneEntity = m_Registry.create();
 		m_Registry.emplace<SceneComponent>(m_SceneEntity, m_SceneID);
+
+		if (s_CameraModel == nullptr)
+			s_CameraModel = Model::Create("assets/objects/camera/camera.fbx");
 	}
 
 	Scene::~Scene()
@@ -97,6 +111,21 @@ namespace Dymatic {
 		CopyComponent<Rigidbody2DComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
 		CopyComponent<BoxCollider2DComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
 		CopyComponent<CircleCollider2DComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
+		CopyComponent<StaticMeshComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
+		CopyComponent<DirectionalLightComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
+		CopyComponent<PointLightComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
+		CopyComponent<SpotLightComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
+		CopyComponent<SkylightComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
+		CopyComponent<AudioComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
+		CopyComponent<RigidbodyComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
+		CopyComponent<BoxColliderComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
+		CopyComponent<SphereColliderComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
+		CopyComponent<CapsuleColliderComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
+		CopyComponent<MeshColliderComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
+
+		CopyComponent<UICanvasComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
+		CopyComponent<UIImageComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
+		CopyComponent<UIButtonComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
 
 		return newScene;
 	}
@@ -136,7 +165,7 @@ namespace Dymatic {
 			auto& rb2d = entity.GetComponent<Rigidbody2DComponent>();
 
 			b2BodyDef bodyDef;
-			bodyDef.type = HazelRigidbody2DTypeToBox2D(rb2d.Type);
+			bodyDef.type = DymaticRigidbody2DTypeToBox2D(rb2d.Type);
 			bodyDef.position.Set(transform.Translation.x, transform.Translation.y);
 			bodyDef.angle = transform.Rotation.z;
 
@@ -177,6 +206,168 @@ namespace Dymatic {
 				body->CreateFixture(&fixtureDef);
 			}
 		}
+
+		// Setup PhysX
+		{
+			physx::PxDefaultCpuDispatcher* mDispatcher = nullptr;
+
+			physx::PxSceneDesc sceneDesc(g_PhysicsEngine->getTolerancesScale());
+			sceneDesc.gravity = physx::PxVec3(0.0f, -9.81f, 0.0f);
+			mDispatcher = physx::PxDefaultCpuDispatcherCreate(0);
+			sceneDesc.cpuDispatcher = mDispatcher;
+			sceneDesc.filterShader = physx::PxDefaultSimulationFilterShader;
+			m_PhysXScene = g_PhysicsEngine->createScene(sceneDesc);
+
+			physx::PxPvdSceneClient* pvdClient = m_PhysXScene->getScenePvdClient();
+			if (pvdClient)
+			{
+				pvdClient->setScenePvdFlag(physx::PxPvdSceneFlag::eTRANSMIT_CONSTRAINTS, true);
+				pvdClient->setScenePvdFlag(physx::PxPvdSceneFlag::eTRANSMIT_CONTACTS, true);
+				pvdClient->setScenePvdFlag(physx::PxPvdSceneFlag::eTRANSMIT_SCENEQUERIES, true);
+			}
+
+			// Add a ground plane
+			auto mMaterial = g_PhysicsEngine->createMaterial(0.5f, 0.5f, 0.6f);
+
+			auto view = m_Registry.view<RigidbodyComponent>();
+			for (auto e : view)
+			{
+				Entity entity = { e, this };
+
+				auto& transform = entity.GetComponent<TransformComponent>();
+				auto& rbc = entity.GetComponent<RigidbodyComponent>();
+
+				physx::PxRigidActor* body;
+				physx::PxVec3 pos { transform.Translation.x, transform.Translation.y, transform.Translation.z };
+				glm::quat q { transform.Rotation };
+				physx::PxQuat rot { q.x, q.y, q.z, q.w };
+
+
+				if (rbc.Type == RigidbodyComponent::BodyType::Static)
+				{
+					body = g_PhysicsEngine->createRigidStatic(physx::PxTransform(pos, rot));
+				}
+				else
+				{
+					physx::PxRigidDynamic* dynamic = g_PhysicsEngine->createRigidDynamic(physx::PxTransform(pos, rot));
+					physx::PxRigidBodyExt::updateMassAndInertia(*dynamic, rbc.Density);
+					body = dynamic;
+				}
+
+				if (entity.HasComponent<BoxColliderComponent>())
+				{
+					auto& bcc = entity.GetComponent<BoxColliderComponent>();
+					auto shape = g_PhysicsEngine->createShape(physx::PxBoxGeometry(bcc.Size.x * transform.Scale.x, bcc.Size.y * transform.Scale.y, bcc.Size.z * transform.Scale.z), *mMaterial);
+					body->attachShape(*shape);
+					shape->release();
+				}
+				
+				if (entity.HasComponent<SphereColliderComponent>())
+				{
+					auto& scc = entity.GetComponent<SphereColliderComponent>();
+					float scale = std::max({ transform.Scale.x, transform.Scale.y, transform.Scale.z });
+					auto shape = g_PhysicsEngine->createShape(physx::PxSphereGeometry(scc.Radius * scale), *mMaterial);
+					body->attachShape(*shape);
+					shape->release();
+				}
+
+				if (entity.HasComponent<CapsuleColliderComponent>())
+				{
+					auto& ccc = entity.GetComponent<CapsuleColliderComponent>();
+					float scale = std::max(transform.Scale.y, transform.Scale.z);
+					auto shape = g_PhysicsEngine->createShape(physx::PxCapsuleGeometry(ccc.Radius * transform.Scale.x, ccc.HalfHeight * scale), *mMaterial);
+					body->attachShape(*shape);
+					shape->release();
+				}
+
+				if (entity.HasComponent<MeshColliderComponent>())
+				{
+					auto& mcc = entity.GetComponent<MeshColliderComponent>();
+					auto& smc = entity.GetComponent<StaticMeshComponent>();
+					if (mcc.Type == MeshColliderComponent::MeshType::Triangle)
+					{
+						for (auto& mesh : smc.GetModel()->GetMeshes())
+						{
+							physx::PxTriangleMeshDesc meshDesc;
+
+							std::vector<physx::PxVec3> verts;
+							for (auto& vertex : mesh->m_Verticies)
+								verts.push_back({ vertex.Position.x, vertex.Position.y, vertex.Position.z });
+
+							meshDesc.points.count = verts.size();
+							meshDesc.points.stride = sizeof(physx::PxVec3);
+							meshDesc.points.data = verts.data();
+
+							meshDesc.triangles.count = mesh->m_Verticies.size() / 3;
+							meshDesc.triangles.stride = 3 * sizeof(uint32_t);
+							meshDesc.triangles.data = mesh->m_Indicies.data();
+
+							physx::PxDefaultMemoryOutputStream writeBuffer;
+							physx::PxTriangleMeshCookingResult::Enum result;
+							bool status = g_PhysicsCooking->cookTriangleMesh(meshDesc, writeBuffer, &result);
+							if (!status)
+								DY_CORE_ASSERT(false, "Triangle Mesh cooking failure");
+
+							physx::PxDefaultMemoryInputData readBuffer(writeBuffer.getData(), writeBuffer.getSize());
+							auto mesh = g_PhysicsEngine->createTriangleMesh(readBuffer);
+							auto shape = g_PhysicsEngine->createShape(physx::PxTriangleMeshGeometry(mesh), *mMaterial);
+							
+							// Apply Scaling
+							auto holder = shape->getGeometry();
+							holder.triangleMesh().triangleMesh->acquireReference();
+							holder.triangleMesh().scale.scale = physx::PxVec3(transform.Scale.x, transform.Scale.y, transform.Scale.z);
+							shape->setGeometry(holder.any());
+							holder.triangleMesh().triangleMesh->release();
+
+							body->attachShape(*shape);
+							shape->release();
+							mesh->release();
+						}
+					}
+					else
+					{
+						for (auto& mesh : smc.GetModel()->GetMeshes())
+						{
+							physx::PxConvexMeshDesc meshDesc;
+
+							std::vector<physx::PxVec3> verts;
+							for (auto& vertex : mesh->m_Verticies)
+								verts.push_back({ vertex.Position.x, vertex.Position.y, vertex.Position.z });
+
+							meshDesc.points.count = verts.size();
+							meshDesc.points.stride = sizeof(physx::PxVec3);
+							meshDesc.points.data = verts.data();
+							meshDesc.flags = physx::PxConvexFlag::eCOMPUTE_CONVEX;
+
+							physx::PxDefaultMemoryOutputStream writeBuffer;
+							physx::PxConvexMeshCookingResult::Enum result;
+							bool status = g_PhysicsCooking->cookConvexMesh(meshDesc, writeBuffer, &result);
+							if (!status)
+								DY_CORE_ASSERT(false, "Convex Mesh cooking failure");
+
+							physx::PxDefaultMemoryInputData readBuffer(writeBuffer.getData(), writeBuffer.getSize());
+							auto mesh = g_PhysicsEngine->createConvexMesh(readBuffer);
+							auto shape = g_PhysicsEngine->createShape(physx::PxConvexMeshGeometry(mesh), *mMaterial);
+
+							// Apply Scaling
+							auto holder = shape->getGeometry();
+							holder.convexMesh().convexMesh->acquireReference();
+							holder.convexMesh().scale.scale = physx::PxVec3(transform.Scale.x, transform.Scale.y, transform.Scale.z);
+							shape->setGeometry(holder.any());
+							holder.convexMesh().convexMesh->release();
+
+							body->attachShape(*shape);
+							shape->release();
+							mesh->release();
+						}
+					}
+				}
+
+				m_PhysXScene->addActor(*body);
+
+				rbc.RuntimeBody = body;
+			}
+		}
 	}
 
 	void Scene::OnRuntimeStop()
@@ -185,6 +376,10 @@ namespace Dymatic {
 		s_ActiveScenes.erase(m_SceneID);
 		delete m_Box2DWorld;
 		m_Box2DWorld = nullptr;
+
+		// destroy PhysX World
+		m_PhysXScene->release();
+		m_PhysXScene = nullptr;
 	}
 
 	void Scene::OnUpdateRuntime(Timestep ts)
@@ -194,18 +389,23 @@ namespace Dymatic {
 			m_Registry.view<NativeScriptComponent>().each([=](auto entity, auto& nsc)
 			{
 				// TODO: Move to Scene::OnScenePlay
-				if (!nsc.Instance)
+				ScriptEngine::BindScript(nsc);
+				if (nsc.InstantiateScript)
 				{
-					nsc.Instance = nsc.InstantiateScript();
-					nsc.Instance->m_Entity = Entity{ entity, this };
-					nsc.Instance->OnCreate();
-				}
+					if (!nsc.Instance)
+					{
+						nsc.Instance = nsc.InstantiateScript();
+						ScriptEngine::InstantiateScript(nsc);
+						nsc.Instance->m_Entity = Entity{ entity, this };
+						nsc.Instance->OnCreate();
+					}
 
-				nsc.Instance->OnUpdate(ts);
+					nsc.Instance->OnUpdate(ts);
+				}
 			});
 		}
 
-		// Update physics
+		// Update physics - Box2D
 		{
 			const int32_t velocityIterations = 6;
 			const int32_t positionIterations = 2;
@@ -227,8 +427,39 @@ namespace Dymatic {
 
 		}
 
-		// Render 2D
-		Camera* mainCamera = nullptr;
+		// Update Physics - PhysX
+		{
+			m_PhysXScene->simulate(ts);
+			m_PhysXScene->fetchResults(true);
+
+			auto view = m_Registry.view<RigidbodyComponent>();
+			for (auto e : view)
+			{
+				Entity entity = { e, this };
+				auto& transform = entity.GetComponent<TransformComponent>();
+				auto& rbc = entity.GetComponent<RigidbodyComponent>();
+				if (rbc.Type == RigidbodyComponent::BodyType::Dynamic)
+				{
+					auto body = (physx::PxRigidDynamic*)rbc.RuntimeBody;
+					const auto& PXtransform = body->getGlobalPose();
+					body->wakeUp();
+					transform.Translation.x = PXtransform.p.x;
+					transform.Translation.y = PXtransform.p.y;
+					transform.Translation.z = PXtransform.p.z;
+
+					glm::quat rot;
+					rot.x = PXtransform.q.x;
+					rot.y = PXtransform.q.y;
+					rot.z = PXtransform.q.z;
+					rot.w = PXtransform.q.w;
+
+					transform.Rotation = glm::eulerAngles(rot);
+				}
+			}
+		}
+		
+		// Get Main Camera
+		SceneCamera* mainCamera = nullptr;
 		glm::mat4 cameraTransform;
 		{
 			auto view = m_Registry.view<TransformComponent, CameraComponent>();
@@ -239,14 +470,90 @@ namespace Dymatic {
 				if (camera.Primary)
 				{
 					mainCamera = &camera.Camera;
-					cameraTransform = transform.GetTransform();
+					//cameraTransform = transform.GetTransform();
+					cameraTransform = GetWorldTransform({ entity, this });
 					break;
 				}
 			}
 		}
 
+		// Update Audio
 		if (mainCamera)
 		{
+			auto view = m_Registry.view<TransformComponent, AudioComponent>();
+			for (auto entity : view)
+			{
+				auto [transform, ac] = view.get<TransformComponent, AudioComponent>(entity);
+				if (ac.GetSound())
+				{
+					if (!ac.GetSound()->IsInitalizedInternal())
+						ac.GetSound()->OnBeginSceneInternal();
+
+					ac.GetSound()->SetPositionInternal(GetWorldTransform({ entity, this })[3]);
+				}
+			}
+			AudioEngine::Update(cameraTransform[3], cameraTransform * glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
+		}
+
+		// Renderer
+		if (mainCamera)
+		{
+			Renderer3D::BeginScene(*mainCamera, cameraTransform);
+
+			// Submit Lights
+			{
+				auto view = m_Registry.view<TransformComponent, DirectionalLightComponent>();
+				for (auto entity : view)
+				{
+					auto [transform, light] = view.get<TransformComponent, DirectionalLightComponent>(entity);
+					//Renderer3D::SubmitDirectionalLight(transform.GetTransform(), light);
+					Renderer3D::SubmitDirectionalLight(GetWorldTransform({ entity, this }), light);
+				}
+			}
+			{
+				auto view = m_Registry.view<TransformComponent, PointLightComponent>();
+				for (auto entity : view)
+				{
+					auto [transform, light] = view.get<TransformComponent, PointLightComponent>(entity);
+					//Renderer3D::SubmitPointLight(transform.GetTransform(), light);
+					Renderer3D::SubmitPointLight(GetWorldTransform({ entity, this }), light);
+				}
+			}
+			{
+				auto view = m_Registry.view<TransformComponent, SpotLightComponent>();
+				for (auto entity : view)
+				{
+					auto [transform, light] = view.get<TransformComponent, SpotLightComponent>(entity);
+					//Renderer3D::SubmitSpotLight(transform.GetTransform(), light);
+					Renderer3D::SubmitSpotLight(GetWorldTransform({ entity, this }), light);
+				}
+			}
+			Renderer3D::SubmitLightSetup();
+
+			{
+				auto view = m_Registry.view<TransformComponent, SkylightComponent>();
+				for (auto entity : view)
+				{
+					auto [transform, light] = view.get<TransformComponent, SkylightComponent>(entity);
+					Renderer3D::SubmitSkyLight(light);
+				}
+			}
+
+			// Draw static meshes
+			{
+				auto view = m_Registry.view<TransformComponent, StaticMeshComponent>();
+				for (auto entity : view)
+				{
+					auto [transform, mesh] = view.get<TransformComponent, StaticMeshComponent>(entity);
+					mesh.Update(ts);
+					Renderer3D::SubmitStaticMesh(GetWorldTransform({ entity, this }), mesh, (int)entity);
+					//Renderer3D::SubmitStaticMesh(transform.GetTransform(), mesh, (int)entity);
+				}
+				Renderer3D::DrawMeshData();
+			}
+
+			Renderer3D::EndScene();
+
 			Renderer2D::BeginScene(*mainCamera, cameraTransform);
 
 			// Draw sprites
@@ -255,7 +562,8 @@ namespace Dymatic {
 				for (auto entity : group)
 				{
 					auto [transform, sprite] = group.get<TransformComponent, SpriteRendererComponent>(entity);
-					Renderer2D::DrawSprite(transform.GetTransform(), sprite, (int)entity);
+					//Renderer2D::DrawSprite(transform.GetTransform(), sprite, (int)entity);
+					Renderer2D::DrawSprite(GetWorldTransform({ entity, this }), sprite, (int)entity);
 				}
 			}
 
@@ -266,7 +574,27 @@ namespace Dymatic {
 				{
 					auto [transform, circle] = view.get<TransformComponent, CircleRendererComponent>(entity);
 
-					Renderer2D::DrawCircle(transform.GetTransform(), circle.Color, circle.Thickness, circle.Fade, (int)entity);
+					//Renderer2D::DrawCircle(transform.GetTransform(), circle.Color, circle.Thickness, circle.Fade, (int)entity);
+					Renderer2D::DrawCircle(GetWorldTransform({ entity, this }), circle.Color, circle.Thickness, circle.Fade, (int)entity);
+				}
+			}
+
+			// Render UI
+			{
+				auto view = m_Registry.view<UIImageComponent>();
+				for (auto entity : view)
+				{
+					if (!IsEntityParented({ entity, this }))
+						continue;
+
+					auto image = view.get<UIImageComponent>(entity);
+
+					Entity parent = GetEntityParent({entity, this});
+
+					glm::vec3 pos = glm::inverse(mainCamera->GetProjection()) * glm::vec4((image.Anchor.x * 2.0f - 1.0f) + (image.Position.x / (m_ViewportWidth * 0.5f)), (image.Anchor.y * 2.0f - 1.0f) + (image.Position.y / (m_ViewportHeight * 0.5f)), -1.0f, 1.0f);
+					auto transform = cameraTransform * glm::translate(glm::mat4(1.0f), pos) * glm::scale(glm::mat4(1.0f), glm::vec3(image.Size.x / (m_ViewportHeight), image.Size.y / m_ViewportHeight, 1.0f));
+					 
+					Renderer2D::DrawQuad(transform, image.Image);
 				}
 			}
 
@@ -275,31 +603,115 @@ namespace Dymatic {
 
 	}
 
-	void Scene::OnUpdateEditor(Timestep ts, EditorCamera& camera)
+	static void DrawDebugSphere(glm::vec3 position, float radius, glm::vec4 color = glm::vec4(1.0f))
 	{
-		//Ground Plane, TODO: Remove (Make sure to remove glad/glad.h when removing)
-		//-------------------------------------------------------------------------------------------------------//
-		//GLint previous[2];
-		//glGetIntegerv(GL_POLYGON_MODE, previous);
+		const size_t ittertions = 30;
+		const float angle = 360.0f / ittertions;
+		glm::vec3 positions[ittertions];
 
-		//Renderer2D::BeginScene(camera);
-		
-		//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-		//
-		//glm::mat4 rotation1 = glm::toMat4(glm::quat(glm::vec3{ -1.5708f, 0.0f, 0.0f }));
-		//
-		//glm::mat4 transform = glm::translate(glm::mat4(1.0f), glm::vec3{ 0.0f, -2.0f, 0.0f })
-		//	* rotation1
-		//	* glm::scale(glm::mat4(1.0f), glm::vec3{ 20.0f, 20.0f, 20.0f });
-		//
-		//Renderer2D::DrawQuad(transform, m_GridTexture, 20.0f, glm::vec4{ 0.318f, 0.318f, 0.318f, 1.0f });
-		//
-		//Renderer2D::EndScene();
-		//-------------------------------------------------------------------------------------------------------//
+		for (size_t i = 0; i < ittertions; i++)
+			positions[i] = (glm::vec3(radius * glm::cos(glm::radians(i * angle)), radius * glm::sin(glm::radians(i * angle)), 0.0f));
+
+		for (size_t j = 0; j < 3; j++)
+		{
+			for (size_t i = 0; i < ittertions - 1; i++)
+				Renderer2D::DrawLine(position + positions[i], position + positions[i + 1], color);
+			Renderer2D::DrawLine(position + positions[ittertions - 1], position + positions[0], color);
+
+			if (j == 0)
+				for (auto& position : positions)
+					std::swap(position.x, position.z);
+			if (j == 1)
+				for (auto& position : positions)
+					std::swap(position.y, position.x);
+		}
+	}
+
+	void Scene::OnUpdateEditor(Timestep ts, EditorCamera& camera, Entity selectedEntity)
+	{
+		Renderer3D::BeginScene(camera);
+
+		// TODO: Move to OnSceneStop()
+		auto view = m_Registry.view<TransformComponent, AudioComponent>();
+		for (auto entity : view)
+		{
+			auto [transform, ac] = view.get<TransformComponent, AudioComponent>(entity);
+			if (ac.GetSound())
+			{
+				if (ac.GetSound()->IsInitalizedInternal())
+					ac.GetSound()->OnEndSceneInternal();
+			}
+		}
+
+		//Renderer3D::DrawGrid();
+
+		// Submit Lights
+		{
+			auto view = m_Registry.view<TransformComponent, DirectionalLightComponent>();
+			for (auto entity : view)
+			{
+				auto [transform, light] = view.get<TransformComponent, DirectionalLightComponent>(entity);
+				//Renderer3D::SubmitDirectionalLight(transform.GetTransform(), light);
+				Renderer3D::SubmitDirectionalLight(GetWorldTransform({ entity, this }), light);
+			}
+		}
+		{
+			auto view = m_Registry.view<TransformComponent, PointLightComponent>();
+			for (auto entity : view)
+			{
+				auto [transform, light] = view.get<TransformComponent, PointLightComponent>(entity);
+				//Renderer3D::SubmitPointLight(transform.GetTransform(), light);
+				Renderer3D::SubmitPointLight(GetWorldTransform({ entity, this }), light);
+			}
+		}
+		{
+			auto view = m_Registry.view<TransformComponent, SpotLightComponent>();
+			for (auto entity : view)
+			{
+				auto [transform, light] = view.get<TransformComponent, SpotLightComponent>(entity);
+				//Renderer3D::SubmitSpotLight(transform.GetTransform(), light);
+				Renderer3D::SubmitSpotLight(GetWorldTransform({ entity, this }), light);
+			}
+		}
+		Renderer3D::SubmitLightSetup();
+
+		{
+			auto view = m_Registry.view<TransformComponent, SkylightComponent>();
+			for (auto entity : view)
+			{
+				auto [transform, light] = view.get<TransformComponent, SkylightComponent>(entity);
+				Renderer3D::SubmitSkyLight(light);
+			}
+		}
+
+		// Draw static meshes
+		{
+			auto view = m_Registry.view<TransformComponent, StaticMeshComponent>();
+			for (auto entity : view)
+			{
+				auto [transform, mesh] = view.get<TransformComponent, StaticMeshComponent>(entity);
+				mesh.Update(ts);
+				//Renderer3D::SubmitStaticMesh(transform.GetTransform(), mesh, (int)entity);
+				Renderer3D::SubmitStaticMesh(GetWorldTransform({ entity, this }), mesh, (int)entity);
+			}
+		}
+
+		// Draw 3D Icons
+		{
+			auto view = m_Registry.view<TransformComponent, CameraComponent>();
+			for (auto entity : view)
+			{
+				auto [transform, camera] = view.get<TransformComponent, CameraComponent>(entity);
+
+				Renderer3D::SubmitModel(GetWorldTransform({ entity, this }), s_CameraModel, (int)entity);
+			}
+		}
+
+		Renderer3D::DrawMeshData();
+
+		Renderer3D::EndScene();
 
 		Renderer2D::BeginScene(camera);
-		//glPolygonMode(GL_FRONT, previous[0]);
-		//glPolygonMode(GL_BACK, previous[1]);
 
 		// Ground Plane
 		Renderer2D::SetLineWidth(3.0f);
@@ -308,6 +720,92 @@ namespace Dymatic {
 		for (int i = -10; i <= 10; i++)
 			Renderer2D::DrawLine(glm::vec3(-10.0f, 0.0f, i), glm::vec3(10.0f, 0.0f, i), glm::vec4(0.75f));
 
+		// Render Frustum For Camera
+		{
+			auto view = m_Registry.view<TransformComponent, CameraComponent>();
+			for (auto entity : view)
+			{
+				if (entity != selectedEntity)
+					continue;
+
+				auto [transform, camera] = view.get<TransformComponent, CameraComponent>(entity);
+
+				std::array<glm::vec3, 8> _cameraFrustumCornerVertices{
+					{
+						{ -1.0f, -1.0f, 1.0f }, { 1.0f, -1.0f, 1.0f }, { 1.0f, 1.0f, 1.0f }, { -1.0f, 1.0f, 1.0f },
+						{ -1.0f, -1.0f, -1.0f }, { 1.0f, -1.0f, -1.0f }, { 1.0f, 1.0f, -1.0f }, { -1.0f, 1.0f, -1.0f },
+					}
+				};
+
+				const auto proj = glm::inverse(camera.Camera.GetProjection());
+				const auto trans = GetWorldTransform({ entity, this });
+				std::array<glm::vec3, 8> v;
+
+				std::transform(
+					_cameraFrustumCornerVertices.begin(),
+					_cameraFrustumCornerVertices.end(),
+					v.begin(),
+					[&](glm::vec3 p) {
+						auto v = trans * proj * glm::vec4(p, 1.0f);
+						return glm::vec3(v) / v.w;
+					}
+				);
+
+				const glm::vec4 color = glm::vec4(0.82f, 0.62f, 0.13f, 1.0f);
+				Renderer2D::DrawLine(glm::vec3(v[0]), glm::vec3(v[1]), color);
+				Renderer2D::DrawLine(glm::vec3(v[1]), glm::vec3(v[2]), color);
+				Renderer2D::DrawLine(glm::vec3(v[2]), glm::vec3(v[3]), color);
+				Renderer2D::DrawLine(glm::vec3(v[3]), glm::vec3(v[0]), color);
+
+				Renderer2D::DrawLine(glm::vec3(v[4]), glm::vec3(v[5]), color);
+				Renderer2D::DrawLine(glm::vec3(v[5]), glm::vec3(v[6]), color);
+				Renderer2D::DrawLine(glm::vec3(v[6]), glm::vec3(v[7]), color);
+				Renderer2D::DrawLine(glm::vec3(v[7]), glm::vec3(v[4]), color);
+
+				Renderer2D::DrawLine(glm::vec3(v[0]), glm::vec3(v[4]), color);
+				Renderer2D::DrawLine(glm::vec3(v[1]), glm::vec3(v[5]), color);
+				Renderer2D::DrawLine(glm::vec3(v[3]), glm::vec3(v[7]), color);
+				Renderer2D::DrawLine(glm::vec3(v[2]), glm::vec3(v[6]), color);
+			}
+		}
+
+		// Draw Audio Debug Sphere
+		{
+			auto view = m_Registry.view<TransformComponent, AudioComponent>();
+			for (auto entity : view)
+			{
+				auto [transform, ac] = view.get<TransformComponent, AudioComponent>(entity);
+
+				float distance = glm::distance(transform.Translation, camera.GetPosition());
+				auto transformation = glm::translate(glm::mat4(1.0f), glm::vec3(GetWorldTransform({ entity, this })[3])) * glm::rotate(glm::mat4(1.0f), camera.GetYaw(), glm::vec3{ 0.0f, -1.0f, 0.0f })
+					* glm::rotate(glm::mat4(1.0f), camera.GetPitch(), glm::vec3{ -1.0f, 0.0f, 0.0f }) * glm::scale(glm::mat4(1.0f), glm::vec3(distance < 5.0f ? distance / 5.0f : 1.0f));
+
+				Renderer2D::DrawQuad(transformation, m_SoundIcon, 1.0f, glm::vec4(1.0f), (int)entity);
+
+				if (entity == selectedEntity)
+					if (ac.GetSound())
+						DrawDebugSphere(transformation[3], ac.GetSound()->GetRadius());
+			}
+		}
+
+		// Draw Icons
+		{
+			auto view = m_Registry.view<TransformComponent, PointLightComponent>();
+			for (auto entity : view)
+			{
+				auto [tc, light] = view.get<TransformComponent, PointLightComponent>(entity);
+
+				float distance = glm::distance(tc.Translation, camera.GetPosition());
+				auto transformation = glm::translate(glm::mat4(1.0f), glm::vec3(GetWorldTransform({ entity, this })[3])) * glm::rotate(glm::mat4(1.0f), camera.GetYaw(), glm::vec3{ 0.0f, -1.0f, 0.0f })
+					* glm::rotate(glm::mat4(1.0f), camera.GetPitch(), glm::vec3{ -1.0f, 0.0f, 0.0f }) * glm::scale(glm::mat4(1.0f), glm::vec3(distance < 5.0f ? distance / 5.0f : 1.0f));
+
+				Renderer2D::DrawQuad(transformation, m_LightIcon, 1.0f, glm::vec4(light.Color, 1.0f), (int)entity);
+
+				if (entity == selectedEntity)
+					DrawDebugSphere(transformation[3], light.Linear, glm::vec4(light.Color, 1.0f));
+			}
+		}
+
 		// Draw sprites
 		{
 			auto group = m_Registry.group<TransformComponent>(entt::get<SpriteRendererComponent>);
@@ -315,7 +813,8 @@ namespace Dymatic {
 			{
 				auto [transform, sprite] = group.get<TransformComponent, SpriteRendererComponent>(entity);
 		
-				Renderer2D::DrawSprite(transform.GetTransform(), sprite, (int)entity);
+				//Renderer2D::DrawSprite(transform.GetTransform(), sprite, (int)entity);
+				Renderer2D::DrawSprite(GetWorldTransform({ entity, this }), sprite, (int)entity);
 			}
 		}
 		
@@ -325,10 +824,11 @@ namespace Dymatic {
 			for (auto entity : view)
 			{
 				auto [transform, circle] = view.get<TransformComponent, CircleRendererComponent>(entity);
-				Renderer2D::DrawCircle(transform.GetTransform(), circle.Color, circle.Thickness, circle.Fade, (int)entity);
+				//Renderer2D::DrawCircle(transform.GetTransform(), circle.Color, circle.Thickness, circle.Fade, (int)entity);
+				Renderer2D::DrawCircle(GetWorldTransform({ entity, this }), circle.Color, circle.Thickness, circle.Fade, (int)entity);
 			}
 		}
-		
+
 		// Draw Particles
 		{
 			auto view = m_Registry.view<TransformComponent, ParticleSystemComponent>();
@@ -336,7 +836,8 @@ namespace Dymatic {
 			{
 				auto [transform, ps] = view.get<TransformComponent, ParticleSystemComponent>(entity);
 		
-				ps.Position = transform.Translation + ps.Offset;
+				//ps.Position = transform.Translation + ps.Offset;
+				ps.Position = glm::vec3(GetWorldTransform({ entity, this })[3]) + ps.Offset;
 		
 				ps.OnUpdate(ts);
 				ps.Emit();
@@ -419,6 +920,7 @@ namespace Dymatic {
 		std::string name = entity.GetName();
 		Entity newEntity = CreateEntity(name);
 
+		CopyComponentIfExists<FolderComponent>(newEntity, entity);
 		CopyComponentIfExists<TransformComponent>(newEntity, entity);
 		CopyComponentIfExists<SpriteRendererComponent>(newEntity, entity);
 		CopyComponentIfExists<CircleRendererComponent>(newEntity, entity);
@@ -427,6 +929,21 @@ namespace Dymatic {
 		CopyComponentIfExists<Rigidbody2DComponent>(newEntity, entity);
 		CopyComponentIfExists<BoxCollider2DComponent>(newEntity, entity);
 		CopyComponentIfExists<CircleCollider2DComponent>(newEntity, entity);
+		CopyComponentIfExists<StaticMeshComponent>(newEntity, entity);
+		CopyComponentIfExists<DirectionalLightComponent>(newEntity, entity);
+		CopyComponentIfExists<PointLightComponent>(newEntity, entity);
+		CopyComponentIfExists<SpotLightComponent>(newEntity, entity);
+		CopyComponentIfExists<SkylightComponent>(newEntity, entity);
+		CopyComponentIfExists<AudioComponent>(newEntity, entity);
+		CopyComponentIfExists<RigidbodyComponent>(newEntity, entity);
+		CopyComponentIfExists<BoxColliderComponent>(newEntity, entity);
+		CopyComponentIfExists<SphereColliderComponent>(newEntity, entity);
+		CopyComponentIfExists<CapsuleColliderComponent>(newEntity, entity);
+		CopyComponentIfExists<MeshColliderComponent>(newEntity, entity);
+
+		CopyComponentIfExists<UICanvasComponent>(newEntity, entity);
+		CopyComponentIfExists<UIImageComponent>(newEntity, entity);
+		CopyComponentIfExists<UIButtonComponent>(newEntity, entity);
 	}
 
 	Entity Scene::GetPrimaryCameraEntity()
@@ -441,6 +958,68 @@ namespace Dymatic {
 		return {};
 	}
 
+	bool Scene::IsEntityParented(Entity entity)
+	{
+		return m_Relations.find(entity) != m_Relations.end();
+	}
+
+	bool Scene::DoesEntityHaveChildren(Entity entity)
+	{
+		for (auto& relation : m_Relations)
+			if (relation.second == entity)
+				return true;
+		return false;
+	}
+
+	Entity Scene::GetEntityParent(Entity entity)
+	{
+		return Entity{ m_Relations[entity], this };
+	}
+
+	std::vector<Entity> Scene::GetEntityChildren(Entity entity)
+	{
+		std::vector<Entity> children;
+		for (auto& relation : m_Relations)
+			if (relation.second == entity)
+				children.push_back(Entity{ relation.first, this });
+		return children;
+	}
+
+	void Scene::SetEntityParent(Entity entity, Entity parent)
+	{
+		m_Relations[entity] = parent;
+	}
+
+	void Scene::RemoveEntityParent(Entity entity)
+	{
+		m_Relations.erase(entity);
+	}
+
+	glm::mat4 Scene::GetWorldTransform(Entity entity)
+	{
+		glm::mat4 matrix = entity.GetComponent<TransformComponent>().GetTransform();
+		Entity currentEntity = entity;
+		while (IsEntityParented(currentEntity))
+		{
+			currentEntity = GetEntityParent(currentEntity);
+			if (currentEntity.HasComponent<TransformComponent>())
+				matrix = currentEntity.GetComponent<TransformComponent>().GetTransform() * matrix;
+		}
+		return matrix;
+	}
+
+	glm::mat4 Scene::WorldToLocalTransform(Entity entity, glm::mat4 matrix)
+	{
+		Entity currentEntity = entity;
+		while (IsEntityParented(currentEntity))
+		{
+			currentEntity = GetEntityParent(currentEntity);
+			if (currentEntity.HasComponent<TransformComponent>())
+				matrix = glm::inverse(currentEntity.GetComponent<TransformComponent>().GetTransform()) * matrix;
+		}
+		return matrix;
+	}
+
 	template<typename T>
 	void Scene::OnComponentAdded(Entity entity, T& component)
 	{
@@ -449,6 +1028,11 @@ namespace Dymatic {
 
 	template<>
 	void Scene::OnComponentAdded<IDComponent>(Entity entity, IDComponent& component)
+	{
+	}
+
+	template<>
+	void Scene::OnComponentAdded<FolderComponent>(Entity entity, FolderComponent& component)
 	{
 	}
 
@@ -504,4 +1088,73 @@ namespace Dymatic {
 	{
 	}
 
+	template<>
+	void Scene::OnComponentAdded<StaticMeshComponent>(Entity entity, StaticMeshComponent& component)
+	{
+	}
+
+	template<>
+	void Scene::OnComponentAdded<DirectionalLightComponent>(Entity entity, DirectionalLightComponent& component)
+	{
+	}
+
+	template<>
+	void Scene::OnComponentAdded<PointLightComponent>(Entity entity, PointLightComponent& component)
+	{
+	}
+
+	template<>
+	void Scene::OnComponentAdded<SpotLightComponent>(Entity entity, SpotLightComponent& component)
+	{
+	}
+
+	template<>
+	void Scene::OnComponentAdded<SkylightComponent>(Entity entity, SkylightComponent& component)
+	{
+	}
+
+	template<>
+	void Scene::OnComponentAdded<AudioComponent>(Entity entity, AudioComponent& component)
+	{
+	}
+
+	template<>
+	void Scene::OnComponentAdded<RigidbodyComponent>(Entity entity, RigidbodyComponent& component)
+	{
+	}
+
+	template<>
+	void Scene::OnComponentAdded<BoxColliderComponent>(Entity entity, BoxColliderComponent& component)
+	{
+	}
+
+	template<>
+	void Scene::OnComponentAdded<SphereColliderComponent>(Entity entity, SphereColliderComponent& component)
+	{
+	}
+
+	template<>
+	void Scene::OnComponentAdded<CapsuleColliderComponent>(Entity entity, CapsuleColliderComponent& component)
+	{
+	}
+
+	template<>
+	void Scene::OnComponentAdded<MeshColliderComponent>(Entity entity, MeshColliderComponent& component)
+	{
+	}
+
+	template<>
+	void Scene::OnComponentAdded<UICanvasComponent>(Entity entity, UICanvasComponent& component)
+	{
+	}
+
+	template<>
+	void Scene::OnComponentAdded<UIImageComponent>(Entity entity, UIImageComponent& component)
+	{
+	}
+
+	template<>
+	void Scene::OnComponentAdded<UIButtonComponent>(Entity entity, UIButtonComponent& component)
+	{
+	}
 }

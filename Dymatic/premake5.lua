@@ -33,6 +33,11 @@ project "Dymatic"
 	{
 		"src",
 		"vendor/spdlog/include",
+		"%{IncludeDir.assimp}",
+		"%{IncludeDir.Box2D}",
+		"%{IncludeDir.irrKlang}",
+		"%{IncludeDir.PhysX}",
+		"%{IncludeDir.PhysXShared}",
 		"%{IncludeDir.Box2D}",
 		"%{IncludeDir.GLFW}",
 		"%{IncludeDir.Glad}",
@@ -49,10 +54,12 @@ project "Dymatic"
 
 	links
 	{
+		"%{Library.assimp}",
 		"Box2D",
 		"GLFW",
 		"Glad",
 		"ImGui",
+		"%{Library.irrKlang}",
 		"yaml-cpp",
 		"opengl32.lib"
 	}
@@ -76,7 +83,9 @@ project "Dymatic"
 		{
 			"%{Library.ShaderC_Debug}",
 			"%{Library.SPIRV_Cross_Debug}",
-			"%{Library.SPIRV_Cross_GLSL_Debug}"
+			"%{Library.SPIRV_Cross_GLSL_Debug}",
+			
+			"%{Library.PhysX_Debug}"
 		}
 
 	filter "configurations:Release"
@@ -88,7 +97,9 @@ project "Dymatic"
 		{
 			"%{Library.ShaderC_Release}",
 			"%{Library.SPIRV_Cross_Release}",
-			"%{Library.SPIRV_Cross_GLSL_Release}"
+			"%{Library.SPIRV_Cross_GLSL_Release}",
+
+			"%{Library.PhysX_Release}"
 		}
 
 	filter "configurations:Dist"
@@ -100,5 +111,7 @@ project "Dymatic"
 		{
 			"%{Library.ShaderC_Release}",
 			"%{Library.SPIRV_Cross_Release}",
-			"%{Library.SPIRV_Cross_GLSL_Release}"
+			"%{Library.SPIRV_Cross_GLSL_Release}",
+
+			"%{Library.PhysX_Release}"
 		}

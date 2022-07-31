@@ -89,6 +89,11 @@ namespace Dymatic::Math {
 		return ((rand() * std::time(nullptr) * seed++) % max + min);
 	}
 
+	float RandomRange(float min, float max)
+	{
+		return min + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (max - min)));
+	}
+
 	// Normalizes any number to an arbitrary range 
 	// by assuming the range wraps around when going below min or above max 
 	float NormalizeAngle(const float value, const float shift, const float size)

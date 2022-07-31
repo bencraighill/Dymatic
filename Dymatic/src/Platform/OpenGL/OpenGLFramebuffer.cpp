@@ -76,12 +76,42 @@ namespace Dymatic {
 			return false;
 		}
 
-		static GLenum DymaticFBTextureFormatToGL(FramebufferTextureFormat format)
+		static GLenum DymaticFBTextureFormatToGLInternalFormat(FramebufferTextureFormat format)
 		{
 			switch (format)
 			{
 				case FramebufferTextureFormat::RGBA8:			return GL_RGBA8;
+				case FramebufferTextureFormat::RGBA16F:			return GL_RGBA16F;
+				case FramebufferTextureFormat::RED_INTEGER:		return GL_R32I;
+				case FramebufferTextureFormat::DEPTH24STENCIL8: return GL_DEPTH24_STENCIL8;
+			}
+
+			DY_CORE_ASSERT(false);
+			return 0;
+		}
+
+		static GLenum DymaticFBTextureFormatToGLFormat(FramebufferTextureFormat format)
+		{
+			switch (format)
+			{
+				case FramebufferTextureFormat::RGBA8:			return GL_RGBA;
+				case FramebufferTextureFormat::RGBA16F:			return GL_RGBA;
 				case FramebufferTextureFormat::RED_INTEGER:		return GL_RED_INTEGER;
+				case FramebufferTextureFormat::DEPTH24STENCIL8:	return GL_DEPTH_STENCIL;
+			}
+
+			DY_CORE_ASSERT(false);
+			return 0;
+		}
+
+		static GLenum DymaticFBTextureFormatToGLType(FramebufferTextureFormat format)
+		{
+			switch (format)
+			{
+				case FramebufferTextureFormat::RGBA8:			return GL_UNSIGNED_BYTE;
+				case FramebufferTextureFormat::RGBA16F:			return GL_FLOAT;
+				case FramebufferTextureFormat::RED_INTEGER:		return GL_INT;
+				case FramebufferTextureFormat::DEPTH24STENCIL8:	return GL_UNSIGNED_INT_24_8;
 			}
 
 			DY_CORE_ASSERT(false);
@@ -141,6 +171,9 @@ namespace Dymatic {
 					case FramebufferTextureFormat::RGBA8:
 						Utils::AttachColorTexture(m_ColorAttachments[i], m_Specification.Samples, GL_RGBA8, GL_RGBA, m_Specification.Width, m_Specification.Height, i);
 						break;
+					case FramebufferTextureFormat::RGBA16F:
+						Utils::AttachColorTexture(m_ColorAttachments[i], m_Specification.Samples, GL_RGBA16F, GL_RGBA, m_Specification.Width, m_Specification.Height, i);
+						break;
 					case FramebufferTextureFormat::RED_INTEGER:
 						Utils::AttachColorTexture(m_ColorAttachments[i], m_Specification.Samples, GL_R32I, GL_RED_INTEGER, m_Specification.Width, m_Specification.Height, i);
 						break;
@@ -162,8 +195,8 @@ namespace Dymatic {
 
 		if (m_ColorAttachments.size() > 1)
 		{
-			DY_CORE_ASSERT(m_ColorAttachments.size() <= 4);
-			GLenum buffers[4] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3 };
+			DY_CORE_ASSERT(m_ColorAttachments.size() <= 7);
+			GLenum buffers[7] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3, GL_COLOR_ATTACHMENT4, GL_COLOR_ATTACHMENT5, GL_COLOR_ATTACHMENT6 };
 			glDrawBuffers(m_ColorAttachments.size(), buffers);
 		}
 		else if (m_ColorAttachments.empty())
@@ -181,11 +214,6 @@ namespace Dymatic {
 	{
 		glBindFramebuffer(GL_FRAMEBUFFER, m_RendererID);
 		glViewport(0, 0, m_Specification.Width, m_Specification.Height);
-
-		//Clear Attachment
-
-		int value = -1;
-		glClearTexImage(m_ColorAttachments[1], 0, GL_RED_INTEGER, GL_INT, &value);
 	}
 
 	void OpenGLFramebuffer::Unbind()
@@ -206,23 +234,51 @@ namespace Dymatic {
 		Invalidate();
 	}
 
-	int OpenGLFramebuffer::ReadPixel(uint32_t attachmentIndex, int x, int y)
+	void OpenGLFramebuffer::ReadPixel(uint32_t attachmentIndex, int x, int y, void* pixelData)
 	{
 		DY_CORE_ASSERT(attachmentIndex < m_ColorAttachments.size());
 
+		auto& spec = m_ColorAttachmentSpecifications[attachmentIndex];
 		glReadBuffer(GL_COLOR_ATTACHMENT0 + attachmentIndex);
-		int pixelData;
-		glReadPixels(x, y, 1, 1, GL_RED_INTEGER, GL_INT, &pixelData);
+		glReadPixels(x, y, 1, 1, Utils::DymaticFBTextureFormatToGLFormat(spec.TextureFormat), Utils::DymaticFBTextureFormatToGLType(spec.TextureFormat), pixelData);
+	}
+
+	float OpenGLFramebuffer::ReadDepthPixel(int x, int y)
+	{
+		auto& spec = m_DepthAttachmentSpecification;
+		glReadBuffer(GL_DEPTH_ATTACHMENT);
+		float pixelData;
+		glReadPixels(x, y, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &pixelData);
 		return pixelData;
 	}
 
-	void OpenGLFramebuffer::ClearAttachment(uint32_t attachmentIndex, int value)
+	void OpenGLFramebuffer::ClearAttachment(uint32_t attachmentIndex, const void* value)
 	{
 		DY_CORE_ASSERT(attachmentIndex < m_ColorAttachments.size());
 
 		auto& spec = m_ColorAttachmentSpecifications[attachmentIndex];
 		glClearTexImage(m_ColorAttachments[attachmentIndex], 0,
-			Utils::DymaticFBTextureFormatToGL(spec.TextureFormat), GL_INT, &value);
+			Utils::DymaticFBTextureFormatToGLFormat(spec.TextureFormat), Utils::DymaticFBTextureFormatToGLType(spec.TextureFormat), value);
+	}
+
+	void OpenGLFramebuffer::BindColorSampler(uint32_t slot, uint32_t index) const
+	{
+		glBindTextureUnit(slot, GetColorAttachmentRendererID(index));
+	}
+
+	void OpenGLFramebuffer::BindDepthSampler(uint32_t slot) const
+	{
+		glBindTextureUnit(slot, GetDepthAttachmentRendererID());
+	}
+
+	void OpenGLFramebuffer::BindColorTexture(uint32_t slot, uint32_t index) const
+	{
+		glBindImageTexture(slot, GetColorAttachmentRendererID(index), 0, GL_FALSE, 0, GL_READ_WRITE, Utils::DymaticFBTextureFormatToGLInternalFormat(m_ColorAttachmentSpecifications[index].TextureFormat));
+	}
+
+	void OpenGLFramebuffer::BindDepthTexture(uint32_t slot) const
+	{
+		glBindImageTexture(slot, GetDepthAttachmentRendererID(), 0, GL_FALSE, 0, GL_READ_WRITE, Utils::DymaticFBTextureFormatToGLInternalFormat(m_DepthAttachmentSpecification.TextureFormat));
 	}
 
 }

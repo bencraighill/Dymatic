@@ -11,7 +11,7 @@ namespace Dymatic {
 	enum class EventType
 	{
 		None = 0,
-		WindowClose, WindowDrop, WindowResize, WindowFocus, WindowLostFocus, WindowMoved,
+		WindowClose, WindowDragEnter, WindowDragLeave, WindowDragOver, WindowDrop, WindowResize, WindowFocus, WindowLostFocus, WindowMoved,
 		AppTick, AppUpdate, AppRender,
 		KeyPressed, KeyReleased, KeyTyped,
 		MouseButtonPressed, MouseButtonReleased, MouseMoved, MouseScrolled

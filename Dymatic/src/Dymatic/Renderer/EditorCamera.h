@@ -42,6 +42,12 @@ namespace Dymatic {
 
 		int GetProjectionType() { return m_ProjectionType; }
 		void SetProjectionType(int type) { m_ProjectionType = type; UpdateProjection(); }
+
+		float GetFOV() { return m_FOV; }
+		float GetAspectRatio() { return m_AspectRatio; }
+
+		float GetNearClip() const { return m_NearClip; }
+		float GetFarClip() const { return m_FarClip; }
 	private:
 		void UpdateProjection();
 		void UpdateView();

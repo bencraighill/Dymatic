@@ -107,7 +107,8 @@ CSplash::CSplash()
     Init();
 }
 
-CSplash::CSplash(LPCTSTR lpszFileName, COLORREF colTrans)
+CSplash::CSplash(LPCTSTR lpszFileName, COLORREF colTrans, const int rounding)
+    : m_rounding(rounding)
 {
     Init();
 
@@ -164,6 +165,13 @@ HWND CSplash::RegAndCreateWindow()
         ShowWindow   (m_hwnd, SW_SHOW) ;
         UpdateWindow (m_hwnd);
     }
+
+	// Code Added for window Rounding
+	RECT rect;
+	GetWindowRect(m_hwnd, &rect);
+	rect = { 0, 0, rect.right - rect.left, rect.bottom - rect.top };
+	SetWindowRgn(m_hwnd, CreateRoundRectRgn(rect.left, rect.top, rect.right, rect.bottom, m_rounding, m_rounding), false);
+
     return m_hwnd;
 }
 
@@ -212,6 +220,7 @@ void CSplash::ReloadBitmap()
     RECT rect;
 	GetWindowRect(m_hwnd, &rect);
     rect = { 0, 0, rect.right - rect.left, rect.bottom - rect.top };
+
 	HDC hdc = GetDC(m_hwnd);
 	HBRUSH brush = CreatePatternBrush(m_hBitmap);
 	FillRect(hdc, &rect, brush);
@@ -313,10 +322,23 @@ void CSplash::DrawLoadText(std::string text, RECT rect, int fontSize, LPCTSTR fo
     SetTextColor(hDC, RGB(255, 255, 255));
 	SelectObject(hDC, NewFont);
     SelectObject(hDC, NewBrush);
-    //SetBkMode(hDC, TRANSPARENT);
 	DrawText(hDC, StringToWString(text).c_str(), text.length(), &rect, DT_LEFT | DT_WORDBREAK);
 	DeleteObject(NewBrush);
 	DeleteObject(NewFont);
 	SelectObject(hDC, hBmpOld);
 	ReleaseDC(m_hwnd, hDC);
+}
+
+void CSplash::DrawRect(int left, int top, int right, int bottom, COLORREF color)
+{
+	HDC hDC = GetDC(m_hwnd);
+	SetBkMode(hDC, TRANSPARENT);
+	HBITMAP hBmpOld = (HBITMAP)SelectObject(hDC, m_hBitmap);
+	HBRUSH NewBrush = CreateSolidBrush(color);
+	SelectObject(hDC, NewBrush);
+    Rectangle(hDC, left, top, right, bottom);
+	DeleteObject(NewBrush);
+	SelectObject(hDC, hBmpOld);
+	ReleaseDC(m_hwnd, hDC);
+
 }

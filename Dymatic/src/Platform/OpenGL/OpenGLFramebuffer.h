@@ -16,11 +16,19 @@ namespace Dymatic {
 		virtual void Unbind() override;
 
 		virtual void Resize(uint32_t width, uint32_t height) override;
-		virtual int ReadPixel(uint32_t attachmentIndex, int x, int y) override;
+		virtual void ReadPixel(uint32_t attachmentIndex, int x, int y, void* pixelData) override;
+		virtual float ReadDepthPixel(int x, int y) override;
 
-		virtual void ClearAttachment(uint32_t attachmentIndex, int value) override;
+		virtual void ClearAttachment(uint32_t attachmentIndex, const void* value) override;
 
 		virtual uint32_t GetColorAttachmentRendererID(uint32_t index = 0) const override { DY_CORE_ASSERT(index < m_ColorAttachments.size()); return m_ColorAttachments[index]; }
+		virtual uint32_t GetDepthAttachmentRendererID() const override { return m_DepthAttachment; }
+
+		virtual void BindColorSampler(uint32_t slot, uint32_t index = 0) const override;
+		virtual void BindDepthSampler(uint32_t slot) const override;
+
+		virtual void BindColorTexture(uint32_t slot, uint32_t index = 0) const override;
+		virtual void BindDepthTexture(uint32_t slot) const override;
 
 		virtual const FramebufferSpecification& GetSpecification() const override { return m_Specification; };
 	private:

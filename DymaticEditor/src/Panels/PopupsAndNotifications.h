@@ -9,79 +9,73 @@ namespace Dymatic {
 
 	struct ButtonData
 	{
-		unsigned int id;
-		std::string name;
-		std::function<void()> func;
-		ButtonData(unsigned int id, std::string name, std::function<void()> func)
-			: id(id), name(name), func(func)
-		{
-		}
+		std::string Name;
+		std::function<void()> OnPressedFunction;
+
+		ButtonData(std::string name, std::function<void()> onPressed)
+			: Name(name), OnPressedFunction(onPressed) {}
 	};
 
-	struct PopupData
-	{
-		unsigned int id;
-		std::string title, message;
-		std::vector<ButtonData> buttons;
-		bool loading = false;
-	};
-
-	struct NotificationData
-	{
-		unsigned int id;
-		std::string title, message;
-		std::vector<ButtonData> buttons;
-		float time;
-		float displayTime;
-		bool loading;
-		std::string executedTime;
-		float height = 0.0f;
-		float offsetMin = 0.0f;
-		float offsetMax = 0.0f;
-		bool fadeOut = false;
-		bool fadeIn = true;
-		float currentOpacity = 0.0f;
-	};
-
-	class PopupsAndNotifications
+	class Popup
 	{
 	public:
-		PopupsAndNotifications(Preferences* preferencesRef);
+		Popup(const std::string& title, const std::string& message, const std::vector<ButtonData>& buttons, Ref<Texture2D> icon, bool loading);
 
-		void Popup(std::string title, std::string message, std::vector<ButtonData> buttons, bool loading = false);
+		static void Create(const std::string& title, const std::string& message, std::vector<ButtonData> buttons, Ref<Texture2D> icon = nullptr, bool loading = false);
+		static void RemoveTopmostPopup();
 
-		void RemoveTopmostPopup();
+		static void OnImGuiRender(Timestep ts);
 
-		void PopupUpdate();
-
-		void Notification(int notificationIndex, std::string title, std::string message, std::vector<ButtonData> buttons = {}, bool loading = false, float displayTime = 0.0f);
-		void NotificationUpdate(Timestep ts, float programTime);
-		void ClearNotificationList();
-		bool GetPopupOpen() { return m_PopupOpen; }
-
-		bool& GetNotificationsVisible() { return m_NotificationsVisible; }
-
-		unsigned int GetNextNotificationId() { m_NextNotificationId++; return m_NextNotificationId; }
 	private:
+		// Popup Data
+		UUID m_ID;
+		Ref<Texture2D> m_Icon = nullptr;
+		std::string m_Title, m_Message;
+		std::vector<ButtonData> m_Buttons;
+		bool m_Loading = false;
+	};
+
+	class Notification
+	{
+	public:
+		Notification(const std::string& title, const std::string& message, const std::vector<ButtonData>& buttons, float displayTime, bool loading);
+		
+		static void Init();
+		static void Create(const std::string& title, const std::string& message, const std::vector<ButtonData>& buttons = {}, float displayTime = 0.0f, bool loading = false);
+		static void Clear();
+
+		static void OnImGuiRender(Timestep ts);
+
 	private:
-		bool m_NotificationsVisible = false;
+		// Notification Data
+		UUID m_ID;
+		std::string m_Title, m_Message;
+		std::vector<ButtonData> m_Buttons;
+		float m_Time;
+		float m_DisplayTime;
+		bool m_Loading;
+		std::string m_Timestamp;
 
-		Ref<Texture2D> m_DymaticLogo = Texture2D::Create("assets/icons/DymaticLogoTransparent.png");
+		// Draw Data
+		float _height = 0.0f;
+		float _offsetMin = 0.0f;
+		float _offsetMax = 0.0f;
+		bool _fadeOut = false;
+		bool _fadeIn = true;
+		float _currentOpacity = 0.0f;
 
-		unsigned int m_NextNotificationId = 0;
+		friend class NotificationsPannel;
+	};
 
-		std::string m_CurrentTitle = "";
-		ImGuiIO& io = ImGui::GetIO();
-		ImVec2 dockspaceWindowPosition;
-		std::vector<NotificationData> m_NotificationList;
-		float m_ProgramTime = 0.0f;
+	class NotificationsPannel
+	{
+	public:
+		NotificationsPannel() = default;
+		void OnImGuiRender(Timestep ts);
 
-		std::vector<PopupData> m_PopupList;
-
-		bool m_PopupOpen = false;
-		bool m_PreviousPopupOpen = false;
-
-		Preferences* m_PreferencesReference;
+		bool& GetNotificationPannelVisible() { return m_NotificationPannelVisible; }
+	private:
+		bool m_NotificationPannelVisible = false;
 	};
 
 }
