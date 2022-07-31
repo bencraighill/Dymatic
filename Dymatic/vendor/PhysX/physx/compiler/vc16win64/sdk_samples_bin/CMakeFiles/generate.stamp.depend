@@ -1,0 +1,21 @@
+# CMake generation dependency list for this directory.
+C:/dev/Dymatic/Dymatic/vendor/PhysX/externals/cmakemodules/ConfigureFileMT.cmake
+C:/dev/Dymatic/Dymatic/vendor/PhysX/externals/cmakemodules/GetCompilerAndPlatform.cmake
+C:/dev/Dymatic/Dymatic/vendor/PhysX/externals/cmakemodules/NvidiaBuildOptions.cmake
+C:/dev/Dymatic/Dymatic/vendor/PhysX/externals/cmakemodules/SetOutputPaths.cmake
+C:/dev/Dymatic/Dymatic/vendor/PhysX/externals/targa/targa-config-version.cmake
+C:/dev/Dymatic/Dymatic/vendor/PhysX/externals/targa/targa-config.cmake
+C:/dev/Dymatic/Dymatic/vendor/PhysX/physx/samples/compiler/cmake/CMakeLists.txt
+C:/dev/Dymatic/Dymatic/vendor/PhysX/physx/samples/compiler/cmake/SampleBase.cmake
+C:/dev/Dymatic/Dymatic/vendor/PhysX/physx/samples/compiler/cmake/SampleFramework.cmake
+C:/dev/Dymatic/Dymatic/vendor/PhysX/physx/samples/compiler/cmake/SamplePlatform.cmake
+C:/dev/Dymatic/Dymatic/vendor/PhysX/physx/samples/compiler/cmake/SampleRenderer.cmake
+C:/dev/Dymatic/Dymatic/vendor/PhysX/physx/samples/compiler/cmake/Samples.cmake
+C:/dev/Dymatic/Dymatic/vendor/PhysX/physx/samples/compiler/cmake/SamplesToolkit.cmake
+C:/dev/Dymatic/Dymatic/vendor/PhysX/physx/samples/compiler/cmake/windows/CMakeLists.txt
+C:/dev/Dymatic/Dymatic/vendor/PhysX/physx/samples/compiler/cmake/windows/SampleBase.cmake
+C:/dev/Dymatic/Dymatic/vendor/PhysX/physx/samples/compiler/cmake/windows/SampleFramework.cmake
+C:/dev/Dymatic/Dymatic/vendor/PhysX/physx/samples/compiler/cmake/windows/SamplePlatform.cmake
+C:/dev/Dymatic/Dymatic/vendor/PhysX/physx/samples/compiler/cmake/windows/SampleRenderer.cmake
+C:/dev/Dymatic/Dymatic/vendor/PhysX/physx/samples/compiler/cmake/windows/Samples.cmake
+C:/dev/Dymatic/Dymatic/vendor/PhysX/physx/samples/compiler/cmake/windows/SamplesToolkit.cmake

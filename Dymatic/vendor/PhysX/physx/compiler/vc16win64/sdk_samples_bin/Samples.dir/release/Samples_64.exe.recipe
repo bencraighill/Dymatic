@@ -1,0 +1,26 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project>
+  <ProjectOutputs>
+    <ProjectOutput>
+      <FullPath>C:\dev\Dymatic\Dymatic\vendor\PhysX\physx\compiler\vc16win64\x64\release\ZERO_CHECK</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>C:\dev\Dymatic\Dymatic\vendor\PhysX\physx\bin\win.x86_64.vc142.mt\release\PhysXFoundation_64.dll</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>C:\dev\Dymatic\Dymatic\vendor\PhysX\physx\bin\win.x86_64.vc142.mt\release\PhysXCommon_64.dll</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>C:\dev\Dymatic\Dymatic\vendor\PhysX\physx\bin\win.x86_64.vc142.mt\release\PhysX_64.dll</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>C:\dev\Dymatic\Dymatic\vendor\PhysX\physx\bin\win.x86_64.vc142.mt\release\PhysXCooking_64.dll</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>C:\dev\Dymatic\Dymatic\vendor\PhysX\physx\bin\win.x86_64.vc142.mt\release\Samples_64.exe</FullPath>
+    </ProjectOutput>
+  </ProjectOutputs>
+  <ContentFiles />
+  <SatelliteDlls />
+  <NonRecipeFileRefs />
+</Project>

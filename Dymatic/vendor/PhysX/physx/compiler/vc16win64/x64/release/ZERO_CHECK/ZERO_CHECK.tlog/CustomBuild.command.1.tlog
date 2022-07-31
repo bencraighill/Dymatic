@@ -1,0 +1,10 @@
+^C:\DEV\DYMATIC\DYMATIC\VENDOR\PHYSX\PHYSX\COMPILER\VC16WIN64\CMAKEFILES\4D8216CF73B29C8F8B87A928DF1C2EB8\GENERATE.STAMP.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/dev/Dymatic/Dymatic/vendor/PhysX/physx/compiler/public -BC:/dev/Dymatic/Dymatic/vendor/PhysX/physx/compiler/vc16win64 --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file C:/dev/Dymatic/Dymatic/vendor/PhysX/physx/compiler/vc16win64/PhysXSDK.sln
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

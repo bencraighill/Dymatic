@@ -1,0 +1,15 @@
+# CMake generation dependency list for this directory.
+C:/dev/Dymatic/Dymatic/vendor/PhysX/externals/cmakemodules/ConfigureFileMT.cmake
+C:/dev/Dymatic/Dymatic/vendor/PhysX/externals/cmakemodules/GetCompilerAndPlatform.cmake
+C:/dev/Dymatic/Dymatic/vendor/PhysX/externals/cmakemodules/NvidiaBuildOptions.cmake
+C:/dev/Dymatic/Dymatic/vendor/PhysX/externals/cmakemodules/SetOutputPaths.cmake
+C:/dev/Dymatic/Dymatic/vendor/PhysX/physx/snippets/compiler/cmake/CMakeLists.txt
+C:/dev/Dymatic/Dymatic/vendor/PhysX/physx/snippets/compiler/cmake/SnippetRender.cmake
+C:/dev/Dymatic/Dymatic/vendor/PhysX/physx/snippets/compiler/cmake/SnippetTemplate.cmake
+C:/dev/Dymatic/Dymatic/vendor/PhysX/physx/snippets/compiler/cmake/SnippetUtils.cmake
+C:/dev/Dymatic/Dymatic/vendor/PhysX/physx/snippets/compiler/cmake/SnippetVehicleTemplate.cmake
+C:/dev/Dymatic/Dymatic/vendor/PhysX/physx/snippets/compiler/cmake/windows/CMakeLists.txt
+C:/dev/Dymatic/Dymatic/vendor/PhysX/physx/snippets/compiler/cmake/windows/SnippetRender.cmake
+C:/dev/Dymatic/Dymatic/vendor/PhysX/physx/snippets/compiler/cmake/windows/SnippetTemplate.cmake
+C:/dev/Dymatic/Dymatic/vendor/PhysX/physx/snippets/compiler/cmake/windows/SnippetUtils.cmake
+C:/dev/Dymatic/Dymatic/vendor/PhysX/physx/snippets/compiler/cmake/windows/SnippetVehicleTemplate.cmake
