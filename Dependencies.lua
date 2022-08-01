@@ -36,6 +36,7 @@ LibraryDir["PhysX_DebugDLL"] = "%{wks.location}/Dymatic/vendor/PhysX/Bin/debug"
 LibraryDir["PhysX_Release"] = "%{wks.location}/Dymatic/vendor/PhysX/Lib/release"
 LibraryDir["PhysX_ReleaseDLL"] = "%{wks.location}/Dymatic/vendor/PhysX/Bin/release"
 
+LibraryDir["assimp_DLL"] = "%{wks.location}/Dymatic/vendor/assimp/Bin"
 LibraryDir["irrKlang_DLL"] = "%{wks.location}/Dymatic/vendor/irrKlang/Bin"
 
 Library = {}

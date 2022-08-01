@@ -42,7 +42,10 @@ project "DymaticEditor"
 		
 		postbuildcommands
 		{
-			"{COPYDIR} \"%{LibraryDir.VulkanSDK_DebugDLL}\" \"%{cfg.targetdir}\""
+			"{COPYDIR} \"%{LibraryDir.VulkanSDK_DebugDLL}\" \"%{cfg.targetdir}\"",
+			"{COPYDIR} \"%{LibraryDir.PhysX_DebugDLL}\" \"%{cfg.targetdir}\"",
+			"{COPYDIR} \"%{LibraryDir.assimp_DLL}\" \"%{cfg.targetdir}\"",
+			"{COPYDIR} \"%{LibraryDir.irrKlang_DLL}\" \"%{cfg.targetdir}\""
 		}
 
 	filter "configurations:Release"

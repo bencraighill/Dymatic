@@ -17,7 +17,7 @@ BEGIN
 BLOCK "040904E4"
 BEGIN
 VALUE "CompanyName", "Dymatic Technologies"
-VALUE "FileDescription", "Dymatic Engine Editor"
+VALUE "FileDescription", "Dymatic Editor"
 VALUE "LegalCopyright", "© 2022 Dymatic Technologies"
 VALUE "ProductName", "Dymatic Editor"
 VALUE "ProductVersion", "DymaticEditor-1.2.4-Development"
