@@ -78,7 +78,7 @@ namespace Dymatic {
 
 		Ref<Texture2D> m_CheckerboardTexture = Texture2D::Create("assets/textures/Checkerboard.png");
 
-		Ref<Texture2D> m_Brush = Texture2D::Create("assets/BrushMask.png");
+		Ref<Texture2D> m_Brush = Texture2D::Create("assets/textures/BrushMask.png");
 		unsigned char* m_BrushData = nullptr;
 		unsigned char* m_StrokeBuffer = nullptr;
 		unsigned char* m_LayerBuffer = nullptr;

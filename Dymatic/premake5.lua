@@ -19,6 +19,11 @@ project "Dymatic"
 		"vendor/glm/glm/**.hpp",
 		"vendor/glm/glm/**.inl",
 
+		"vendor/CSplash/**.h",
+		"vendor/CSplash/**.cpp",
+		"vendor/ImGuiNode/**.h",
+		"vendor/ImGuiNode/**.cpp",
+
 		"vendor/ImGuizmo/ImGuizmo.h",
 		"vendor/ImGuizmo/ImGuizmo.cpp"
 	}
@@ -85,7 +90,20 @@ project "Dymatic"
 			"%{Library.SPIRV_Cross_Debug}",
 			"%{Library.SPIRV_Cross_GLSL_Debug}",
 			
-			"%{Library.PhysX_Debug}"
+			"%{Library.PhysX_Debug_LowLevel_static_64}",
+			"%{Library.PhysX_Debug_LowLevelAABB_static_64}",
+			"%{Library.PhysX_Debug_LowLevelDynamics_static_64}",
+			"%{Library.PhysX_Debug_PhysX_64}",
+			"%{Library.PhysX_Debug_PhysXCharacterKinematic_static_64}",
+			"%{Library.PhysX_Debug_PhysXCommon_64}",
+			"%{Library.PhysX_Debug_PhysXCooking_64}",
+			"%{Library.PhysX_Debug_PhysXExtensions_static_64}",
+			"%{Library.PhysX_Debug_PhysXFoundation_64}",
+			"%{Library.PhysX_Debug_PhysXPvdSDK_static_64}",
+			"%{Library.PhysX_Debug_PhysXTask_static_64}",
+			"%{Library.PhysX_Debug_PhysXVehicle_static_64}",
+			"%{Library.PhysX_Debug_SceneQuery_static_64}",
+			"%{Library.PhysX_Debug_SimulationController_static_64}"
 		}
 
 	filter "configurations:Release"
@@ -99,7 +117,20 @@ project "Dymatic"
 			"%{Library.SPIRV_Cross_Release}",
 			"%{Library.SPIRV_Cross_GLSL_Release}",
 
-			"%{Library.PhysX_Release}"
+			"%{Library.PhysX_Release_SimulationController_static_64}",
+			"%{Library.PhysX_Release_LowLevel_static_64}",
+			"%{Library.PhysX_Release_LowLevelAABB_static_64}",
+			"%{Library.PhysX_Release_LowLevelDynamics_static_64}",
+			"%{Library.PhysX_Release_PhysX_64}",
+			"%{Library.PhysX_Release_PhysXCharacterKinematic_static_64}",
+			"%{Library.PhysX_Release_PhysXCommon_64}",
+			"%{Library.PhysX_Release_PhysXCooking_64}",
+			"%{Library.PhysX_Release_PhysXExtensions_static_64}",
+			"%{Library.PhysX_Release_PhysXFoundation_64}",
+			"%{Library.PhysX_Release_PhysXPvdSDK_static_64}",
+			"%{Library.PhysX_Release_PhysXTask_static_64}",
+			"%{Library.PhysX_Release_PhysXVehicle_static_64}",
+			"%{Library.PhysX_Release_SceneQuery_static_64}"
 		}
 
 	filter "configurations:Dist"
@@ -113,5 +144,18 @@ project "Dymatic"
 			"%{Library.SPIRV_Cross_Release}",
 			"%{Library.SPIRV_Cross_GLSL_Release}",
 
-			"%{Library.PhysX_Release}"
+			"%{Library.PhysX_Release_SimulationController_static_64}",
+			"%{Library.PhysX_Release_LowLevel_static_64}",
+			"%{Library.PhysX_Release_LowLevelAABB_static_64}",
+			"%{Library.PhysX_Release_LowLevelDynamics_static_64}",
+			"%{Library.PhysX_Release_PhysX_64}",
+			"%{Library.PhysX_Release_PhysXCharacterKinematic_static_64}",
+			"%{Library.PhysX_Release_PhysXCommon_64}",
+			"%{Library.PhysX_Release_PhysXCooking_64}",
+			"%{Library.PhysX_Release_PhysXExtensions_static_64}",
+			"%{Library.PhysX_Release_PhysXFoundation_64}",
+			"%{Library.PhysX_Release_PhysXPvdSDK_static_64}",
+			"%{Library.PhysX_Release_PhysXTask_static_64}",
+			"%{Library.PhysX_Release_PhysXVehicle_static_64}",
+			"%{Library.PhysX_Release_SceneQuery_static_64}"
 		}

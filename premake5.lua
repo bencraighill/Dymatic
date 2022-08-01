@@ -26,7 +26,6 @@ outputdir = "%{cfg.buildcfg}-%{cfg.system}-%{cfg.architecture}"
 
 group "Dependencies"
 	include "vendor/premake"
-	include "Dymatic/vendor/assimp"
 	include "Dymatic/vendor/Box2D"
 	include "Dymatic/vendor/GLFW"
 	include "Dymatic/vendor/Glad"

@@ -53,7 +53,7 @@ namespace Dymatic {
 		WCHAR path[MAX_PATH];
 		GetModuleFileName(GetModuleHandle(NULL), path, sizeof(path));
 
-		TCHAR s[100];
+		TCHAR s[MAX_PATH + 10 + 11];
 		swprintf_s(s, (L"%X %s %S"), GetCurrentProcessId(), path, "Dymatic.log");
 
 		// start the program up

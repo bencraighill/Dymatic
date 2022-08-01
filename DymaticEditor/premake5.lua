@@ -10,7 +10,8 @@ project "DymaticEditor"
 	files
 	{
 		"src/**.h",
-		"src/**.cpp"
+		"src/**.cpp",
+		"DymaticEditor.rc"
 	}
 
 	includedirs
