@@ -20,6 +20,9 @@
 #include "box2d/b2_circle_shape.h"
 
 // PhysX
+#ifdef DY_RELEASE
+#define NDEBUG
+#endif
 #include <PxPhysics.h>
 #include <PxPhysicsAPI.h>
 

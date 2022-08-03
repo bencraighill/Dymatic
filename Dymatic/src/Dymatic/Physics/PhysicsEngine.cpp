@@ -1,6 +1,9 @@
 #include "dypch.h"
 #include "Dymatic/Physics/PhysicsEngine.h"
 
+#ifdef DY_RELEASE
+#define NDEBUG
+#endif
 #include <PxPhysics.h>
 #include <PxPhysicsAPI.h>
 

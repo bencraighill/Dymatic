@@ -23,9 +23,9 @@ if is_admin():
     # Setup Desktop Shortcut
     print("Setting up Desktop Shortcut...")
     path = os.path.join(desktop, "Dymatic Engine.lnk")
-    target = cwd + r"\..\..\bin\Debug-windows-x86_64\DymaticEditor\DymaticEditor.exe"
+    target = cwd + r"\..\..\bin\Release-windows-x86_64\DymaticEditor\DymaticEditor.exe"
     wDir = cwd + r"\..\..\DymaticEditor"
-    icon = cwd + r"\..\..\bin\Debug-windows-x86_64\DymaticEditor\DymaticEditor.exe"
+    icon = cwd + r"\..\..\bin\Release-windows-x86_64\DymaticEditor\DymaticEditor.exe"
 
     shell = Dispatch('WScript.Shell')
     shortcut = shell.CreateShortCut(path)
@@ -73,7 +73,7 @@ if is_admin():
             winreg.HKEY_CURRENT_USER,
             r"Software\Microsoft\DirectX\UserGpuPreferences",
             0, winreg.KEY_SET_VALUE)
-        path = os.path.abspath(cwd + "\\..\\..\\bin\\Debug-windows-x86_64\\DymaticEditor\\DymaticEditor.exe")
+        path = os.path.abspath(cwd + "\\..\\..\\bin\\Release-windows-x86_64\\DymaticEditor\\DymaticEditor.exe")
         winreg.SetValueEx(gpu_preferences, path, 0, winreg.REG_SZ, "AutoHDREnable=1;GpuPreference=2;")
 
     # Set .dymatic default

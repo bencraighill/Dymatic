@@ -175,23 +175,31 @@ namespace Dymatic {
 		{
 			std::ifstream file("Resources/Plugins/PluginsManifest");
 			std::string data = "";
-			while (getline(file, data, ','))
+			while (getline(file, data, '|'))
 				if (!data.empty())
 				{
-					std::filesystem::path path = std::filesystem::path("Resources/Plugins") / data;
-					getline(file, data, ',');
+					auto name = data;
+					getline(file, data, '|');
+					auto dir = data;
+#ifdef DY_DEBUG
+					std::filesystem::path path = std::filesystem::path("Resources/Plugins") / dir / "Debug" /  name;
+#else
+					std::filesystem::path path = std::filesystem::path("Resources/Plugins") / dir / "Release" / name;
+
+#endif
+					getline(file, data, '|');
 					if (data == "1")
 					{
 
 						std::vector<std::pair<std::string, std::string>> params;
-						getline(file, data, ',');
+						getline(file, data, '|');
 						std::string type;
 						while (data != "_END_PLUGIN")
 						{
-							getline(file, type, ',');
+							getline(file, type, '|');
 							params.push_back({ data, type });
 
-							getline(file, data, ',');
+							getline(file, data, '|');
 						}
 
 						if (std::filesystem::exists(path))
@@ -275,29 +283,32 @@ namespace Dymatic {
 						if (LoadPluginLibraryFunction(library, ("DYMATIC_PLUGIN_GET_PARAM_" + std::to_string(i * 3 + 1)).c_str(), &getParamsFunction)
 							&& LoadPluginLibraryFunction(library, ("DYMATIC_PLUGIN_GET_PARAM_DEFAULT_" + std::to_string(i * 3 + 2)).c_str(), &getParamDefaultFunction))
 						{
-							const char* name;
-							const char* type;
+							const char* _name;
+							const char* _type;
 
-							getParamsFunction(&name, &type);
+							getParamsFunction(&_name, &_type);
+
+							std::string name = _name;
+							std::string type = _type;
 
 							PluginInfo::PluginParam::PluginParamData internal_data;
 							PluginInfo::PluginParam::PluginParamType internal_type;
-							if (strcmp(type, "bool") == 0)
+							if (type == "bool")
 							{
 								internal_type = PluginInfo::PluginParam::PluginParamType::Bool;
 								getParamDefaultFunction(&internal_data.Bool);
 							}
-							else if (strcmp(type, "int") == 0)
+							else if (type == "int")
 							{
 								internal_type = PluginInfo::PluginParam::PluginParamType::Int;
 								getParamDefaultFunction(&internal_data.Int);
 							}
-							else if (strcmp(type, "float") == 0)
+							else if (type == "float")
 							{
 								internal_type = PluginInfo::PluginParam::PluginParamType::Float;
 								getParamDefaultFunction(&internal_data.Float);
 							}
-							else if (strcmp(type, "string") == 0)
+							else if (type == "string")
 							{
 								internal_type = PluginInfo::PluginParam::PluginParamType::String;
 								getParamDefaultFunction(&internal_data.String);

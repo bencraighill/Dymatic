@@ -1026,11 +1026,23 @@ namespace Dymatic {
 	{
 		m_PluginInfo.clear();
 		for (auto& file : std::filesystem::directory_iterator("Resources/Plugins"))
-			if (file.path().extension().string() == ".dll")
+			if (file.is_directory())
 			{
-				PluginInfo info;
-				if (PluginLoader::GetPluginInfo(file.path(), info))
-					m_PluginInfo.push_back(info);
+#ifdef DY_DEBUG
+				auto path = file.path() / "Debug";
+#else
+				auto path = file.path() / "Release";
+#endif
+					if (std::filesystem::exists(path))
+					{
+						for (auto& file : std::filesystem::directory_iterator(path))
+							if (file.path().extension().string() == ".dll")
+							{
+								PluginInfo info;
+								if (PluginLoader::GetPluginInfo(file.path(), info))
+									m_PluginInfo.push_back(info);
+							}
+					}
 			}
 		LoadPluginManifest();
 	}
@@ -1042,7 +1054,7 @@ namespace Dymatic {
 			std::ifstream file("Resources/Plugins/PluginsManifest");
 			std::string data;
 
-			while (getline(file, data, ','))
+			while (getline(file, data, '|'))
 			{
 				bool found = false;
 				if (!data.empty())
@@ -1052,13 +1064,14 @@ namespace Dymatic {
 						{
 							found = true;
 
-							getline(file, data, ',');
+							getline(file, data, '|');
+							getline(file, data, '|');
 							plugin.enabled = data == "1";
-							getline(file, data, ',');
+							getline(file, data, '|');
 							while (data != "_END_PLUGIN")
 							{
 								std::string type;
-								getline(file, type, ',');
+								getline(file, type, '|');
 
 								for (auto& param : plugin.params)
 								{
@@ -1082,14 +1095,14 @@ namespace Dymatic {
 									}
 								}
 
-								getline(file, data, ',');
+								getline(file, data, '|');
 							}
 						}
 				}
 
 				if (!found)
 				{
-					while (getline(file, data, ','))
+					while (getline(file, data, '|'))
 					{
 						if (data == "_END_PLUGIN")
 							break;
@@ -1106,8 +1119,20 @@ namespace Dymatic {
 		manifest.open("Resources/Plugins/PluginsManifest");
 		for (auto& plugin : m_PluginInfo)
 		{
-			manifest << plugin.path.filename().string() << ",";
-			manifest << plugin.enabled << ",";
+			manifest << plugin.path.filename().string() << "|";
+			{
+				auto path = plugin.path.string();
+				String::ReplaceAll(path, '\\', '/');
+				const char* loc = "Resources/Plugins/";
+				int index = path.find(loc);
+				if (index != std::string::npos)
+				{
+					path.erase(0, index + strlen(loc));
+					path.erase(path.find("/"));
+					manifest << path << "|";
+				}
+			}
+			manifest << plugin.enabled << "|";
 
 			for (auto& param : plugin.params)
 			{
@@ -1116,35 +1141,35 @@ namespace Dymatic {
 				case PluginInfo::PluginParam::Bool:
 					if (param.data.Bool != param.defaultValue.Bool)
 					{
-						manifest << param.name << ",";
-						manifest << param.data.Bool << ",";
+						manifest << param.name << "|";
+						manifest << param.data.Bool << "|";
 					}
 					break;
 				case PluginInfo::PluginParam::Int:
 					if (param.data.Int != param.defaultValue.Int)
 					{
-						manifest << param.name << ",";
-						manifest << param.data.Int << ",";
+						manifest << param.name << "|";
+						manifest << param.data.Int << "|";
 					}
 					break;
 				case PluginInfo::PluginParam::Float:
 					if (param.data.Float != param.defaultValue.Float)
 					{
-						manifest << param.name << ",";
-						manifest << param.data.Float << ",";
+						manifest << param.name << "|";
+						manifest << param.data.Float << "|";
 					}
 					break;
 				case PluginInfo::PluginParam::String:
 					if (param.data.String != param.defaultValue.String)
 					{
-						manifest << param.name << ",";
-						manifest << param.data.String << ",";
+						manifest << param.name << "|";
+						manifest << param.data.String << "|";
 					}
 					break;
 				}
 
 			}
-			manifest << "_END_PLUGIN,";
+			manifest << "_END_PLUGIN|";
 		}
 		manifest.close();
 	}

@@ -36,6 +36,13 @@ namespace Dymatic::String {
 		}
 	}
 
+	void ReplaceAll(std::string& str, const char& from, const char& to)
+	{
+		for (auto& character : str)
+			if (character == from)
+				character = to;
+	}
+
 	std::string GetNextNameWithIndex(std::vector<std::string>& vector, std::string prefix)
 	{
 		int index = 0;

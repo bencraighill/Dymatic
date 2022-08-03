@@ -53,7 +53,21 @@ project "DymaticEditor"
 		runtime "Release"
 		optimize "on"
 
+		postbuildcommands
+		{
+			"{COPYDIR} \"%{LibraryDir.PhysX_DebugDLL}\" \"%{cfg.targetdir}\"",
+			"{COPYDIR} \"%{LibraryDir.assimp_DLL}\" \"%{cfg.targetdir}\"",
+			"{COPYDIR} \"%{LibraryDir.irrKlang_DLL}\" \"%{cfg.targetdir}\""
+		}
+
 	filter "configurations:Dist"
 		defines "DY_DIST"
 		runtime "Release"
 		optimize "on"
+
+		postbuildcommands
+		{
+			"{COPYDIR} \"%{LibraryDir.PhysX_DebugDLL}\" \"%{cfg.targetdir}\"",
+			"{COPYDIR} \"%{LibraryDir.assimp_DLL}\" \"%{cfg.targetdir}\"",
+			"{COPYDIR} \"%{LibraryDir.irrKlang_DLL}\" \"%{cfg.targetdir}\""
+		}
