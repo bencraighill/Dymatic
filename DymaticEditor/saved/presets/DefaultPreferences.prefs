@@ -5,4 +5,5 @@ Recent Files: 10
 Show Splash: true
 Double Click Speed: 300
 Emulate Numpad: false
-devenv Path: ""
+Manual Devenv: false
+Devenv Path: ""

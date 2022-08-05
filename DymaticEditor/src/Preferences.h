@@ -22,7 +22,8 @@ namespace Dymatic {
 
 			bool ShowSplashStartup = true;
 
-			std::string devenvPath;
+			bool ManualDevenv = false;
+			std::string DevenvPath;
 
 			//--- Editor Preferences ---//
 

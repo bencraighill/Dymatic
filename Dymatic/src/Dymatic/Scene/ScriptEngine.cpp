@@ -51,13 +51,19 @@ namespace Dymatic {
 
 		if (devenv.empty())
 		{
-			s_CompilationMessage = "Development Environment Not Specified";
+			s_CompilationMessage = "Development Environment Not Specified.";
 			return false;
 		}
 
 		if (!std::filesystem::exists(devenv))
 		{
 			s_CompilationMessage = "Cannot Access Development Environment.";
+			return false;
+		}
+
+		if (!std::filesystem::exists(projectPath))
+		{
+			s_CompilationMessage = "Project Path Does Not Exist.";
 			return false;
 		}
 

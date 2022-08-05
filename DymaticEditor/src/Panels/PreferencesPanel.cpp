@@ -588,14 +588,12 @@ namespace Dymatic {
 					if (ImGui::TreeNodeEx("Preferences", treeNodeFlags | ImGuiTreeNodeFlags_DefaultOpen))
 					{
 						static const char* b[2] = { "Mouse Left", "Mouse Right" };
-						ImGui::PushID("SwitchButton");
 						int selectedValue = keymap[Preferences::Keymap::SelectObjectBind].MouseCode == Mouse::ButtonRight ? 1 : 0;
-						if (ImGui::SwitchButtonEx("##Switch", b, 2, &selectedValue, ImVec2{ ImGui::GetContentRegionAvail().x, 23 }))
+						if (ImGui::SwitchButtonEx("##MouseSwitch", b, 2, &selectedValue, ImVec2{ ImGui::GetContentRegionAvail().x, 23 }))
 						{
 							keymap[Preferences::Keymap::SelectObjectBind].MouseCode = Mouse::ButtonLeft; 
 							keymap[Preferences::Keymap::SelectObjectBind].BindCategory = Preferences::Keymap::BindCategory::MouseButton;
 						}
-						ImGui::PopID();
 						ImGui::TreePop();
 					}
 					ImGui::PopStyleColor();
@@ -718,13 +716,23 @@ namespace Dymatic {
 				{
 					if (ImGui::TreeNodeEx("Development Environment", treeNodeFlags | ImGuiTreeNodeFlags_DefaultOpen))
 					{
-						char buffer[256];
-						memset(buffer, 0, sizeof(buffer));
-						std::strncpy(buffer, Preferences::GetData().devenvPath.c_str(), sizeof(buffer));
-						if (ImGui::InputText("##devenvPathInput", buffer, sizeof(buffer)))
-							Preferences::GetData().devenvPath = std::string(buffer);
-						ImGui::SameLine();
-						ImGui::Text("devenv Path");
+						ImGui::Text("Devenv Path Detection");
+
+						const char* options[] = { "Automatic", "Manual" };
+						int option = Preferences::GetData().ManualDevenv;
+						if (ImGui::SwitchButtonEx("##DevenvDetectionMethod", options, 2, &option, ImVec2(ImGui::GetContentRegionAvailWidth(), 30.0f)))
+							Preferences::GetData().ManualDevenv = option;
+
+						if (Preferences::GetData().ManualDevenv)
+						{
+							char buffer[256];
+							memset(buffer, 0, sizeof(buffer));
+							std::strncpy(buffer, Preferences::GetData().DevenvPath.c_str(), sizeof(buffer));
+							if (ImGui::InputText("##DevenvPathInput", buffer, sizeof(buffer)))
+								Preferences::GetData().DevenvPath = std::string(buffer);
+							ImGui::SameLine();
+							ImGui::Text("Devenv Path");
+						}
 
 						ImGui::TreePop();
 					}

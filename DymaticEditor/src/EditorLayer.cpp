@@ -57,7 +57,7 @@ namespace Dymatic {
 		swprintf_s(s, (L"%X %s %S"), GetCurrentProcessId(), path, "Dymatic.log");
 
 		// start the program up
-		CreateProcess(L"../bin/Debug-windows-x86_64/CrashManager/CrashManager.exe",   // the path
+		CreateProcess(L"../bin/Release-windows-x86_64/CrashManager/CrashManager.exe",   // the path
 			s,        // Command line
 			NULL,           // Process handle not inheritable
 			NULL,           // Thread handle not inheritable
@@ -115,7 +115,8 @@ namespace Dymatic {
 		m_Framebuffer = Framebuffer::Create(fbSpec);
 		Renderer3D::SetActiveFramebuffer(m_Framebuffer);
 
-		m_ActiveScene = CreateRef<Scene>();
+		m_EditorScene = CreateRef<Scene>();
+		m_ActiveScene = m_EditorScene;
 
 		auto commandLineArgs = Application::Get().GetCommandLineArgs();
 		if (commandLineArgs.Count > 1)
@@ -123,7 +124,12 @@ namespace Dymatic {
 			auto sceneFilePath = commandLineArgs[1];
 			SceneSerializer serializer(m_ActiveScene);
 			serializer.Deserialize(sceneFilePath);
+
+			m_EditorScenePath = sceneFilePath;
+			AddRecentFile(sceneFilePath);
 		}
+
+		m_SceneHierarchyPanel.SetContext(m_ActiveScene);
 
 		m_EditorCamera = EditorCamera(/*30.0f*/45.0f, 1.778f, 0.1f, 1000.0f);
 
@@ -555,7 +561,33 @@ namespace Dymatic {
 
 			if (ImGui::BeginMenu("Script"))
 			{
-				if (ImGui::MenuItem("Compile", "", false, m_SceneState == SceneState::Edit)) { if (!ScriptEngine::Compile(Preferences::GetData().devenvPath, "../../DymaticScriptingEnvironment/DymaticTestProject")) { Popup::Create("Compilation Failure", ScriptEngine::GetCompilationMessage(), { { "Ok", []() {} } }, m_ErrorIcon); } }
+				if (ImGui::MenuItem("Compile", "", false, m_SceneState == SceneState::Edit)) 
+				{
+					std::string devenvPath = Preferences::GetData().DevenvPath;
+
+					if (!Preferences::GetData().ManualDevenv)
+					{
+						// Automatically check for the location of devenv with vswhere.exe
+						system("\"\"Resources/Executables/vswhere/vswhere.exe\" -property productPath > devenv\"");
+
+						std::ifstream in;
+						in.open("devenv");
+						if (!in.fail())
+						{
+							getline(in, devenvPath);
+
+							devenvPath.erase(devenvPath.find(".exe"));
+							devenvPath += ".com";
+						}
+
+						if (std::filesystem::exists("devenv"))
+							std::filesystem::remove("devenv");
+					}
+
+
+					if (!ScriptEngine::Compile(devenvPath, "../../DymaticScriptingEnvironment/DymaticTestProject"))
+						Popup::Create("Compilation Failure", ScriptEngine::GetCompilationMessage(), { { "Ok", []() {} } }, m_ErrorIcon);
+				}
 				if (ImGui::MenuItem("Reload Assembly", "", false, m_SceneState == SceneState::Edit)) { if (!ScriptEngine::LoadScriptLibrary()) { Popup::Create("Compilation Failure", ScriptEngine::GetCompilationMessage(), { { "Ok", []() {} } }, m_ErrorIcon); } }
 				if (ImGui::MenuItem("Clean Assembly", "", false, m_SceneState == SceneState::Edit)) { ScriptEngine::CleanLibraryAssembly(); }
 				ImGui::EndMenu();

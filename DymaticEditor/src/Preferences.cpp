@@ -449,9 +449,13 @@ namespace Dymatic {
 			if (emulateNumpad)
 				GetData().EmulateNumpad = emulateNumpad.as<bool>();
 
-			auto devenvPath = prefs["devenv Path"];
+			auto manualDevenv = prefs["Manual Devenv"];
+			if (manualDevenv)
+				GetData().ManualDevenv = manualDevenv.as<bool>();
+
+			auto devenvPath = prefs["Devenv Path"];
 			if (devenvPath)
-				GetData().devenvPath = devenvPath.as<std::string>();
+				GetData().DevenvPath = devenvPath.as<std::string>();
 		}
 	}
 
@@ -467,7 +471,8 @@ namespace Dymatic {
 		out << YAML::Key << "Show Splash" << YAML::Value << GetData().ShowSplashStartup;
 		out << YAML::Key << "Double Click Speed" << YAML::Value << GetData().DoubleClickSpeed;
 		out << YAML::Key << "Emulate Numpad" << YAML::Value << GetData().EmulateNumpad;
-		out << YAML::Key << "devenv Path" << YAML::Value << GetData().devenvPath;
+		out << YAML::Key << "Manual Devenv" << YAML::Value << GetData().ManualDevenv;
+		out << YAML::Key << "Devenv Path" << YAML::Value << GetData().DevenvPath;
 
 		out << YAML::EndMap;
 
