@@ -3,7 +3,6 @@
 
 #include "EditorLayer.h"
 
-
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include <imgui/imgui.h>
 #include <imgui/imgui_internal.h>
@@ -95,7 +94,10 @@ namespace Dymatic {
 
 		//m_CheckerboardTexture = Texture2D::Create("assets/textures/Checkerboard.png");
 		m_IconPlay = Texture2D::Create("Resources/Icons/PlayButton.png");
+		m_IconSimulate = Texture2D::Create("Resources/Icons/SimulateButton.png");
 		m_IconStop = Texture2D::Create("Resources/Icons/StopButton.png");
+		m_IconPause = Texture2D::Create("Resources/Icons/PauseButton.png");
+		m_IconNextFrame = Texture2D::Create("Resources/Icons/NextFrameButton.png");
 
 		Application::Get().GetImGuiLayer()->AddIconFont("assets/fonts/IconsFont.ttf", 25.0f, 0x700, 0x70F);	// Window Icons
 		Application::Get().GetImGuiLayer()->AddIconFont("assets/fonts/IconsFont.ttf", 12.0f, 0x710, 0x71E); // Viewport Shading Icons
@@ -215,9 +217,21 @@ namespace Dymatic {
 				m_ActiveScene->OnUpdateEditor(ts, m_EditorCamera, m_SceneHierarchyPanel.GetSelectedEntity());
 				break;
 			}
+			case SceneState::Simulate:
+			{
+				// Update Selected Entity
+				Renderer3D::SetSelectedEntity((uint32_t)m_SceneHierarchyPanel.GetSelectedEntity());
+
+				m_EditorCamera.OnUpdate(ts);
+
+				m_ActiveScene->OnUpdateSimulation(ts, m_EditorCamera, m_SceneHierarchyPanel.GetSelectedEntity(), m_ScenePaused && !m_NextFrame);
+				m_NextFrame = false;
+				break;
+			}
 			case SceneState::Play:
 			{
-				m_ActiveScene->OnUpdateRuntime(ts);
+				m_ActiveScene->OnUpdateRuntime(ts, m_ScenePaused && !m_NextFrame);
+				m_NextFrame = false;
 				break;
 			}
 		}
@@ -678,19 +692,65 @@ namespace Dymatic {
 		if (m_ToolbarVisible)
 		{
 			ImGui::Begin((std::string(CHARACTER_WINDOW_ICON_TOOLBAR) + " Toolbar").c_str(), &m_ToolbarVisible, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
-			
-			ImGui::Dummy(ImVec2{ 0, ((ImGui::GetContentRegionAvail().y - 30) / 2) });
 
-			float size = 30.0f;
-			Ref<Texture2D> icon = m_SceneState == SceneState::Edit ? m_IconPlay : m_IconStop;
-			ImGui::SetCursorPosX((ImGui::GetWindowContentRegionMax().x * 0.5f) - (size * 0.5f));
-			if (ImGui::ImageButton((ImTextureID)icon->GetRendererID(), ImVec2(size, size), ImVec2(0, 0), ImVec2(1, 1), 0))
+			auto drawList = ImGui::GetWindowDrawList();
+
+			const float size = 30.0f;
+			const int button_count = 4;
+			ImGui::SetCursorPosX((ImGui::GetWindowContentRegionMax().x * 0.5f) - (size * button_count * 0.5f));
+
+			drawList->AddRectFilled(ImVec2(ImGui::GetCursorScreenPos().x - style.FramePadding.x, ImGui::GetCursorScreenPos().y - style.FramePadding.y), ImVec2(ImGui::GetCursorScreenPos().x + (size + 2.0f * style.FramePadding.x) * button_count, ImGui::GetCursorScreenPos().y + size + style.FramePadding.y), ImGui::GetColorU32(ImGuiCol_Header), style.FrameRounding);
+
+			ImGui::PushStyleColor(ImGuiCol_Button, {});
+			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, {});
+			ImGui::PushStyleColor(ImGuiCol_ButtonActive, {});
 			{
-				if (m_SceneState == SceneState::Edit)
-					OnScenePlay();
-				else if (m_SceneState == SceneState::Play)
-					OnSceneStop();
+				const Ref<Texture2D> icon = m_SceneState == SceneState::Edit || m_SceneState == SceneState::Simulate ? m_IconPlay : (m_ScenePaused ? m_IconPlay: m_IconPause);
+				if (ImGui::Button("##PlayButton", { size, size }))
+				{
+					if (m_SceneState == SceneState::Edit || m_SceneState == SceneState::Simulate)
+						OnScenePlay();
+					else if (m_SceneState == SceneState::Play)
+						m_ScenePaused = !m_ScenePaused;
+				}
+				const ImColor color = m_SceneState == SceneState::Edit || m_SceneState == SceneState::Simulate || (m_SceneState == SceneState::Play && m_ScenePaused) ? (ImGui::IsItemActive() ? ImColor(101, 142, 52) : (ImGui::IsItemHovered() ? ImColor(169, 194, 150) : ImColor(139, 194, 74))) : (ImGui::IsItemActive() ? ImColor(117, 117, 117) : (ImGui::IsItemHovered() ? ImColor(255, 255, 255) : ImColor(192, 192, 192)));
+				drawList->AddImage((ImTextureID)icon->GetRendererID(), ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), { 0, 1 }, { 1, 0 }, color);
 			}
+			ImGui::SameLine();
+			{
+				const Ref<Texture2D> icon = m_SceneState == SceneState::Edit || m_SceneState == SceneState::Play ? m_IconSimulate : (m_ScenePaused ? m_IconSimulate : m_IconPause);
+				if (ImGui::Button("##SimulateButton", { size, size }))
+				{
+					if (m_SceneState == SceneState::Edit || m_SceneState == SceneState::Play)
+						OnSceneSimulate();
+					else if (m_SceneState == SceneState::Simulate)
+						m_ScenePaused = !m_ScenePaused;
+				}
+				const ImColor color = ImGui::IsItemActive() ? ImColor(117, 117, 117) : (ImGui::IsItemHovered() ? ImColor(255, 255, 255) : ImColor(192, 192, 192));
+				drawList->AddImage((ImTextureID)icon->GetRendererID(), ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), { 0, 1 }, { 1, 0 }, color);
+			}
+			ImGui::SameLine();
+			{
+				if (ImGui::Button("##StopButton", { size, size }))
+				{
+					if (m_SceneState != SceneState::Edit)
+						OnSceneStop();
+				}
+				const ImColor color = m_SceneState == SceneState::Edit ? ImColor(117, 117, 117) : (ImGui::IsItemActive() ? ImColor(188, 44, 44) : (ImGui::IsItemHovered() ? ImColor(255, 192, 192) : ImColor(255, 64, 64)));
+				drawList->AddImage((ImTextureID)m_IconStop->GetRendererID(), ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), { 0, 1 }, { 1, 0 }, color);
+			}
+			ImGui::SameLine();
+			{
+				if (ImGui::Button("##NextFrameButton", { size, size }))
+				{
+					if (m_SceneState != SceneState::Edit && m_ScenePaused)
+						m_NextFrame = true;
+				}
+				const ImColor color = (m_SceneState != SceneState::Edit && m_ScenePaused) ? (ImGui::IsItemHovered() ? ImColor(255, 255, 255) : ImColor(192, 192, 192)) : ImColor(117, 117, 117);
+				drawList->AddImage((ImTextureID)m_IconNextFrame->GetRendererID(), ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), { 0, 1 }, { 1, 0 }, color);
+			}
+
+			ImGui::PopStyleColor(3);
 
 			ImGui::SameLine();
 
@@ -1496,6 +1556,9 @@ namespace Dymatic {
 		if (m_SceneState == SceneState::Play)
 		{
 			Entity camera = m_ActiveScene->GetPrimaryCameraEntity();
+			if (!camera)
+				return;
+
 			Renderer2D::BeginScene(camera.GetComponent<CameraComponent>().Camera, camera.GetComponent<TransformComponent>().GetTransform());
 		}
 		else
@@ -1667,7 +1730,11 @@ namespace Dymatic {
 
 	void EditorLayer::OnScenePlay()
 	{
+		if (m_SceneState == SceneState::Simulate)
+			OnSceneStop();
+
 		m_SceneState = SceneState::Play;
+		m_ScenePaused = false;
 
 		m_ActiveScene = Scene::Copy(m_EditorScene);
 		m_ActiveScene->OnRuntimeStart();
@@ -1675,11 +1742,31 @@ namespace Dymatic {
 		m_SceneHierarchyPanel.SetContext(m_ActiveScene);
 	}
 
+	void EditorLayer::OnSceneSimulate()
+	{
+		if (m_SceneState == SceneState::Play)
+			OnSceneStop();
+
+		m_SceneState = SceneState::Simulate;
+		m_ScenePaused = false;
+
+		m_ActiveScene = Scene::Copy(m_EditorScene);
+		m_ActiveScene->OnSimulationStart();
+
+		m_SceneHierarchyPanel.SetContext(m_ActiveScene);
+	}
+
 	void EditorLayer::OnSceneStop()
 	{
+		DY_CORE_ASSERT(m_SceneState == SceneState::Play || m_SceneState == SceneState::Simulate);
+
+		if (m_SceneState == SceneState::Play)
+			m_ActiveScene->OnRuntimeStop();
+		else if (m_SceneState == SceneState::Simulate)
+			m_ActiveScene->OnSimulationStop();
+
 		m_SceneState = SceneState::Edit;
 
-		m_ActiveScene->OnRuntimeStop();
 		m_ActiveScene = m_EditorScene;
 
 		m_SceneHierarchyPanel.SetContext(m_ActiveScene);

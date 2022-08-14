@@ -33,7 +33,11 @@ namespace Dymatic {
 		void OnRuntimeStart();
 		void OnRuntimeStop();
 
-		void OnUpdateRuntime(Timestep ts);
+		void OnSimulationStart();
+		void OnSimulationStop();
+
+		void OnUpdateRuntime(Timestep ts, bool paused = false);
+		void OnUpdateSimulation(Timestep ts, EditorCamera& camera, Entity selectedEntity, bool paused = false);
 		void OnUpdateEditor(Timestep ts, EditorCamera& camera, Entity selectedEntity);
 		void OnViewportResize(uint32_t width, uint32_t height);
 
@@ -63,6 +67,14 @@ namespace Dymatic {
 	private:
 		template<typename T>
 		void OnComponentAdded(Entity entity, T& component);
+
+		void OnPhysics2DStart();
+		void OnPhysics2DStop();
+
+		void OnPhysicsStart();
+		void OnPhysicsStop();
+
+		void RenderScene(Timestep ts, EditorCamera& camera, Entity selectedEntity);
 	private:
 
 		// Icons

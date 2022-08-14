@@ -60,6 +60,7 @@ namespace Dymatic {
 
 	Scene::~Scene()
 	{
+		delete m_Box2DWorld;
 	}
 
 	template<typename Component>
@@ -155,312 +156,34 @@ namespace Dymatic {
 
 	void Scene::OnRuntimeStart()
 	{
-		// create box2d world
 		s_ActiveScenes[m_SceneID] = this;
-
-		// Create physics world and add bodies
-		m_Box2DWorld = new b2World({ 0.0f, -9.8f });
-		auto view = m_Registry.view<Rigidbody2DComponent>();
-		for (auto e : view)
-		{
-			Entity entity = { e, this };
-			auto& transform = entity.GetComponent<TransformComponent>();
-			auto& rb2d = entity.GetComponent<Rigidbody2DComponent>();
-
-			b2BodyDef bodyDef;
-			bodyDef.type = DymaticRigidbody2DTypeToBox2D(rb2d.Type);
-			bodyDef.position.Set(transform.Translation.x, transform.Translation.y);
-			bodyDef.angle = transform.Rotation.z;
-
-			b2Body* body = m_Box2DWorld->CreateBody(&bodyDef);
-			body->SetFixedRotation(rb2d.FixedRotation);
-			rb2d.RuntimeBody = body;
-
-			if (entity.HasComponent<BoxCollider2DComponent>())
-			{
-				auto& bc2d = entity.GetComponent<BoxCollider2DComponent>();
-
-				b2PolygonShape boxShape;
-				boxShape.SetAsBox(bc2d.Size.x * transform.Scale.x, bc2d.Size.y * transform.Scale.y);
-
-				b2FixtureDef fixtureDef;
-				fixtureDef.shape = &boxShape;
-				fixtureDef.density = bc2d.Density;
-				fixtureDef.friction = bc2d.Friction;
-				fixtureDef.restitution = bc2d.Restitution;
-				fixtureDef.restitutionThreshold = bc2d.RestitutionThreshold;
-				body->CreateFixture(&fixtureDef);
-			}
-
-			if (entity.HasComponent<CircleCollider2DComponent>())
-			{
-				auto& cc2d = entity.GetComponent<CircleCollider2DComponent>();
-
-				b2CircleShape circleShape;
-				circleShape.m_p.Set(cc2d.Offset.x, cc2d.Offset.y);
-				circleShape.m_radius = transform.Scale.x * cc2d.Radius;
-
-				b2FixtureDef fixtureDef;
-				fixtureDef.shape = &circleShape;
-				fixtureDef.density = cc2d.Density;
-				fixtureDef.friction = cc2d.Friction;
-				fixtureDef.restitution = cc2d.Restitution;
-				fixtureDef.restitutionThreshold = cc2d.RestitutionThreshold;
-				body->CreateFixture(&fixtureDef);
-			}
-		}
-
-		// Setup PhysX
-		{
-			physx::PxDefaultCpuDispatcher* mDispatcher = nullptr;
-
-			physx::PxSceneDesc sceneDesc(g_PhysicsEngine->getTolerancesScale());
-			sceneDesc.gravity = physx::PxVec3(0.0f, -9.81f, 0.0f);
-			mDispatcher = physx::PxDefaultCpuDispatcherCreate(0);
-			sceneDesc.cpuDispatcher = mDispatcher;
-			sceneDesc.filterShader = physx::PxDefaultSimulationFilterShader;
-			m_PhysXScene = g_PhysicsEngine->createScene(sceneDesc);
-
-			physx::PxPvdSceneClient* pvdClient = m_PhysXScene->getScenePvdClient();
-			if (pvdClient)
-			{
-				pvdClient->setScenePvdFlag(physx::PxPvdSceneFlag::eTRANSMIT_CONSTRAINTS, true);
-				pvdClient->setScenePvdFlag(physx::PxPvdSceneFlag::eTRANSMIT_CONTACTS, true);
-				pvdClient->setScenePvdFlag(physx::PxPvdSceneFlag::eTRANSMIT_SCENEQUERIES, true);
-			}
-
-			// Add a ground plane
-			auto mMaterial = g_PhysicsEngine->createMaterial(0.5f, 0.5f, 0.6f);
-
-			auto view = m_Registry.view<RigidbodyComponent>();
-			for (auto e : view)
-			{
-				Entity entity = { e, this };
-
-				auto& transform = entity.GetComponent<TransformComponent>();
-				auto& rbc = entity.GetComponent<RigidbodyComponent>();
-
-				physx::PxRigidActor* body;
-				physx::PxVec3 pos { transform.Translation.x, transform.Translation.y, transform.Translation.z };
-				glm::quat q { transform.Rotation };
-				physx::PxQuat rot { q.x, q.y, q.z, q.w };
-
-
-				if (rbc.Type == RigidbodyComponent::BodyType::Static)
-				{
-					body = g_PhysicsEngine->createRigidStatic(physx::PxTransform(pos, rot));
-				}
-				else
-				{
-					physx::PxRigidDynamic* dynamic = g_PhysicsEngine->createRigidDynamic(physx::PxTransform(pos, rot));
-					physx::PxRigidBodyExt::updateMassAndInertia(*dynamic, rbc.Density);
-					body = dynamic;
-				}
-
-				if (entity.HasComponent<BoxColliderComponent>())
-				{
-					auto& bcc = entity.GetComponent<BoxColliderComponent>();
-					auto shape = g_PhysicsEngine->createShape(physx::PxBoxGeometry(bcc.Size.x * transform.Scale.x, bcc.Size.y * transform.Scale.y, bcc.Size.z * transform.Scale.z), *mMaterial);
-					body->attachShape(*shape);
-					shape->release();
-				}
-				
-				if (entity.HasComponent<SphereColliderComponent>())
-				{
-					auto& scc = entity.GetComponent<SphereColliderComponent>();
-					float scale = std::max({ transform.Scale.x, transform.Scale.y, transform.Scale.z });
-					auto shape = g_PhysicsEngine->createShape(physx::PxSphereGeometry(scc.Radius * scale), *mMaterial);
-					body->attachShape(*shape);
-					shape->release();
-				}
-
-				if (entity.HasComponent<CapsuleColliderComponent>())
-				{
-					auto& ccc = entity.GetComponent<CapsuleColliderComponent>();
-					float scale = std::max(transform.Scale.y, transform.Scale.z);
-					auto shape = g_PhysicsEngine->createShape(physx::PxCapsuleGeometry(ccc.Radius * transform.Scale.x, ccc.HalfHeight * scale), *mMaterial);
-					body->attachShape(*shape);
-					shape->release();
-				}
-
-				if (entity.HasComponent<MeshColliderComponent>())
-				{
-					auto& mcc = entity.GetComponent<MeshColliderComponent>();
-					auto& smc = entity.GetComponent<StaticMeshComponent>();
-					if (mcc.Type == MeshColliderComponent::MeshType::Triangle)
-					{
-						for (auto& mesh : smc.GetModel()->GetMeshes())
-						{
-							physx::PxTriangleMeshDesc meshDesc;
-
-							std::vector<physx::PxVec3> verts;
-							for (auto& vertex : mesh->m_Verticies)
-								verts.push_back({ vertex.Position.x, vertex.Position.y, vertex.Position.z });
-
-							meshDesc.points.count = verts.size();
-							meshDesc.points.stride = sizeof(physx::PxVec3);
-							meshDesc.points.data = verts.data();
-
-							meshDesc.triangles.count = mesh->m_Verticies.size() / 3;
-							meshDesc.triangles.stride = 3 * sizeof(uint32_t);
-							meshDesc.triangles.data = mesh->m_Indicies.data();
-
-							physx::PxDefaultMemoryOutputStream writeBuffer;
-							physx::PxTriangleMeshCookingResult::Enum result;
-							bool status = g_PhysicsCooking->cookTriangleMesh(meshDesc, writeBuffer, &result);
-							if (!status)
-								DY_CORE_ASSERT(false, "Triangle Mesh cooking failure");
-
-							physx::PxDefaultMemoryInputData readBuffer(writeBuffer.getData(), writeBuffer.getSize());
-							auto mesh = g_PhysicsEngine->createTriangleMesh(readBuffer);
-							auto shape = g_PhysicsEngine->createShape(physx::PxTriangleMeshGeometry(mesh), *mMaterial);
-							
-							// Apply Scaling
-							auto holder = shape->getGeometry();
-							holder.triangleMesh().triangleMesh->acquireReference();
-							holder.triangleMesh().scale.scale = physx::PxVec3(transform.Scale.x, transform.Scale.y, transform.Scale.z);
-							shape->setGeometry(holder.any());
-							holder.triangleMesh().triangleMesh->release();
-
-							body->attachShape(*shape);
-							shape->release();
-							mesh->release();
-						}
-					}
-					else
-					{
-						for (auto& mesh : smc.GetModel()->GetMeshes())
-						{
-							physx::PxConvexMeshDesc meshDesc;
-
-							std::vector<physx::PxVec3> verts;
-							for (auto& vertex : mesh->m_Verticies)
-								verts.push_back({ vertex.Position.x, vertex.Position.y, vertex.Position.z });
-
-							meshDesc.points.count = verts.size();
-							meshDesc.points.stride = sizeof(physx::PxVec3);
-							meshDesc.points.data = verts.data();
-							meshDesc.flags = physx::PxConvexFlag::eCOMPUTE_CONVEX;
-
-							physx::PxDefaultMemoryOutputStream writeBuffer;
-							physx::PxConvexMeshCookingResult::Enum result;
-							bool status = g_PhysicsCooking->cookConvexMesh(meshDesc, writeBuffer, &result);
-							if (!status)
-								DY_CORE_ASSERT(false, "Convex Mesh cooking failure");
-
-							physx::PxDefaultMemoryInputData readBuffer(writeBuffer.getData(), writeBuffer.getSize());
-							auto mesh = g_PhysicsEngine->createConvexMesh(readBuffer);
-							auto shape = g_PhysicsEngine->createShape(physx::PxConvexMeshGeometry(mesh), *mMaterial);
-
-							// Apply Scaling
-							auto holder = shape->getGeometry();
-							holder.convexMesh().convexMesh->acquireReference();
-							holder.convexMesh().scale.scale = physx::PxVec3(transform.Scale.x, transform.Scale.y, transform.Scale.z);
-							shape->setGeometry(holder.any());
-							holder.convexMesh().convexMesh->release();
-
-							body->attachShape(*shape);
-							shape->release();
-							mesh->release();
-						}
-					}
-				}
-
-				m_PhysXScene->addActor(*body);
-
-				rbc.RuntimeBody = body;
-			}
-		}
+		OnPhysics2DStart();
+		OnPhysicsStart();
 	}
 
 	void Scene::OnRuntimeStop()
 	{
-		// destroy box2d world
 		s_ActiveScenes.erase(m_SceneID);
-		delete m_Box2DWorld;
-		m_Box2DWorld = nullptr;
-
-		// destroy PhysX World
-		m_PhysXScene->release();
-		m_PhysXScene = nullptr;
+		OnPhysics2DStop();
+		OnPhysicsStop();
 	}
 
-	void Scene::OnUpdateRuntime(Timestep ts)
+	void Scene::OnSimulationStart()
 	{
-		// Update scripts
-		{
-			m_Registry.view<NativeScriptComponent>().each([=](auto entity, auto& nsc)
-			{
-				// TODO: Move to Scene::OnScenePlay
-				ScriptEngine::BindScript(nsc);
-				if (nsc.InstantiateScript)
-				{
-					if (!nsc.Instance)
-					{
-						nsc.Instance = nsc.InstantiateScript();
-						ScriptEngine::InstantiateScript(nsc);
-						nsc.Instance->m_Entity = Entity{ entity, this };
-						nsc.Instance->OnCreate();
-					}
+		s_ActiveScenes[m_SceneID] = this;
+		OnPhysics2DStart();
+		OnPhysicsStart();
+	}
 
-					nsc.Instance->OnUpdate(ts);
-				}
-			});
-		}
+	void Scene::OnSimulationStop()
+	{
+		s_ActiveScenes.erase(m_SceneID);
+		OnPhysics2DStop();
+		OnPhysicsStop();
+	}
 
-		// Update physics - Box2D
-		{
-			const int32_t velocityIterations = 6;
-			const int32_t positionIterations = 2;
-			m_Box2DWorld->Step(ts, velocityIterations, positionIterations);
-
-			// retrieve transform from box2d
-			auto view = m_Registry.view<Rigidbody2DComponent>();
-			for (auto e : view)
-			{
-				Entity entity = { e, this };
-				auto& transform = entity.GetComponent<TransformComponent>();
-				auto& rb2d = entity.GetComponent<Rigidbody2DComponent>();
-				b2Body* body = (b2Body*)rb2d.RuntimeBody;
-				const auto& position = body->GetPosition();
-				transform.Translation.x = position.x;
-				transform.Translation.y = position.y;
-				transform.Rotation.z = body->GetAngle();
-			}
-
-		}
-
-		// Update Physics - PhysX
-		{
-			m_PhysXScene->simulate(ts);
-			m_PhysXScene->fetchResults(true);
-
-			auto view = m_Registry.view<RigidbodyComponent>();
-			for (auto e : view)
-			{
-				Entity entity = { e, this };
-				auto& transform = entity.GetComponent<TransformComponent>();
-				auto& rbc = entity.GetComponent<RigidbodyComponent>();
-				if (rbc.Type == RigidbodyComponent::BodyType::Dynamic)
-				{
-					auto body = (physx::PxRigidDynamic*)rbc.RuntimeBody;
-					const auto& PXtransform = body->getGlobalPose();
-					body->wakeUp();
-					transform.Translation.x = PXtransform.p.x;
-					transform.Translation.y = PXtransform.p.y;
-					transform.Translation.z = PXtransform.p.z;
-
-					glm::quat rot;
-					rot.x = PXtransform.q.x;
-					rot.y = PXtransform.q.y;
-					rot.z = PXtransform.q.z;
-					rot.w = PXtransform.q.w;
-
-					transform.Rotation = glm::eulerAngles(rot);
-				}
-			}
-		}
-		
+	void Scene::OnUpdateRuntime(Timestep ts, bool paused)
+	{
 		// Get Main Camera
 		SceneCamera* mainCamera = nullptr;
 		glm::mat4 cameraTransform;
@@ -480,22 +203,99 @@ namespace Dymatic {
 			}
 		}
 
-		// Update Audio
-		if (mainCamera)
+		if (!paused)
 		{
-			auto view = m_Registry.view<TransformComponent, AudioComponent>();
-			for (auto entity : view)
+			// Update scripts
 			{
-				auto [transform, ac] = view.get<TransformComponent, AudioComponent>(entity);
-				if (ac.GetSound())
-				{
-					if (!ac.GetSound()->IsInitalizedInternal())
-						ac.GetSound()->OnBeginSceneInternal();
+				m_Registry.view<NativeScriptComponent>().each([=](auto entity, auto& nsc)
+					{
+						// TODO: Move to Scene::OnScenePlay
+						ScriptEngine::BindScript(nsc);
+						if (nsc.InstantiateScript)
+						{
+							if (!nsc.Instance)
+							{
+								nsc.Instance = nsc.InstantiateScript();
+								ScriptEngine::InstantiateScript(nsc);
+								nsc.Instance->m_Entity = Entity{ entity, this };
+								nsc.Instance->OnCreate();
+							}
 
-					ac.GetSound()->SetPositionInternal(GetWorldTransform({ entity, this })[3]);
+							nsc.Instance->OnUpdate(ts);
+						}
+					});
+			}
+
+			// Update physics - Box2D
+			{
+				const int32_t velocityIterations = 6;
+				const int32_t positionIterations = 2;
+				m_Box2DWorld->Step(ts, velocityIterations, positionIterations);
+
+				// retrieve transform from box2d
+				auto view = m_Registry.view<Rigidbody2DComponent>();
+				for (auto e : view)
+				{
+					Entity entity = { e, this };
+					auto& transform = entity.GetComponent<TransformComponent>();
+					auto& rb2d = entity.GetComponent<Rigidbody2DComponent>();
+					b2Body* body = (b2Body*)rb2d.RuntimeBody;
+					const auto& position = body->GetPosition();
+					transform.Translation.x = position.x;
+					transform.Translation.y = position.y;
+					transform.Rotation.z = body->GetAngle();
+				}
+
+			}
+
+			// Update Physics - PhysX
+			{
+				m_PhysXScene->simulate(ts);
+				m_PhysXScene->fetchResults(true);
+
+				auto view = m_Registry.view<RigidbodyComponent>();
+				for (auto e : view)
+				{
+					Entity entity = { e, this };
+					auto& transform = entity.GetComponent<TransformComponent>();
+					auto& rbc = entity.GetComponent<RigidbodyComponent>();
+					if (rbc.Type == RigidbodyComponent::BodyType::Dynamic)
+					{
+						auto body = (physx::PxRigidDynamic*)rbc.RuntimeBody;
+						const auto& PXtransform = body->getGlobalPose();
+						body->wakeUp();
+						transform.Translation.x = PXtransform.p.x;
+						transform.Translation.y = PXtransform.p.y;
+						transform.Translation.z = PXtransform.p.z;
+
+						glm::quat rot;
+						rot.x = PXtransform.q.x;
+						rot.y = PXtransform.q.y;
+						rot.z = PXtransform.q.z;
+						rot.w = PXtransform.q.w;
+
+						transform.Rotation = glm::eulerAngles(rot);
+					}
 				}
 			}
-			AudioEngine::Update(cameraTransform[3], cameraTransform * glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
+
+			// Update Audio
+			if (mainCamera)
+			{
+				auto view = m_Registry.view<TransformComponent, AudioComponent>();
+				for (auto entity : view)
+				{
+					auto [transform, ac] = view.get<TransformComponent, AudioComponent>(entity);
+					if (ac.GetSound())
+					{
+						if (!ac.GetSound()->IsInitalizedInternal())
+							ac.GetSound()->OnBeginSceneInternal();
+
+						ac.GetSound()->SetPositionInternal(GetWorldTransform({ entity, this })[3]);
+					}
+				}
+				AudioEngine::Update(cameraTransform[3], cameraTransform * glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
+			}
 		}
 
 		// Renderer
@@ -606,6 +406,434 @@ namespace Dymatic {
 
 	}
 
+	void Scene::OnUpdateSimulation(Timestep ts, EditorCamera& camera, Entity selectedEntity, bool paused)
+	{
+		if (!paused)
+		{
+			// Update physics - Box2D
+			{
+				const int32_t velocityIterations = 6;
+				const int32_t positionIterations = 2;
+				m_Box2DWorld->Step(ts, velocityIterations, positionIterations);
+
+				// retrieve transform from box2d
+				auto view = m_Registry.view<Rigidbody2DComponent>();
+				for (auto e : view)
+				{
+					Entity entity = { e, this };
+					auto& transform = entity.GetComponent<TransformComponent>();
+					auto& rb2d = entity.GetComponent<Rigidbody2DComponent>();
+					b2Body* body = (b2Body*)rb2d.RuntimeBody;
+					const auto& position = body->GetPosition();
+					transform.Translation.x = position.x;
+					transform.Translation.y = position.y;
+					transform.Rotation.z = body->GetAngle();
+				}
+
+			}
+
+			// Update Physics - PhysX
+			{
+				m_PhysXScene->simulate(ts);
+				m_PhysXScene->fetchResults(true);
+
+				auto view = m_Registry.view<RigidbodyComponent>();
+				for (auto e : view)
+				{
+					Entity entity = { e, this };
+					auto& transform = entity.GetComponent<TransformComponent>();
+					auto& rbc = entity.GetComponent<RigidbodyComponent>();
+					if (rbc.Type == RigidbodyComponent::BodyType::Dynamic)
+					{
+						auto body = (physx::PxRigidDynamic*)rbc.RuntimeBody;
+						const auto& PXtransform = body->getGlobalPose();
+						body->wakeUp();
+						transform.Translation.x = PXtransform.p.x;
+						transform.Translation.y = PXtransform.p.y;
+						transform.Translation.z = PXtransform.p.z;
+
+						glm::quat rot;
+						rot.x = PXtransform.q.x;
+						rot.y = PXtransform.q.y;
+						rot.z = PXtransform.q.z;
+						rot.w = PXtransform.q.w;
+
+						transform.Rotation = glm::eulerAngles(rot);
+					}
+				}
+			}
+		}
+
+		// Render
+		RenderScene(ts, camera, selectedEntity);
+	}
+
+	void Scene::OnUpdateEditor(Timestep ts, EditorCamera& camera, Entity selectedEntity)
+	{
+		// Render
+		RenderScene(ts, camera, selectedEntity);
+	}
+
+	void Scene::OnViewportResize(uint32_t width, uint32_t height)
+	{
+		m_ViewportWidth = width;
+		m_ViewportHeight = height;
+
+		// Resize our non-FixedAspectRatio cameras
+		auto view = m_Registry.view<CameraComponent>();
+		for (auto entity : view)
+		{
+			auto& cameraComponent = view.get<CameraComponent>(entity);
+			if (!cameraComponent.FixedAspectRatio)
+				cameraComponent.Camera.SetViewportSize(width, height);
+		}
+	}
+
+	void Scene::DuplicateEntity(Entity entity)
+	{
+		std::string name = entity.GetName();
+		Entity newEntity = CreateEntity(name);
+
+		CopyComponentIfExists<FolderComponent>(newEntity, entity);
+		CopyComponentIfExists<TransformComponent>(newEntity, entity);
+		CopyComponentIfExists<SpriteRendererComponent>(newEntity, entity);
+		CopyComponentIfExists<CircleRendererComponent>(newEntity, entity);
+		CopyComponentIfExists<CameraComponent>(newEntity, entity);
+		CopyComponentIfExists<NativeScriptComponent>(newEntity, entity);
+		CopyComponentIfExists<Rigidbody2DComponent>(newEntity, entity);
+		CopyComponentIfExists<BoxCollider2DComponent>(newEntity, entity);
+		CopyComponentIfExists<CircleCollider2DComponent>(newEntity, entity);
+		CopyComponentIfExists<StaticMeshComponent>(newEntity, entity);
+		CopyComponentIfExists<DirectionalLightComponent>(newEntity, entity);
+		CopyComponentIfExists<PointLightComponent>(newEntity, entity);
+		CopyComponentIfExists<SpotLightComponent>(newEntity, entity);
+		CopyComponentIfExists<SkylightComponent>(newEntity, entity);
+		CopyComponentIfExists<AudioComponent>(newEntity, entity);
+		CopyComponentIfExists<RigidbodyComponent>(newEntity, entity);
+		CopyComponentIfExists<BoxColliderComponent>(newEntity, entity);
+		CopyComponentIfExists<SphereColliderComponent>(newEntity, entity);
+		CopyComponentIfExists<CapsuleColliderComponent>(newEntity, entity);
+		CopyComponentIfExists<MeshColliderComponent>(newEntity, entity);
+
+		CopyComponentIfExists<UICanvasComponent>(newEntity, entity);
+		CopyComponentIfExists<UIImageComponent>(newEntity, entity);
+		CopyComponentIfExists<UIButtonComponent>(newEntity, entity);
+	}
+
+	Entity Scene::GetPrimaryCameraEntity()
+	{
+		auto view = m_Registry.view<CameraComponent>();
+		for (auto entity : view)
+		{
+			const auto& camera = view.get<CameraComponent>(entity);
+			if (camera.Primary)
+				return Entity{ entity, this };
+		}
+		return {};
+	}
+
+	bool Scene::IsEntityParented(Entity entity)
+	{
+		return m_Relations.find(entity) != m_Relations.end();
+	}
+
+	bool Scene::DoesEntityHaveChildren(Entity entity)
+	{
+		for (auto& relation : m_Relations)
+			if (relation.second == entity)
+				return true;
+		return false;
+	}
+
+	Entity Scene::GetEntityParent(Entity entity)
+	{
+		return Entity{ m_Relations[entity], this };
+	}
+
+	std::vector<Entity> Scene::GetEntityChildren(Entity entity)
+	{
+		std::vector<Entity> children;
+		for (auto& relation : m_Relations)
+			if (relation.second == entity)
+				children.push_back(Entity{ relation.first, this });
+		return children;
+	}
+
+	void Scene::SetEntityParent(Entity entity, Entity parent)
+	{
+		m_Relations[entity] = parent;
+	}
+
+	void Scene::RemoveEntityParent(Entity entity)
+	{
+		m_Relations.erase(entity);
+	}
+
+	glm::mat4 Scene::GetWorldTransform(Entity entity)
+	{
+		glm::mat4 matrix = entity.GetComponent<TransformComponent>().GetTransform();
+		Entity currentEntity = entity;
+		while (IsEntityParented(currentEntity))
+		{
+			currentEntity = GetEntityParent(currentEntity);
+			if (currentEntity.HasComponent<TransformComponent>())
+				matrix = currentEntity.GetComponent<TransformComponent>().GetTransform() * matrix;
+		}
+		return matrix;
+	}
+
+	glm::mat4 Scene::WorldToLocalTransform(Entity entity, glm::mat4 matrix)
+	{
+		Entity currentEntity = entity;
+		while (IsEntityParented(currentEntity))
+		{
+			currentEntity = GetEntityParent(currentEntity);
+			if (currentEntity.HasComponent<TransformComponent>())
+				matrix = glm::inverse(currentEntity.GetComponent<TransformComponent>().GetTransform()) * matrix;
+		}
+		return matrix;
+	}
+
+	template<typename T>
+	void Scene::OnComponentAdded(Entity entity, T& component)
+	{
+		//static_assert(false);
+	}
+
+	void Scene::OnPhysics2DStart()
+	{
+		// create box2d world
+		// Create physics world and add bodies
+		m_Box2DWorld = new b2World({ 0.0f, -9.8f });
+		auto view = m_Registry.view<Rigidbody2DComponent>();
+		for (auto e : view)
+		{
+			Entity entity = { e, this };
+			auto& transform = entity.GetComponent<TransformComponent>();
+			auto& rb2d = entity.GetComponent<Rigidbody2DComponent>();
+
+			b2BodyDef bodyDef;
+			bodyDef.type = DymaticRigidbody2DTypeToBox2D(rb2d.Type);
+			bodyDef.position.Set(transform.Translation.x, transform.Translation.y);
+			bodyDef.angle = transform.Rotation.z;
+
+			b2Body* body = m_Box2DWorld->CreateBody(&bodyDef);
+			body->SetFixedRotation(rb2d.FixedRotation);
+			rb2d.RuntimeBody = body;
+
+			if (entity.HasComponent<BoxCollider2DComponent>())
+			{
+				auto& bc2d = entity.GetComponent<BoxCollider2DComponent>();
+
+				b2PolygonShape boxShape;
+				boxShape.SetAsBox(bc2d.Size.x * transform.Scale.x, bc2d.Size.y * transform.Scale.y);
+
+				b2FixtureDef fixtureDef;
+				fixtureDef.shape = &boxShape;
+				fixtureDef.density = bc2d.Density;
+				fixtureDef.friction = bc2d.Friction;
+				fixtureDef.restitution = bc2d.Restitution;
+				fixtureDef.restitutionThreshold = bc2d.RestitutionThreshold;
+				body->CreateFixture(&fixtureDef);
+			}
+
+			if (entity.HasComponent<CircleCollider2DComponent>())
+			{
+				auto& cc2d = entity.GetComponent<CircleCollider2DComponent>();
+
+				b2CircleShape circleShape;
+				circleShape.m_p.Set(cc2d.Offset.x, cc2d.Offset.y);
+				circleShape.m_radius = transform.Scale.x * cc2d.Radius;
+
+				b2FixtureDef fixtureDef;
+				fixtureDef.shape = &circleShape;
+				fixtureDef.density = cc2d.Density;
+				fixtureDef.friction = cc2d.Friction;
+				fixtureDef.restitution = cc2d.Restitution;
+				fixtureDef.restitutionThreshold = cc2d.RestitutionThreshold;
+				body->CreateFixture(&fixtureDef);
+			}
+		}
+	}
+
+	void Scene::OnPhysics2DStop()
+	{
+		// Destroy box2d world
+		delete m_Box2DWorld;
+		m_Box2DWorld = nullptr;
+	}
+
+	void Scene::OnPhysicsStart()
+	{
+		// Setup PhysX
+		{
+			physx::PxDefaultCpuDispatcher* mDispatcher = nullptr;
+
+			physx::PxSceneDesc sceneDesc(g_PhysicsEngine->getTolerancesScale());
+			sceneDesc.gravity = physx::PxVec3(0.0f, -9.81f, 0.0f);
+			mDispatcher = physx::PxDefaultCpuDispatcherCreate(0);
+			sceneDesc.cpuDispatcher = mDispatcher;
+			sceneDesc.filterShader = physx::PxDefaultSimulationFilterShader;
+			m_PhysXScene = g_PhysicsEngine->createScene(sceneDesc);
+
+			physx::PxPvdSceneClient* pvdClient = m_PhysXScene->getScenePvdClient();
+			if (pvdClient)
+			{
+				pvdClient->setScenePvdFlag(physx::PxPvdSceneFlag::eTRANSMIT_CONSTRAINTS, true);
+				pvdClient->setScenePvdFlag(physx::PxPvdSceneFlag::eTRANSMIT_CONTACTS, true);
+				pvdClient->setScenePvdFlag(physx::PxPvdSceneFlag::eTRANSMIT_SCENEQUERIES, true);
+			}
+
+			auto mMaterial = g_PhysicsEngine->createMaterial(0.5f, 0.5f, 0.6f);
+
+			auto view = m_Registry.view<RigidbodyComponent>();
+			for (auto e : view)
+			{
+				Entity entity = { e, this };
+
+				auto& transform = entity.GetComponent<TransformComponent>();
+				auto& rbc = entity.GetComponent<RigidbodyComponent>();
+
+				physx::PxRigidActor* body;
+				physx::PxVec3 pos{ transform.Translation.x, transform.Translation.y, transform.Translation.z };
+				glm::quat q{ transform.Rotation };
+				physx::PxQuat rot{ q.x, q.y, q.z, q.w };
+
+
+				if (rbc.Type == RigidbodyComponent::BodyType::Static)
+				{
+					body = g_PhysicsEngine->createRigidStatic(physx::PxTransform(pos, rot));
+				}
+				else
+				{
+					physx::PxRigidDynamic* dynamic = g_PhysicsEngine->createRigidDynamic(physx::PxTransform(pos, rot));
+					physx::PxRigidBodyExt::updateMassAndInertia(*dynamic, rbc.Density);
+					body = dynamic;
+				}
+
+				if (entity.HasComponent<BoxColliderComponent>())
+				{
+					auto& bcc = entity.GetComponent<BoxColliderComponent>();
+					auto shape = g_PhysicsEngine->createShape(physx::PxBoxGeometry(bcc.Size.x * transform.Scale.x, bcc.Size.y * transform.Scale.y, bcc.Size.z * transform.Scale.z), *mMaterial);
+					body->attachShape(*shape);
+					shape->release();
+				}
+
+				if (entity.HasComponent<SphereColliderComponent>())
+				{
+					auto& scc = entity.GetComponent<SphereColliderComponent>();
+					float scale = std::max({ transform.Scale.x, transform.Scale.y, transform.Scale.z });
+					auto shape = g_PhysicsEngine->createShape(physx::PxSphereGeometry(scc.Radius * scale), *mMaterial);
+					body->attachShape(*shape);
+					shape->release();
+				}
+
+				if (entity.HasComponent<CapsuleColliderComponent>())
+				{
+					auto& ccc = entity.GetComponent<CapsuleColliderComponent>();
+					float scale = std::max(transform.Scale.y, transform.Scale.z);
+					auto shape = g_PhysicsEngine->createShape(physx::PxCapsuleGeometry(ccc.Radius * transform.Scale.x, ccc.HalfHeight * scale), *mMaterial);
+					body->attachShape(*shape);
+					shape->release();
+				}
+
+				if (entity.HasComponent<MeshColliderComponent>())
+				{
+					auto& mcc = entity.GetComponent<MeshColliderComponent>();
+					auto& smc = entity.GetComponent<StaticMeshComponent>();
+					if (mcc.Type == MeshColliderComponent::MeshType::Triangle)
+					{
+						for (auto& mesh : smc.GetModel()->GetMeshes())
+						{
+							physx::PxTriangleMeshDesc meshDesc;
+
+							std::vector<physx::PxVec3> verts;
+							for (auto& vertex : mesh->m_Verticies)
+								verts.push_back({ vertex.Position.x, vertex.Position.y, vertex.Position.z });
+
+							meshDesc.points.count = verts.size();
+							meshDesc.points.stride = sizeof(physx::PxVec3);
+							meshDesc.points.data = verts.data();
+
+							meshDesc.triangles.count = mesh->m_Verticies.size() / 3;
+							meshDesc.triangles.stride = 3 * sizeof(uint32_t);
+							meshDesc.triangles.data = mesh->m_Indicies.data();
+
+							physx::PxDefaultMemoryOutputStream writeBuffer;
+							physx::PxTriangleMeshCookingResult::Enum result;
+							bool status = g_PhysicsCooking->cookTriangleMesh(meshDesc, writeBuffer, &result);
+							if (!status)
+								DY_CORE_ASSERT(false, "Triangle Mesh cooking failure");
+
+							physx::PxDefaultMemoryInputData readBuffer(writeBuffer.getData(), writeBuffer.getSize());
+							auto mesh = g_PhysicsEngine->createTriangleMesh(readBuffer);
+							auto shape = g_PhysicsEngine->createShape(physx::PxTriangleMeshGeometry(mesh), *mMaterial);
+
+							// Apply Scaling
+							auto holder = shape->getGeometry();
+							holder.triangleMesh().triangleMesh->acquireReference();
+							holder.triangleMesh().scale.scale = physx::PxVec3(transform.Scale.x, transform.Scale.y, transform.Scale.z);
+							shape->setGeometry(holder.any());
+							holder.triangleMesh().triangleMesh->release();
+
+							body->attachShape(*shape);
+							shape->release();
+							mesh->release();
+						}
+					}
+					else
+					{
+						for (auto& mesh : smc.GetModel()->GetMeshes())
+						{
+							physx::PxConvexMeshDesc meshDesc;
+
+							std::vector<physx::PxVec3> verts;
+							for (auto& vertex : mesh->m_Verticies)
+								verts.push_back({ vertex.Position.x, vertex.Position.y, vertex.Position.z });
+
+							meshDesc.points.count = verts.size();
+							meshDesc.points.stride = sizeof(physx::PxVec3);
+							meshDesc.points.data = verts.data();
+							meshDesc.flags = physx::PxConvexFlag::eCOMPUTE_CONVEX;
+
+							physx::PxDefaultMemoryOutputStream writeBuffer;
+							physx::PxConvexMeshCookingResult::Enum result;
+							bool status = g_PhysicsCooking->cookConvexMesh(meshDesc, writeBuffer, &result);
+							if (!status)
+								DY_CORE_ASSERT(false, "Convex Mesh cooking failure");
+
+							physx::PxDefaultMemoryInputData readBuffer(writeBuffer.getData(), writeBuffer.getSize());
+							auto mesh = g_PhysicsEngine->createConvexMesh(readBuffer);
+							auto shape = g_PhysicsEngine->createShape(physx::PxConvexMeshGeometry(mesh), *mMaterial);
+
+							// Apply Scaling
+							auto holder = shape->getGeometry();
+							holder.convexMesh().convexMesh->acquireReference();
+							holder.convexMesh().scale.scale = physx::PxVec3(transform.Scale.x, transform.Scale.y, transform.Scale.z);
+							shape->setGeometry(holder.any());
+							holder.convexMesh().convexMesh->release();
+
+							body->attachShape(*shape);
+							shape->release();
+							mesh->release();
+						}
+					}
+				}
+
+				m_PhysXScene->addActor(*body);
+
+				rbc.RuntimeBody = body;
+			}
+		}
+	}
+
+	void Scene::OnPhysicsStop()
+	{
+		// Destroy PhysX World
+		m_PhysXScene->release();
+		m_PhysXScene = nullptr;
+	}
+
 	static void DrawDebugSphere(glm::vec3 position, float radius, glm::vec4 color = glm::vec4(1.0f))
 	{
 		const size_t ittertions = 30;
@@ -630,7 +858,7 @@ namespace Dymatic {
 		}
 	}
 
-	void Scene::OnUpdateEditor(Timestep ts, EditorCamera& camera, Entity selectedEntity)
+	void Scene::RenderScene(Timestep ts, EditorCamera& camera, Entity selectedEntity)
 	{
 		Renderer3D::BeginScene(camera);
 
@@ -645,8 +873,6 @@ namespace Dymatic {
 					ac.GetSound()->OnEndSceneInternal();
 			}
 		}
-
-		//Renderer3D::DrawGrid();
 
 		// Submit Lights
 		{
@@ -815,12 +1041,12 @@ namespace Dymatic {
 			for (auto entity : group)
 			{
 				auto [transform, sprite] = group.get<TransformComponent, SpriteRendererComponent>(entity);
-		
+
 				//Renderer2D::DrawSprite(transform.GetTransform(), sprite, (int)entity);
 				Renderer2D::DrawSprite(GetWorldTransform({ entity, this }), sprite, (int)entity);
 			}
 		}
-		
+
 		// Draw circles
 		{
 			auto view = m_Registry.view<TransformComponent, CircleRendererComponent>();
@@ -838,19 +1064,19 @@ namespace Dymatic {
 			for (auto entity : view)
 			{
 				auto [transform, ps] = view.get<TransformComponent, ParticleSystemComponent>(entity);
-		
+
 				//ps.Position = transform.Translation + ps.Offset;
 				ps.Position = glm::vec3(GetWorldTransform({ entity, this })[3]) + ps.Offset;
-		
+
 				ps.OnUpdate(ts);
 				ps.Emit();
 				for (auto& particle : ps.GetParticlePool())
 				{
 					if (!particle.Active)
 						continue;
-		
+
 					glm::vec4 color = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
-		
+
 					float life = particle.LifeRemaining / particle.LifeTime;
 					if (ps.ColorMethod == 0) {
 						// Fade away particles
@@ -880,20 +1106,20 @@ namespace Dymatic {
 							}
 						}
 					}
-		
+
 					float size = glm::lerp(particle.SizeEnd, particle.SizeBegin, life);
-		
+
 					glm::vec3 position = { particle.Position.x, particle.Position.y, particle.Position.z };
-		
+
 					glm::mat4 transformation = glm::translate(glm::mat4(1.0f), position)
 						* glm::rotate(glm::mat4(1.0f), glm::radians(particle.Rotation), glm::vec3{ 0.0f, 0.0f, 1.0f })
 						* glm::scale(glm::mat4(1.0f), { size, size, size });
-		
+
 					if (ps.FaceCamera) {
 						transformation = transformation * glm::rotate(glm::mat4(1.0f), camera.GetYaw(), glm::vec3{ 0.0f, -1.0f, 0.0f })
 							* glm::rotate(glm::mat4(1.0f), camera.GetPitch(), glm::vec3{ -1.0f, 0.0f, 0.0f });
 					}
-		
+
 					//Renderer2D::DrawQuad(transformation, color, (int)entity);
 					Renderer2D::DrawCircle(transformation, color, 1.0f, 0.005f, (int)entity);
 				}
@@ -901,132 +1127,6 @@ namespace Dymatic {
 		}
 
 		Renderer2D::EndScene();
-	}
-
-	void Scene::OnViewportResize(uint32_t width, uint32_t height)
-	{
-		m_ViewportWidth = width;
-		m_ViewportHeight = height;
-
-		// Resize our non-FixedAspectRatio cameras
-		auto view = m_Registry.view<CameraComponent>();
-		for (auto entity : view)
-		{
-			auto& cameraComponent = view.get<CameraComponent>(entity);
-			if (!cameraComponent.FixedAspectRatio)
-				cameraComponent.Camera.SetViewportSize(width, height);
-		}
-	}
-
-	void Scene::DuplicateEntity(Entity entity)
-	{
-		std::string name = entity.GetName();
-		Entity newEntity = CreateEntity(name);
-
-		CopyComponentIfExists<FolderComponent>(newEntity, entity);
-		CopyComponentIfExists<TransformComponent>(newEntity, entity);
-		CopyComponentIfExists<SpriteRendererComponent>(newEntity, entity);
-		CopyComponentIfExists<CircleRendererComponent>(newEntity, entity);
-		CopyComponentIfExists<CameraComponent>(newEntity, entity);
-		CopyComponentIfExists<NativeScriptComponent>(newEntity, entity);
-		CopyComponentIfExists<Rigidbody2DComponent>(newEntity, entity);
-		CopyComponentIfExists<BoxCollider2DComponent>(newEntity, entity);
-		CopyComponentIfExists<CircleCollider2DComponent>(newEntity, entity);
-		CopyComponentIfExists<StaticMeshComponent>(newEntity, entity);
-		CopyComponentIfExists<DirectionalLightComponent>(newEntity, entity);
-		CopyComponentIfExists<PointLightComponent>(newEntity, entity);
-		CopyComponentIfExists<SpotLightComponent>(newEntity, entity);
-		CopyComponentIfExists<SkylightComponent>(newEntity, entity);
-		CopyComponentIfExists<AudioComponent>(newEntity, entity);
-		CopyComponentIfExists<RigidbodyComponent>(newEntity, entity);
-		CopyComponentIfExists<BoxColliderComponent>(newEntity, entity);
-		CopyComponentIfExists<SphereColliderComponent>(newEntity, entity);
-		CopyComponentIfExists<CapsuleColliderComponent>(newEntity, entity);
-		CopyComponentIfExists<MeshColliderComponent>(newEntity, entity);
-
-		CopyComponentIfExists<UICanvasComponent>(newEntity, entity);
-		CopyComponentIfExists<UIImageComponent>(newEntity, entity);
-		CopyComponentIfExists<UIButtonComponent>(newEntity, entity);
-	}
-
-	Entity Scene::GetPrimaryCameraEntity()
-	{
-		auto view = m_Registry.view<CameraComponent>();
-		for (auto entity : view)
-		{
-			const auto& camera = view.get<CameraComponent>(entity);
-			if (camera.Primary)
-				return Entity{ entity, this };
-		}
-		return {};
-	}
-
-	bool Scene::IsEntityParented(Entity entity)
-	{
-		return m_Relations.find(entity) != m_Relations.end();
-	}
-
-	bool Scene::DoesEntityHaveChildren(Entity entity)
-	{
-		for (auto& relation : m_Relations)
-			if (relation.second == entity)
-				return true;
-		return false;
-	}
-
-	Entity Scene::GetEntityParent(Entity entity)
-	{
-		return Entity{ m_Relations[entity], this };
-	}
-
-	std::vector<Entity> Scene::GetEntityChildren(Entity entity)
-	{
-		std::vector<Entity> children;
-		for (auto& relation : m_Relations)
-			if (relation.second == entity)
-				children.push_back(Entity{ relation.first, this });
-		return children;
-	}
-
-	void Scene::SetEntityParent(Entity entity, Entity parent)
-	{
-		m_Relations[entity] = parent;
-	}
-
-	void Scene::RemoveEntityParent(Entity entity)
-	{
-		m_Relations.erase(entity);
-	}
-
-	glm::mat4 Scene::GetWorldTransform(Entity entity)
-	{
-		glm::mat4 matrix = entity.GetComponent<TransformComponent>().GetTransform();
-		Entity currentEntity = entity;
-		while (IsEntityParented(currentEntity))
-		{
-			currentEntity = GetEntityParent(currentEntity);
-			if (currentEntity.HasComponent<TransformComponent>())
-				matrix = currentEntity.GetComponent<TransformComponent>().GetTransform() * matrix;
-		}
-		return matrix;
-	}
-
-	glm::mat4 Scene::WorldToLocalTransform(Entity entity, glm::mat4 matrix)
-	{
-		Entity currentEntity = entity;
-		while (IsEntityParented(currentEntity))
-		{
-			currentEntity = GetEntityParent(currentEntity);
-			if (currentEntity.HasComponent<TransformComponent>())
-				matrix = glm::inverse(currentEntity.GetComponent<TransformComponent>().GetTransform()) * matrix;
-		}
-		return matrix;
-	}
-
-	template<typename T>
-	void Scene::OnComponentAdded(Entity entity, T& component)
-	{
-		//static_assert(false);
 	}
 
 	template<>

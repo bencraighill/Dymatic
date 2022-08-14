@@ -37,8 +37,6 @@ namespace Dymatic {
 
 		static void SubmitSkyLight(SkylightComponent& lightComponent);
 
-		static void DrawGrid();
-
 		static void SetSelectedEntity(int id);
 
 		// Stats

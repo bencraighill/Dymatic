@@ -105,12 +105,6 @@ namespace Dymatic {
 		// Renderer Stats
 		Renderer3D::Statistics Stats;
 
-		// Grid
-		const int GridBuffer[4] = { 0, 1, 2, 3 };
-		Ref<VertexArray> GridVertexArray;
-		Ref<VertexBuffer> GridVertexBuffer;
-		Ref<Shader> GridShader;
-
 		float skyboxVertices[24] =
 		{
 			-1.0f, -1.0f, -1.0f,
@@ -254,31 +248,6 @@ namespace Dymatic {
 		s_Data.LightIndex_SSBO = ShaderStorageBuffer::Create(s_Data.MaxLights * sizeof(unsigned int), 7, ShaderStorageBufferUsage::STATIC_COPY);
 		s_Data.LightGrid_SSBO = ShaderStorageBuffer::Create(s_Data.NumClusters * 2 * sizeof(unsigned int), 8, ShaderStorageBufferUsage::STATIC_COPY);
 		s_Data.GlobalIndexCountSSBO = ShaderStorageBuffer::Create(sizeof(unsigned int), 9, ShaderStorageBufferUsage::STATIC_COPY);
-
-		// Setup Grid Rendering Data
-		{
-			s_Data.GridVertexArray = VertexArray::Create();
-
-			s_Data.GridVertexBuffer = VertexBuffer::Create(4 * sizeof(int));
-			s_Data.GridVertexBuffer->SetLayout({
-				{ ShaderDataType::Int, "a_VertexIndex" }
-				});
-			s_Data.GridVertexArray->AddVertexBuffer(s_Data.GridVertexBuffer);
-
-			uint32_t quadIndices[6];
-
-			quadIndices[0] = 0;
-			quadIndices[1] = 1;
-			quadIndices[2] = 2;
-			quadIndices[3] = 2;
-			quadIndices[4] = 3;
-			quadIndices[5] = 0;
-
-			Ref<IndexBuffer> quadIB = IndexBuffer::Create(quadIndices, 6);
-			s_Data.GridVertexArray->SetIndexBuffer(quadIB);
-
-			s_Data.GridShader = Shader::Create("assets/shaders/Renderer3D_Grid.glsl");
-		}
 
 		// Setup Pre Deferred pass
 		{
@@ -903,14 +872,6 @@ namespace Dymatic {
 
 			glDepthFunc(GL_LESS);
 		}
-	}
-
-	void Renderer3D::DrawGrid()
-	{
-		s_Data.GridVertexBuffer->SetData(s_Data.GridBuffer, sizeof(int) * 4);
-
-		s_Data.GridShader->Bind();
-		RenderCommand::DrawIndexed(s_Data.GridVertexArray, 6);
 	}
 
 	void Renderer3D::SetSelectedEntity(int id)

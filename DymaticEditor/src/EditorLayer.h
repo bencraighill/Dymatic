@@ -58,6 +58,7 @@ namespace Dymatic {
 		void SerializeScene(Ref<Scene> scene, const std::filesystem::path& path);
 
 		void OnScenePlay();
+		void OnSceneSimulate();
 		void OnSceneStop();
 
 		void OnDuplicateEntity();
@@ -159,9 +160,11 @@ namespace Dymatic {
 		// Runtime
 		enum class SceneState
 		{
-			Edit = 0, Play = 1
+			Edit = 0, Play = 1, Simulate = 2
 		};
 		SceneState m_SceneState = SceneState::Edit;
+		bool m_ScenePaused = false;
+		bool m_NextFrame = false;
 
 		// Panels
 		SceneHierarchyPanel m_SceneHierarchyPanel;
@@ -185,7 +188,7 @@ namespace Dymatic {
 		//Sandbox::GPUSIM::GPUSimulation gpusim;
 
 		// Editor Resources
-		Ref<Texture2D> m_IconPlay, m_IconStop;
+		Ref<Texture2D> m_IconPlay, m_IconSimulate, m_IconStop, m_IconPause, m_IconNextFrame;
 
 		bool m_ShowSplash;
 	};
