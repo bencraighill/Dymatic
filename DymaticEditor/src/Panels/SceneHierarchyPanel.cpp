@@ -53,7 +53,7 @@ namespace Dymatic {
 				// Draw BK
 				{
 					auto window = ImGui::GetCurrentWindow();
-					ImVec2 frame_size = ImVec2( ImGui::GetContentRegionAvail().x, ImGui::GetFontSize() + style.FramePadding.y * 2.0f);
+					ImVec2 frame_size = ImVec2(ImGui::GetContentRegionAvail().x, ImGui::GetFontSize() + style.FramePadding.y * 2.0f);
 					const ImRect frame_bb(window->DC.CursorPos, window->DC.CursorPos + frame_size);
 					ImGui::RenderFrame(frame_bb.Min, frame_bb.Max, ImGui::GetColorU32(ImGuiCol_FrameBg), true, style.FrameRounding);
 				}
@@ -105,22 +105,23 @@ namespace Dymatic {
 
 			// Main Hierarchy List
 			ImGui::BeginChild("##SceneHierarchyList");
+
+			// Push Style Flags
+			ImGui::PushStyleColor(ImGuiCol_TableRowBgAlt, {});
+			ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2{});
+			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2{ 3, 3 });
+
+			// Setup Table
+			const ImGuiTableFlags flags = ImGuiTableFlags_PadOuterX | ImGuiTableFlags_Resizable | ImGuiTableFlags_NoBordersInBody | ImGuiTableFlags_NoPadInnerX;
+			ImGui::BeginTable("##SceneHierarchyTable", 3, flags);
+			ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_NoHide);
+			ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, 64.0f);
+			ImGui::TableSetupColumn("Modifiers", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+			ImGui::TableHeadersRow();
+
+			// Display Main Items
 			if (m_Context)
 			{
-				// Push Style Flags
-				ImGui::PushStyleColor(ImGuiCol_TableRowBgAlt, {});
-				ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2{});
-				ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2{ 3, 3 });
-
-				// Setup Table
-				const ImGuiTableFlags flags = ImGuiTableFlags_PadOuterX | ImGuiTableFlags_Resizable | ImGuiTableFlags_NoBordersInBody | ImGuiTableFlags_NoPadInnerX;
-				ImGui::BeginTable("##SceneHierarchyTable", 3, flags);
-				ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_NoHide);
-				ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, 64.0f);
-				ImGui::TableSetupColumn("Modifiers", ImGuiTableColumnFlags_WidthFixed, 80.0f);
-				ImGui::TableHeadersRow();
-				
-				// Display Main Items
 				m_Context->m_Registry.each([&](auto entityID)
 					{
 						Entity entity{ entityID , m_Context.get() };
@@ -128,67 +129,68 @@ namespace Dymatic {
 							DrawEntityNode(entity);
 					});
 
-				// Pop Table Styles
-				ImGui::PopStyleVar(2);
-				ImGui::PopStyleColor();
+			}
 
-				if (ImGui::IsMouseDown(0) && ImGui::IsWindowHovered())
-					m_SelectionContext = {};
+			// Pop Table Styles
+			ImGui::PopStyleVar(2);
+			ImGui::PopStyleColor();
 
-				// Right-click on blank space
-				if (m_ShowCreateMenu)
+			if (ImGui::IsMouseDown(0) && ImGui::IsWindowHovered())
+				m_SelectionContext = {};
+
+			// Right-click on blank space
+			if (m_ShowCreateMenu)
+			{
+				ImGui::OpenPopup(ImGui::GetID("##CreateEntityPopup"));
+				m_ShowCreateMenu = false;
+			}
+
+			// Create Entity Context Popup
+			if (ImGui::BeginPopupContextWindow(0, 1, false) || ImGui::BeginPopupEx(ImGui::GetID("##CreateEntityPopup"), ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoSavedSettings))
+			{
+				if (ImGui::BeginMenu("Create"))
 				{
-					ImGui::OpenPopup(ImGui::GetID("##CreateEntityPopup"));
-					m_ShowCreateMenu = false;
-				}
 
-				// Create Entity Context Popup
-				if (ImGui::BeginPopupContextWindow(0, 1, false) || ImGui::BeginPopupEx(ImGui::GetID("##CreateEntityPopup"), ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoSavedSettings))
-				{
-					if (ImGui::BeginMenu("Create"))
+					if (ImGui::MenuItem("Empty Entity"))
+						SetSelectedEntity(m_Context->CreateEntity("Empty Entity"));
+
+					if (ImGui::MenuItem("Folder")) { auto& entity = m_Context->CreateEntity("Folder"); entity.RemoveComponent<TransformComponent>(); entity.AddComponent<FolderComponent>(); SetSelectedEntity(entity); }
+
+					ImGui::Separator();
+
+					if (ImGui::BeginMenu("Mesh"))
 					{
-
-						if (ImGui::MenuItem("Empty Entity"))
-							 SetSelectedEntity(m_Context->CreateEntity("Empty Entity"));
-
-						if (ImGui::MenuItem("Folder")) { auto& entity = m_Context->CreateEntity("Folder"); entity.RemoveComponent<TransformComponent>(); entity.AddComponent<FolderComponent>(); SetSelectedEntity(entity); }
-
-						ImGui::Separator();
-
-						if (ImGui::BeginMenu("Mesh"))
-						{
-							if (ImGui::MenuItem("Static Mesh")) { auto& entity = m_Context->CreateEntity("Static Mesh"); entity.AddComponent<StaticMeshComponent>(); SetSelectedEntity(entity); }
-							ImGui::EndMenu();
-						}
-
-						if (ImGui::BeginMenu("Light"))
-						{
-							if (ImGui::MenuItem("Directional Light")) { auto& entity = m_Context->CreateEntity("Directional Light"); entity.AddComponent<DirectionalLightComponent>(); SetSelectedEntity(entity); }
-							if (ImGui::MenuItem("Point Light")) { auto& entity = m_Context->CreateEntity("Point Light"); entity.AddComponent<PointLightComponent>(); SetSelectedEntity(entity); }
-							if (ImGui::MenuItem("Spot Light")) { auto& entity = m_Context->CreateEntity("Spot Light"); entity.AddComponent<SpotLightComponent>(); SetSelectedEntity(entity); }
-							if (ImGui::MenuItem("Sky Light")) { auto& entity = m_Context->CreateEntity("Sky Light"); entity.AddComponent<SkylightComponent>(); SetSelectedEntity(entity); }
-							ImGui::EndMenu();
-						}
-
-						ImGui::Separator();
-
-						if (ImGui::MenuItem("Camera")) { auto& entity = m_Context->CreateEntity("Camera"); entity.AddComponent<CameraComponent>(); SetSelectedEntity(entity); }
-						if (ImGui::MenuItem("Sprite")) { auto& entity = m_Context->CreateEntity("Sprite"); entity.AddComponent<SpriteRendererComponent>(); SetSelectedEntity(entity); }
-						if (ImGui::MenuItem("Particle System")) { auto& entity = m_Context->CreateEntity("Particle System"); entity.AddComponent<ParticleSystemComponent>(); SetSelectedEntity(entity); }
-						if (ImGui::MenuItem("Audio")) { auto& entity = m_Context->CreateEntity("Audio"); entity.AddComponent<AudioComponent>(); SetSelectedEntity(entity); }
-
-						ImGui::Separator();
-
-						if (ImGui::MenuItem("Native Script")) { auto& entity = m_Context->CreateEntity("Native Script"); entity.AddComponent<NativeScriptComponent>(); SetSelectedEntity(entity); }
-
+						if (ImGui::MenuItem("Static Mesh")) { auto& entity = m_Context->CreateEntity("Static Mesh"); entity.AddComponent<StaticMeshComponent>(); SetSelectedEntity(entity); }
 						ImGui::EndMenu();
 					}
-					ImGui::EndPopup();
-				}
 
-				// End Table
-				ImGui::EndTable();
+					if (ImGui::BeginMenu("Light"))
+					{
+						if (ImGui::MenuItem("Directional Light")) { auto& entity = m_Context->CreateEntity("Directional Light"); entity.AddComponent<DirectionalLightComponent>(); SetSelectedEntity(entity); }
+						if (ImGui::MenuItem("Point Light")) { auto& entity = m_Context->CreateEntity("Point Light"); entity.AddComponent<PointLightComponent>(); SetSelectedEntity(entity); }
+						if (ImGui::MenuItem("Spot Light")) { auto& entity = m_Context->CreateEntity("Spot Light"); entity.AddComponent<SpotLightComponent>(); SetSelectedEntity(entity); }
+						if (ImGui::MenuItem("Sky Light")) { auto& entity = m_Context->CreateEntity("Sky Light"); entity.AddComponent<SkylightComponent>(); SetSelectedEntity(entity); }
+						ImGui::EndMenu();
+					}
+
+					ImGui::Separator();
+
+					if (ImGui::MenuItem("Camera")) { auto& entity = m_Context->CreateEntity("Camera"); entity.AddComponent<CameraComponent>(); SetSelectedEntity(entity); }
+					if (ImGui::MenuItem("Sprite")) { auto& entity = m_Context->CreateEntity("Sprite"); entity.AddComponent<SpriteRendererComponent>(); SetSelectedEntity(entity); }
+					if (ImGui::MenuItem("Particle System")) { auto& entity = m_Context->CreateEntity("Particle System"); entity.AddComponent<ParticleSystemComponent>(); SetSelectedEntity(entity); }
+					if (ImGui::MenuItem("Audio")) { auto& entity = m_Context->CreateEntity("Audio"); entity.AddComponent<AudioComponent>(); SetSelectedEntity(entity); }
+
+					ImGui::Separator();
+
+					if (ImGui::MenuItem("Native Script")) { auto& entity = m_Context->CreateEntity("Native Script"); entity.AddComponent<NativeScriptComponent>(); SetSelectedEntity(entity); }
+
+					ImGui::EndMenu();
+				}
+				ImGui::EndPopup();
 			}
+
+			// End Table
+			ImGui::EndTable();
 			ImGui::EndChild();
 
 			ImGui::End();

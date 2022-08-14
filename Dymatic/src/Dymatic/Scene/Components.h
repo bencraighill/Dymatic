@@ -615,4 +615,17 @@ namespace Dymatic {
 		UIButtonComponent(const UIButtonComponent&) = default;
 	};
 
+	template<typename... Component>
+	struct ComponentGroup
+	{
+	};
+
+	using AllComponents =
+		ComponentGroup<FolderComponent, TransformComponent, SpriteRendererComponent,
+			CircleRendererComponent, CameraComponent, NativeScriptComponent, Rigidbody2DComponent, 
+			BoxCollider2DComponent, CircleCollider2DComponent, StaticMeshComponent, DirectionalLightComponent, 
+			PointLightComponent, SpotLightComponent, SkylightComponent, AudioComponent, RigidbodyComponent, 
+			BoxColliderComponent, SphereColliderComponent, CapsuleColliderComponent, MeshColliderComponent,
+			UICanvasComponent, UIImageComponent, UIButtonComponent>;
+
 }
