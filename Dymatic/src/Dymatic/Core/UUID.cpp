@@ -19,9 +19,4 @@ namespace Dymatic {
 	{
 	}
 
-	UUID::UUID(const UUID& other)
-		: m_UUID(other.m_UUID)
-	{
-	}
-
 }

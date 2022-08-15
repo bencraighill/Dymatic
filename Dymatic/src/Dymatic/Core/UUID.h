@@ -10,7 +10,7 @@ namespace Dymatic {
 	public:
 		UUID();
 		UUID(uint64_t uuid);
-		UUID(const UUID& other);
+		UUID(const UUID&) = default;
 
 		operator uint64_t () { return m_UUID; }
 		operator const uint64_t() const { return m_UUID; }
@@ -21,13 +21,14 @@ namespace Dymatic {
 }
 
 namespace std {
+	template <typename T> struct hash;
 
 	template <>
 	struct hash<Dymatic::UUID>
 	{
 		std::size_t operator()(const Dymatic::UUID& uuid) const
 		{
-			return hash<uint64_t>()((uint64_t)uuid);
+			return (uint64_t)uuid;
 		}
 	};
 

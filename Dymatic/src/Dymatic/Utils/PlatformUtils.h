@@ -18,4 +18,10 @@ namespace Dymatic {
 		static void CreateApplicationProcess(const std::filesystem::path& path, std::vector<std::string> args);
 	};
 
+	class Time
+	{
+	public:
+		static float GetTime();
+	};
+
 }

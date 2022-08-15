@@ -120,10 +120,10 @@ namespace Dymatic {
 		m_EditorScene = CreateRef<Scene>();
 		m_ActiveScene = m_EditorScene;
 
-		auto commandLineArgs = Application::Get().GetCommandLineArgs();
-		if (commandLineArgs.Count > 1)
+		auto& commandLineArgs = Application::Get().GetSpecification().CommandLineArgs;
+		if (commandLineArgs.Count > 2)
 		{
-			auto sceneFilePath = commandLineArgs[1];
+			auto sceneFilePath = commandLineArgs[2];
 			SceneSerializer serializer(m_ActiveScene);
 			serializer.Deserialize(sceneFilePath);
 
@@ -134,6 +134,8 @@ namespace Dymatic {
 		m_SceneHierarchyPanel.SetContext(m_ActiveScene);
 
 		m_EditorCamera = EditorCamera(/*30.0f*/45.0f, 1.778f, 0.1f, 1000.0f);
+
+		Renderer2D::SetLineWidth(4.0f);
 
 		m_ShowSplash = Preferences::GetData().ShowSplashStartup;
 	}
@@ -1436,7 +1438,10 @@ namespace Dymatic {
 	void EditorLayer::OnEvent(Event& e)
 	{
 		m_CameraController.OnEvent(e);
-		m_EditorCamera.OnEvent(e);
+
+		if (m_SceneState == SceneState::Edit)
+			m_EditorCamera.OnEvent(e);
+
 		m_NodeEditorPannel.OnEvent(e);
 		m_PreferencesPannel.OnEvent(e);
 		m_CurveEditor.OnEvent(e);
@@ -1601,6 +1606,17 @@ namespace Dymatic {
 
 					Renderer2D::DrawCircle(transform, glm::vec4(0, 1, 0, 1), 0.01f);
 				}
+			}
+		}
+
+		// Draw selected entity outline 
+		if (Entity selectedEntity = m_SceneHierarchyPanel.GetSelectedEntity())
+		{
+			if (selectedEntity.HasComponent<SpriteRendererComponent>() || selectedEntity.HasComponent<CircleRendererComponent>())
+			{
+				TransformComponent transform = selectedEntity.GetComponent<TransformComponent>();
+
+				Renderer2D::DrawRect(transform.GetTransform(), glm::vec4(0.82f, 0.62f, 0.13f, 1.0));
 			}
 		}
 

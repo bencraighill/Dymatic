@@ -7,7 +7,11 @@
 
 #include "Dymatic/Core/Input.h"
 
-#include <GLFW/glfw3.h>
+#include "Dymatic/Utils/PlatformUtils.h"
+
+#include "GLFW/glfw3.h"
+#define GLFW_EXPOSE_NATIVE_WIN32
+#include <GLFW/glfw3native.h>
 
 #include "../vendor/CSplash/Splash.h"
 
@@ -15,9 +19,6 @@
 #include <oleidl.h>
 
 #include <cmath>
-
-#define GLFW_EXPOSE_NATIVE_WIN32
-#include <GLFW/glfw3native.h>
 
 #include "Dymatic/Scene/ScriptEngine.h"
 #include "Dymatic/Audio/AudioEngine.h"
@@ -127,8 +128,8 @@ namespace Dymatic {
 		ApplicationSplash.DrawRect(min, 333, min + ((max - min) * (percentage / 100.0f)), 340, RGB(150, 150, 150));
 	}
 
-	Application::Application(const std::string& name, ApplicationCommandLineArgs args)
-		: m_CommandLineArgs(args)
+	Application::Application(const ApplicationSpecification& specification)
+		: m_Specification(specification)
 	{
 		DY_PROFILE_FUNCTION();
 		//Log::HideConsole(); //!!!
@@ -137,12 +138,17 @@ namespace Dymatic {
 		OleInitialize(NULL);
 
 		ApplicationSplash.ShowSplash();
-		UpdateSplashMessage("Initializing Dymatic Core...", 5);		
-
+		UpdateSplashMessage("Initializing Dymatic Core...", 5);
 		DY_CORE_ASSERT(!s_Instance, "Application already exists!");
 		s_Instance = this;
+
+		// Set working directory here
+		if (!m_Specification.WorkingDirectory.empty())
+			std::filesystem::current_path(m_Specification.WorkingDirectory);
+
 		UpdateSplashMessage("Creating Window...", 14);
-		m_Window = Window::Create(WindowProps(name));
+		m_Window = Window::Create(WindowProps(m_Specification.Name));
+
 		UpdateSplashMessage("Binding Callbacks...", 37);
 		m_Window->SetEventCallback(DY_BIND_EVENT_FN(Application::OnEvent));
 
@@ -233,7 +239,7 @@ namespace Dymatic {
 		{
 			DY_PROFILE_SCOPE("RunLoop");
 
-			float time = (float)glfwGetTime();
+			float time = Time::GetTime();
 			m_Timestep = time - m_LastFrameTime;
 			m_LastFrameTime = time;
 

@@ -563,12 +563,6 @@ namespace Dymatic {
 		return matrix;
 	}
 
-	template<typename T>
-	void Scene::OnComponentAdded(Entity entity, T& component)
-	{
-		//static_assert(false);
-	}
-
 	void Scene::OnPhysics2DStart()
 	{
 		// create box2d world
@@ -1096,6 +1090,12 @@ namespace Dymatic {
 		}
 
 		Renderer2D::EndScene();
+	}
+
+	template<typename T>
+	void Scene::OnComponentAdded(Entity entity, T& component)
+	{
+		static_assert(sizeof(T) == 0);
 	}
 
 	template<>

@@ -8,8 +8,8 @@ namespace Dymatic {
 	class DymaticEditor : public Application
 	{
 	public:
-		DymaticEditor(ApplicationCommandLineArgs args)
-			: Application("Dymatic Editor", args)
+		DymaticEditor(const ApplicationSpecification& spec)
+			: Application(spec)
 		{
 			PushLayer(new EditorLayer());
 		}
@@ -21,7 +21,14 @@ namespace Dymatic {
 
 	Application* CreateApplication(ApplicationCommandLineArgs args)
 	{
-		return new DymaticEditor(args);
+		ApplicationSpecification spec;
+		spec.Name = "Dymatic Editor";
+		spec.CommandLineArgs = args;
+
+		if (args.Count > 1)
+			spec.WorkingDirectory = args.Args[1];
+
+		return new DymaticEditor(spec);
 	}
 
 }

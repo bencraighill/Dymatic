@@ -94,4 +94,9 @@ namespace Dymatic {
 		CloseHandle(pi.hThread);
 	}
 
+	float Time::GetTime()
+	{
+		return glfwGetTime();
+	}
+
 }
