@@ -372,6 +372,7 @@ namespace Dymatic {
 		}
 		catch (YAML::ParserException e)
 		{
+			DY_CORE_ERROR("Failed to load .dymatic file '{0}'\n     {1}", filepath, e.what());
 			return false;
 		}
 

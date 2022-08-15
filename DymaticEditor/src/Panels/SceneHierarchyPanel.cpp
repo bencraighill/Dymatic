@@ -489,18 +489,6 @@ namespace Dymatic {
 		if (ImGui::Button(std::string(CHARACTER_PROPERTIES_ICON_DELETE).c_str(), ImVec2{ 31.0f, 24.0f }))
 			entityDeleted = true;
 
-		// Original Image Button Version
-		//if (ImGui::ImageButton(reinterpret_cast<void*>(m_IconAddComponent->GetRendererID()), ImVec2{ 18, 18}, ImVec2{ 0, 1 }, ImVec2{ 1, 0 }))
-		//	ImGui::OpenPopup("AddComponent");
-		//
-		//ImGui::SameLine();
-		//if (ImGui::ImageButton(reinterpret_cast<void*>(m_IconDuplicate->GetRendererID()), ImVec2{ 18, 18 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 }))
-		//	m_SelectionContext = m_Context->DuplicateEntity(m_SelectionContext);
-		//
-		//ImGui::SameLine();
-		//if (ImGui::ImageButton(reinterpret_cast<void*>(m_IconDelete->GetRendererID()), ImVec2{ 18, 18 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 }))
-		//	entityDeleted = true;
-
 		if (ImGui::BeginPopup("AddComponent"))
 		{
 			ImGui::TextDisabled("Add Component");
@@ -508,160 +496,41 @@ namespace Dymatic {
 
 			if (ImGui::BeginMenu("Mesh"))
 			{
-				if (!m_SelectionContext.HasComponent<StaticMeshComponent>())
-				{
-					if (ImGui::MenuItem("Static Mesh"))
-					{
-						m_SelectionContext.AddComponent<StaticMeshComponent>();
-						ImGui::CloseCurrentPopup();
-					}
-				}
+				DisplayAddComponentEntry<StaticMeshComponent>("Static Mesh");
 				ImGui::EndMenu();
 			}
 
 			if (ImGui::BeginMenu("Light"))
 			{
-				if (!m_SelectionContext.HasComponent<DirectionalLightComponent>())
-				{
-					if (ImGui::MenuItem("Directional Light"))
-					{
-						m_SelectionContext.AddComponent<DirectionalLightComponent>();
-						ImGui::CloseCurrentPopup();
-					}
-				}
-
-				if (!m_SelectionContext.HasComponent<PointLightComponent>())
-				{
-					if (ImGui::MenuItem("Point Light"))
-					{
-						m_SelectionContext.AddComponent<PointLightComponent>();
-						ImGui::CloseCurrentPopup();
-					}
-				}
-
-				if (!m_SelectionContext.HasComponent<SpotLightComponent>())
-				{
-					if (ImGui::MenuItem("Spot Light"))
-					{
-						m_SelectionContext.AddComponent<SpotLightComponent>();
-						ImGui::CloseCurrentPopup();
-					}
-				}
-
-				if (!m_SelectionContext.HasComponent<SkylightComponent>())
-				{
-					if (ImGui::MenuItem("Sky Light"))
-					{
-						m_SelectionContext.AddComponent<SkylightComponent>();
-						ImGui::CloseCurrentPopup();
-					}
-				}
+				DisplayAddComponentEntry<DirectionalLightComponent>("Directional Light");
+				DisplayAddComponentEntry<PointLightComponent>("Point Light");
+				DisplayAddComponentEntry<SpotLightComponent>("Spot Light");
+				DisplayAddComponentEntry<SkylightComponent>("Sky Light");
 				ImGui::EndMenu();
 			}
 
 			if (ImGui::BeginMenu("2D"))
 			{
-
-				if (!m_SelectionContext.HasComponent<SpriteRendererComponent>())
-				{
-					if (ImGui::MenuItem("Sprite Renderer"))
-					{
-						m_SelectionContext.AddComponent<SpriteRendererComponent>();
-						ImGui::CloseCurrentPopup();
-					}
-				}
-
-				if (!m_SelectionContext.HasComponent<CircleRendererComponent>())
-				{
-					if (ImGui::MenuItem("Circle Renderer"))
-					{
-						m_SelectionContext.AddComponent<CircleRendererComponent>();
-						ImGui::CloseCurrentPopup();
-					}
-				}
+				DisplayAddComponentEntry<SpriteRendererComponent>("Sprite Renderer");
+				DisplayAddComponentEntry<CircleRendererComponent>("Circle Renderer");
 				ImGui::EndMenu();
 			}
 
 			if (ImGui::BeginMenu("Physics"))
 			{
-
-				if (!m_SelectionContext.HasComponent<RigidbodyComponent>())
-				{
-					if (ImGui::MenuItem("Rigidbody"))
-					{
-						m_SelectionContext.AddComponent<RigidbodyComponent>();
-						ImGui::CloseCurrentPopup();
-					}
-				}
-
-				if (!m_SelectionContext.HasComponent<BoxColliderComponent>())
-				{
-					if (ImGui::MenuItem("Box Collider"))
-					{
-						m_SelectionContext.AddComponent<BoxColliderComponent>();
-						ImGui::CloseCurrentPopup();
-					}
-				}
-
-				if (!m_SelectionContext.HasComponent<SphereColliderComponent>())
-				{
-					if (ImGui::MenuItem("Sphere Collider"))
-					{
-						m_SelectionContext.AddComponent<SphereColliderComponent>();
-						ImGui::CloseCurrentPopup();
-					}
-				}
-
-				if (!m_SelectionContext.HasComponent<CapsuleColliderComponent>())
-				{
-					if (ImGui::MenuItem("Capsule Collider"))
-					{
-						m_SelectionContext.AddComponent<CapsuleColliderComponent>();
-						ImGui::CloseCurrentPopup();
-					}
-				}
-
-				if (!m_SelectionContext.HasComponent<MeshColliderComponent>())
-				{
-					if (ImGui::MenuItem("Mesh Collider"))
-					{
-						m_SelectionContext.AddComponent<MeshColliderComponent>();
-						ImGui::CloseCurrentPopup();
-					}
-				}
+				DisplayAddComponentEntry<RigidbodyComponent>("Rigidbody");
+				DisplayAddComponentEntry<BoxColliderComponent>("Box Collider");
+				DisplayAddComponentEntry<SphereColliderComponent>("Sphere Collider");
+				DisplayAddComponentEntry<CapsuleColliderComponent>("Capsule Collider");
+				DisplayAddComponentEntry<MeshColliderComponent>("Mesh Collider");
 
 				ImGui::Separator();
 
 				if (ImGui::BeginMenu("2D"))
 				{
-
-					if (!m_SelectionContext.HasComponent<Rigidbody2DComponent>())
-					{
-						if (ImGui::MenuItem("Rigidbody 2D"))
-						{
-							m_SelectionContext.AddComponent<Rigidbody2DComponent>();
-							ImGui::CloseCurrentPopup();
-						}
-					}
-
-					if (!m_SelectionContext.HasComponent<BoxCollider2DComponent>())
-					{
-						if (ImGui::MenuItem("Box Collider 2D"))
-						{
-							m_SelectionContext.AddComponent<BoxCollider2DComponent>();
-							ImGui::CloseCurrentPopup();
-						}
-					}
-
-					if (!m_SelectionContext.HasComponent<CircleCollider2DComponent>())
-					{
-						if (ImGui::MenuItem("Circle Collider 2D"))
-						{
-							m_SelectionContext.AddComponent<CircleCollider2DComponent>();
-							ImGui::CloseCurrentPopup();
-						}
-					}
-
+					DisplayAddComponentEntry<Rigidbody2DComponent>("Rigidbody 2D");
+					DisplayAddComponentEntry<BoxCollider2DComponent>("Box Collider 2D");
+					DisplayAddComponentEntry<CircleCollider2DComponent>("Circle Collider 2D");
 					ImGui::EndMenu();
 				}
 
@@ -670,34 +539,9 @@ namespace Dymatic {
 
 			if (ImGui::BeginMenu("UI"))
 			{
-
-				if (!m_SelectionContext.HasComponent<UICanvasComponent>())
-				{
-					if (ImGui::MenuItem("Canvas"))
-					{
-						m_SelectionContext.AddComponent<UICanvasComponent>();
-						ImGui::CloseCurrentPopup();
-					}
-				}
-
-				if (!m_SelectionContext.HasComponent<UIImageComponent>())
-				{
-					if (ImGui::MenuItem("Image"))
-					{
-						m_SelectionContext.AddComponent<UIImageComponent>();
-						ImGui::CloseCurrentPopup();
-					}
-				}
-
-				if (!m_SelectionContext.HasComponent<UIButtonComponent>())
-				{
-					if (ImGui::MenuItem("Button"))
-					{
-						m_SelectionContext.AddComponent<UIButtonComponent>();
-						ImGui::CloseCurrentPopup();
-					}
-				}
-
+				DisplayAddComponentEntry<UICanvasComponent>("Canvas");
+				DisplayAddComponentEntry<UIImageComponent>("Image");
+				DisplayAddComponentEntry<UIButtonComponent>("Button");
 				ImGui::EndMenu();
 			}
 
@@ -1660,6 +1504,18 @@ namespace Dymatic {
 		if (entityDeleted)
 			DeleteEntity(entity);
 
+	}
+
+	template<typename T>
+	void SceneHierarchyPanel::DisplayAddComponentEntry(const std::string& entryName) {
+		if (!m_SelectionContext.HasComponent<T>())
+		{
+			if (ImGui::MenuItem(entryName.c_str()))
+			{
+				m_SelectionContext.AddComponent<T>();
+				ImGui::CloseCurrentPopup();
+			}
+		}
 	}
 
 }
