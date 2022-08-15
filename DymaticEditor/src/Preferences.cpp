@@ -499,7 +499,7 @@ namespace Dymatic {
 					(bind.Alt == Input::IsKeyPressed(Key::LeftAlt) || bind.Alt == Input::IsKeyPressed(Key::RightAlt))
 					)
 				{
-					if (bind.Enabled && (bind.Repeats || event.GetRepeatCount() == 0))
+					if (bind.Enabled && (bind.Repeats || !event.IsRepeat()))
 						events.push_back((Preferences::Keymap::KeyBindEvent)index);
 				}
 			}
