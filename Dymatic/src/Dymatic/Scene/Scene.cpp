@@ -994,7 +994,7 @@ namespace Dymatic {
 				Renderer2D::DrawQuad(transformation, m_LightIcon, 1.0f, glm::vec4(light.Color, 1.0f), (int)entity);
 
 				if (entity == selectedEntity)
-					DrawDebugSphere(transformation[3], light.Linear, glm::vec4(light.Color, 1.0f));
+					DrawDebugSphere(transformation[3], light.Radius, glm::vec4(light.Color, 1.0f));
 			}
 		}
 

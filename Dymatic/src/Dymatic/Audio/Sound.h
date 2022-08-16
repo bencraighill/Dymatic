@@ -11,6 +11,8 @@ namespace Dymatic {
 		Sound(const std::string& path);
 		~Sound();
 
+		inline const std::string GetPath() const { return m_Path; }
+
 		// Engine Methods (Internal Use Only!)
 		void SetPositionInternal(glm::vec3 position);
 		void PlaySoundInternal();
@@ -19,7 +21,7 @@ namespace Dymatic {
 		inline bool IsInitalizedInternal() { return m_Initialized; }
 
 		// Application Methods
-		inline std::string GetSourcePath() { return m_SourcePath; }
+		inline std::string GetSourcePath() { return m_Path; }
 
 		void Play();
 		void Stop();
@@ -53,7 +55,7 @@ namespace Dymatic {
 		inline uint32_t GetPlayLength() { return m_PlayLength; }
 
 	private:
-		std::string m_SourcePath;
+		std::string m_Path;
 		bool m_Initialized = false;
 
 		uint32_t m_PlayLength = 0;

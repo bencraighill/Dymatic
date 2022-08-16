@@ -1439,7 +1439,7 @@ namespace Dymatic {
 	{
 		m_CameraController.OnEvent(e);
 
-		if (m_SceneState == SceneState::Edit)
+		if (m_SceneState != SceneState::Play)
 			m_EditorCamera.OnEvent(e);
 
 		m_NodeEditorPannel.OnEvent(e);

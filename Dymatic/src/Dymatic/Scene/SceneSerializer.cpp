@@ -134,6 +134,48 @@ namespace Dymatic {
 		return Rigidbody2DComponent::BodyType::Static;
 	}
 
+	static std::string RigidBodyBodyTypeToString(RigidbodyComponent::BodyType bodyType)
+	{
+		switch (bodyType)
+		{
+		case RigidbodyComponent::BodyType::Static:    return "Static";
+		case RigidbodyComponent::BodyType::Dynamic:   return "Dynamic";
+		}
+
+		DY_CORE_ASSERT(false, "Unknown body type");
+		return {};
+	}
+
+	static RigidbodyComponent::BodyType RigidBodyBodyTypeFromString(const std::string& bodyTypeString)
+	{
+		if (bodyTypeString == "Static")    return RigidbodyComponent::BodyType::Static;
+		if (bodyTypeString == "Dynamic")   return RigidbodyComponent::BodyType::Dynamic;
+
+		DY_CORE_ASSERT(false, "Unknown body type");
+		return RigidbodyComponent::BodyType::Static;
+	}
+
+	static std::string MeshColliderMeshTypeToString(MeshColliderComponent::MeshType meshType)
+	{
+		switch (meshType)
+		{
+		case MeshColliderComponent::MeshType::Triangle:    return "Triangle";
+		case MeshColliderComponent::MeshType::Convex:   return "Convex";
+		}
+
+		DY_CORE_ASSERT(false, "Unknown mesh type");
+		return {};
+	}
+
+	static MeshColliderComponent::MeshType MeshColliderMeshTypeFromString(const std::string& meshTypeString)
+	{
+		if (meshTypeString == "Triangle")    return MeshColliderComponent::MeshType::Triangle;
+		if (meshTypeString == "Convex")    return MeshColliderComponent::MeshType::Convex;
+
+		DY_CORE_ASSERT(false, "Unknown mesh type");
+		return MeshColliderComponent::MeshType::Triangle;
+	}
+
 	SceneSerializer::SceneSerializer(const Ref<Scene>& scene)
 		: m_Scene(scene)
 	{
@@ -202,6 +244,10 @@ namespace Dymatic {
 
 			auto& spriteRendererComponent = entity.GetComponent<SpriteRendererComponent>();
 			out << YAML::Key << "Color" << YAML::Value << spriteRendererComponent.Color;
+			if (spriteRendererComponent.Texture)
+				out << YAML::Key << "TexturePath" << YAML::Value << spriteRendererComponent.Texture->GetPath();
+
+			out << YAML::Key << "TilingFactor" << YAML::Value << spriteRendererComponent.TilingFactor;
 
 			out << YAML::EndMap; // SpriteRendererComponent
 		}
@@ -298,8 +344,6 @@ namespace Dymatic {
 			out << YAML::EndMap; // CircleCollider2DComponent
 		}
 
-		
-
 		if (entity.HasComponent<NativeScriptComponent>())
 		{
 			out << YAML::Key << "NativeScriptComponent";
@@ -331,6 +375,112 @@ namespace Dymatic {
 			out << YAML::EndSeq;
 		
 			out << YAML::EndMap; // NativeScriptComponent
+		}
+
+		if (entity.HasComponent<StaticMeshComponent>())
+		{
+			out << YAML::Key << "StaticMeshComponent";
+			out << YAML::BeginMap; // StaticMeshComponent
+
+			auto& staticMeshComponent = entity.GetComponent<StaticMeshComponent>();
+			if (staticMeshComponent.m_Model)
+				out << YAML::Key << "MeshPath" << YAML::Value << staticMeshComponent.m_Model->GetPath();
+
+			out << YAML::EndMap; // StaticMeshComponent
+		}
+
+		if (entity.HasComponent<DirectionalLightComponent>())
+		{
+			out << YAML::Key << "DirectionalLightComponent";
+			out << YAML::BeginMap; // DirectionalLightComponent
+
+			auto& directionalLightComponent = entity.GetComponent<DirectionalLightComponent>();
+			out << YAML::Key << "Color" << YAML::Value << directionalLightComponent.Color;
+			out << YAML::Key << "Intensity" << YAML::Value << directionalLightComponent.Intensity;
+
+			out << YAML::EndMap; // DirectionalLightComponent
+		}
+
+		if (entity.HasComponent<PointLightComponent>())
+		{
+			out << YAML::Key << "PointLightComponent";
+			out << YAML::BeginMap; // PointLightComponent
+
+			auto& pointLightComponent = entity.GetComponent<PointLightComponent>();
+			out << YAML::Key << "Color" << YAML::Value << pointLightComponent.Color;
+			out << YAML::Key << "Intensity" << YAML::Value << pointLightComponent.Intensity;
+			out << YAML::Key << "Radius" << YAML::Value << pointLightComponent.Radius;
+
+			out << YAML::EndMap; // PointLightComponent
+		}
+
+		if (entity.HasComponent<AudioComponent>())
+		{
+			out << YAML::Key << "AudioComponent";
+			out << YAML::BeginMap; // AudioComponent
+
+			auto& audioComponent = entity.GetComponent<AudioComponent>();
+			if (audioComponent.m_Sound)
+				out << YAML::Key << "SoundPath" << YAML::Value << audioComponent.m_Sound->GetPath();
+
+			out << YAML::EndMap; // AudioComponent
+		}
+
+		if (entity.HasComponent<RigidbodyComponent>())
+		{
+			out << YAML::Key << "RigidbodyComponent";
+			out << YAML::BeginMap; // RigidbodyComponent
+
+			auto& rigidbodyComponent = entity.GetComponent<RigidbodyComponent>();
+			out << YAML::Key << "BodyType" << YAML::Value << RigidBodyBodyTypeToString(rigidbodyComponent.Type);
+			out << YAML::Key << "Density" << YAML::Value << rigidbodyComponent.Density;
+
+			out << YAML::EndMap; // RigidbodyComponent
+		}
+
+		if (entity.HasComponent<BoxColliderComponent>())
+		{
+			out << YAML::Key << "BoxColliderComponent";
+			out << YAML::BeginMap; // BoxColliderComponent
+
+			auto& boxColliderComponent = entity.GetComponent<BoxColliderComponent>();
+			out << YAML::Key << "Size" << YAML::Value << boxColliderComponent.Size;
+
+			out << YAML::EndMap; // BoxColliderComponent
+		}
+
+		if (entity.HasComponent<SphereColliderComponent>())
+		{
+			out << YAML::Key << "SphereColliderComponent";
+			out << YAML::BeginMap; // SphereColliderComponent
+
+			auto& sphereColliderComponent = entity.GetComponent<SphereColliderComponent>();
+			out << YAML::Key << "Radius" << YAML::Value << sphereColliderComponent.Radius;
+
+			out << YAML::EndMap; // SphereColliderComponent
+		}
+
+		if (entity.HasComponent<CapsuleColliderComponent>())
+		{
+			out << YAML::Key << "CapsuleColliderComponent";
+			out << YAML::BeginMap; // CapsuleColliderComponent
+
+			auto& capsuleColliderComponent = entity.GetComponent<CapsuleColliderComponent>();
+			out << YAML::Key << "Radius" << YAML::Value << capsuleColliderComponent.Radius;
+			out << YAML::Key << "HalfHeight" << YAML::Value << capsuleColliderComponent.HalfHeight;
+
+			out << YAML::EndMap; // CapsuleColliderComponent
+		}
+
+		if (entity.HasComponent<MeshColliderComponent>())
+		{
+			out << YAML::Key << "MeshColliderComponent";
+			out << YAML::BeginMap; // MeshColliderComponent
+
+			auto& meshColliderComponent = entity.GetComponent<MeshColliderComponent>();
+			out << YAML::Key << "MeshType" << YAML::Value << MeshColliderMeshTypeToString(meshColliderComponent.Type);
+
+			out << YAML::EndMap; // MeshColliderComponent
 		}
 
 		out << YAML::EndMap; // Entity
@@ -433,6 +583,12 @@ namespace Dymatic {
 				{
 					auto& src = deserializedEntity.AddComponent<SpriteRendererComponent>();
 					src.Color = spriteRendererComponent["Color"].as<glm::vec4>();
+
+					if (spriteRendererComponent["TexturePath"])
+						src.Texture = Texture2D::Create(spriteRendererComponent["TexturePath"].as<std::string>());
+
+					if (spriteRendererComponent["TilingFactor"])
+						src.TilingFactor = spriteRendererComponent["TilingFactor"].as<float>();
 				}
 
 				auto circleRendererComponent = entity["CircleRendererComponent"];
@@ -457,11 +613,11 @@ namespace Dymatic {
 					ps.ColorBegin = particleSystemComponent["ColorBegin"].as<glm::vec4>();
 					ps.ColorEnd = particleSystemComponent["ColorEnd"].as<glm::vec4>();
 					ps.ColorConstant = particleSystemComponent["ColorConstant"].as<glm::vec4>();
+
 					auto colorPoints = particleSystemComponent["ColorPoints"];
 					for (auto colorPoint : colorPoints)
-					{
 						ps.ColorPoints.push_back({ ps.GetNextColorPointId(), colorPoint["Point"].as<float>(), colorPoint["Color"].as<glm::vec4>() });
-					}
+
 					ps.SizeBegin = particleSystemComponent["SizeBegin"].as<float>();
 					ps.SizeEnd = particleSystemComponent["SizeEnd"].as<float>();
 					ps.SizeVariation = particleSystemComponent["SizeVariation"].as<float>();
@@ -529,6 +685,75 @@ namespace Dymatic {
 							break;
 						}
 					}
+				}
+
+				auto staticMeshComponent = entity["StaticMeshComponent"];
+				if (staticMeshComponent)
+				{
+					if (staticMeshComponent["MeshPath"])
+						deserializedEntity.AddComponent<StaticMeshComponent>(staticMeshComponent["MeshPath"].as<std::string>());
+				}
+
+				auto directionalLightComponent = entity["DirectionalLightComponent"];
+				if (directionalLightComponent)
+				{
+					auto& dlc = deserializedEntity.AddComponent<DirectionalLightComponent>();
+					dlc.Color = directionalLightComponent["Color"].as<glm::vec3>();
+					dlc.Intensity = directionalLightComponent["Intensity"].as<float>();
+				}
+
+				auto pointLightComponent = entity["PointLightComponent"];
+				if (pointLightComponent)
+				{
+					auto& plc = deserializedEntity.AddComponent<PointLightComponent>();
+					plc.Color = pointLightComponent["Color"].as<glm::vec3>();
+					plc.Intensity = pointLightComponent["Intensity"].as<float>();
+					plc.Radius = pointLightComponent["Radius"].as<float>();
+				}
+
+				auto audioComponent = entity["AudioComponent"];
+				if (audioComponent)
+				{
+					auto& ac = deserializedEntity.AddComponent<AudioComponent>();
+					if (audioComponent["SoundPath"])
+						ac.LoadSound(audioComponent["SoundPath"].as<std::string>());
+				}
+
+				auto rigidbodyComponent = entity["RigidbodyComponent"];
+				if (rigidbodyComponent)
+				{
+					auto& rbc = deserializedEntity.AddComponent<RigidbodyComponent>();
+					rbc.Type = RigidBodyBodyTypeFromString(rigidbodyComponent["BodyType"].as<std::string>());
+					rbc.Density = rigidbodyComponent["Density"].as<float>();
+				}
+
+				auto boxColliderComponent = entity["BoxColliderComponent"];
+				if (boxColliderComponent)
+				{
+					auto& bcc = deserializedEntity.AddComponent<BoxColliderComponent>();
+					bcc.Size = boxColliderComponent["Size"].as<glm::vec3>();
+				}
+
+				auto sphereColliderComponent = entity["SphereColliderComponent"];
+				if (sphereColliderComponent)
+				{
+					auto& scc = deserializedEntity.AddComponent<SphereColliderComponent>();
+					scc.Radius = sphereColliderComponent["Radius"].as<float>();
+				}
+
+				auto capsuleColliderComponent = entity["CapsuleColliderComponent"];
+				if (capsuleColliderComponent)
+				{
+					auto& ccc = deserializedEntity.AddComponent<CapsuleColliderComponent>();
+					ccc.Radius = capsuleColliderComponent["Radius"].as<float>();
+					ccc.HalfHeight = capsuleColliderComponent["HalfHeight"].as<float>();
+				}
+
+				auto meshColliderComponent = entity["MeshColliderComponent"];
+				if (meshColliderComponent)
+				{
+					auto& mcc = deserializedEntity.AddComponent<MeshColliderComponent>();
+					mcc.Type = MeshColliderMeshTypeFromString(meshColliderComponent["MeshType"].as<std::string>());
 				}
 
 			}

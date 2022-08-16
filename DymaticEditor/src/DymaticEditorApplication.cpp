@@ -13,10 +13,6 @@ namespace Dymatic {
 		{
 			PushLayer(new EditorLayer());
 		}
-
-		~DymaticEditor()
-		{
-		}
 	};
 
 	Application* CreateApplication(ApplicationCommandLineArgs args)

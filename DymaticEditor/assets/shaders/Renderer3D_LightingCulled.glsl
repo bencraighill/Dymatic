@@ -173,7 +173,7 @@ const float LightQuadratic = 0.032;
 struct DirectionalLight
 {
     vec4 direction;
-    vec4 color;
+    vec4 color; // w = intensity
 };
 struct PointLight
 {
@@ -447,7 +447,7 @@ vec3 calcDirLight(DirectionalLight light, vec3 normal, vec3 viewDir, vec3 albedo
     vec3 halfway  = normalize(lightDir + viewDir);
     float nDotV = max(dot(normal, viewDir), 0.0);
     float nDotL = max(dot(normal, lightDir), 0.0);
-    vec3 radianceIn = vec3(light.color);
+    vec3 radianceIn = vec3(light.color) * light.color.w;
 
     //Cook-Torrance BRDF
     float NDF = distributionGGX(normal, halfway, rough);
@@ -492,7 +492,7 @@ vec3 calcPointLight(uint index, vec3 normal, vec3 fragPos,
                     float metal, vec3 F0,  float viewDistance){
     //Point light basics
     vec3 position = u_PointLights[index].position.xyz;
-    vec3 color    = 100.0 * u_PointLights[index].color.rgb;
+    vec3 color    = 100.0 * u_PointLights[index].color.rgb * u_PointLights[index].intensity;
     float radius  = u_PointLights[index].range;
 
     //Stuff common to the BRDF subfunctions 

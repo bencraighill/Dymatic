@@ -31,6 +31,8 @@ namespace Dymatic {
 		inline bool IsLoaded() const { return m_IsLoaded; }
 		inline std::vector<Ref<Mesh>> GetMeshes() const { return m_Meshes; }
 
+		inline const std::string GetPath() const { return m_Path; }
+
 	private:
 		void LoadModel(const std::string& path);
 		void ProcessNode(aiNode* node, const aiScene* scene);
@@ -54,7 +56,7 @@ namespace Dymatic {
 		std::vector<LoadData> m_TexturesLoaded;
 
 		std::vector<Ref<Mesh>> m_Meshes;
-		std::string m_Directory;
+		std::string m_Path;
 
 		bool m_IsLoaded = false;
 	};

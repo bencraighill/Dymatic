@@ -347,7 +347,6 @@ namespace Dymatic {
 
 	struct StaticMeshComponent
 	{
-		std::string m_Path;
 		Ref<Model> m_Model = nullptr;
 		Ref<Animator> m_Animator;
 
@@ -357,10 +356,9 @@ namespace Dymatic {
 		}
 		StaticMeshComponent(const StaticMeshComponent&) = default;
 		StaticMeshComponent(const std::string& path)
-			: m_Path(path)
 		{
-			m_Model = Model::Create(path);
 			m_Animator = Animator::Create();
+			LoadModel(path);
 		}
 
 		inline Ref<Model> GetModel() { return m_Model; }
@@ -372,7 +370,6 @@ namespace Dymatic {
 			if (model->IsLoaded())
 			{
 				m_Model = model;
-				m_Path = path;
 			}
 			else
 				DY_CORE_WARN("Could not load model {0}", path);
@@ -394,7 +391,8 @@ namespace Dymatic {
 
 		void ReloadModel()
 		{
-			LoadModel(m_Path);
+			if (m_Model)
+				LoadModel(m_Model->GetPath());
 		}
 
 		void Update(Timestep ts)
@@ -402,12 +400,12 @@ namespace Dymatic {
 			if (m_Animator)
 				m_Animator->UpdateAnimation(ts.GetSeconds());
 		}
-
 	};
 
 	struct DirectionalLightComponent
 	{
 		glm::vec3 Color = glm::vec3(1.0f, 1.0f, 1.0f);
+		float Intensity = 1.0f;
 
 		DirectionalLightComponent() = default;
 		DirectionalLightComponent(const DirectionalLightComponent&) = default;
@@ -417,9 +415,7 @@ namespace Dymatic {
 	{
 		glm::vec3 Color = glm::vec3(1.0f, 1.0f, 1.0f);
 		float Intensity = 1.0f;
-		float Constant = 1.0f;
-		float Linear = 0.09f;
-		float Quadratic = 0.032f;
+		float Radius = 1.0f;
 
 		PointLightComponent() = default;
 		PointLightComponent(const PointLightComponent&) = default;
@@ -452,21 +448,21 @@ namespace Dymatic {
 	struct AudioComponent
 	{
 	public:
+		Ref<Sound> m_Sound = nullptr;
+
 		AudioComponent() = default;
 		AudioComponent(const AudioComponent& ac) = default;
+		AudioComponent(const std::string& path)
+		{
+			LoadSound(path);
+		}
 
 		void LoadSound(const std::string& path)
 		{
 			m_Sound = Sound::Create(path);
-			m_Path = path;
 		}
 
-		inline std::string GetPath() { return m_Path; }
 		inline Ref<Sound> GetSound() { return m_Sound; }
-
-	private:
-		std::string m_Path;
-		Ref<Sound> m_Sound = nullptr;
 	};
 
 	struct RigidbodyComponent

@@ -135,7 +135,8 @@ namespace Dymatic {
 		struct DirectionalLight
 		{
 			glm::vec4 direction;
-			glm::vec4 color;
+			glm::vec3 color;
+			float intensity;
 		};
 		struct PointLight
 		{
@@ -812,7 +813,8 @@ namespace Dymatic {
 		direction.z = -sin(rotation.y);
 
 		s_Data.LightingBuffer.DirectionalLight.direction = glm::vec4(direction, 1.0f);
-		s_Data.LightingBuffer.DirectionalLight.color = glm::vec4(lightComponent.Color, 1.0f);
+		s_Data.LightingBuffer.DirectionalLight.color = lightComponent.Color;
+		s_Data.LightingBuffer.DirectionalLight.intensity = lightComponent.Intensity;
 		s_Data.LightingBuffer.UsingDirectionalLight = true;
 	}
 
@@ -824,7 +826,7 @@ namespace Dymatic {
 		light.position = transform[3];
 		light.color = glm::vec4(lightComponent.Color, 1.0f);
 		light.intensity = lightComponent.Intensity;
-		light.range = lightComponent.Linear;
+		light.range = lightComponent.Radius;
 		light.enabled = true;
 	}
 

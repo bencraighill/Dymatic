@@ -603,9 +603,9 @@ namespace Dymatic {
 				if (ImGui::MenuItem("Copy"))
 				{
 					std::stringstream ss;
-					ss << component.Translation.x << component.Translation.y << component.Translation.z
-						<< component.Rotation.x  << component.Rotation.y  << component.Rotation.z
-						<< component.Scale.x  << component.Scale.y << component.Scale.z;
+					ss << component.Translation.x << " " << component.Translation.y << " " << component.Translation.z
+						<< " " << component.Rotation.x  << " " << component.Rotation.y  << " " << component.Rotation.z
+						<< " " << component.Scale.x  << " " << component.Scale.y << " " << component.Scale.z;
 					ImGui::SetClipboardText(ss.str().c_str());
 				}
 				if (ImGui::MenuItem("Paste"))
@@ -857,11 +857,10 @@ namespace Dymatic {
 
 		DrawComponent<StaticMeshComponent>("MESH", entity, [this](auto& component)
 			{
-				if (!component.m_Path.empty())
-					ImGui::Text("Model: %s", component.m_Path.c_str());
-
 				if (component.m_Model)
 				{
+					ImGui::Text("Model: %s", component.m_Model->GetPath().c_str());
+
 					// Materials Section
 					{
 						ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2{ 4, 4 });
@@ -1083,7 +1082,7 @@ namespace Dymatic {
 					ImGui::EndDragDropTarget();
 				}
 
-				if (!component.m_Path.empty())
+				if (component.m_Model)
 					if (ImGui::Button("Reload", ImVec2(-1.0f, 0.0f)))
 						component.ReloadModel();
 			}, [](auto& component) {});
@@ -1091,15 +1090,14 @@ namespace Dymatic {
 			DrawComponent<DirectionalLightComponent>("DIRECTIONAL LIGHT", entity, [](auto& component)
 			{
 				ImGui::ColorEdit3("Color", glm::value_ptr(component.Color));
+				ImGui::DragFloat("Intensity", &component.Intensity);
 			}, [](auto& component) {});
 
 			DrawComponent<PointLightComponent>("POINT LIGHT", entity, [](auto& component)
 			{
 				ImGui::ColorEdit3("Color", glm::value_ptr(component.Color));
 				ImGui::DragFloat("Intensity", &component.Intensity);
-				ImGui::DragFloat("Constant", &component.Constant);
-				ImGui::DragFloat("Linear", &component.Linear);
-				ImGui::DragFloat("Quadratic", &component.Quadratic);
+				ImGui::DragFloat("Radius", &component.Radius);
 			}, [](auto& component) {});
 
 			DrawComponent<SpotLightComponent>("SPOT LIGHT", entity, [](auto& component)
@@ -1157,7 +1155,7 @@ namespace Dymatic {
 					auto& sound = component.GetSound();
 					if (sound)
 					{
-						ImGui::Text(component.GetPath().c_str());
+						ImGui::Text(component.m_Sound->GetPath().c_str());
 
 						ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2{ 4, 4 });
 						bool open = ImGui::TreeNodeEx("Sound Properties", ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_AllowItemOverlap | ImGuiTreeNodeFlags_FramePadding);
@@ -1177,7 +1175,7 @@ namespace Dymatic {
 								sound->SetStartOnAwake(startOnAwake);
 
 							float radius = sound->GetRadius();
-							if (ImGui::InputFloat("Radius", &radius))
+							if (ImGui::DragFloat("Radius", &radius))
 								sound->SetRadius(radius);
 
 							{

@@ -15,7 +15,7 @@ namespace Dymatic {
 	Sound::Sound(const std::string& path)
 	{
 		CHECK_ENGINE();
-		m_SourcePath = path;
+		m_Path = path;
 
 		// Calculate Source Length
 		auto temp_sound = g_AudioEngine->play2D(path.c_str(), false, true);
@@ -50,9 +50,9 @@ namespace Dymatic {
 		}
 
 		if (m_3D)
-			m_Sound = g_AudioEngine->play3D(m_SourcePath.c_str(), { m_Position.x, m_Position.y, m_Position.z }, m_Looping, !m_StartOnAwake, true, {}, true);
+			m_Sound = g_AudioEngine->play3D(m_Path.c_str(), { m_Position.x, m_Position.y, m_Position.z }, m_Looping, !m_StartOnAwake, true, {}, true);
 		else
-			m_Sound = g_AudioEngine->play2D(m_SourcePath.c_str(), m_Looping, !m_StartOnAwake, true, {}, true);
+			m_Sound = g_AudioEngine->play2D(m_Path.c_str(), m_Looping, !m_StartOnAwake, true, {}, true);
 
 		((ISound*)m_Sound)->setPlayPosition(m_StartPosition);
 		((ISound*)m_Sound)->setVolume(m_Volume);

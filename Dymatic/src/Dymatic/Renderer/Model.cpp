@@ -23,7 +23,7 @@ namespace Dymatic {
 			return;
 		}
 
-		m_Directory = path.substr(0, path.find_last_of("/\\"));
+		m_Path = path;
 
 		ProcessNode(scene->mRootNode, scene);
 
@@ -160,6 +160,8 @@ namespace Dymatic {
 
 	std::vector<Ref<Texture2D>> Model::LoadMaterialTextures(aiMaterial* mat, aiTextureType type)
 	{
+		const auto directory = m_Path.substr(0, m_Path.find_last_of("/\\"));
+
 		std::vector<Ref<Texture2D>> textures;
 		for (size_t i = 0; i < mat->GetTextureCount(type); i++)
 		{
@@ -181,7 +183,7 @@ namespace Dymatic {
 			// Load texture if it hasn't.
 			if (!skip)
 			{
-				Ref<Texture2D> texture = Texture2D::Create(m_Directory + '/' + (str.C_Str() + 4));
+				Ref<Texture2D> texture = Texture2D::Create(directory + '/' + (str.C_Str() + 4));
 				if (texture->IsLoaded())
 				{
 					textures.push_back(texture);
