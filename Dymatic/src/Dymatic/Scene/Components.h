@@ -468,8 +468,12 @@ namespace Dymatic {
 	struct RigidbodyComponent
 	{
 		enum class BodyType { Static = 0, Dynamic };
+
 		BodyType Type;
 		float Density = 1.0f;
+		float StaticFriction = 0.5f;
+		float DynamicFriction = 0.5f;
+		float Restitution = 0.1f;
 
 		// Storage for runtime
 		void* RuntimeBody = nullptr;

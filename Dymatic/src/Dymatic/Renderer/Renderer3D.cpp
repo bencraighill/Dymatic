@@ -402,7 +402,27 @@ namespace Dymatic {
 
 		s_Data.CameraBuffer.ViewProjection = camera.GetProjection() * glm::inverse(transform);
 		s_Data.CameraBuffer.ViewPosition = transform[3];
+
+		s_Data.CameraBuffer.Projection = camera.GetProjection();
+		s_Data.CameraBuffer.InverseProjection = glm::inverse(s_Data.CameraBuffer.Projection);
+		s_Data.CameraBuffer.View = glm::inverse(transform);
+		s_Data.CameraBuffer.InverseView = transform;
+
+		auto sizeX = (unsigned int)std::ceilf(s_Data.ActiveWidth / (float)s_Data.GridSizeX);
+		s_Data.CameraBuffer.TileSizes = { s_Data.GridSizeX, s_Data.GridSizeY, s_Data.GridSizeZ, sizeX };
+
+		s_Data.CameraBuffer.ScreenDimensions = { s_Data.ActiveWidth, s_Data.ActiveHeight };
+		s_Data.CameraBuffer.ZNear = ((SceneCamera*)&camera)->GetPerspectiveNearClip();
+		s_Data.CameraBuffer.ZFar = ((SceneCamera*)&camera)->GetPerspectiveFarClip();
+
+		// Simple pre-calculation to reduce use of log function - TODO: Should really be under lighting
+		s_Data.CameraBuffer.Scale = (float)s_Data.GridSizeZ / std::log2f(s_Data.CameraBuffer.ZFar / s_Data.CameraBuffer.ZNear);
+		s_Data.CameraBuffer.Bias = -((float)s_Data.GridSizeZ * std::log2f(s_Data.CameraBuffer.ZNear) / std::log2f(s_Data.CameraBuffer.ZFar / s_Data.CameraBuffer.ZNear));
+
 		s_Data.CameraUniformBuffer->SetData(&s_Data.CameraBuffer, sizeof(Renderer3DData::CameraData));
+
+		// Reset Lighting Data
+		s_Data.LightingBuffer.UsingDirectionalLight = false;
 	}
 
 	void Renderer3D::BeginScene(const EditorCamera& camera)
@@ -431,7 +451,7 @@ namespace Dymatic {
 		s_Data.CameraUniformBuffer->SetData(&s_Data.CameraBuffer, sizeof(Renderer3DData::CameraData));
 
 		// Reset Lighting Data
-		s_Data.LightingBuffer.UsingDirectionalLight = true;
+		s_Data.LightingBuffer.UsingDirectionalLight = false;
 	}
 
 	void Renderer3D::EndScene()
@@ -494,7 +514,7 @@ namespace Dymatic {
 			float near_plane = 0.001f, far_plane = 10.0f;
 			//lightProjection = glm::perspective(glm::radians(45.0f), (GLfloat)SHADOW_WIDTH / (GLfloat)SHADOW_HEIGHT, near_plane, far_plane); // note that if you use a perspective projection matrix you'll have to change the light position as the current light position isn't enough to reflect the whole scene
 			lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, near_plane, far_plane);
-			lightView = glm::lookAt(glm::vec3(1.0f, 1.0f, 1.0f), glm::vec3(0.0f), glm::vec3(0.0, 1.0, 0.0));
+			lightView = glm::lookAt(glm::vec3(-s_Data.LightingBuffer.DirectionalLight.direction), glm::vec3(0.0f), glm::vec3(0.0, 1.0, 0.0));
 			lightSpaceMatrix = lightProjection * lightView;
 
 

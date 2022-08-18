@@ -395,8 +395,9 @@ void main()
     float shadow = calcDirShadow(Input.FragPosLightSpace);
     float viewDistance = length(vec3(u_ViewPosition) - vec3(Input.Position));
 
-    //Directional light 
-    radianceOut = calcDirLight(u_DirectionalLight, norm, viewDir, albedo, roughness, metallic, shadow, F0);
+    //Directional light
+    if (u_UsingDirectionalLight)
+        radianceOut = calcDirLight(u_DirectionalLight, norm, viewDir, albedo, roughness, metallic, shadow, F0);
 
     // Point lights
     uint lightCount       = u_LightGrid[tileIndex].count;

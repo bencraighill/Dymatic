@@ -1241,6 +1241,27 @@ namespace Dymatic {
 				ImGui::Text("Density");
 				ImGui::SameLine();
 				ImGui::DragFloat("##DensityInput", &component.Density, 0.1f, 0.0f, 0.0f, "%.2f");
+
+				ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2{ 4, 4 });
+				bool open = ImGui::TreeNodeEx("Material Properties", ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_AllowItemOverlap | ImGuiTreeNodeFlags_FramePadding);
+				ImGui::PopStyleVar();
+				if (open)
+				{
+					ImGui::Text("Static Friction");
+					ImGui::SameLine();
+					ImGui::DragFloat("##StaticFrictionInput", &component.StaticFriction, 0.5f, 0.0f, 1.0f, "%.2f");
+
+					ImGui::Text("Dynamic Friction");
+					ImGui::SameLine();
+					ImGui::DragFloat("##DynamicFrictionInput", &component.DynamicFriction, 0.5f, 0.0f, 1.0f, "%.2f");
+
+					ImGui::Text("Restitution");
+					ImGui::SameLine();
+					ImGui::DragFloat("##RestitutionInput", &component.Restitution, 0.5f, 0.0f, 1.0f, "%.2f");
+
+					ImGui::TreePop();
+				}
+
 			}, [](auto& component) {});
 
 			DrawComponent<BoxColliderComponent>("BOX COLLIDER", entity, [](auto& component)

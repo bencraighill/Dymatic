@@ -783,6 +783,20 @@ namespace Dymatic {
 					}
 				}
 
+				// Create New Physics Material
+				auto material = g_PhysicsEngine->createMaterial(rbc.StaticFriction, rbc.DynamicFriction, rbc.Restitution);
+
+				// Setup Physics Material
+				physx::PxShape** shapes = new physx::PxShape*[body->getNbShapes()];
+				body->getShapes(shapes, body->getNbShapes());
+
+				for (size_t i = 0; i < body->getNbShapes(); i++)
+					shapes[i]->setMaterials(&material, 1);
+
+				// Clean Up
+				material->release();
+				delete[] shapes;
+
 				m_PhysXScene->addActor(*body);
 
 				rbc.RuntimeBody = body;
