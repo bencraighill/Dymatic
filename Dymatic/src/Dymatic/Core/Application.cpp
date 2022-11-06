@@ -121,7 +121,7 @@ namespace Dymatic {
 		ApplicationSplash.ReloadBitmap();
 		ApplicationSplash.DrawLoadText(message + " (" + std::to_string(percentage) + "%)", {(LONG)25.0, (LONG)(315.0), (LONG)(500.0), (LONG)331.0}, 14.0f, TEXT("Lato"));
 		ApplicationSplash.DrawLoadText("© Dymatic Technologies 2022", {(LONG)475.0, (LONG)(315.0), (LONG)(638.0), (LONG)331.0}, 14.0f, TEXT("Lato"));
-		ApplicationSplash.DrawLoadText("V1.2.4", {(LONG)575.0, (LONG)(15.0f), (LONG)(638.0 * 1.0f), (LONG)(30.0f)}, 14.0f, TEXT("Lato"));
+		ApplicationSplash.DrawLoadText("V1.2.5", {(LONG)575.0, (LONG)(15.0f), (LONG)(638.0 * 1.0f), (LONG)(30.0f)}, 14.0f, TEXT("Lato"));
 		const int min = 25;
 		const int max = 620;
 		ApplicationSplash.DrawRect(min, 333, max, 340, RGB(50, 50, 50));
@@ -147,12 +147,10 @@ namespace Dymatic {
 			std::filesystem::current_path(m_Specification.WorkingDirectory);
 
 		UpdateSplashMessage("Creating Window...", 14);
-		m_Window = Window::Create(WindowProps(m_Specification.Name));
+		m_Window = Window::Create(WindowProps(m_Specification.Name, m_Specification.WindowWidth, m_Specification.WindowHeight, m_Specification.WindowDecorated));
 
 		UpdateSplashMessage("Binding Callbacks...", 37);
 		m_Window->SetEventCallback(DY_BIND_EVENT_FN(Application::OnEvent));
-
-		m_Window->MaximizeWindow();
 
 		// OLE
 		RegisterDragDrop(glfwGetWin32Window((GLFWwindow*)m_Window->GetNativeWindow()), &dropManager);
@@ -238,33 +236,47 @@ namespace Dymatic {
 		while (m_Running)
 		{
 			DY_PROFILE_SCOPE("RunLoop");
+			Draw();
+		}
+	}
 
-			float time = Time::GetTime();
-			m_Timestep = time - m_LastFrameTime;
-			m_LastFrameTime = time;
+	static bool s_DrawGuard;
+	void Application::Draw()
+	{
+		if (s_DrawGuard)
+			return;
 
-			if (!m_Minimized)
+		s_DrawGuard = true;
+
+		DY_PROFILE_FUNCTION();
+
+		float time = Time::GetTime();
+		m_Timestep = time - m_LastFrameTime;
+		m_LastFrameTime = time;
+
+		if (!m_Minimized)
+		{
 			{
-				{
-					DY_PROFILE_SCOPE("LayerStack OnUpdate");
-
-					for (Layer* layer : m_LayerStack)
-						layer->OnUpdate(m_Timestep);
-				}
-
-			}
-			// OnImGuiRender used to be reliant on being not minimized, but this meant unlocked windows wouldn't work when GLFW was minimized.
-			m_ImGuiLayer->Begin();
-			{
-				DY_PROFILE_SCOPE("LayerStack OnImGuiRender");
+				DY_PROFILE_SCOPE("LayerStack OnUpdate");
 
 				for (Layer* layer : m_LayerStack)
-					layer->OnImGuiRender();
+					layer->OnUpdate(m_Timestep);
 			}
-			m_ImGuiLayer->End();
-
-			m_Window->OnUpdate();
 		}
+
+		// Undocked ImGui windows may not be minimized
+		m_ImGuiLayer->Begin();
+		{
+			DY_PROFILE_SCOPE("LayerStack OnImGuiRender");
+
+			for (Layer* layer : m_LayerStack)
+				layer->OnImGuiRender();
+		}
+		m_ImGuiLayer->End();
+
+		m_Window->OnUpdate();
+
+		s_DrawGuard = false;
 	}
 
 	bool Application::OnWindowClose(WindowCloseEvent& e)
@@ -285,6 +297,8 @@ namespace Dymatic {
 
 		m_Minimized = false;
 		Renderer::OnWindowResize(e.GetWidth(), e.GetHeight());
+
+		Draw();
 
 		return false;
 	}

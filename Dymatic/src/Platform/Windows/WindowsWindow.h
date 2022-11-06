@@ -31,6 +31,11 @@ namespace Dymatic {
 
 		void SetCursor(int shape) const override;
 
+		void SetTitlebarHoveredQueryCallback(void (*)(int*)) override;
+		void SetMinimizeHoveredQueryCallback(void (*)(int*)) override;
+		void SetMaximizeHoveredQueryCallback(void (*)(int*)) override;
+		void SetCloseHoveredQueryCallback(void (*)(int*)) override;
+
 		// Window attributes
 		void SetEventCallback(const EventCallbackFn& callback) override { m_Data.EventCallback = callback; }
 		void SetVSync(bool enabled) override;

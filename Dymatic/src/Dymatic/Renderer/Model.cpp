@@ -90,21 +90,24 @@ namespace Dymatic {
 
 		// Process Materials
 		aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
-
-		Ref<Material> mat = Material::Create();
+		Ref<Material> mat = Material::Create((*material->mProperties)->mKey.C_Str());
 		aiColor4D color = {};
 
 		material->Get(AI_MATKEY_COLOR_DIFFUSE, color);
 		mat->SetAlbedo(glm::vec4(color.r, color.g, color.b, 1.0f));
 
-		//auto baseColorMaps = LoadMaterialTextures(material, aiTextureType_BASE_COLOR);
-		//if (!baseColorMaps.empty())
-		//	mat->SetAlbedoMap(baseColorMaps[0]);
-		//else
 		{
 			auto diffuseMaps = LoadMaterialTextures(material, aiTextureType_DIFFUSE);
 			if (!diffuseMaps.empty())
 				mat->SetAlbedoMap(diffuseMaps[0]);
+		}
+		{
+			auto alphaMaps = LoadMaterialTextures(material, aiTextureType_OPACITY);
+			if (!alphaMaps.empty())
+			{
+				mat->SetAlbedoMap(alphaMaps[0]);
+				mat->SetAlphaBlendMode(Material::AlphaBlendMode::Dithered);
+			}
 		}
 
 		ExtractBoneWeightForVertices(verticies, mesh, scene);

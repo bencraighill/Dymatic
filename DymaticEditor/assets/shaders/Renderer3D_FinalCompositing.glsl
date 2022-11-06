@@ -1,18 +1,7 @@
 // Final Compositing Shader
 
-#type vertex
-#version 450 core
-
-const vec2 madd = vec2(0.5,0.5);
-
-layout (location = 0) in vec3 a_Position;
-layout (location = 0) out vec2 o_TexCoord;
-
-void main() 
-{
-   o_TexCoord = a_Position.xy*madd+madd; // scale vertex attribute to [0-1] range
-   gl_Position = vec4(a_Position.xy,0.0,1.0);
-}
+// Include Fullscreen Quad Vertex Shader
+#include assets/shaders/Renderer3D_Fullscreen.glsl
 
 #type fragment
 #version 450 core
@@ -29,6 +18,8 @@ layout(std140, binding = 4) uniform PostProcessing
 {
     vec4 u_SSAOSamples[64];
     float u_Exposure;
+    int u_BlurHorizontal;
+    float u_Time;
 };
 
 vec3 aces(vec3 x) 
@@ -45,16 +36,27 @@ vec3 vignette()
 {
 	vec2 uv = v_TexCoord.xy;
    
-    uv *=  1.0 - uv.yx;
-    
-    float vig = uv.x*uv.y * 15.0; // multiply with sth for intensity
-    
-    vig = pow(vig, 0.25); // change pow for modifying the extend of the  vignette
+  uv *=  1.0 - uv.yx;
+  
+  float vig = uv.x*uv.y * 15.0; // multiply with sth for intensity
+  
+  vig = pow(vig, 0.25); // change pow for modifying the extend of the  vignette
 
-    return vec3(vig);
+  return vec3(vig);
 }
 
-  const float aberrationAmount =  0.05;
+float noise(vec2 coords, float time)
+{
+  float e = fract((time * 0.01));
+
+  float cx = coords.x*e;
+  float cy = coords.y*e;
+
+  return fract(23.0*fract(2.0/fract(fract(cx*2.4/cy*23.0+pow(abs(cy/22.4),3.3))*fract(cx*time/pow(abs(cy), 0.050)))));
+}
+
+const float aberrationAmount =  0.01;
+const float grainAmount = 0.025;
 
 void main()
 {
@@ -72,6 +74,10 @@ void main()
   vec3 FragColor = aces(hdrColor * u_Exposure);
 
   // Color Grading
+
+  // Film Grain
+  if (grainAmount != 0.0)
+    FragColor += grainAmount * noise(v_TexCoord, u_Time);
 
   // Apply Vignette
   FragColor *= vignette();

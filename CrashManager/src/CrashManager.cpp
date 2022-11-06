@@ -387,10 +387,10 @@ namespace Dymatic {
 	class CrashManager : public Application
 	{
 	public:
-		CrashManager(ApplicationCommandLineArgs args)
-			: Application("Dymatic Crash Manager", args)
+		CrashManager(const ApplicationSpecification& spec)
+			: Application(spec)
 		{
-			PushLayer(new CrashManagerLayer(args[1]));
+			PushLayer(new CrashManagerLayer(spec.CommandLineArgs[1]));
 		}
 
 		~CrashManager()
@@ -400,7 +400,11 @@ namespace Dymatic {
 
 	Application* CreateApplication(ApplicationCommandLineArgs args)
 	{
-		return new CrashManager(args);
+		ApplicationSpecification spec;
+		spec.Name = "Dymatic Crash Manager";
+		spec.CommandLineArgs = args;
+
+		return new CrashManager(spec);
 	}
 
 }

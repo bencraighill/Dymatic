@@ -20,6 +20,7 @@ namespace Dymatic {
 		ApplicationSpecification spec;
 		spec.Name = "Dymatic Editor";
 		spec.CommandLineArgs = args;
+		spec.WindowDecorated = false;
 
 		if (args.Count > 1)
 			spec.WorkingDirectory = args.Args[1];

@@ -1,3 +1,5 @@
+// Dymatic Node Core V1.2.5
+
 #pragma once
 #include "Dymatic/Core/Base.h"
 

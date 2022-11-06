@@ -1,26 +1,13 @@
 // Motion Blur Shader
 
-#type vertex
-#version 450 core
-
-const vec2 madd = vec2(0.5,0.5);
-
-layout (location = 0) in vec3 a_Position;
-layout (location = 0) out vec2 o_TexCoord;
-
-void main() 
-{
-   o_TexCoord = a_Position.xy*madd+madd; // scale vertex attribute to [0-1] range
-   gl_Position = vec4(a_Position.xy,0.0,1.0);
-}
+// Include Fullscreen Quad Vertex Shader
+#include assets/shaders/Renderer3D_Fullscreen.glsl
 
 #type fragment
 #version 450 core
 
 layout (location = 0) in vec2 v_TexCoord;
-
 layout (location = 0) out vec4 o_Color;
-layout (location = 1) out int o_EntityID;
 
 layout (binding = 0) uniform sampler2D u_SceneTexture;
 layout (binding = 1) uniform sampler2D u_DepthTexture;
@@ -35,11 +22,10 @@ layout(std140, binding = 2) uniform Object
 {
 	mat4 u_Model;
 	mat4 u_ModelInverse;
-	mat4 lightSpaceMatrix;
 	int u_EntityID;
 };
 
-const int numSamples = 10;
+const int numSamples = 20;
 
 void main()
 {
@@ -72,7 +58,7 @@ void main()
     vec2 TexCoord = v_TexCoord;
     TexCoord += velocity * 0.1;
 
-    for(int i = 1; i < numSamples; ++i, TexCoord += velocity * 0.1) 
+    for(int i = 1; i < numSamples; ++i, TexCoord += velocity * 0.005) 
     {   
         // Sample the color buffer along the velocity vector.
         vec4 currentColor = texture(u_SceneTexture, TexCoord);  
@@ -81,7 +67,5 @@ void main()
     } 
     
     // Average all of the samples to get the final blur color.
-    o_Color = color / numSamples; 
-        
-    o_EntityID = -1;
+    o_Color = color / numSamples;
 }

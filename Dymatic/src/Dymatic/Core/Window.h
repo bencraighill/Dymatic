@@ -12,11 +12,13 @@ namespace Dymatic {
 		std::string Title;
 		uint32_t Width;
 		uint32_t Height;
+		bool Decorated;
 
 		WindowProps(const std::string& title = "Dymatic Engine",
 			uint32_t width = 1600,
-			uint32_t height = 900)
-			: Title(title), Width(width), Height(height)
+			uint32_t height = 900,
+			bool decorated = true)
+			: Title(title), Width(width), Height(height), Decorated(decorated)
 		{
 		}
 	};
@@ -46,6 +48,11 @@ namespace Dymatic {
 		virtual bool IsWindowMaximized() const = 0;
 
 		virtual void SetCursor(int shape) const = 0;
+
+		virtual void SetTitlebarHoveredQueryCallback(void (*)(int*)) = 0;
+		virtual void SetMinimizeHoveredQueryCallback(void (*)(int*)) = 0;
+		virtual void SetMaximizeHoveredQueryCallback(void (*)(int*)) = 0;
+		virtual void SetCloseHoveredQueryCallback(void (*)(int*)) = 0;
 
 		// Window attributes
 		virtual void SetEventCallback(const EventCallbackFn& callback) = 0;

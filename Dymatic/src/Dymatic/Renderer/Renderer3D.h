@@ -25,17 +25,19 @@ namespace Dymatic {
 		static void Resize();
 		static void SetActiveFramebuffer(Ref<Framebuffer> framebuffer);
 
+		static void UpdateTimestep(Timestep ts);
+
 		static void SubmitModel(glm::mat4 transform, Ref<Model> model, int entityID = -1);
 		static void SubmitModel(glm::mat4 transform, Ref<Model> model, Ref<Animator> animator, int entityID = -1);
 		static void SubmitStaticMesh(const glm::mat4& transform, StaticMeshComponent& mesh, int entityID);
-		static void DrawMeshData();
+		static void RenderScene();
 
 		static void SubmitDirectionalLight(const glm::mat4& transform, DirectionalLightComponent& lightComponent);
 		static void SubmitPointLight(const glm::mat4& transform, PointLightComponent& lightComponent);
 		static void SubmitSpotLight(const glm::mat4& transform, SpotLightComponent& lightComponent);
 		static void SubmitLightSetup();
 
-		static void SubmitSkyLight(SkylightComponent& lightComponent);
+		static void SubmitSkyLight(SkyLightComponent& lightComponent);
 
 		static void SetSelectedEntity(int id);
 
@@ -46,6 +48,12 @@ namespace Dymatic {
 		};
 		static void ResetStats();
 		static Statistics GetStats();
+
+		// Editor Only
+		static void OnImGuiRender();
+
+	private:
+		static void UpdateSkyLight();
 	};
 
 }

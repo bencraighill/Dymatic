@@ -28,10 +28,10 @@ layout(location = 1) out int o_EntityID;
 
 layout(location = 1) in vec3 TexCoords;
 
-layout (set = 0, binding = 7) uniform samplerCube u_EnvironmentMap;
+layout (set = 0, binding = 0) uniform samplerCube u_EnvironmentMap;
 
 void main()
-{    
-    o_Color = texture(u_EnvironmentMap, TexCoords);
+{
+    o_Color = vec4(texture(u_EnvironmentMap, TexCoords).rgb, 1.0);
     o_EntityID = -1;
 }

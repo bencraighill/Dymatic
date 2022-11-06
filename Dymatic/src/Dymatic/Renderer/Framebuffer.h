@@ -1,32 +1,42 @@
 #pragma once
 
 #include "Dymatic/Core/Base.h"
+#include "Dymatic/Renderer/TextureFormat.h"
 
 namespace Dymatic {
 
-	enum class FramebufferTextureFormat
+	enum class TextureTarget
 	{
 		None = 0,
-	 
-		// Color
-		RGBA8,
-		RGBA16F,
-		RED_INTEGER,
 
-		// Depth/Stencil
-		DEPTH24STENCIL8,
+		TEXTURE_2D,
+		TEXTURE_CUBE_MAP
+	};
 
-		// Defaults
-		Depth = DEPTH24STENCIL8
+	enum class FramebufferTextureTarget
+	{
+		None = 0,
+
+		TEXTURE_2D,
+
+		CUBE_MAP_POSITIVE_X,
+		CUBE_MAP_NEGATIVE_X,
+		CUBE_MAP_POSITIVE_Y,
+		CUBE_MAP_NEGATIVE_Y,
+		CUBE_MAP_POSITIVE_Z,
+		CUBE_MAP_NEGATIVE_Z
 	};
 
 	struct FramebufferTextureSpecification
 	{
 		FramebufferTextureSpecification() = default;
-		FramebufferTextureSpecification(FramebufferTextureFormat format)
+		FramebufferTextureSpecification(TextureFormat format)
 			: TextureFormat(format) {}
+		FramebufferTextureSpecification(TextureFormat format, FramebufferTextureTarget target)
+			: TextureFormat(format), TextureTarget(target) {}
 
-		FramebufferTextureFormat TextureFormat = FramebufferTextureFormat::None;
+		TextureFormat TextureFormat = TextureFormat::None;
+		FramebufferTextureTarget TextureTarget = FramebufferTextureTarget::TEXTURE_2D;
 		// TODO: filtering/wrap
 	};
 
@@ -45,6 +55,8 @@ namespace Dymatic {
 		FramebufferAttachmentSpecification Attachments;
 		uint32_t Samples = 1;
 
+		TextureTarget Target = TextureTarget::TEXTURE_2D;
+
 		bool SwapChainTarget = false;
 	};
 
@@ -55,6 +67,8 @@ namespace Dymatic {
 
 		virtual void Bind() = 0;
 		virtual void Unbind() = 0;
+
+		virtual uint32_t GetRendererID() const = 0;
 
 		virtual void Resize(uint32_t width, uint32_t height) = 0;
 		virtual void ReadPixel(uint32_t attachmentIndex, int x, int y, void* pixelData) = 0;
@@ -70,6 +84,9 @@ namespace Dymatic {
 
 		virtual void BindColorTexture(uint32_t slot, uint32_t index = 0) const = 0;
 		virtual void BindDepthTexture(uint32_t slot) const = 0;
+
+		virtual void SetTarget(TextureTarget target) = 0;
+		virtual void SetAttachmentTarget(uint32_t index, FramebufferTextureTarget target, uint32_t mip = 0) = 0;
 
 		virtual const FramebufferSpecification& GetSpecification() const = 0;
 

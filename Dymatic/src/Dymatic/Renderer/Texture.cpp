@@ -6,36 +6,36 @@
 
 namespace Dymatic {
 
-	Ref<Texture2D> Texture2D::Create(uint32_t width, uint32_t height)
+	Ref<Texture2D> Texture2D::Create(uint32_t width, uint32_t height, TextureFormat format)
 	{
 		switch (Renderer::GetAPI())
 		{
 		case RendererAPI::API::None:    DY_CORE_ASSERT(false, "RendererAPI::None is currently not supported!"); return nullptr;
-		case RendererAPI::API::OpenGL:  return CreateRef<OpenGLTexture2D>(width, height);
+		case RendererAPI::API::OpenGL:  return CreateRef<OpenGLTexture2D>(width, height, format);
 		}
 
 		DY_CORE_ASSERT(false, "Unknown RendererAPI!");
 		return nullptr;
 	}
 
-	Ref<Texture2D> Texture2D::Create(const std::string& path)
+	Ref<Texture2D> Texture2D::Create(const std::string& path, TextureFormat format)
 	{
 		switch (Renderer::GetAPI())
 		{
 		case RendererAPI::API::None:    DY_CORE_ASSERT(false, "RendererAPI::None is currently not supported!"); return nullptr;
-		case RendererAPI::API::OpenGL:  return CreateRef<OpenGLTexture2D>(path);
+		case RendererAPI::API::OpenGL:  return CreateRef<OpenGLTexture2D>(path, format);
 		}
 
 		DY_CORE_ASSERT(false, "Unknown RendererAPI!");
 		return nullptr;
 	}
 
-	Ref<TextureCube> TextureCube::Create(const std::string* files)
+	Ref<TextureCube> TextureCube::Create(uint32_t width, uint32_t height, uint32_t levels, TextureFormat format)
 	{
 		switch (Renderer::GetAPI())
 		{
 		case RendererAPI::API::None:    DY_CORE_ASSERT(false, "RendererAPI::None is currently not supported!"); return nullptr;
-		case RendererAPI::API::OpenGL:  return CreateRef<OpenGLTextureCube>(files);
+		case RendererAPI::API::OpenGL:  return CreateRef<OpenGLTextureCube>(width, height, levels, format);
 		}
 
 		DY_CORE_ASSERT(false, "Unknown RendererAPI!");

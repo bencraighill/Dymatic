@@ -1,18 +1,7 @@
 // SRR Shader
 
-#type vertex
-#version 450 core
-
-const vec2 madd = vec2(0.5,0.5);
-
-layout (location = 0) in vec3 a_Position;
-layout (location = 0) out vec2 o_TexCoord;
-
-void main() 
-{
-   o_TexCoord = a_Position.xy*madd+madd; // scale vertex attribute to [0-1] range
-   gl_Position = vec4(a_Position.xy,0.0,1.0);
-}
+// Include Fullscreen Quad Vertex Shader
+#include assets/shaders/Renderer3D_Fullscreen.glsl
 
 #type fragment
 #version 450 core
@@ -23,7 +12,7 @@ layout (location = 0) out vec4 o_Color;
 layout (binding = 0) uniform sampler2D u_FinalImage;
 layout (binding = 1) uniform sampler2D u_Depth;
 layout (binding = 2) uniform sampler2D u_Normal;
-layout (binding = 3) uniform sampler2D u_Metallic;
+layout (binding = 3) uniform sampler2D u_Roughness_Metallic_Specular;
 
 layout(std140, binding = 0) uniform Camera
 {
@@ -69,16 +58,16 @@ vec3 hash(vec3 a);
 
 void main()
 {
-    float Metallic = texture(u_Metallic, v_TexCoord).r;
+    float Metallic = texture(u_Roughness_Metallic_Specular, v_TexCoord).y;
 
-    if(Metallic < 0.01)
-        discard;
+    //if(Metallic < 0.01)
+    //    discard;
  
     vec3 viewNormal = vec3(texture(u_Normal, v_TexCoord) * u_InverseView);
     vec3 viewPos = PositionFromDepth(texture(u_Depth, v_TexCoord).r);//textureLod(gPosition, v_TexCoord, 2).xyz;
     vec3 albedo = texture(u_FinalImage, v_TexCoord).rgb;
 
-    float spec = texture(u_Metallic, v_TexCoord).g;
+    float spec = texture(u_Roughness_Metallic_Specular, v_TexCoord).z;
 
     vec3 F0 = vec3(0.04);
     F0      = mix(F0, albedo, Metallic);
@@ -108,7 +97,8 @@ void main()
     // Get color
     vec3 SSR = textureLod(u_FinalImage, coords.xy, 0).rgb * clamp(ReflectionMultiplier, 0.0, 0.9) * Fresnel;  
 
-    o_Color = vec4(SSR, Metallic);
+    //o_Color = vec4(SSR, Metallic);
+    o_Color = vec4(albedo + SSR * Metallic, 1.0);
 }
 
 vec3 PositionFromDepth(float depth) {

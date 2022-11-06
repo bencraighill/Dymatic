@@ -1,5 +1,7 @@
 #include "dypch.h"
+
 #include "Platform/OpenGL/OpenGLFramebuffer.h"
+#include "Platform/OpenGL/OpenGLTextureFormat.h"
 
 #include <glad/glad.h>
 
@@ -9,113 +11,95 @@ namespace Dymatic {
 
 	namespace Utils {
 
-		static GLenum TextureTarget(bool multisampled)
+		static GLenum GetFramebufferTextureTarget(bool multisampled, FramebufferTextureTarget target)
 		{
-			return multisampled ? GL_TEXTURE_2D_MULTISAMPLE : GL_TEXTURE_2D;
+			switch (target)
+			{
+			case FramebufferTextureTarget::TEXTURE_2D:
+				return multisampled ? GL_TEXTURE_2D_MULTISAMPLE : GL_TEXTURE_2D;
+
+			case FramebufferTextureTarget::CUBE_MAP_POSITIVE_X:		return GL_TEXTURE_CUBE_MAP_POSITIVE_X;
+			case FramebufferTextureTarget::CUBE_MAP_NEGATIVE_X:		return GL_TEXTURE_CUBE_MAP_NEGATIVE_X;
+			case FramebufferTextureTarget::CUBE_MAP_POSITIVE_Y:		return GL_TEXTURE_CUBE_MAP_POSITIVE_Y;
+			case FramebufferTextureTarget::CUBE_MAP_NEGATIVE_Y:		return GL_TEXTURE_CUBE_MAP_NEGATIVE_Y;
+			case FramebufferTextureTarget::CUBE_MAP_POSITIVE_Z:		return GL_TEXTURE_CUBE_MAP_POSITIVE_Z;
+			case FramebufferTextureTarget::CUBE_MAP_NEGATIVE_Z:		return GL_TEXTURE_CUBE_MAP_NEGATIVE_Z;
+			}
+
+			DY_CORE_ASSERT(false);
+			return 0;
 		}
 
-		static void CreateTextures(bool multisampled, uint32_t* outID, uint32_t count)
+		static GLenum GetTextureTarget(bool multisampled, TextureTarget target)
 		{
-			glCreateTextures(TextureTarget(multisampled), count, outID);
+			switch (target)
+			{
+			case TextureTarget::TEXTURE_2D:
+				return multisampled ? GL_TEXTURE_2D_MULTISAMPLE : GL_TEXTURE_2D;
+
+			case TextureTarget::TEXTURE_CUBE_MAP:	return GL_TEXTURE_CUBE_MAP;
+			}
+
+			DY_CORE_ASSERT(false);
+			return 0;
 		}
 
-		static void BindTexture(bool multisampled, uint32_t id)
+		static void CreateTextures(bool multisampled, TextureTarget target, uint32_t* outID, uint32_t count)
 		{
-			glBindTexture(TextureTarget(multisampled), id);
+			glCreateTextures(GetTextureTarget(multisampled, target), count, outID);
 		}
 
-		static void AttachColorTexture(uint32_t id, int samples, GLenum internalFormat, GLenum format, uint32_t width, uint32_t height, int index)
+		static void BindTexture(bool multisampled, TextureTarget target, uint32_t id)
 		{
-			bool multisampled = samples > 1;
+			glBindTexture(GetTextureTarget(multisampled, target), id);
+		}
+
+		static void AttachColorTexture(uint32_t id, const FramebufferSpecification& spec, const FramebufferTextureSpecification& attachment, int index)
+		{
+			bool multisampled = spec.Samples > 1;
+
+			GLenum target = GetFramebufferTextureTarget(multisampled, attachment.TextureTarget);
+
 			if (multisampled)
 			{
-				glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, samples, internalFormat, width, height, GL_FALSE);
+				glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, spec.Samples, Utils::DymaticTextureFormatToGLInternalFormat(attachment.TextureFormat), spec.Width, spec.Height, GL_FALSE);
 			}
 			else
 			{
-				glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, format, GL_UNSIGNED_BYTE, nullptr);
+				glTexImage2D(target, 0, Utils::DymaticTextureFormatToGLInternalFormat(attachment.TextureFormat), spec.Width, spec.Height, 0, Utils::DymaticTextureFormatToGLFormat(attachment.TextureFormat), Utils::DymaticTextureFormatToGLType(attachment.TextureFormat), nullptr);
 
-				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+				glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+				glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+				glTexParameteri(target, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+				glTexParameteri(target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+				glTexParameteri(target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 			}
 
-			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + index, TextureTarget(multisampled), id, 0);
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + index, target, id, 0);
 		}
 
-		static void AttachDepthTexture(uint32_t id, int samples, GLenum format, GLenum attachmentType, uint32_t width, uint32_t height)
+		static void AttachDepthTexture(uint32_t id, GLenum attachmentType, const FramebufferSpecification& spec, const FramebufferTextureSpecification& attachment)
 		{
-			bool multisampled = samples > 1;
+			bool multisampled = spec.Samples > 1;
+
+			GLenum target = GetFramebufferTextureTarget(multisampled, attachment.TextureTarget);
+
 			if (multisampled)
 			{
-				glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, samples, format, width, height, GL_FALSE);
+				glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, spec.Samples, Utils::DymaticTextureFormatToGLInternalFormat(attachment.TextureFormat), spec.Width, spec.Height, GL_FALSE);
 			}
 			else
 			{
-				glTexStorage2D(GL_TEXTURE_2D, 1, format, width, height);
+				glTexStorage2D(target, 1, Utils::DymaticTextureFormatToGLInternalFormat(attachment.TextureFormat), spec.Width, spec.Height);
 
-				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+				glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+				glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+				glTexParameteri(target, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+				glTexParameteri(target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+				glTexParameteri(target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 			}
 
-			glFramebufferTexture2D(GL_FRAMEBUFFER, attachmentType, TextureTarget(multisampled), id, 0);
-		}
-
-		static bool IsDepthFormat(FramebufferTextureFormat format)
-		{
-			switch (format)
-			{
-				case FramebufferTextureFormat::DEPTH24STENCIL8: return true;
-			}
-
-			return false;
-		}
-
-		static GLenum DymaticFBTextureFormatToGLInternalFormat(FramebufferTextureFormat format)
-		{
-			switch (format)
-			{
-				case FramebufferTextureFormat::RGBA8:			return GL_RGBA8;
-				case FramebufferTextureFormat::RGBA16F:			return GL_RGBA16F;
-				case FramebufferTextureFormat::RED_INTEGER:		return GL_R32I;
-				case FramebufferTextureFormat::DEPTH24STENCIL8: return GL_DEPTH24_STENCIL8;
-			}
-
-			DY_CORE_ASSERT(false);
-			return 0;
-		}
-
-		static GLenum DymaticFBTextureFormatToGLFormat(FramebufferTextureFormat format)
-		{
-			switch (format)
-			{
-				case FramebufferTextureFormat::RGBA8:			return GL_RGBA;
-				case FramebufferTextureFormat::RGBA16F:			return GL_RGBA;
-				case FramebufferTextureFormat::RED_INTEGER:		return GL_RED_INTEGER;
-				case FramebufferTextureFormat::DEPTH24STENCIL8:	return GL_DEPTH_STENCIL;
-			}
-
-			DY_CORE_ASSERT(false);
-			return 0;
-		}
-
-		static GLenum DymaticFBTextureFormatToGLType(FramebufferTextureFormat format)
-		{
-			switch (format)
-			{
-				case FramebufferTextureFormat::RGBA8:			return GL_UNSIGNED_BYTE;
-				case FramebufferTextureFormat::RGBA16F:			return GL_FLOAT;
-				case FramebufferTextureFormat::RED_INTEGER:		return GL_INT;
-				case FramebufferTextureFormat::DEPTH24STENCIL8:	return GL_UNSIGNED_INT_24_8;
-			}
-
-			DY_CORE_ASSERT(false);
-			return 0;
+			glFramebufferTexture2D(GL_FRAMEBUFFER, attachmentType, target, id, 0);
 		}
 	}
 
@@ -161,34 +145,23 @@ namespace Dymatic {
 		if (m_ColorAttachmentSpecifications.size())
 		{
 			m_ColorAttachments.resize(m_ColorAttachmentSpecifications.size());
-			Utils::CreateTextures(multisample, m_ColorAttachments.data(), m_ColorAttachments.size());
+			Utils::CreateTextures(multisample, m_Specification.Target, m_ColorAttachments.data(), m_ColorAttachments.size());
 
 			for (size_t i = 0; i < m_ColorAttachments.size(); i++)
 			{
-				Utils::BindTexture(multisample, m_ColorAttachments[i]);
-				switch (m_ColorAttachmentSpecifications[i].TextureFormat)
-				{
-					case FramebufferTextureFormat::RGBA8:
-						Utils::AttachColorTexture(m_ColorAttachments[i], m_Specification.Samples, GL_RGBA8, GL_RGBA, m_Specification.Width, m_Specification.Height, i);
-						break;
-					case FramebufferTextureFormat::RGBA16F:
-						Utils::AttachColorTexture(m_ColorAttachments[i], m_Specification.Samples, GL_RGBA16F, GL_RGBA, m_Specification.Width, m_Specification.Height, i);
-						break;
-					case FramebufferTextureFormat::RED_INTEGER:
-						Utils::AttachColorTexture(m_ColorAttachments[i], m_Specification.Samples, GL_R32I, GL_RED_INTEGER, m_Specification.Width, m_Specification.Height, i);
-						break;
-				}
+				Utils::BindTexture(multisample, m_Specification.Target, m_ColorAttachments[i]);
+				Utils::AttachColorTexture(m_ColorAttachments[i], m_Specification, m_ColorAttachmentSpecifications[i], i);
 			}
 		}
 
-		if (m_DepthAttachmentSpecification.TextureFormat != FramebufferTextureFormat::None)
+		if (m_DepthAttachmentSpecification.TextureFormat != TextureFormat::None)
 		{
-			Utils::CreateTextures(multisample, &m_DepthAttachment, 1);
-			Utils::BindTexture(multisample, m_DepthAttachment);
+			Utils::CreateTextures(multisample, m_Specification.Target, &m_DepthAttachment, 1);
+			Utils::BindTexture(multisample, m_Specification.Target, m_DepthAttachment);
 			switch (m_DepthAttachmentSpecification.TextureFormat)
 			{
-				case FramebufferTextureFormat::DEPTH24STENCIL8:
-					Utils::AttachDepthTexture(m_DepthAttachment, m_Specification.Samples, GL_DEPTH24_STENCIL8, GL_DEPTH_STENCIL_ATTACHMENT, m_Specification.Width, m_Specification.Height);
+				case TextureFormat::DEPTH24STENCIL8:
+					Utils::AttachDepthTexture(m_DepthAttachment, GL_DEPTH_STENCIL_ATTACHMENT, m_Specification, m_DepthAttachmentSpecification);
 					break;
 			}
 		}
@@ -240,7 +213,7 @@ namespace Dymatic {
 
 		auto& spec = m_ColorAttachmentSpecifications[attachmentIndex];
 		glReadBuffer(GL_COLOR_ATTACHMENT0 + attachmentIndex);
-		glReadPixels(x, y, 1, 1, Utils::DymaticFBTextureFormatToGLFormat(spec.TextureFormat), Utils::DymaticFBTextureFormatToGLType(spec.TextureFormat), pixelData);
+		glReadPixels(x, y, 1, 1, Utils::DymaticTextureFormatToGLFormat(spec.TextureFormat), Utils::DymaticTextureFormatToGLType(spec.TextureFormat), pixelData);
 	}
 
 	float OpenGLFramebuffer::ReadDepthPixel(int x, int y)
@@ -258,7 +231,7 @@ namespace Dymatic {
 
 		auto& spec = m_ColorAttachmentSpecifications[attachmentIndex];
 		glClearTexImage(m_ColorAttachments[attachmentIndex], 0,
-			Utils::DymaticFBTextureFormatToGLFormat(spec.TextureFormat), Utils::DymaticFBTextureFormatToGLType(spec.TextureFormat), value);
+			Utils::DymaticTextureFormatToGLFormat(spec.TextureFormat), Utils::DymaticTextureFormatToGLType(spec.TextureFormat), value);
 	}
 
 	void OpenGLFramebuffer::BindColorSampler(uint32_t slot, uint32_t index) const
@@ -273,12 +246,24 @@ namespace Dymatic {
 
 	void OpenGLFramebuffer::BindColorTexture(uint32_t slot, uint32_t index) const
 	{
-		glBindImageTexture(slot, GetColorAttachmentRendererID(index), 0, GL_FALSE, 0, GL_READ_WRITE, Utils::DymaticFBTextureFormatToGLInternalFormat(m_ColorAttachmentSpecifications[index].TextureFormat));
+		glBindImageTexture(slot, GetColorAttachmentRendererID(index), 0, GL_FALSE, 0, GL_READ_WRITE, Utils::DymaticTextureFormatToGLInternalFormat(m_ColorAttachmentSpecifications[index].TextureFormat));
 	}
 
 	void OpenGLFramebuffer::BindDepthTexture(uint32_t slot) const
 	{
-		glBindImageTexture(slot, GetDepthAttachmentRendererID(), 0, GL_FALSE, 0, GL_READ_WRITE, Utils::DymaticFBTextureFormatToGLInternalFormat(m_DepthAttachmentSpecification.TextureFormat));
+		glBindImageTexture(slot, GetDepthAttachmentRendererID(), 0, GL_FALSE, 0, GL_READ_WRITE, Utils::DymaticTextureFormatToGLInternalFormat(m_DepthAttachmentSpecification.TextureFormat));
+	}
+
+	void OpenGLFramebuffer::SetAttachmentTarget(uint32_t index, FramebufferTextureTarget target, uint32_t mip)
+	{
+		m_ColorAttachmentSpecifications[index].TextureTarget = target;
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + index,Utils::GetFramebufferTextureTarget(m_Specification.Samples > 1, target), m_ColorAttachments[index], mip);
+	}
+
+	void OpenGLFramebuffer::SetTarget(TextureTarget target)
+	{
+		m_Specification.Target = target;
+		Invalidate();
 	}
 
 }

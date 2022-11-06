@@ -6,7 +6,7 @@
 
 #include "Panels/PopupsAndNotifications.h"
 #include "Panels/PreferencesPanel.h"
-#include "Panels/NodeEditor/NodeProgram.h"
+#include "Panels/NodeEditor/NodeEditor.h"
 #include "Panels/TextEditor.h"
 #include "Panels/CurveEditor.h"
 #include "Panels/ImageEditor.h"
@@ -117,6 +117,9 @@ namespace Dymatic {
 		Ref<Texture2D> m_DymaticSplash = Texture2D::Create("assets/icons/DymaticSplash.png");
 		Ref<Texture2D> m_QuestionMarkIcon = Texture2D::Create("assets/icons/General/QuestionMark.png");
 		Ref<Texture2D> m_ErrorIcon = Texture2D::Create("assets/icons/General/Error.png");
+
+		Ref<Texture2D> m_EditIcon;
+		Ref<Texture2D> m_LoadingCogAnimation[3];
 
 		//Shader Icons
 		//Ref<Texture2D> m_IconShaderWireframe = Texture2D::Create("assets/icons/Viewport/ShaderIconWireframe.png");

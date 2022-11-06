@@ -9,8 +9,8 @@ namespace Dymatic {
 	class OpenGLTexture2D : public Texture2D
 	{
 	public:
-		OpenGLTexture2D(uint32_t width, uint32_t height);
-		OpenGLTexture2D(const std::string& path);
+		OpenGLTexture2D(uint32_t width, uint32_t height, TextureFormat format);
+		OpenGLTexture2D(const std::string& path, TextureFormat format);
 		virtual ~OpenGLTexture2D();
 
 		virtual uint32_t GetWidth() const override { return m_Width; }
@@ -32,24 +32,25 @@ namespace Dymatic {
 			return m_RendererID == other.GetRendererID();
 		}
 	private:
+		uint32_t m_RendererID;
+		TextureFormat m_Format;
+
 		std::string m_Path;
 		bool m_IsLoaded = false;
 		uint32_t m_Width, m_Height;
-		uint32_t m_RendererID;
-		GLenum m_InternalFormat, m_DataFormat;
 	};
 
 	class OpenGLTextureCube : public TextureCube
 	{
 	public:
-		OpenGLTextureCube(const std::string files[6]);
+		OpenGLTextureCube(uint32_t width, uint32_t height, uint32_t levels, TextureFormat format);
 		virtual ~OpenGLTextureCube();
 
 		virtual uint32_t GetWidth() const override { return m_Width; }
 		virtual uint32_t GetHeight() const override { return m_Height; }
 		virtual uint32_t GetRendererID() const override { return m_RendererID; }
 
-		virtual const std::string& GetPath() const override { return m_Paths[0]; }
+		virtual const std::string& GetPath() const override { return ""; }
 
 		virtual void GetData(void* data, uint32_t size) override;
 		virtual void SetData(void* data, uint32_t size) override;
@@ -64,11 +65,10 @@ namespace Dymatic {
 			return m_RendererID == ((OpenGLTextureCube&)other).m_RendererID;
 		}
 	private:
-		std::string m_Paths[6];
-		bool m_IsLoaded = false;
-		uint32_t m_Width, m_Height;
 		uint32_t m_RendererID;
-		GLenum m_InternalFormat, m_DataFormat;
-	};
+		TextureFormat m_Format;
 
+		bool m_IsLoaded = false;
+		uint32_t m_Width, m_Height, m_Levels;
+	};
 }

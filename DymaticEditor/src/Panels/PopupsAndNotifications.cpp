@@ -51,6 +51,8 @@ namespace Dymatic {
 		const ImVec2 window_pos = ImGui::GetWindowPos();
 		const ImVec2 window_size = ImGui::GetWindowSize();
 
+		const float barThickness = 10.0f;
+
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 5.0f);
 		ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(25.0f, 25.0f));
@@ -95,7 +97,7 @@ namespace Dymatic {
 				button_width = (width - style.WindowPadding.x * 2.0f) / (float)popup.m_Buttons.size() - style.FramePadding.x * 2.0f;
 
 				const float message_height = ImGui::CalcTextSize(popup.m_Message.c_str(), nullptr, false, width).y;
-				const float height = style.WindowPadding.y * 2.0f + message_height + style.FramePadding.y * 2.0f + 55.0f;
+				const float height = style.WindowPadding.y * 2.0f + message_height + style.FramePadding.y * 2.0f + 55.0f + (popup.m_Loading ? (barThickness + 2.0f * style.FramePadding.y + 10.0f) : 0.0f);
 				
 				if (popup.m_Icon)
 					image_width = std::min(height - (ImGui::GetTextLineHeight() + style.FramePadding.y * 2.0f) - style.WindowPadding.y * 2.0f, (float)popup.m_Icon->GetHeight()) * ((float)popup.m_Icon->GetWidth() / (float)popup.m_Icon->GetHeight());
@@ -121,22 +123,23 @@ namespace Dymatic {
 
 			if (popup.m_Loading)
 			{
-				const float barThickness = 10.0f;
-				const float padding = 25.0f;
+				ImGui::Dummy(ImVec2{ 0, 10 });
+
+				const float padding = 10.0f;
 				const float size = 100.0f;
 
 				float time = (ImGui::GetTime() - std::floor(ImGui::GetTime()));
-				ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(ImGui::GetWindowPos().x + padding, ImGui::GetCursorScreenPos().y), ImVec2(ImGui::GetWindowPos().x + ImGui::GetWindowSize().x - padding, ImGui::GetCursorScreenPos().y + barThickness), ImGui::GetColorU32(ImGuiCol_ProgressBarBg));
-				ImGui::GetWindowDrawList()->AddRect(ImVec2(ImGui::GetWindowPos().x + padding, ImGui::GetCursorScreenPos().y), ImVec2(ImGui::GetWindowPos().x + ImGui::GetWindowSize().x - padding, ImGui::GetCursorScreenPos().y + barThickness), ImGui::GetColorU32(ImGuiCol_ProgressBarBorder));
+				ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(ImGui::GetCursorScreenPos().x + padding - 1.0f, ImGui::GetCursorScreenPos().y - 1.0f), ImVec2(ImGui::GetCursorScreenPos().x + ImGui::GetContentRegionAvailWidth() - padding + 1.0f, ImGui::GetCursorScreenPos().y + barThickness + 1.0f), ImGui::GetColorU32(ImGuiCol_ProgressBarBg));
+				ImGui::GetWindowDrawList()->AddRect(ImVec2(ImGui::GetCursorScreenPos().x + padding - 1.0f, ImGui::GetCursorScreenPos().y - 1.0f), ImVec2(ImGui::GetCursorScreenPos().x + ImGui::GetContentRegionAvailWidth() - padding + 1.0f, ImGui::GetCursorScreenPos().y + barThickness + 1.0f), ImGui::GetColorU32(ImGuiCol_ProgressBarBorder));
 
-				double minX = ImGui::GetWindowPos().x - size + padding + (ImGui::GetWindowSize().x + size) * (time);
-				double maxX = ImGui::GetWindowPos().x - size - padding + (ImGui::GetWindowSize().x + size) * (time)+size;
+				double minX = ImGui::GetCursorScreenPos().x - size + padding + (ImGui::GetContentRegionAvailWidth() + size) * (time);
+				double maxX = ImGui::GetCursorScreenPos().x - size - padding + (ImGui::GetContentRegionAvailWidth() + size) * (time)+size;
 
-				if (minX > (ImGui::GetWindowPos().x + ImGui::GetWindowSize().x - padding)) { minX = (ImGui::GetWindowPos().x + ImGui::GetWindowSize().x - padding); }
-				if (maxX > (ImGui::GetWindowPos().x + ImGui::GetWindowSize().x - padding)) { maxX = (ImGui::GetWindowPos().x + ImGui::GetWindowSize().x - padding); }
+				if (minX > (ImGui::GetCursorScreenPos().x + ImGui::GetContentRegionAvailWidth() - padding)) { minX = (ImGui::GetCursorScreenPos().x + ImGui::GetContentRegionAvailWidth() - padding); }
+				if (maxX > (ImGui::GetCursorScreenPos().x + ImGui::GetContentRegionAvailWidth() - padding)) { maxX = (ImGui::GetCursorScreenPos().x + ImGui::GetContentRegionAvailWidth() - padding); }
 
-				if (minX < (ImGui::GetWindowPos().x + padding)) { minX = (ImGui::GetWindowPos().x + padding); }
-				if (maxX < (ImGui::GetWindowPos().x + padding)) { maxX = (ImGui::GetWindowPos().x + padding); }
+				if (minX < (ImGui::GetCursorScreenPos().x + padding)) { minX = (ImGui::GetCursorScreenPos().x + padding); }
+				if (maxX < (ImGui::GetCursorScreenPos().x + padding)) { maxX = (ImGui::GetCursorScreenPos().x + padding); }
 
 				ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(minX, ImGui::GetCursorScreenPos().y), ImVec2(maxX, ImGui::GetCursorScreenPos().y + barThickness), ImGui::GetColorU32(ImGuiCol_ProgressBarFill));
 

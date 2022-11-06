@@ -410,8 +410,26 @@ namespace Dymatic {
 			out << YAML::Key << "Color" << YAML::Value << pointLightComponent.Color;
 			out << YAML::Key << "Intensity" << YAML::Value << pointLightComponent.Intensity;
 			out << YAML::Key << "Radius" << YAML::Value << pointLightComponent.Radius;
+			out << YAML::Key << "Casts Shadows" << YAML::Value << pointLightComponent.CastsShadows;
 
 			out << YAML::EndMap; // PointLightComponent
+		}
+
+		if (entity.HasComponent<SkyLightComponent>())
+		{
+			out << YAML::Key << "SkyLightComponent";
+			out << YAML::BeginMap; // SkyLightComponent
+
+			auto& skyLightComponent = entity.GetComponent<SkyLightComponent>();
+			out << YAML::Key << "Type" << YAML::Value << skyLightComponent.Type;
+			if (skyLightComponent.Type == 0)
+			{
+				if (!skyLightComponent.Filepath.empty())
+					out << YAML::Key << "SkyLightPath" << YAML::Value << skyLightComponent.Filepath;
+			}
+			out << YAML::Key << "Intensity" << YAML::Value << skyLightComponent.Intensity;
+
+			out << YAML::EndMap; // SkyLightComponent
 		}
 
 		if (entity.HasComponent<AudioComponent>())
@@ -690,8 +708,10 @@ namespace Dymatic {
 				auto staticMeshComponent = entity["StaticMeshComponent"];
 				if (staticMeshComponent)
 				{
-					if (staticMeshComponent["MeshPath"])
-						deserializedEntity.AddComponent<StaticMeshComponent>(staticMeshComponent["MeshPath"].as<std::string>());
+					auto& smc = deserializedEntity.AddComponent<StaticMeshComponent>();
+					auto& meshPath = staticMeshComponent["MeshPath"];
+					if (meshPath)
+						smc.LoadModel(meshPath.as<std::string>());
 				}
 
 				auto directionalLightComponent = entity["DirectionalLightComponent"];
@@ -706,9 +726,33 @@ namespace Dymatic {
 				if (pointLightComponent)
 				{
 					auto& plc = deserializedEntity.AddComponent<PointLightComponent>();
-					plc.Color = pointLightComponent["Color"].as<glm::vec3>();
-					plc.Intensity = pointLightComponent["Intensity"].as<float>();
-					plc.Radius = pointLightComponent["Radius"].as<float>();
+
+					if (auto& color = pointLightComponent["Color"])
+						plc.Color = color.as<glm::vec3>();
+
+					if (auto& intensity = pointLightComponent["Intensity"])
+						plc.Intensity = intensity.as<float>();
+
+					if (auto& radius = pointLightComponent["Radius"])
+						plc.Radius = radius.as<float>();
+
+					if (auto& castsShadows = pointLightComponent["Casts Shadows"])
+						plc.CastsShadows = castsShadows.as<bool>();
+				}
+
+				auto skyLightComponent = entity["SkyLightComponent"];
+				if (skyLightComponent)
+				{
+					auto& slc = deserializedEntity.AddComponent<SkyLightComponent>();
+
+					if (auto& skyLightType = skyLightComponent["Type"])
+						slc.Type = skyLightType.as<int>();
+
+					auto& skyLightPath = skyLightComponent["SkyLightPath"];
+					if (skyLightPath)
+						slc.Load(skyLightPath.as<std::string>());
+
+					slc.Intensity = skyLightComponent["Intensity"].as<float>();
 				}
 
 				auto audioComponent = entity["AudioComponent"];

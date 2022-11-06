@@ -26,14 +26,14 @@
 // To Open URL
 #include <shellapi.h>
 
-#include "Nodes/UnrealBlueprintClass.h"
-
 #include "Dymatic/Core/Memory.h"
 
 #include "Dymatic/Scene/ScriptEngine.h"
 #include "Plugins/PluginLoader.h"
 
 #include <imgui/imgui_neo_sequencer.h>
+
+#include "VSUplink.h"
 
 namespace Dymatic {
 
@@ -75,8 +75,18 @@ namespace Dymatic {
 
 	EditorLayer::EditorLayer()
 		: Layer("EditorLayer"), m_CameraController(1280.0f / 720.0f), m_SquareColor({ 0.2f, 0.3f, 0.8f, 1.0f })
-	{
+	{		
 	}
+
+	// Window Button Hover Queries
+	static bool s_TitlebarHovered;
+	static void IsTitlebarHovered(int* hovered) { *hovered = s_TitlebarHovered; }
+	static bool s_MinimizeHovered;
+	static void IsMinimizeHovered(int* hovered) { *hovered = s_MinimizeHovered; }
+	static bool s_MaximiseHovered;
+	static void IsMaximiseHovered(int* hovered) { *hovered = s_MaximiseHovered; }
+	static bool s_CloseHovered;
+	static void IsCloseHovered(int* hovered) { *hovered = s_CloseHovered; }
 
 	void EditorLayer::OnAttach()
 	{
@@ -84,9 +94,17 @@ namespace Dymatic {
 
 		LoadApplicationCrashManager();
 
+		auto& window = Application::Get().GetWindow();
+		window.SetTitlebarHoveredQueryCallback(&IsTitlebarHovered);
+		window.SetMinimizeHoveredQueryCallback(&IsMinimizeHovered);
+		window.SetMaximizeHoveredQueryCallback(&IsMaximiseHovered);
+		window.SetCloseHoveredQueryCallback(&IsCloseHovered);
+
 		PluginLoader::Init();
 
 		Notification::Init();
+
+		VSUplink::Init();
 			
 		OpenWindowLayout("saved/presets/GeneralWorkspace.layout");
 		OpenWindowLayout("saved/SavedLayout.layout");
@@ -99,6 +117,11 @@ namespace Dymatic {
 		m_IconPause = Texture2D::Create("Resources/Icons/PauseButton.png");
 		m_IconNextFrame = Texture2D::Create("Resources/Icons/NextFrameButton.png");
 
+		m_EditIcon = Texture2D::Create("assets/icons/Info/EditIcon.png");
+		m_LoadingCogAnimation[0] = Texture2D::Create("assets/icons/Info/LoadingCog1.png");
+		m_LoadingCogAnimation[1] = Texture2D::Create("assets/icons/Info/LoadingCog2.png");
+		m_LoadingCogAnimation[2] = Texture2D::Create("assets/icons/Info/LoadingCog3.png");
+
 		Application::Get().GetImGuiLayer()->AddIconFont("assets/fonts/IconsFont.ttf", 25.0f, 0x700, 0x70F);	// Window Icons
 		Application::Get().GetImGuiLayer()->AddIconFont("assets/fonts/IconsFont.ttf", 12.0f, 0x710, 0x71E); // Viewport Shading Icons
 		Application::Get().GetImGuiLayer()->AddIconFont("assets/fonts/IconsFont.ttf", 25.0f, 0x71F, 0x72E); // Icons
@@ -107,10 +130,8 @@ namespace Dymatic {
 		Application::Get().GetImGuiLayer()->AddIconFont("assets/fonts/IconsFont.ttf", 10.0f, 0xF7, 0xF8); // Division Symbol
 
 		FramebufferSpecification fbSpec;
-		// Color, EntityID, Depth, Normal, Metallic
-		fbSpec.Attachments = { FramebufferTextureFormat::RGBA16F, FramebufferTextureFormat::RED_INTEGER, FramebufferTextureFormat::Depth, FramebufferTextureFormat::RGBA16F, FramebufferTextureFormat::RGBA8 };
-
-
+		// Color, EntityID, Depth, Normal, Roughness + Metallic + Specular
+		fbSpec.Attachments = { TextureFormat::RGBA16F, TextureFormat::RED_INTEGER, TextureFormat::Depth, TextureFormat::RGBA16F, TextureFormat::RGBA8 };
 		fbSpec.Width = 1600;
 		fbSpec.Height = 900;
 		fbSpec.Samples = 1;
@@ -133,7 +154,7 @@ namespace Dymatic {
 
 		m_SceneHierarchyPanel.SetContext(m_ActiveScene);
 
-		m_EditorCamera = EditorCamera(/*30.0f*/45.0f, 1.778f, 0.1f, 1000.0f);
+		m_EditorCamera = EditorCamera(45.0f, 1.778f, 0.1f, 1000.0f);
 
 		Renderer2D::SetLineWidth(4.0f);
 
@@ -213,7 +234,6 @@ namespace Dymatic {
 
 				if (m_ViewportFocused)
 					m_CameraController.OnUpdate(ts);
-
 				m_EditorCamera.OnUpdate(ts);
 
 				m_ActiveScene->OnUpdateEditor(ts, m_EditorCamera, m_SceneHierarchyPanel.GetSelectedEntity());
@@ -267,17 +287,8 @@ namespace Dymatic {
 		static bool opt_fullscreen_persistant = true;
 		bool opt_fullscreen = opt_fullscreen_persistant;
 		static ImGuiDockNodeFlags dockspace_flags = ImGuiDockNodeFlags_None;
-
-		bool maximized = Application::Get().GetWindow().IsWindowMaximized();
 		
-		// Set Rounding Frame
-		const float window_rounding = 25.0f;
-		const float window_border_thickness = 3.0f;
-		auto& window = Application::Get().GetWindow();
-		if (maximized)
-			SetWindowRgn(GetActiveWindow(), 0, false);
-		else
-			SetWindowRgn(GetActiveWindow(), CreateRoundRectRgn(0, 0, window.GetWidth(), window.GetHeight(), window_rounding, window_rounding), false);
+		bool maximized = Application::Get().GetWindow().IsWindowMaximized();
 
 		// We are using the ImGuiWindowFlags_NoDocking flag to make the parent window not dockable into,
 		// because it would be confusing to have two docking targets within each others.
@@ -315,121 +326,18 @@ namespace Dymatic {
 			const ImVec2 pos = ImGui::GetWindowPos();
 			const ImVec2 size = ImGui::GetWindowSize();
 
+			const float window_border_thickness = 3.0f;
 			const float half_thickness = window_border_thickness * 0.5f;
-			ImGui::GetForegroundDrawList()->AddRect({ pos.x + half_thickness, pos.y + half_thickness }, { pos.x + size.x - half_thickness, pos.y + size.y - half_thickness }, ImGui::GetColorU32(ImGuiCol_MainWindowBorder), 15.0f, 0, window_border_thickness);
+
+			ImGuiCol coloridx = m_SceneState == SceneState::Edit ? (ImGuiCol_MainWindowBorderEdit)
+				: (m_SceneState == SceneState::Play ? (ImGuiCol_MainWindowBorderPlay)
+					: (ImGuiCol_MainWindowBorderSimulate));
+
+			ImGui::GetForegroundDrawList()->AddRect({ pos.x + half_thickness, pos.y + half_thickness }, { pos.x + size.x - half_thickness, pos.y + size.y - half_thickness }, ImGui::GetColorU32(coloridx), 5.0f, 0, window_border_thickness);
 		}
 
 		if (opt_fullscreen)
 			ImGui::PopStyleVar(2);
-
-		static bool windowResizeHeld = false;
-		static bool windowMoveHeld = false;
-
-		if (!Application::Get().GetWindow().IsWindowMaximized() && !windowMoveHeld )
-		{
-			auto& window = Application::Get().GetWindow();
-
-			
-
-			static int selectionIndex = -1;
-
-			static float mouseDistance = 5.0f;
-
-			if (!windowResizeHeld)
-			{
-				if (Math::NearlyEqual(ImGui::GetMousePos().x, window.GetPositionX(), mouseDistance) && Math::NearlyEqual(ImGui::GetMousePos().y, window.GetPositionY(), mouseDistance)) { selectionIndex = 4; }
-				else if (Math::NearlyEqual(ImGui::GetMousePos().x, window.GetPositionX() + window.GetWidth(), mouseDistance) && Math::NearlyEqual(ImGui::GetMousePos().y, window.GetPositionY(), mouseDistance)) { selectionIndex = 5; }
-				else if (Math::NearlyEqual(ImGui::GetMousePos().x, window.GetPositionX() + window.GetWidth(), mouseDistance) && Math::NearlyEqual(ImGui::GetMousePos().y, window.GetPositionY() + window.GetHeight(), mouseDistance)) { selectionIndex = 6; }
-				else if (Math::NearlyEqual(ImGui::GetMousePos().x, window.GetPositionX(), mouseDistance) && Math::NearlyEqual(ImGui::GetMousePos().y, window.GetPositionY() + window.GetHeight(), mouseDistance)) { selectionIndex = 7; }
-
-				else if (Math::NearlyEqual(ImGui::GetMousePos().x, window.GetPositionX(), mouseDistance)) { selectionIndex = 0; }
-				else if (Math::NearlyEqual(ImGui::GetMousePos().y, window.GetPositionY(), mouseDistance)) { selectionIndex = 1; }
-				else if (Math::NearlyEqual(ImGui::GetMousePos().x, window.GetPositionX() + window.GetWidth(), mouseDistance)) { selectionIndex = 2; }
-				else if (Math::NearlyEqual(ImGui::GetMousePos().y, window.GetPositionY() + window.GetHeight(), mouseDistance)) { selectionIndex = 3; }
-			}
-
-
-			if (selectionIndex != -1 || windowResizeHeld)
-			{
-				if (Input::IsMouseButtonPressed(Mouse::ButtonLeft))
-				{
-					windowResizeHeld = true;
-				}
-				switch (selectionIndex)
-				{
-				case 0: {window.SetCursor(4); break; }
-				case 1: {window.SetCursor(5); break; }
-				case 2: {window.SetCursor(4); break; }
-				case 3: {window.SetCursor(5); break; }
-				case 4: {window.SetCursor(6); break; }
-				case 5: {window.SetCursor(7); break; }
-				case 6: {window.SetCursor(6); break; }
-				case 7: {window.SetCursor(7); break; }
-				}
-				
-			}
-			if (!Input::IsMouseButtonPressed(Mouse::ButtonLeft))
-			{
-				windowResizeHeld = false;
-				selectionIndex = -1;
-			} 
-
-			static ImVec2 prevMousePos = ImGui::GetMousePos();
-			static int prevWindowWidth = window.GetWidth();
-			static int prevWindowHeight = window.GetHeight();
-			static bool init = true;
-			if (windowResizeHeld)
-			{
-				if (init)
-				{
-					prevMousePos = ImGui::GetMousePos();
-					prevWindowWidth = window.GetWidth();
-					prevWindowHeight = window.GetHeight();
-					init = false;
-				}
-
-				int sizeX = window.GetWidth();
-				int sizeY = window.GetHeight();
-
-				switch (selectionIndex)
-				{
-				case 0: {sizeX = window.GetWidth() - (ImGui::GetMousePos().x - prevMousePos.x); break; };
-				case 1: {sizeY = window.GetHeight() - (ImGui::GetMousePos().y - prevMousePos.y); break; };
-				case 2: {sizeX = window.GetWidth() + (ImGui::GetMousePos().x - prevMousePos.x); break; };
-				case 3: {sizeY = window.GetHeight() + (ImGui::GetMousePos().y - prevMousePos.y); break; };
-				case 4: {sizeX = window.GetWidth() - (ImGui::GetMousePos().x - prevMousePos.x); sizeY = window.GetHeight() - (ImGui::GetMousePos().y - prevMousePos.y); break; };
-				case 5: {sizeX = window.GetWidth() + (ImGui::GetMousePos().x - prevMousePos.x); sizeY = window.GetHeight() - (ImGui::GetMousePos().y - prevMousePos.y); break; };
-				case 6: {sizeX = window.GetWidth() + (ImGui::GetMousePos().x - prevMousePos.x); sizeY = window.GetHeight() + (ImGui::GetMousePos().y - prevMousePos.y); break; };
-				case 7: {sizeX = window.GetWidth() - (ImGui::GetMousePos().x - prevMousePos.x); sizeY = window.GetHeight() + (ImGui::GetMousePos().y - prevMousePos.y); break; };
-				}
-				
-
-				sizeX = sizeX < 250 ? 250 : sizeX;
-				sizeY = sizeY < 250 ? 250 : sizeY;
-
-				window.SetSize(sizeX, sizeY);
-				switch (selectionIndex)
-				{
-				case 0: {window.SetPosition(window.GetPositionX() + (prevWindowWidth - sizeX), window.GetPositionY()); break; }
-				case 1: {window.SetPosition(window.GetPositionX(), window.GetPositionY() + (prevWindowHeight - sizeY)); break; }
-				case 2: {break; }
-				case 3: {break; }
-				case 4: {window.SetPosition(window.GetPositionX() + (prevWindowWidth - sizeX), window.GetPositionY() + (prevWindowHeight - sizeY)); break; }
-				case 5: {window.SetPosition(window.GetPositionX(), window.GetPositionY() + (prevWindowHeight - sizeY)); break; }
-				case 6: {break; }
-				case 7: {window.SetPosition(window.GetPositionX() + (prevWindowWidth - sizeX), window.GetPositionY()); break; }
-				}
-				
-
-				prevMousePos = ImGui::GetMousePos();
-				prevWindowWidth = window.GetWidth();
-				prevWindowHeight = window.GetHeight();
-			}
-			else
-			{
-				init = true;
-			}
-		}
 
 		// DockSpace
 		ImGuiIO& io = ImGui::GetIO();
@@ -460,10 +368,10 @@ namespace Dymatic {
 			if (ImGui::BeginMenu(CHARACTER_ICON_DYMATIC))
 			{
 				if (ImGui::MenuItem("Splash Screen")) { m_ShowSplash = true; }
-				if (ImGui::MenuItem("About Dymatic")) { Popup::Create("Engine Information", "Dymatic Engine\nV1.2.4 (Development)\n\n\nBranch Publication Date: 28/5/2022\nBranch: Development\n\n\n Dymatic Engine is a free, open source engine developed by Dymatic Technologies.\nView source files for licenses from vendor libraries.", { { "Learn More", []() { ShellExecute(0, 0, L"https://github.com/benc25/dymatic", 0, 0, SW_SHOW); } }, { "Ok", []() {} } }); }
+				if (ImGui::MenuItem("About Dymatic")) { Popup::Create("Engine Information", "Dymatic Engine\nV1.2.5 (Development)\n\n\nBranch Publication Date: 28/5/2022\nBranch: Development\n\n\n Dymatic Engine is a free, open source engine developed by Dymatic Technologies.\nView source files for licenses from vendor libraries.", { { "Learn More", []() { ShellExecute(0, 0, L"https://github.com/benc25/dymatic", 0, 0, SW_SHOW); } }, { "Ok", []() {} } }); }
 				ImGui::Separator();
 				if (ImGui::MenuItem("Github")) { ShellExecute(0, 0, L"https://github.com/benc25/dymatic", 0, 0 , SW_SHOW ); }
-				if (ImGui::MenuItem("Uninstall")) { Popup::Create("Uninstall Message", "Current Version:\nV1.2.4 (Development)\n\n\nUnfortunately Dymatic doesn't currently have an uninstaller.\nAll files must be deleted manually from the root directory.", { { "Ok", [](){} } }); }
+				if (ImGui::MenuItem("Uninstall")) { Popup::Create("Uninstall Message", "Current Version:\nV1.2.5 (Development)\n\n\nUnfortunately Dymatic doesn't currently have an uninstaller.\nAll files must be deleted manually from the root directory.", { { "Ok", [](){} } }); }
 				ImGui::Separator();
 				if (ImGui::BeginMenu("System"))
 				{
@@ -584,7 +492,7 @@ namespace Dymatic {
 					if (!Preferences::GetData().ManualDevenv)
 					{
 						// Automatically check for the location of devenv with vswhere.exe
-						system("\"\"Resources/Executables/vswhere/vswhere.exe\" -property productPath > devenv\"");
+						system("\"\"assets/vswhere/vswhere.exe\" -property productPath > devenv\"");
 
 						std::ifstream in;
 						in.open("devenv");
@@ -595,6 +503,7 @@ namespace Dymatic {
 							devenvPath.erase(devenvPath.find(".exe"));
 							devenvPath += ".com";
 						}
+						in.close();
 
 						if (std::filesystem::exists("devenv"))
 							std::filesystem::remove("devenv");
@@ -614,28 +523,45 @@ namespace Dymatic {
 				ImGui::EndMenu();
 			}
 
-			ImVec4 WindowOperatorButtonCol = ImVec4{1.0f, 1.0f, 1.0f, 1.0f};
-			ImVec4 WindowOperatorCircleCol = ImVec4{ 0.5f, 0.5f, 0.5f, 0.0f };
-			ImVec4 WindowOperatorCircleColHovered = ImVec4{ 0.5f, 0.5f, 0.5f, 1.0f };
-			float lineThickness = 1.0f;
-			float buttonSize = 5.0f;
+			const ImVec4 WindowOperatorButtonCol = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+			const ImVec4 WindowOperatorCircleCol = ImVec4{ 0.0f, 0.0f, 0.0f, 0.0f };
+			const ImVec4 WindowOperatorCircleColHovered = ImGui::GetStyleColorVec4(ImGuiCol_HeaderHovered);
+			const float lineThickness = 1.0f;
+			const ImVec2 buttonSize = ImVec2(45.0f, 32.0f);
+			const float iconRadius = 5.0f;
 
 			for (int i = 0; i < 3; i++)
 			{
-				ImVec2 pos = ImVec2{ ImGui::GetWindowPos().x + ImGui::GetWindowSize().x - ((i) * ((buttonSize + 12.5f) * 2.0f)) - buttonSize * 2.5f, (ImGui::GetWindowPos().y + 10.0f) };
+				ImGui::PushID(i);
 
-				const ImGuiID id = ImGui::GetCurrentWindow()->GetID(("##WindowOperatorButton" + std::to_string(i)).c_str());
-				const ImRect bb(ImVec2{pos.x - buttonSize - 5.0f, pos.y - buttonSize - 5.0f }, ImVec2{pos.x + buttonSize + 5.0f, pos.y + buttonSize + 5.0f });
+				ImVec2 pos = ImVec2{ ImGui::GetWindowPos().x + ImGui::GetWindowSize().x - ((i + 1) * buttonSize.x), (ImGui::GetWindowPos().y) };
+
+				const ImGuiID id = ImGui::GetCurrentWindow()->GetID("##WindowOperatorButton");
+				const ImRect bb(pos, ImVec2(pos.x + buttonSize.x, pos.y + buttonSize.y));
+				const ImVec2 center = ImVec2((bb.Min.x + bb.Max.x) * 0.5f, (bb.Min.y + bb.Max.y) * 0.5f);
 				bool hovered, held;
 				bool pressed = ImGui::ButtonBehavior(bb, id, &hovered, &held);
 				ImU32 col = ImGui::ColorConvertFloat4ToU32(WindowOperatorButtonCol);
-				ImGui::GetWindowDrawList()->AddCircleFilled(pos, buttonSize + 4.0f, ImGui::ColorConvertFloat4ToU32(hovered ? WindowOperatorCircleColHovered : WindowOperatorCircleCol));
+				ImGui::GetWindowDrawList()->AddRectFilled(pos, ImVec2(pos.x + buttonSize.x, pos.y + buttonSize.y), ImGui::ColorConvertFloat4ToU32(hovered ? WindowOperatorCircleColHovered : WindowOperatorCircleCol));
 				switch (i)
 				{
-				case 0: {ImGui::GetWindowDrawList()->AddLine(ImVec2{ pos.x - buttonSize, pos.y + buttonSize }, ImVec2{ pos.x + buttonSize, pos.y - buttonSize }, col, lineThickness);
-					ImGui::GetWindowDrawList()->AddLine(ImVec2{ pos.x - buttonSize, pos.y - buttonSize }, ImVec2{ pos.x + buttonSize, pos.y + buttonSize }, col, lineThickness); break; }
-				case 1: {ImGui::GetWindowDrawList()->AddRect(ImVec2{ pos.x - buttonSize, pos.y - buttonSize }, ImVec2{ pos.x + buttonSize, pos.y + buttonSize }, col, NULL, NULL, lineThickness); break; }
-				case 2: {ImGui::GetWindowDrawList()->AddLine(ImVec2{pos.x - buttonSize, pos.y}, ImVec2{ pos.x + buttonSize, pos.y }, col, lineThickness); break; }
+				case 0: {
+					ImGui::GetWindowDrawList()->AddLine(ImVec2{ center.x - iconRadius, center.y + iconRadius }, ImVec2{ center.x + iconRadius, center.y - iconRadius }, col, lineThickness);
+					ImGui::GetWindowDrawList()->AddLine(ImVec2{ center.x - iconRadius, center.y - iconRadius }, ImVec2{ center.x + iconRadius, center.y + iconRadius }, col, lineThickness);
+					s_CloseHovered = hovered;
+					break;
+				}
+				case 1: {
+					ImGui::GetWindowDrawList()->AddRect(ImVec2{ center.x - iconRadius, center.y - iconRadius }, ImVec2{ center.x + iconRadius, center.y + iconRadius }, col, NULL, NULL, lineThickness);
+					s_MaximiseHovered = !held && hovered;
+					break; 
+				}
+				case 2: 
+				{
+					ImGui::GetWindowDrawList()->AddLine(ImVec2{ center.x - iconRadius, center.y }, ImVec2{ center.x + iconRadius, center.y }, col, lineThickness);
+					s_MinimizeHovered = hovered;
+					break;
+				}
 				}
 				if (pressed)
 				{
@@ -647,45 +573,13 @@ namespace Dymatic {
 					}
 				}
 
+				ImGui::PopID();
 			}
 
 			//Window Move
-
 			const ImGuiID id = ImGui::GetCurrentWindow()->GetID(("##WindowMoveTab"));
 			const ImRect bb(ImGui::GetWindowPos(), ImVec2{ ImGui::GetWindowPos().x + ImGui::GetWindowSize().x, ImGui::GetWindowPos().y + 30 });
-			bool hovered;
-			bool pressed = ImGui::ButtonBehavior(bb, id, &hovered, &windowMoveHeld);
-			if (pressed)
-			{
-				if (Input::GetMouseY() + (window.GetPositionY() > 99999 ? 0.0f : window.GetPositionY()) <= Input::GetMouseY())
-				{
-					 window.MaximizeWindow();
-				}
-			}
-
-			static ImVec2 offset = {};
-			static bool init = true;
-			static ImVec2 previousMousePos = {};
-			if (windowMoveHeld && !windowResizeHeld)
-			{
-				if (init)
-				{
-					offset = ImVec2{ ImGui::GetMousePos().x - ImGui::GetWindowPos().x,  ImGui::GetMousePos().y - ImGui::GetWindowPos().y };
-					init = false;
-					previousMousePos = ImGui::GetMousePos();
-				}
-				if (previousMousePos.x != ImGui::GetMousePos().x || previousMousePos.y != ImGui::GetMousePos().y)
-				{
-					if (window.IsWindowMaximized()) { window.ReturnWindow(); }
-				}
-				previousMousePos = ImGui::GetMousePos();
-
-				window.SetPosition(ImGui::GetMousePos().x - offset.x, ImGui::GetMousePos().y - offset.y);
-			}
-			else
-			{
-				init = true;
-			}
+			bool pressed, held = ImGui::ButtonBehavior(bb, id, &s_TitlebarHovered, &held);
 
 			ImGui::EndMenuBar();
 		}
@@ -867,13 +761,55 @@ namespace Dymatic {
 
 		if (m_InfoVisible)
 		{
+			ImVec4 color = ImGui::GetStyleColorVec4(
+				m_SceneState == SceneState::Edit ? (ImGuiCol_MainWindowBorderEdit)
+				: (m_SceneState == SceneState::Play ? (ImGuiCol_MainWindowBorderPlay)
+					: (ImGuiCol_MainWindowBorderSimulate)));
+
+			ImGui::PushStyleColor(ImGuiCol_WindowBg, color);
+			ImGui::PushStyleColor(ImGuiCol_Border, color);
 			ImGui::Begin((std::string(CHARACTER_WINDOW_ICON_INFO) + " Info").c_str(), &m_InfoVisible, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
-			ImGui::TextDisabled(GetCurrentFileName().c_str());
+			ImGui::PopStyleColor(2);
+
+			static int s_LoadingFrameIndex;
+			s_LoadingFrameIndex++;
+			if (s_LoadingFrameIndex > 7)
+				s_LoadingFrameIndex = 0;
+
+			float size = ImGui::GetContentRegionAvail().y;
+			ImGui::Image((ImTextureID)((m_SceneState == SceneState::Edit ? m_EditIcon : m_LoadingCogAnimation[s_LoadingFrameIndex/3])->GetRendererID()), { size, size }, { 0, 1 }, { 1, 0 });
+
+			{
+				std::string text;
+				if (m_SceneState == SceneState::Edit)
+					text = "Editing";
+				else if (m_SceneState == SceneState::Play)
+					text = "Playing";
+				else if (m_SceneState == SceneState::Simulate)
+					text = "Simulating";
+
+				if (m_SceneState != SceneState::Edit)
+				{
+					for (size_t i = 0; i < ((int)ImGui::GetTime())%4; i++)
+						text += ".";
+				}
+
+				ImGui::SameLine();
+				ImGui::Text(text.c_str());
+			}
+
+			auto& filename = GetCurrentFileName();
 			ImGui::SameLine();
-			std::string text = "1.2.4 - (Development)";
+			ImGui::Dummy({ (ImGui::GetContentRegionAvailWidth() - ImGui::CalcTextSize(filename.c_str()).x) * 0.5f, 0.0f });
+			ImGui::SameLine();
+			ImGui::Text(filename.c_str());
+
+			ImGui::SameLine();
+			std::string text = "1.2.5 - (Development)";
 			ImGui::Dummy(ImVec2{ ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize(text.c_str()).x - 5, 0 });
 			ImGui::SameLine();
-			ImGui::TextDisabled(text.c_str());
+			ImGui::Text(text.c_str());
+
 			ImGui::End();
 		}
 
@@ -895,6 +831,8 @@ namespace Dymatic {
 
 		// Check for external drag drop sources
 		m_ContentBrowserPanel.OnImGuiRender(m_IsDragging);
+
+		Renderer3D::OnImGuiRender();
 
 		m_PerformanceAnalyser.OnImGuiRender(m_DeltaTime);
 
@@ -1397,7 +1335,7 @@ namespace Dymatic {
 			ImGui::SameLine();
 			ImGui::Dummy(ImVec2{ 0, 40 - (ImGui::CalcTextSize("W").y / 2) });
 			ImGui::SameLine();
-			std::string versionName = "V1.2.4";
+			std::string versionName = "V1.2.5";
 			ImGui::SameLine( 488 -ImGui::CalcTextSize(versionName.c_str()).x);
 			ImGui::Text(versionName.c_str());
 			ImGui::Columns(2);
@@ -2001,7 +1939,6 @@ namespace Dymatic {
 		std::ofstream fout(path);
 		fout << out.c_str();
 	}
-
 }
 
 

@@ -416,6 +416,7 @@ namespace Dymatic {
 		glm::vec3 Color = glm::vec3(1.0f, 1.0f, 1.0f);
 		float Intensity = 1.0f;
 		float Radius = 1.0f;
+		bool CastsShadows = true;
 
 		PointLightComponent() = default;
 		PointLightComponent(const PointLightComponent&) = default;
@@ -436,13 +437,27 @@ namespace Dymatic {
 		SpotLightComponent(const SpotLightComponent&) = default;
 	};
 
-	struct SkylightComponent
+	struct SkyLightComponent
 	{
-		Ref<TextureCube> EnvironmentMap;
+		Ref<Texture2D> SkyboxHDRI;
+		std::string Filepath;
 		float Intensity;
+		int Type = 0;
 
-		SkylightComponent() = default;
-		SkylightComponent(const SkylightComponent&) = default;
+		SkyLightComponent() = default;
+		SkyLightComponent(const SkyLightComponent&) = default;
+
+		void Load(const std::string& filepath)
+		{
+			Ref<Texture2D> hdri = Texture2D::Create(filepath);
+			if (hdri->IsLoaded())
+			{
+				SkyboxHDRI = hdri;
+				Filepath = filepath;
+			}
+			else
+				DY_CORE_WARN("Could not load HDRI '{0}'", filepath);
+		}
 	};
 
 	struct AudioComponent
@@ -624,7 +639,7 @@ namespace Dymatic {
 		ComponentGroup<FolderComponent, TransformComponent, SpriteRendererComponent,
 			CircleRendererComponent, CameraComponent, NativeScriptComponent, Rigidbody2DComponent, 
 			BoxCollider2DComponent, CircleCollider2DComponent, StaticMeshComponent, DirectionalLightComponent, 
-			PointLightComponent, SpotLightComponent, SkylightComponent, AudioComponent, RigidbodyComponent, 
+			PointLightComponent, SpotLightComponent, SkyLightComponent, AudioComponent, RigidbodyComponent, 
 			BoxColliderComponent, SphereColliderComponent, CapsuleColliderComponent, MeshColliderComponent,
 			UICanvasComponent, UIImageComponent, UIButtonComponent>;
 

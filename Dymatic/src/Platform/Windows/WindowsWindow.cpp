@@ -64,9 +64,12 @@ namespace Dymatic {
 			if (Renderer::GetAPI() == RendererAPI::API::OpenGL)
 				glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
 #endif
-			glfwWindowHint(GLFW_DECORATED, false);
-			m_Window = glfwCreateWindow((int)props.Width, (int)props.Height, m_Data.Title.c_str(), nullptr, nullptr);
-			++s_GLFWWindowCount;
+			glfwWindowHint(GLFW_DECORATED, true);
+			glfwWindowHint(GLFW_DECORATION_VISIBLE, props.Decorated);
+			m_Window = glfwCreateWindow((int)props.Width - 1, (int)props.Height, m_Data.Title.c_str(), nullptr, nullptr);
+			// Trigger a resize event
+			glfwSetWindowSize(m_Window, (int)props.Width, (int)props.Height);
+			s_GLFWWindowCount++;
 
 			GLFWimage images[1];
 			images[0].pixels = stbi_load("assets/icons/DymaticLogo_Larger.png", &images[0].width, &images[0].height, 0, 4); //rgba channels 
@@ -244,6 +247,26 @@ namespace Dymatic {
 
 		GLFWcursor* cursor = glfwCreateStandardCursor(shape);
 		glfwSetCursor(m_Window, cursor);
+	}
+
+	void WindowsWindow::SetTitlebarHoveredQueryCallback(void (*query)(int*))
+	{
+		glfwSetTitlebarHoveredQueryCallback(m_Window, query);
+	}
+
+	void WindowsWindow::SetMinimizeHoveredQueryCallback(void (*query)(int*))
+	{
+		glfwSetIconifyHoveredQueryCallback(m_Window, query);
+	}
+
+	void WindowsWindow::SetMaximizeHoveredQueryCallback(void (*query)(int*))
+	{
+		glfwSetMaximizeHoveredQueryCallback(m_Window, query);
+	}
+
+	void WindowsWindow::SetCloseHoveredQueryCallback(void (*query)(int*))
+	{
+		glfwSetCloseHoveredQueryCallback(m_Window, query);
 	}
 
 	void WindowsWindow::Shutdown()

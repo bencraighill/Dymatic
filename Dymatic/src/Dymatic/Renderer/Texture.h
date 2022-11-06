@@ -3,6 +3,7 @@
 #include <string>
 
 #include "Dymatic/Core/Base.h"
+#include "Dymatic/Renderer/TextureFormat.h"
 
 namespace Dymatic {
 
@@ -31,14 +32,14 @@ namespace Dymatic {
 	class Texture2D : public Texture
 	{
 	public:
-		static Ref<Texture2D> Create(uint32_t width, uint32_t height);
-		static Ref<Texture2D> Create(const std::string& path);
+		static Ref<Texture2D> Create(uint32_t width, uint32_t height, TextureFormat format = TextureFormat::RGBA8);
+		static Ref<Texture2D> Create(const std::string& path, TextureFormat format = TextureFormat::None);
 	};
 
 	class TextureCube : public Texture
 	{
 	public:
-		static Ref<TextureCube> Create(const std::string* files);
+		static Ref<TextureCube> Create(uint32_t width, uint32_t height, uint32_t levels, TextureFormat format = TextureFormat::RGBA8);
 	};
 
 }

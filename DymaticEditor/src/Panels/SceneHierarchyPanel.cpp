@@ -113,84 +113,87 @@ namespace Dymatic {
 
 			// Setup Table
 			const ImGuiTableFlags flags = ImGuiTableFlags_PadOuterX | ImGuiTableFlags_Resizable | ImGuiTableFlags_NoBordersInBody | ImGuiTableFlags_NoPadInnerX;
-			ImGui::BeginTable("##SceneHierarchyTable", 3, flags);
-			ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_NoHide);
-			ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, 64.0f);
-			ImGui::TableSetupColumn("Modifiers", ImGuiTableColumnFlags_WidthFixed, 80.0f);
-			ImGui::TableHeadersRow();
-
-			// Display Main Items
-			if (m_Context)
+			if (ImGui::BeginTable("##SceneHierarchyTable", 3, flags))
 			{
-				m_Context->m_Registry.each([&](auto entityID)
-					{
-						Entity entity{ entityID , m_Context.get() };
-						if (!m_Context->IsEntityParented(entity))
-							DrawEntityNode(entity);
-					});
+				ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_NoHide);
+				ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, 64.0f);
+				ImGui::TableSetupColumn("Modifiers", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+				ImGui::TableHeadersRow();
 
+				// Display Main Items
+				if (m_Context)
+				{
+					m_Context->m_Registry.each([&](auto entityID)
+						{
+							Entity entity{ entityID , m_Context.get() };
+							if (!m_Context->IsEntityParented(entity))
+								DrawEntityNode(entity);
+						});
+
+				}
+
+				if (ImGui::IsMouseDown(0) && ImGui::IsWindowHovered())
+					m_SelectionContext = {};
+
+				// Right-click on blank space
+				if (m_ShowCreateMenu)
+				{
+					ImGui::OpenPopup(ImGui::GetID("##CreateEntityPopup"));
+					m_ShowCreateMenu = false;
+				}
+
+				// Create Entity Context Popup
+				if (ImGui::BeginPopupContextWindow(0, 1, false) || ImGui::BeginPopupEx(ImGui::GetID("##CreateEntityPopup"), ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoSavedSettings))
+				{
+					if (ImGui::BeginMenu("Create"))
+					{
+
+						if (ImGui::MenuItem("Empty Entity"))
+							SetSelectedEntity(m_Context->CreateEntity("Empty Entity"));
+
+						if (ImGui::MenuItem("Folder")) { auto& entity = m_Context->CreateEntity("Folder"); entity.RemoveComponent<TransformComponent>(); entity.AddComponent<FolderComponent>(); SetSelectedEntity(entity); }
+
+						ImGui::Separator();
+
+						if (ImGui::BeginMenu("Mesh"))
+						{
+							if (ImGui::MenuItem("Static Mesh")) { auto& entity = m_Context->CreateEntity("Static Mesh"); entity.AddComponent<StaticMeshComponent>(); SetSelectedEntity(entity); }
+							ImGui::EndMenu();
+						}
+
+						if (ImGui::BeginMenu("Light"))
+						{
+							if (ImGui::MenuItem("Directional Light")) { auto& entity = m_Context->CreateEntity("Directional Light"); entity.AddComponent<DirectionalLightComponent>(); SetSelectedEntity(entity); }
+							if (ImGui::MenuItem("Point Light")) { auto& entity = m_Context->CreateEntity("Point Light"); entity.AddComponent<PointLightComponent>(); SetSelectedEntity(entity); }
+							if (ImGui::MenuItem("Spot Light")) { auto& entity = m_Context->CreateEntity("Spot Light"); entity.AddComponent<SpotLightComponent>(); SetSelectedEntity(entity); }
+							if (ImGui::MenuItem("Sky Light")) { auto& entity = m_Context->CreateEntity("Sky Light"); entity.AddComponent<SkyLightComponent>(); SetSelectedEntity(entity); }
+							ImGui::EndMenu();
+						}
+
+						ImGui::Separator();
+
+						if (ImGui::MenuItem("Camera")) { auto& entity = m_Context->CreateEntity("Camera"); entity.AddComponent<CameraComponent>(); SetSelectedEntity(entity); }
+						if (ImGui::MenuItem("Sprite")) { auto& entity = m_Context->CreateEntity("Sprite"); entity.AddComponent<SpriteRendererComponent>(); SetSelectedEntity(entity); }
+						if (ImGui::MenuItem("Particle System")) { auto& entity = m_Context->CreateEntity("Particle System"); entity.AddComponent<ParticleSystemComponent>(); SetSelectedEntity(entity); }
+						if (ImGui::MenuItem("Audio")) { auto& entity = m_Context->CreateEntity("Audio"); entity.AddComponent<AudioComponent>(); SetSelectedEntity(entity); }
+
+						ImGui::Separator();
+
+						if (ImGui::MenuItem("Native Script")) { auto& entity = m_Context->CreateEntity("Native Script"); entity.AddComponent<NativeScriptComponent>(); SetSelectedEntity(entity); }
+
+						ImGui::EndMenu();
+					}
+					ImGui::EndPopup();
+				}
+
+				// End Table
+				ImGui::EndTable();
 			}
 
 			// Pop Table Styles
 			ImGui::PopStyleVar(2);
 			ImGui::PopStyleColor();
 
-			if (ImGui::IsMouseDown(0) && ImGui::IsWindowHovered())
-				m_SelectionContext = {};
-
-			// Right-click on blank space
-			if (m_ShowCreateMenu)
-			{
-				ImGui::OpenPopup(ImGui::GetID("##CreateEntityPopup"));
-				m_ShowCreateMenu = false;
-			}
-
-			// Create Entity Context Popup
-			if (ImGui::BeginPopupContextWindow(0, 1, false) || ImGui::BeginPopupEx(ImGui::GetID("##CreateEntityPopup"), ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoSavedSettings))
-			{
-				if (ImGui::BeginMenu("Create"))
-				{
-
-					if (ImGui::MenuItem("Empty Entity"))
-						SetSelectedEntity(m_Context->CreateEntity("Empty Entity"));
-
-					if (ImGui::MenuItem("Folder")) { auto& entity = m_Context->CreateEntity("Folder"); entity.RemoveComponent<TransformComponent>(); entity.AddComponent<FolderComponent>(); SetSelectedEntity(entity); }
-
-					ImGui::Separator();
-
-					if (ImGui::BeginMenu("Mesh"))
-					{
-						if (ImGui::MenuItem("Static Mesh")) { auto& entity = m_Context->CreateEntity("Static Mesh"); entity.AddComponent<StaticMeshComponent>(); SetSelectedEntity(entity); }
-						ImGui::EndMenu();
-					}
-
-					if (ImGui::BeginMenu("Light"))
-					{
-						if (ImGui::MenuItem("Directional Light")) { auto& entity = m_Context->CreateEntity("Directional Light"); entity.AddComponent<DirectionalLightComponent>(); SetSelectedEntity(entity); }
-						if (ImGui::MenuItem("Point Light")) { auto& entity = m_Context->CreateEntity("Point Light"); entity.AddComponent<PointLightComponent>(); SetSelectedEntity(entity); }
-						if (ImGui::MenuItem("Spot Light")) { auto& entity = m_Context->CreateEntity("Spot Light"); entity.AddComponent<SpotLightComponent>(); SetSelectedEntity(entity); }
-						if (ImGui::MenuItem("Sky Light")) { auto& entity = m_Context->CreateEntity("Sky Light"); entity.AddComponent<SkylightComponent>(); SetSelectedEntity(entity); }
-						ImGui::EndMenu();
-					}
-
-					ImGui::Separator();
-
-					if (ImGui::MenuItem("Camera")) { auto& entity = m_Context->CreateEntity("Camera"); entity.AddComponent<CameraComponent>(); SetSelectedEntity(entity); }
-					if (ImGui::MenuItem("Sprite")) { auto& entity = m_Context->CreateEntity("Sprite"); entity.AddComponent<SpriteRendererComponent>(); SetSelectedEntity(entity); }
-					if (ImGui::MenuItem("Particle System")) { auto& entity = m_Context->CreateEntity("Particle System"); entity.AddComponent<ParticleSystemComponent>(); SetSelectedEntity(entity); }
-					if (ImGui::MenuItem("Audio")) { auto& entity = m_Context->CreateEntity("Audio"); entity.AddComponent<AudioComponent>(); SetSelectedEntity(entity); }
-
-					ImGui::Separator();
-
-					if (ImGui::MenuItem("Native Script")) { auto& entity = m_Context->CreateEntity("Native Script"); entity.AddComponent<NativeScriptComponent>(); SetSelectedEntity(entity); }
-
-					ImGui::EndMenu();
-				}
-				ImGui::EndPopup();
-			}
-
-			// End Table
-			ImGui::EndTable();
 			ImGui::EndChild();
 
 			ImGui::End();
@@ -505,7 +508,7 @@ namespace Dymatic {
 				DisplayAddComponentEntry<DirectionalLightComponent>("Directional Light");
 				DisplayAddComponentEntry<PointLightComponent>("Point Light");
 				DisplayAddComponentEntry<SpotLightComponent>("Spot Light");
-				DisplayAddComponentEntry<SkylightComponent>("Sky Light");
+				DisplayAddComponentEntry<SkyLightComponent>("Sky Light");
 				ImGui::EndMenu();
 			}
 
@@ -868,8 +871,11 @@ namespace Dymatic {
 						ImGui::PopStyleVar();
 						if (open)
 						{
+							size_t index = 0;
 							for (auto& mesh : component.m_Model->GetMeshes())
 							{
+								ImGui::PushID(index);
+
 								if (ImGui::TreeNode(mesh->GetName().c_str()))
 								{
 									auto material = mesh->GetMaterial();
@@ -997,6 +1003,7 @@ namespace Dymatic {
 											if (ImGui::MenuItem("Opaque")) material->m_MaterialData.BlendMode = Material::AlphaBlendMode::Opaque;
 											if (ImGui::MenuItem("Masked")) material->m_MaterialData.BlendMode = Material::AlphaBlendMode::Masked;
 											if (ImGui::MenuItem("Translucent")) material->m_MaterialData.BlendMode = Material::AlphaBlendMode::Translucent;
+											if (ImGui::MenuItem("Dithered")) material->m_MaterialData.BlendMode = Material::AlphaBlendMode::Dithered;
 											ImGui::EndCombo();
 										}
 
@@ -1029,6 +1036,10 @@ namespace Dymatic {
 
 									ImGui::TreePop();
 								}
+
+								ImGui::PopID();
+
+								index++;
 							}
 							ImGui::TreePop();
 						}
@@ -1098,6 +1109,7 @@ namespace Dymatic {
 				ImGui::ColorEdit3("Color", glm::value_ptr(component.Color));
 				ImGui::DragFloat("Intensity", &component.Intensity);
 				ImGui::DragFloat("Radius", &component.Radius);
+				ImGui::Checkbox("Casts Shadows", &component.CastsShadows);
 			}, [](auto& component) {});
 
 			DrawComponent<SpotLightComponent>("SPOT LIGHT", entity, [](auto& component)
@@ -1110,25 +1122,34 @@ namespace Dymatic {
 				ImGui::DragFloat("Quadratic", &component.Quadratic);
 			}, [](auto& component) {});
 
-			DrawComponent<SkylightComponent>("SKY LIGHT", entity, [](auto& component)
+			DrawComponent<SkyLightComponent>("SKY LIGHT", entity, [](auto& component)
 			{
-				if (ImGui::Button("Load Cubemap", ImVec2(-1.0f, 0.0f)))
+				if (ImGui::BeginCombo("Type", component.Type == 0 ? "HDRI" : "Dynamic"))
 				{
-					std::string paths[6];
-					paths[0] = FileDialogs::OpenFile("Right");
-					paths[1] = FileDialogs::OpenFile("Left");
-					paths[2] = FileDialogs::OpenFile("Top");
-					paths[3] = FileDialogs::OpenFile("Bottom");
-					paths[4] = FileDialogs::OpenFile("Front");
-					paths[5] = FileDialogs::OpenFile("Back");
+					if (ImGui::MenuItem("HDRI"))
+						component.Type = 0;
 
-					Ref<TextureCube> texture = TextureCube::Create(paths);
-					if (texture->IsLoaded())
+					if (ImGui::MenuItem("Dynamic"))
+						component.Type = 1;
+
+					ImGui::EndCombo();
+				}
+
+				if (component.Type == 0)
+				{
+					if (ImGui::Button("Load HDRI", ImVec2(-1.0f, 0.0f)))
 					{
-						component.EnvironmentMap = texture;
+						std::string filepath = FileDialogs::OpenFile("HDRI");
+						if (!filepath.empty())
+						{
+							Ref<Texture2D> texture = Texture2D::Create(filepath);
+							if (texture->IsLoaded())
+							{
+								component.SkyboxHDRI = texture;
+								component.Filepath = filepath;
+							}
+						}
 					}
-					else
-						DY_WARN("Could not load cubemap {0}", paths[0]);
 				}
 
 				ImGui::DragFloat("Intensity", &component.Intensity);

@@ -105,7 +105,9 @@ namespace Dymatic {
 		case ImGuiCol_ButtonToggledHovered:  return "Button Toggled & Hovered";
 		case ImGuiCol_PopupBg:  return "Popup Background";
 		case ImGuiCol_ModalWindowDimBg:  return "Modal Window Dim Background";
-		case ImGuiCol_MainWindowBorder:  return "Main Window Border";
+		case ImGuiCol_MainWindowBorderEdit:  return "Main Window Border Edit";
+		case ImGuiCol_MainWindowBorderPlay:  return "Main Window Border Play";
+		case ImGuiCol_MainWindowBorderSimulate:  return "Main Window Border Simulate";
 		case ImGuiCol_Border:  return "Border";
 		case ImGuiCol_BorderShadow:  return "Border Shadow";
 		case ImGuiCol_FrameBg:  return "Frame Background";
@@ -198,7 +200,9 @@ namespace Dymatic {
 		else if (name == "Button Toggled & Hovered") { return ImGuiCol_ButtonToggledHovered; }
 		else if (name == "Popup Background") { return ImGuiCol_PopupBg; }
 		else if (name == "Modal Window Dim Background") { return ImGuiCol_ModalWindowDimBg; }
-		else if (name == "Main Window Border") { return ImGuiCol_MainWindowBorder; }
+		else if (name == "Main Window Border Edit") { return ImGuiCol_MainWindowBorderEdit; }
+		else if (name == "Main Window Border Play") { return ImGuiCol_MainWindowBorderPlay; }
+		else if (name == "Main Window Border Simulate") { return ImGuiCol_MainWindowBorderSimulate; }
 		else if (name == "Border") { return ImGuiCol_Border; }
 		else if (name == "Border Shadow") { return ImGuiCol_BorderShadow; }
 		else if (name == "Frame Background") { return ImGuiCol_FrameBg; }

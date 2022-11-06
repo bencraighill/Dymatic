@@ -86,7 +86,7 @@ namespace Dymatic {
 
 			for (const auto& entry : std::filesystem::recursive_directory_iterator(projectPath))
 			{
-				if (entry.path().extension() == ".h")
+				if (entry.path().extension() == ".dyheader")
 				{
 					std::ifstream fileStream;
 					fileStream.open(entry);
@@ -199,7 +199,7 @@ namespace Dymatic {
 			out += "}\n\n";
 
 			// (function) GetCompilerVersion
-			out += "extern \"C\" __declspec(dllexport) void GetCompilerVersion(std::string & version) { version = \"1.2.4\"; }";
+			out += "extern \"C\" __declspec(dllexport) void GetCompilerVersion(std::string & version) { version = \"1.2.5\"; }";
 
 			// (function) QueryScriptCore
 			{
@@ -350,7 +350,7 @@ namespace Dymatic {
 				
 				if (result.find("ScriptLibraryInterface.cpp") == std::string::npos)
 				{
-					result.insert(result.find("</Project>"), "<ItemGroup><ClInclude Include = \"ScriptLibraryInterface.cpp\"/></ItemGroup>");
+					result.insert(result.find("</Project>"), "<ItemGroup><ClInclude Include = \"ScriptLibraryInterface.cpp\"/></ItemGroup><ItemGroup><ClInclude Include = \"NodeGenerated\"/></ItemGroup>");
 
 					std::ofstream fout(entry.path());
 					fout << result;
@@ -442,7 +442,7 @@ namespace Dymatic {
 			{
 				std::string version;
 				getCompilerVersionFunc(version);
-				if (version != "1.2.4")
+				if (version != "1.2.5")
 				{
 					s_CompilationMessage = "Engine Version Not Compatible.";
 					return false;

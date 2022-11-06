@@ -91,7 +91,7 @@ vec3 lineIntersectionToZPlane(vec3 A, vec3 B, float zDistance){
 
 vec4 clipToView(vec4 clip){
     //View space transform
-    vec4 view = u_InverseProjection /*inverseProjection*/ * clip;
+    vec4 view = u_InverseProjection * clip;
 
     //Perspective projection
     view = view / view.w;
@@ -104,9 +104,7 @@ vec4 screen2View(vec4 screen){
     vec2 texCoord = screen.xy / u_ScreenDimensions.xy;
 
     //Convert to clipSpace
-    // vec4 clip = vec4(vec2(texCoord.x, 1.0 - texCoord.y)* 2.0 - 1.0, screen.z, screen.w);
     vec4 clip = vec4(vec2(texCoord.x, texCoord.y)* 2.0 - 1.0, screen.z, screen.w);
-    //Not sure which of the two it is just yet
 
     return clipToView(clip);
 }

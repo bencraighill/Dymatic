@@ -33,6 +33,7 @@ namespace Dymatic {
 	extern physx::PxPhysics* g_PhysicsEngine;
 	extern physx::PxCooking* g_PhysicsCooking;
 
+	static Ref<Model> s_ArrowModel = nullptr;
 	static Ref<Model> s_CameraModel = nullptr;
 
 	static std::unordered_map<UUID, Scene*> s_ActiveScenes;
@@ -54,6 +55,8 @@ namespace Dymatic {
 		m_SceneEntity = m_Registry.create();
 		m_Registry.emplace<SceneComponent>(m_SceneEntity, m_SceneID);
 
+		if (s_ArrowModel == nullptr)
+			s_ArrowModel = Model::Create("assets/objects/arrow/arrow.fbx");
 		if (s_CameraModel == nullptr)
 			s_CameraModel = Model::Create("assets/objects/camera/camera.fbx");
 	}
@@ -296,6 +299,7 @@ namespace Dymatic {
 		if (mainCamera)
 		{
 			Renderer3D::BeginScene(*mainCamera, cameraTransform);
+			Renderer3D::UpdateTimestep(ts);
 
 			// Submit Lights
 			{
@@ -328,10 +332,10 @@ namespace Dymatic {
 			Renderer3D::SubmitLightSetup();
 
 			{
-				auto view = m_Registry.view<TransformComponent, SkylightComponent>();
+				auto view = m_Registry.view<TransformComponent, SkyLightComponent>();
 				for (auto entity : view)
 				{
-					auto [transform, light] = view.get<TransformComponent, SkylightComponent>(entity);
+					auto [transform, light] = view.get<TransformComponent, SkyLightComponent>(entity);
 					Renderer3D::SubmitSkyLight(light);
 				}
 			}
@@ -346,8 +350,9 @@ namespace Dymatic {
 					Renderer3D::SubmitStaticMesh(GetWorldTransform({ entity, this }), mesh, (int)entity);
 					//Renderer3D::SubmitStaticMesh(transform.GetTransform(), mesh, (int)entity);
 				}
-				Renderer3D::DrawMeshData();
 			}
+
+			Renderer3D::RenderScene();
 
 			Renderer3D::EndScene();
 
@@ -838,6 +843,7 @@ namespace Dymatic {
 	void Scene::RenderScene(Timestep ts, EditorCamera& camera, Entity selectedEntity)
 	{
 		Renderer3D::BeginScene(camera);
+		Renderer3D::UpdateTimestep(ts);
 
 		// TODO: Move to OnSceneStop()
 		auto view = m_Registry.view<TransformComponent, AudioComponent>();
@@ -882,10 +888,10 @@ namespace Dymatic {
 		Renderer3D::SubmitLightSetup();
 
 		{
-			auto view = m_Registry.view<TransformComponent, SkylightComponent>();
+			auto view = m_Registry.view<TransformComponent, SkyLightComponent>();
 			for (auto entity : view)
 			{
-				auto [transform, light] = view.get<TransformComponent, SkylightComponent>(entity);
+				auto [transform, light] = view.get<TransformComponent, SkyLightComponent>(entity);
 				Renderer3D::SubmitSkyLight(light);
 			}
 		}
@@ -904,16 +910,27 @@ namespace Dymatic {
 
 		// Draw 3D Icons
 		{
-			auto view = m_Registry.view<TransformComponent, CameraComponent>();
-			for (auto entity : view)
 			{
-				auto [transform, camera] = view.get<TransformComponent, CameraComponent>(entity);
+				auto view = m_Registry.view<TransformComponent, CameraComponent>();
+				for (auto entity : view)
+				{
+					auto [transform, camera] = view.get<TransformComponent, CameraComponent>(entity);
 
-				Renderer3D::SubmitModel(GetWorldTransform({ entity, this }), s_CameraModel, (int)entity);
+					Renderer3D::SubmitModel(GetWorldTransform({ entity, this }), s_CameraModel, (int)entity);
+				}
+			}
+
+			{
+				auto view = m_Registry.view<TransformComponent, DirectionalLightComponent>();
+				for (auto entity : view)
+				{
+					auto [dlc, camera] = view.get<TransformComponent, DirectionalLightComponent>(entity);
+					Renderer3D::SubmitModel(GetWorldTransform({ entity, this }), s_ArrowModel, (int)entity);
+				}
 			}
 		}
 
-		Renderer3D::DrawMeshData();
+		Renderer3D::RenderScene();
 
 		Renderer3D::EndScene();
 
@@ -1195,7 +1212,7 @@ namespace Dymatic {
 	}
 
 	template<>
-	void Scene::OnComponentAdded<SkylightComponent>(Entity entity, SkylightComponent& component)
+	void Scene::OnComponentAdded<SkyLightComponent>(Entity entity, SkyLightComponent& component)
 	{
 	}
 

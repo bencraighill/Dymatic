@@ -31,6 +31,9 @@ namespace Dymatic {
 	{
 		std::string Name = "Dymatic Application";
 		std::string WorkingDirectory;
+		uint32_t WindowWidth = 1600;
+		uint32_t WindowHeight = 900;
+		bool WindowDecorated = true;
 		ApplicationCommandLineArgs CommandLineArgs;
 	};
 
@@ -58,6 +61,7 @@ namespace Dymatic {
 		const ApplicationSpecification& GetSpecification() const { return m_Specification; }
 	private:
 		void Run();
+		void Draw();
 		bool OnWindowClose(WindowCloseEvent& e);
 		bool OnWindowResize(WindowResizeEvent& e);
 	private:

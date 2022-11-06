@@ -184,7 +184,9 @@ namespace Dymatic {
 						EditThemeColor(ImGuiCol_MenuBarBg, "Main menu bar, located at the top of the main window.");
 						EditThemeColor(ImGuiCol_MenuBarGrip);
 						EditThemeColor(ImGuiCol_MenuBarGripBorder);
-						EditThemeColor(ImGuiCol_MainWindowBorder);
+						EditThemeColor(ImGuiCol_MainWindowBorderEdit);
+						EditThemeColor(ImGuiCol_MainWindowBorderPlay);
+						EditThemeColor(ImGuiCol_MainWindowBorderSimulate);
 						EditThemeColor(ImGuiCol_WindowShadow);
 						ImGui::TreePop();
 					}

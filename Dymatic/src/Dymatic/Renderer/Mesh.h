@@ -26,13 +26,21 @@ namespace Dymatic {
 	class Material
 	{
 	public:
-		static Ref<Material> Create() { return CreateRef<Material>(); }
+		static Ref<Material> Create(const std::string& name) { return CreateRef<Material>(name); }
+
+		Material(const std::string& name)
+			: m_Name(name)
+		{
+		}
+
+		const std::string& GetName() { return m_Name; }
 
 		enum AlphaBlendMode
 		{
 			Opaque = 0,
 			Masked,
-			Translucent
+			Translucent,
+			Dithered
 		};
 
 		static const char* AlphaBlendModeToString(AlphaBlendMode mode)
@@ -42,6 +50,7 @@ namespace Dymatic {
 			case Opaque: return "Opaque";
 			case Masked: return "Masked";
 			case Translucent: return "Translucent";
+			case Dithered: return "Dithered";
 			}
 			return "Unknown";
 		}
@@ -103,6 +112,7 @@ namespace Dymatic {
 		MaterialData m_MaterialData;
 
 	private:
+		std::string m_Name;
 	};
 
 	class Mesh
