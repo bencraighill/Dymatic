@@ -1,8 +1,7 @@
 #pragma once
 
-#include "Dymatic/Renderer/OrthographicCamera.h"
-
 #include "Dymatic/Renderer/Texture.h"
+#include "Dymatic/Renderer/Font.h"
 
 #include "Dymatic/Renderer/Camera.h"
 #include "Dymatic/Renderer/EditorCamera.h"
@@ -19,7 +18,6 @@ namespace Dymatic {
 
 		static void BeginScene(const Camera& camera, const glm::mat4& transform);
 		static void BeginScene(const EditorCamera& camera);
-		static void BeginScene(const OrthographicCamera& camera); // TODO: Remove
 		static void EndScene();
 		static void Flush();
 
@@ -41,8 +39,13 @@ namespace Dymatic {
 
 		static void DrawLine(const glm::vec3& p0, glm::vec3& p1, const glm::vec4& color, int entityID = -1);
 
+		static void DrawTextComponent(const glm::mat4& transform, TextComponent& tc, int entityID = -1);
+		
 		static void DrawRect(const glm::vec3& position, const glm::vec2& size, const glm::vec4& color, int entityID = -1);
 		static void DrawRect(const glm::mat4& transform, const glm::vec4& color, int entityID = -1);
+
+		static void DrawCube(const glm::vec3& position, const glm::vec3& size, const glm::vec4& color, int entityID = -1);
+		static void DrawCube(const glm::mat4& transform, const glm::vec4& color, int entityID = -1);
 
 		static void DrawSprite(const glm::mat4& transform, SpriteRendererComponent& src, int entityID);
 
@@ -64,6 +67,9 @@ namespace Dymatic {
 	private:
 		static void StartBatch();
 		static void NextBatch();
+
+		static void FlushText();
+		static void StartTextBatch();
 	};
 
 }

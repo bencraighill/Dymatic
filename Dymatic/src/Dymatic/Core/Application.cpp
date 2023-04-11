@@ -4,6 +4,10 @@
 #include "Dymatic/Core/Log.h"
 
 #include "Dymatic/Renderer/Renderer.h"
+#include "Dymatic/Scripting/ScriptEngine.h"
+#include "Dymatic/Audio/AudioEngine.h"
+#include "Dymatic/Physics/PhysicsEngine.h"
+#include "Dymatic/Asset/AssetManager.h"
 
 #include "Dymatic/Core/Input.h"
 
@@ -13,132 +17,28 @@
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3native.h>
 
-#include "../vendor/CSplash/Splash.h"
-
-// OLE DROP
-#include <oleidl.h>
-
 #include <cmath>
 
-#include "Dymatic/Scene/ScriptEngine.h"
-#include "Dymatic/Audio/AudioEngine.h"
-#include "Dymatic/Physics/PhysicsEngine.h"
+extern const char* g_ImGuiWindowIconPath;
 
 namespace Dymatic {
 
 	Application* Application::s_Instance = nullptr;
 
-	class DropManager : public IDropTarget
-	{
-	public:
-		ULONG AddRef() { return 1; }
-		ULONG Release() { return 0; }
-
-		HRESULT QueryInterface(REFIID riid, void** ppvObject)
-		{
-			if (riid == IID_IDropTarget)
-			{
-				*ppvObject = this;
-				return S_OK;
-			}
-			*ppvObject = NULL;
-			return E_NOINTERFACE;
-		};
-
-		HRESULT DragEnter(IDataObject* pDataObj, DWORD grfKeyState, POINTL pt, DWORD* pdwEffect)
-		{
-			WindowDragEnterEvent e;
-			Application::Get().OnEvent(e);
-
-			*pdwEffect &= DROPEFFECT_COPY;
-			return S_OK;
-		}
-
-		HRESULT DragLeave() 
-		{
-			WindowDragLeaveEvent e;
-			Application::Get().OnEvent(e);
-
-			return S_OK; 
-		}
-
-		HRESULT DragOver(DWORD grfKeyState, POINTL pt, DWORD* pdwEffect)
-		{
-			WindowDragOverEvent e;
-			Application::Get().OnEvent(e);
-
-			// trigger MouseMove within ImGui, position is within pt.x and pt.y
-			// grfKeyState contains flags for control, alt, shift etc
-
-			*pdwEffect &= DROPEFFECT_COPY;
-			return S_OK;
-		}
-
-		HRESULT Drop(IDataObject* pDataObj, DWORD grfKeyState, POINTL pt, DWORD* pdwEffect)
-		{
-			// grfKeyState contains flags for control, alt, shift etc
-
-			FORMATETC fmte = { CF_HDROP, NULL, DVASPECT_CONTENT, -1, TYMED_HGLOBAL };
-			STGMEDIUM stgm;
-
-			if (SUCCEEDED(pDataObj->GetData(&fmte, &stgm)))
-			{
-				std::vector<std::string> paths;
-
-				HDROP hdrop = (HDROP)stgm.hGlobal;
-				UINT file_count = DragQueryFile(hdrop, 0xFFFFFFFF, NULL, 0);
-
-				for (UINT i = 0; i < file_count; i++)
-				{
-					TCHAR szFile[MAX_PATH];
-					UINT cch = DragQueryFile(hdrop, i, szFile, MAX_PATH);
-					if (cch > 0 && cch < MAX_PATH)
-					{
-						std::wstring wstr = szFile;
-						std::string str(wstr.begin(), wstr.end());
-
-						paths.push_back(str);
-					}
-				}
-
-				ReleaseStgMedium(&stgm);
-
-				WindowDropEvent e { paths };
-				Application::Get().OnEvent(e);
-			}
-
-			*pdwEffect &= DROPEFFECT_COPY;
-			return S_OK;
-		}
-	};
-
-	DropManager dropManager;
-
-	CSplash ApplicationSplash(TEXT("splash.bmp"), RGB(255, 0, 0), 30);
-
-	static void UpdateSplashMessage(const std::string& message, uint8_t percentage)
-	{
-		ApplicationSplash.ReloadBitmap();
-		ApplicationSplash.DrawLoadText(message + " (" + std::to_string(percentage) + "%)", {(LONG)25.0, (LONG)(315.0), (LONG)(500.0), (LONG)331.0}, 14.0f, TEXT("Lato"));
-		ApplicationSplash.DrawLoadText("© Dymatic Technologies 2022", {(LONG)475.0, (LONG)(315.0), (LONG)(638.0), (LONG)331.0}, 14.0f, TEXT("Lato"));
-		ApplicationSplash.DrawLoadText("V1.2.5", {(LONG)575.0, (LONG)(15.0f), (LONG)(638.0 * 1.0f), (LONG)(30.0f)}, 14.0f, TEXT("Lato"));
-		const int min = 25;
-		const int max = 620;
-		ApplicationSplash.DrawRect(min, 333, max, 340, RGB(50, 50, 50));
-		ApplicationSplash.DrawRect(min, 333, min + ((max - min) * (percentage / 100.0f)), 340, RGB(150, 150, 150));
-	}
-
 	Application::Application(const ApplicationSpecification& specification)
 		: m_Specification(specification)
 	{
 		DY_PROFILE_FUNCTION();
-		//Log::HideConsole(); //!!!
 
-		// OLE
-		OleInitialize(NULL);
+		if (m_Specification.ConsoleVisible)
+			Log::ShowConsole();
+		else
+			Log::HideConsole();
 
-		ApplicationSplash.ShowSplash();
-		UpdateSplashMessage("Initializing Dymatic Core...", 5);
+		if (!m_Specification.SplashImage.empty())
+			Splash::Init(m_Specification.SplashName.empty() ? m_Specification.Name : m_Specification.SplashName, m_Specification.SplashImage, 30);
+
+		Splash::Update("Initializing Dymatic Core...", 5);
 		DY_CORE_ASSERT(!s_Instance, "Application already exists!");
 		s_Instance = this;
 
@@ -146,28 +46,31 @@ namespace Dymatic {
 		if (!m_Specification.WorkingDirectory.empty())
 			std::filesystem::current_path(m_Specification.WorkingDirectory);
 
-		UpdateSplashMessage("Creating Window...", 14);
-		m_Window = Window::Create(WindowProps(m_Specification.Name, m_Specification.WindowWidth, m_Specification.WindowHeight, m_Specification.WindowDecorated));
+		Splash::Update("Creating Window...", 14);
+		m_Window = Window::Create(WindowProps(m_Specification.Name, m_Specification.WindowWidth, m_Specification.WindowHeight, m_Specification.WindowDecorated, m_Specification.WindowStartHidden, m_Specification.ApplicationIcon));
 
-		UpdateSplashMessage("Binding Callbacks...", 37);
+		Splash::Update("Binding Callbacks...", 37);
 		m_Window->SetEventCallback(DY_BIND_EVENT_FN(Application::OnEvent));
 
-		// OLE
-		RegisterDragDrop(glfwGetWin32Window((GLFWwindow*)m_Window->GetNativeWindow()), &dropManager);
+		PlatformUtils::Init();
 
-		UpdateSplashMessage("Initializing Renderer...", 42);
+		Splash::Update("Initializing Renderer...", 42);
 		Renderer::Init();
 
-		UpdateSplashMessage("Initializing Script Engine...", 54);
+		Splash::Update("Initializing Script Engine...", 54);
 		ScriptEngine::Init();
 
-		UpdateSplashMessage("Initializing Audio Engine...", 71);
+		Splash::Update("Initializing Audio Engine...", 71);
 		AudioEngine::Init();
 
-		UpdateSplashMessage("Initializing Physics Engine...", 79);
+		Splash::Update("Initializing Physics Engine...", 79);
 		PhysicsEngine::Init();
 
-		UpdateSplashMessage("Initializing GUI...", 86);
+		Splash::Update("Initializing Asset Manager...", 87);
+		AssetManager::Init();
+
+		Splash::Update("Initializing GUI...", 92);
+		g_ImGuiWindowIconPath = m_Specification.ApplicationIcon.c_str();
 		m_ImGuiLayer = new ImGuiLayer();
 		PushOverlay(m_ImGuiLayer);
 	}
@@ -177,25 +80,25 @@ namespace Dymatic {
 		DY_PROFILE_FUNCTION();
 
 		Renderer::Shutdown();
+		ScriptEngine::Shutdown();
 		AudioEngine::Shutdown();
 		PhysicsEngine::Shutdown();
-
-		// OLE
-		RevokeDragDrop(glfwGetWin32Window((GLFWwindow*)m_Window->GetNativeWindow()));
-
-		// OLE
-		OleUninitialize();
+		AssetManager::Shutdown();
+		
+		PlatformUtils::Shutdown();
 	}
 
 	void Application::PushLayer(Layer* layer)
 	{
 		DY_PROFILE_FUNCTION();
 
-		UpdateSplashMessage("Launching Editor...", 97);
-		ApplicationSplash.CloseSplash();
+		Splash::Update("Launching Application...", 97);
 
 		m_LayerStack.PushLayer(layer);
 		layer->OnAttach();
+
+		Splash::Update("Finalizing...", 100);
+		Splash::Shutdown();
 	}
 
 	void Application::PushOverlay(Layer* layer)
@@ -209,6 +112,13 @@ namespace Dymatic {
 	void Application::Close()
 	{
 		m_Running = false;
+	}
+
+	void Application::SubmitToMainThread(const std::function<void()>& function)
+	{
+		std::scoped_lock<std::mutex> lock(m_MainThreadQueueMutex);
+
+		m_MainThreadQueue.emplace_back(function);
 	}
 
 	void Application::OnEvent(Event& e)
@@ -251,8 +161,10 @@ namespace Dymatic {
 		DY_PROFILE_FUNCTION();
 
 		float time = Time::GetTime();
-		m_Timestep = time - m_LastFrameTime;
+		Timestep timestep = time - m_LastFrameTime;
 		m_LastFrameTime = time;
+
+		ExecuteMainThreadQueue();
 
 		if (!m_Minimized)
 		{
@@ -260,7 +172,7 @@ namespace Dymatic {
 				DY_PROFILE_SCOPE("LayerStack OnUpdate");
 
 				for (Layer* layer : m_LayerStack)
-					layer->OnUpdate(m_Timestep);
+					layer->OnUpdate(timestep);
 			}
 		}
 
@@ -301,6 +213,16 @@ namespace Dymatic {
 		Draw();
 
 		return false;
+	}
+
+	void Application::ExecuteMainThreadQueue()
+	{
+		std::scoped_lock<std::mutex> lock(m_MainThreadQueueMutex);
+
+		for (auto& func : m_MainThreadQueue)
+			func();
+
+		m_MainThreadQueue.clear();
 	}
 
 }

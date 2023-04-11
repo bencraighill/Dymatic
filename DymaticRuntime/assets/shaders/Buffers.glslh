@@ -1,0 +1,216 @@
+// Definitions
+#define MAX_BONES 100
+#define MAX_BONE_INFLUENCE 4
+
+const int MaxCascadeCount = 16;
+
+const float LightConstant = 1.0;
+const float LightLinear = 0.09;
+const float LightQuadratic = 0.032;
+
+#define LIGHT_CULL_SIZE_X 16
+#define LIGHT_CULL_SIZE_Y 9
+#define LIGHT_CULL_SIZE_Z 4
+
+#define GRID_SIZE_X 64
+#define GRID_SIZE_Y 64
+#define GRID_SIZE_Z 64
+#define GRID_SIZE vec3(64, 64, 64)
+
+#define MAX_VOLUMES 32
+
+#define MAX_BOKEH 2048
+
+#define PI 3.1415926535897932384626433832795
+
+#define VISUALIZATION_MODE_RENDERED 0
+#define VISUALIZATION_MODE_PRE_POST_PROCESSING 1
+#define VISUALIZATION_MODE_LIGHTING_ONLY 2
+#define VISUALIZATION_MODE_WIREFRAME 3
+#define VISUALIZATION_MODE_ALBEDO 4
+#define VISUALIZATION_MODE_DEPTH 5
+#define VISUALIZATION_MODE_OBJECT_ID 6
+#define VISUALIZATION_MODE_NORMAL 7
+#define VISUALIZATION_MODE_EMISSIVE 8
+#define VISUALIZATION_MODE_ROUGHNESS 9
+#define VISUALIZATION_MODE_METALLIC 10
+#define VISUALIZATION_MODE_SPECULAR 11
+#define VISUALIZATION_MODE_AMBIENT_OCCLUSION 12
+
+#define SELECTION_COLOR vec3(0.82, 0.62, 0.13)
+
+// Structures
+struct DirectionalLight
+{
+    vec4 direction;
+    vec4 color; // w = intensity
+};
+
+struct PointLight
+{
+    vec4 position;
+    vec4 color;
+    uint enabled;
+    float intensity;
+    float range;
+	int shadowIndex;
+};
+
+struct LightGrid
+{
+    uint offset;
+    uint count;
+};
+
+struct VolumeTileAABB
+{
+    vec4 minPoint;
+    vec4 maxPoint;
+};
+
+struct Volume
+{
+    vec4 min;
+    vec4 max;
+
+    int blend;
+    float scatteringDistribution;
+    float scatteringIntensity;
+    float extinctionScale;
+};
+
+struct BokehPoint
+{
+    vec2 position;
+    float size;
+    vec3 color;
+};
+
+// Buffers
+layout(std140, binding = 0) uniform Camera
+{
+	mat4 u_ViewProjection;
+	vec4 u_ViewPosition;
+    
+    mat4 u_Projection;
+    mat4 u_InverseProjection;
+    mat4 u_View;
+    mat4 u_InverseView;
+	uvec4 u_TileSizes;
+    uvec2 u_ScreenDimensions;
+    vec2 u_PixelSize;
+    float u_Scale;
+    float u_Bias;
+	float u_ZNear;
+	float u_ZFar;
+};
+
+layout(std140, binding = 1) uniform Lighting
+{
+	DirectionalLight u_DirectionalLight;
+    mat4 u_LightSpaceMatrices[MaxCascadeCount];
+    vec4 u_CascadePlaneDistances[MaxCascadeCount/4];
+	int u_UsingDirectionalLight;
+    int u_CascadeCount;
+    int u_UsingSkyLight;
+    float BUFF1[1];
+};
+
+layout(std140, binding = 2) uniform Object
+{
+	mat4 u_Model;
+	mat4 u_ModelInverse;
+	mat4 u_FinalBonesMatrices[MAX_BONES];
+	int u_EntityID;
+	int u_Animated;
+    float BUFF2[2];
+};
+
+layout(std140, binding = 3) uniform Material
+{
+	vec4 u_Albedo;
+    vec4 u_Emissive;
+	vec4 u_Specular;
+	float u_Metalness;
+	float u_Shininess;
+	float u_Roughness;
+	float u_Alpha;
+	float u_AmbientOcclusion;
+
+	float u_UsingAlbedoMap;
+	float u_UsingNormalMap;
+	float u_UsingEmissiveMap;
+	float u_UsingSpecularMap;
+	float u_UsingMetalnessMap;
+	float u_UsingRoughnessMap;
+	float u_UsingAlphaMap;
+	float u_UsingAmbientOcclusionMap;
+
+	int  u_AlphaBlendMode;
+};
+
+layout(std140, binding = 4) uniform Volumetric
+{
+    Volume u_Volumes[MAX_VOLUMES];
+    int u_VolumeCount;
+    float BUFF4[3];
+};
+
+layout(std140, binding = 5) uniform PostProcessing
+{
+    vec4 u_SSAOSamples[64];
+
+    int u_VisualizationMode;
+
+    float u_Gamma;
+    float u_Time;
+
+    float u_LensDistortion;
+    float u_AberrationAmount;
+    float u_GrainAmount;
+    float u_VignetteIntensity;
+    float u_VignettePower;
+
+    float u_FocusNearStart;
+    float u_FocusNearEnd;
+    float u_FocusFarStart;
+    float u_FocusFarEnd;
+    float u_FocusScale;
+
+    float u_BokehThreshold;
+    float u_BokehSize;
+
+    float BUFF5[1];
+};
+
+layout (std430, binding = 6) buffer ClusterAABB
+{
+    VolumeTileAABB u_Cluster[];
+};
+
+layout (std430, binding = 7) buffer PointLightSSBO
+{
+    PointLight u_PointLights[];
+};
+
+layout (std430, binding = 8) buffer LightIndexSSBO
+{
+    uint u_GlobalLightIndexList[];
+};
+
+layout (std430, binding = 9) buffer LightGridSSBO
+{
+    LightGrid u_LightGrid[];
+};
+
+layout (std430, binding = 10) buffer LightCountSSBO
+{
+    uint u_GlobalIndexCount;
+    uint u_PointLightCount;
+};
+
+layout (std140, binding = 11) buffer BokehSSBO
+{
+    uint u_GlobalBokehIndex;
+    BokehPoint u_BokehList[MAX_BOKEH];
+};

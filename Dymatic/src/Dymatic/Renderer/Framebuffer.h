@@ -72,7 +72,11 @@ namespace Dymatic {
 
 		virtual void Resize(uint32_t width, uint32_t height) = 0;
 		virtual void ReadPixel(uint32_t attachmentIndex, int x, int y, void* pixelData) = 0;
+		virtual void ReadPixels(uint32_t attachmentIndex, int x, int y, int width, int height, void* pixelData) = 0;
 		virtual float ReadDepthPixel(int x, int y) = 0;
+
+		virtual void Copy(uint32_t target) = 0;
+		virtual void Copy(Ref<Framebuffer> target) = 0;
 
 		virtual void ClearAttachment(uint32_t attachmentIndex, const void* value) = 0;
 

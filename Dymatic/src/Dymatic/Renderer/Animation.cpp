@@ -9,8 +9,8 @@ namespace Dymatic {
 	{
 		Assimp::Importer importer;
 		const aiScene* scene = importer.ReadFile(animationPath, aiProcess_Triangulate);
-		assert(scene && scene->mRootNode);
-		auto animation = scene->mAnimations[0];
+		DY_CORE_ASSERT(scene && scene->mRootNode);
+		aiAnimation* animation = scene->mAnimations[0];
 		m_Duration = animation->mDuration;
 		m_TicksPerSecond = animation->mTicksPerSecond;
 		aiMatrix4x4 globalTransformation = scene->mRootNode->mTransformation;
@@ -18,33 +18,44 @@ namespace Dymatic {
 		ReadHeirarchyData(m_RootNode, scene->mRootNode);
 		ReadMissingBones(animation, model);
 
+		// Decode mesh channels
+		for (uint32_t i = 0; i < animation->mNumMeshChannels; i++)
+		{
+			aiMeshAnim* meshChannel = animation->mMeshChannels[i];
+			DY_CORE_INFO("Decoding mesh channel '{}'", meshChannel->mName.data);
+			for (uint32_t j = 0; j < meshChannel->mNumKeys; j++)
+			{
+				aiMeshKey key = meshChannel->mKeys[j];
+				DY_CORE_INFO("	Time: {}, Value: {}", key.mTime, key.mValue);
+			}
+		}
+
 		m_IsLoaded = true;
 	}
 
 	Ref<Bone> Animation::FindBone(const std::string& name)
 	{
-		auto iter = std::find_if(m_Bones.begin(), m_Bones.end(),
-			[&](const Ref<Bone> Bone)
-			{
-				return Bone->GetBoneName() == name;
-			}
-		);
-		if (iter == m_Bones.end()) return nullptr;
-		else return *iter;
+		for (auto& bone : m_Bones)
+		{
+			if (bone->GetBoneName() == name)
+				return bone;
+		}
+		return nullptr;
 	}
 
 	void Animation::ReadMissingBones(const aiAnimation* animation, Ref<Model> model)
 	{
-		int size = animation->mNumChannels;
+		uint32_t size = animation->mNumChannels;
 
 		auto& boneInfoMap = model->GetBoneInfoMap();
-		int& boneCount = model->GetBoneCount();
+		uint32_t& boneCount = model->GetBoneCount();
 
-		//reading channels(bones engaged in an animation and their keyframes)
-		for (int i = 0; i < size; i++)
+		//reading channels(bones engaged in an animation and their key frames)
+		for (uint32_t i = 0; i < size; i++)
 		{
-			auto channel = animation->mChannels[i];
-			std::string boneName = channel->mNodeName.data;
+			const aiNodeAnim* channel = animation->mChannels[i];
+			const std::string boneName = channel->mNodeName.data;
+			
 
 			if (boneInfoMap.find(boneName) == boneInfoMap.end())
 			{
@@ -57,19 +68,19 @@ namespace Dymatic {
 		m_BoneInfoMap = boneInfoMap;
 	}
 
-	void Animation::ReadHeirarchyData(AssimpNodeData& dest, const aiNode* src)
+	void Animation::ReadHeirarchyData(BoneNodeData& dest, const aiNode* src)
 	{
 		DY_CORE_ASSERT(src);
 
-		dest.name = src->mName.data;
-		dest.transformation = AssimpGLMHelpers::ConvertMatrixToGLMFormat(src->mTransformation);
-		dest.childrenCount = src->mNumChildren;
+		dest.Name = src->mName.data;
+		dest.Transformation = AssimpGLMHelpers::ConvertMatrixToGLMFormat(src->mTransformation);
 
-		for (int i = 0; i < src->mNumChildren; i++)
+		dest.Children.resize(src->mNumChildren);
+		for (uint32_t i = 0; i < src->mNumChildren; i++)
 		{
-			AssimpNodeData newData;
+			BoneNodeData newData;
 			ReadHeirarchyData(newData, src->mChildren[i]);
-			dest.children.push_back(newData);
+			dest.Children[i] = newData;
 		}
 	}
 

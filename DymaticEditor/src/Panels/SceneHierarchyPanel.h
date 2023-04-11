@@ -7,40 +7,46 @@
 
 namespace Dymatic {
 
+	class ScriptField;
+
 	class SceneHierarchyPanel
 	{
 	public:
-		SceneHierarchyPanel() = default;
+		SceneHierarchyPanel();
 		SceneHierarchyPanel(const Ref<Scene>& scene);
 
 		void SetContext(const Ref<Scene>& scene);
 
 		void OnImGuiRender();
 
-		Entity GetSelectedEntity() const { return m_SelectionContext; }
-		void SetSelectedEntity(Entity entity);
+		inline Entity GetActiveEntity() { return m_ActiveEntity; }
+		void SelectedEntity(Entity entity);
+		inline bool IsEntitySelected(Entity entity) { return m_Context->IsEntitySelected(entity); }
+		inline std::unordered_set<entt::entity>& GetSelectedEntities() { return m_Context->GetSelectedEntities(); }
 
-		bool& GetSceneHierarchyVisible() { return m_SceneHierarchyVisible; }
-		bool& GetPropertiesVisible() { return m_PropertiesVisible; }
+		void DuplicateEntities();
 
 		void DeleteEntity(Entity entity);
+		void DeleteEntities();
 
 		inline void ShowCreateMenu() { m_ShowCreateMenu = true; }
+		inline uint64_t& GetPickingID() { return m_PickingID; }
 	private:
 		template<typename T>
 		void DisplayAddComponentEntry(const std::string& entryName);
+		void DisplayCreateEntityPopup();
 
 		void DrawEntityNode(Entity entity);
 		void DrawComponents(Entity entity);
+		
+		bool DrawScriptField(const Entity& entity, const std::string& name, const ScriptField& field, void* data);
 
 		inline bool IsEntitySelectable(Entity entity) { if (m_EntityModifiers.find(entity) == m_EntityModifiers.end()) return true; return m_EntityModifiers[entity].Selectable; }
 		inline bool IsEntityLocked(Entity entity) { if (m_EntityModifiers.find(entity) == m_EntityModifiers.end()) return false; return m_EntityModifiers[entity].Locked; }
 		inline void ToggleEntitySelectable(Entity entity) { m_EntityModifiers[entity].Selectable = !m_EntityModifiers[entity].Selectable; }
 		inline void ToggleEntityLocked(Entity entity) { m_EntityModifiers[entity].Locked = !m_EntityModifiers[entity].Locked; }
 	private:
-		bool m_SceneHierarchyVisible = true;
-		bool m_PropertiesVisible = true;
-
+		
 		struct Modifiers
 		{
 			bool Selectable = true;
@@ -51,36 +57,35 @@ namespace Dymatic {
 		std::string m_SearchBuffer;
 
 		Ref<Scene> m_Context;
-		Entity m_SelectionContext;
+		Entity m_ActiveEntity;
 
 		bool m_ShowCreateMenu = false;
+		
+		std::string m_PickingField;
+		uint64_t m_PickingID = 0;
 
-		Ref<Texture2D> m_CheckerboardTexture = Texture2D::Create("assets/textures/Checkerboard.png");
+		std::string m_EntitySearchBuffer;
 
-		// Search bar
-		Ref<Texture2D> m_SearchbarIcon = Texture2D::Create("assets/icons/SceneHierarchy/SearchbarIcon.png");
-		Ref<Texture2D> m_ClearIcon = Texture2D::Create("assets/icons/SceneHierarchy/ClearIcon.png");
-
-		Ref<Texture2D> m_EntityIcon = Texture2D::Create("assets/icons/Properties/ComponentIcons/SceneIconEmptyEntity.png");
-		Ref<Texture2D> m_FolderIcon = Texture2D::Create("assets/icons/SceneHierarchy/FolderIcon.png");
+		Ref<Texture2D> m_CheckerboardTexture = Texture2D::Create("Resources/Textures/Checkerboard.png");
 
 		// Modifier Icons
-		Ref<Texture2D> m_VisibleIcon = Texture2D::Create("assets/icons/SceneHierarchy/VisibleIcon.png");
-		Ref<Texture2D> m_HiddenIcon = Texture2D::Create("assets/icons/SceneHierarchy/HiddenIcon.png");
-		Ref<Texture2D> m_UnlockedIcon = Texture2D::Create("assets/icons/SceneHierarchy/UnlockedIcon.png");
-		Ref<Texture2D> m_LockedIcon = Texture2D::Create("assets/icons/SceneHierarchy/LockedIcon.png");
-		Ref<Texture2D> m_SelectableIcon = Texture2D::Create("assets/icons/SceneHierarchy/SelectableIcon.png");
-		Ref<Texture2D> m_NonSelectableIcon = Texture2D::Create("assets/icons/SceneHierarchy/NonSelectableIcon.png");
+		Ref<Texture2D> m_VisibleIcon = Texture2D::Create("Resources/Icons/SceneHierarchy/VisibleIcon.png");
+		Ref<Texture2D> m_HiddenIcon = Texture2D::Create("Resources/Icons/SceneHierarchy/HiddenIcon.png");
+		Ref<Texture2D> m_UnlockedIcon = Texture2D::Create("Resources/Icons/SceneHierarchy/UnlockedIcon.png");
+		Ref<Texture2D> m_LockedIcon = Texture2D::Create("Resources/Icons/SceneHierarchy/LockedIcon.png");
+		Ref<Texture2D> m_SelectableIcon = Texture2D::Create("Resources/Icons/SceneHierarchy/SelectableIcon.png");
+		Ref<Texture2D> m_NonSelectableIcon = Texture2D::Create("Resources/Icons/SceneHierarchy/NonSelectableIcon.png");
 
-		Ref<Texture2D> m_IconAddComponent = Texture2D::Create("assets/icons/Properties/PropertiesAddComponent.png");
-		Ref<Texture2D> m_IconDuplicate = Texture2D::Create("assets/icons/Properties/PropertiesDuplicate.png");
-		Ref<Texture2D> m_IconDelete = Texture2D::Create("assets/icons/Properties/PropertiesDelete.png");
-		Ref<Texture2D> m_IconRevert = Texture2D::Create("assets/icons/Properties/PropertiesRevert.png");
+		Ref<Texture2D> m_IconAddComponent = Texture2D::Create("Resources/Icons/Properties/PropertiesAddComponent.png");
+		Ref<Texture2D> m_IconDuplicate = Texture2D::Create("Resources/Icons/Properties/PropertiesDuplicate.png");
+		Ref<Texture2D> m_IconDelete = Texture2D::Create("Resources/Icons/Properties/PropertiesDelete.png");
+		Ref<Texture2D> m_IconRevert = Texture2D::Create("Resources/Icons/Properties/PropertiesRevert.png");
+		Ref<Texture2D> m_IconPicker = Texture2D::Create("Resources/Icons/Properties/PickerIcon.png");
 
-		Ref<Texture2D> m_IconTransformComponent = Texture2D::Create("assets/icons/Properties/ComponentIcons/SceneIconTransformComponent.png");
-		Ref<Texture2D> m_IconSpriteRendererComponent = Texture2D::Create("assets/icons/Properties/ComponentIcons/SceneIconSpriteRendererComponent.png");
-		Ref<Texture2D> m_IconParticleSystemComponent = Texture2D::Create("assets/icons/Properties/ComponentIcons/SceneIconParticleComponent.png");
-		Ref<Texture2D> m_IconCameraComponent = Texture2D::Create("assets/icons/Properties/ComponentIcons/SceneIconCameraComponent.png");
+		Ref<Texture2D> m_IconTransformComponent = Texture2D::Create("Resources/Icons/Properties/ComponentIcons/SceneIconTransformComponent.png");
+		Ref<Texture2D> m_IconSpriteRendererComponent = Texture2D::Create("Resources/Icons/Properties/ComponentIcons/SceneIconSpriteRendererComponent.png");
+		Ref<Texture2D> m_IconParticleSystemComponent = Texture2D::Create("Resources/Icons/Properties/ComponentIcons/SceneIconParticleComponent.png");
+		Ref<Texture2D> m_IconCameraComponent = Texture2D::Create("Resources/Icons/Properties/ComponentIcons/SceneIconCameraComponent.png");
 	};
 
 }

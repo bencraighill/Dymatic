@@ -7,24 +7,16 @@
 
 #include "PopupsAndNotifications.h"
 
+#include "Filesystem/FileManager.h"
+
 namespace Dymatic {
 
 	class ContentBrowserPanel
 	{
 	public:
-		enum FileType
-		{
-			Directory = 0,
-			File,
-			SceneAsset,
-			MeshAsset,
-			TextureAsset,
-			FontAsset
-		};
-
 		struct FileEntry
 		{
-			FileEntry(const std::filesystem::path& path, bool isDirectory = false, Ref<Texture2D> texture = nullptr);
+			FileEntry(const std::filesystem::path& path, const std::filesystem::path& base, bool isDirectory = false, Ref<Texture2D> texture = nullptr);
 
 			Ref<Texture2D> Texture = nullptr;
 			FileType Type;
@@ -40,10 +32,10 @@ namespace Dymatic {
 		};
 
 	public:
-
 		ContentBrowserPanel();
 
-		bool& GetContentBrowserVisible() { return m_ContentBrowserVisible; }
+		void Init();
+		void SetOpenFileCallback(const std::function<void(const std::filesystem::path&)>& callback) { m_OpenFileEditorCallback = callback; }
 
 		void OnImGuiRender(bool m_IsDragging);
 
@@ -51,7 +43,13 @@ namespace Dymatic {
 
 		void OnExternalFileDrop(std::vector<std::string> filepaths);
 
-		static FileType GetFileType(const std::filesystem::path& path);
+		// Actions
+		void OpenExternally(const std::filesystem::path& path);
+		bool DuplicateFile(const std::filesystem::path& file);
+		void CopyFile(const std::filesystem::path& file);
+		void PasteFile();
+		void RenameFile(const std::filesystem::path& path);
+		
 	private:
 		// Updating Directory
 		void AddDirectoryHistory(const std::filesystem::path& path);
@@ -62,6 +60,7 @@ namespace Dymatic {
 		// Updating File View
 		void UpdateDisplayFiles();
 		void InsertDirectoryEntry(const std::filesystem::directory_entry& directoryEntry, bool searching);
+		void UpdateDirectorySplit();
 
 		// Display Directory View
 		void UpdateDisplayDirectories();
@@ -75,39 +74,43 @@ namespace Dymatic {
 		bool IsFileSelected(const std::filesystem::path& path);
 		void InvertSelection();
 
-		// Actions
-		void OpenExternally(const std::filesystem::path& path);
-		bool DuplicateFile(const std::filesystem::path& file);
-		void CopyFile(const std::filesystem::path& file);
-		void PasteFile();
-
 		void ImportExternalFiles();
 
 		// Internal Action
 		void CreateFolder();
 		bool DeleteFile(const std::filesystem::path& path, bool reload = true);
+		void RenameFile(const std::filesystem::path& oldPath, const std::filesystem::path& newPath);
 		bool MoveFileToDirectory(const std::filesystem::path& file, const std::filesystem::path& dir, bool reload = true);
-		bool CopyFileToDirectory(const std::filesystem::path& file, const std::filesystem::path& dir, bool reload = true);
+		bool CopyFileToDirectory(const std::filesystem::path& file, const std::filesystem::path& dir, bool moving = false);
+		
+		uint32_t GetNumberOfFoldersInDirectory(const std::filesystem::path& directory);
 
-		// Calculations
-		size_t GetNumberOfFoldersInDirectory(const std::filesystem::path& dir);
-		std::filesystem::path GetNextOfNameInDirectory(std::filesystem::path name, const std::filesystem::path& dir);
+		void DrawCreateMenu();
+		void DrawRenameInput(const std::filesystem::path& path);
+
+		void CheckFileAssetData(const std::filesystem::path& path);
 
 		// File Info
 		static Ref<Texture2D> GetFileIcon(FileType type);
 		static std::string FileTypeToString(FileType type);
-	private:
-		bool m_ContentBrowserVisible = true;
 
+	private:
+		bool m_Init = false;
+
+		std::filesystem::path m_BaseDirectory;
 		std::filesystem::path m_CurrentDirectory;
 
 		bool m_InContentBounds = false;
 		bool m_ScrollToTop = false;
 
 		std::vector<FileEntry> m_DisplayFiles;
+		std::vector<std::string> m_DirectorySplit;
 		DirectoryEntry m_DisplayDirectories;
 
 		std::vector<FileEntry> m_SelectionContext;
+
+		bool m_StartRename = false;
+		std::filesystem::path m_RenameContext;
 
 		std::vector<std::filesystem::path> m_DirectoryHistory;
 		uint32_t m_DirectoryHistoryIndex = 0;
@@ -117,6 +120,8 @@ namespace Dymatic {
 		std::string m_SearchbarBuffer;
 
 		glm::vec2 m_SelectionPos { -1.0f, -1.0f };
+		
+		std::function<void(const std::filesystem::path&)> m_OpenFileEditorCallback;
 	};
 
 }

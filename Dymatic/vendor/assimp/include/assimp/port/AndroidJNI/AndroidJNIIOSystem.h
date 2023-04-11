@@ -2,7 +2,7 @@
 Open Asset Import Library (assimp)
 ----------------------------------------------------------------------
 
-Copyright (c) 2006-2016, assimp team
+Copyright (c) 2006-2021, assimp team
 All rights reserved.
 
 Redistribution and use of this software in source and binary forms,
@@ -45,7 +45,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef AI_ANDROIDJNIIOSYSTEM_H_INC
 #define AI_ANDROIDJNIIOSYSTEM_H_INC
 
-#include "../code/DefaultIOSystem.h"
+#include <assimp/DefaultIOSystem.h>
 #include <android/asset_manager.h>
 #include <android/asset_manager_jni.h>
 #include <android/native_activity.h>
@@ -54,36 +54,32 @@ namespace Assimp	{
 
 // ---------------------------------------------------------------------------
 /** Android extension to DefaultIOSystem using the standard C file functions */
-class ASSIMP_API AndroidJNIIOSystem : public DefaultIOSystem
-{
+class ASSIMP_API AndroidJNIIOSystem : public DefaultIOSystem {
 public:
-
 	/** Initialize android activity data */
 	std::string mApkWorkspacePath;
 	AAssetManager* mApkAssetManager;
 
-	/** Constructor. */
+	/// Constructor.
 	AndroidJNIIOSystem(ANativeActivity* activity);
 
-	/** Destructor. */
+    /// Class constructor with past and asset manager.
+	AndroidJNIIOSystem(const char *internalPath, AAssetManager* assetManager);
+
+	/// Destructor.
 	~AndroidJNIIOSystem();
 
-	// -------------------------------------------------------------------
-	/** Tests for the existence of a file at the given path. */
+	/// Tests for the existence of a file at the given path.
 	bool Exists( const char* pFile) const;
 
-	// -------------------------------------------------------------------
-	/** Opens a file at the given path, with given mode */
+	/// Opens a file at the given path, with given mode
 	IOStream* Open( const char* strFile, const char* strMode);
 
-	// ------------------------------------------------------------------------------------------------
-	// Inits Android extractor
+	/// Inits Android extractor
 	void AndroidActivityInit(ANativeActivity* activity);
 
-	// ------------------------------------------------------------------------------------------------
-	// Extracts android asset
+	/// Extracts android asset
 	bool AndroidExtractAsset(std::string name);
-
 };
 
 } //!ns Assimp

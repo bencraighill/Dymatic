@@ -424,14 +424,13 @@ namespace Dymatic {
 		void OnEvent(Event& e);
 		bool OnMouseScrolled(MouseScrolledEvent& e);
 
-		void Duplicate() { if (m_SelectedEditor != nullptr && m_TextEditorVisible) { if (!m_SelectedEditor->textEditor.IsReadOnly()) { m_SelectedEditor->textEditor.Duplicate(); } } }
-		void SwapLineUp() { if (m_SelectedEditor != nullptr && m_TextEditorVisible) { if (!m_SelectedEditor->textEditor.IsReadOnly()) { m_SelectedEditor->textEditor.SwapLineUp(); } } }
-		void SwapLineDown() { if (m_SelectedEditor != nullptr && m_TextEditorVisible) { if (!m_SelectedEditor->textEditor.IsReadOnly()) { m_SelectedEditor->textEditor.SwapLineDown(); } } }
+		void Duplicate();
+		void SwapLineUp();
+		void SwapLineDown();
 		void SwitchCStyleHeader();
 
 		void Zoom(float offset) { m_Zoom = std::clamp(m_Zoom + offset * 0.025f, 0.1f, 1.0f); }
-
-		bool& GetTextEditorVisible() { return m_TextEditorVisible; }
+		
 		void OpenTextFileByFilepath(std::string filepath);
 	private:
 		void NewTextFile();
@@ -448,8 +447,6 @@ namespace Dymatic {
 
 		unsigned int GetNextTextEditorID() { nextID++; return nextID; }
 	private:
-		bool m_TextEditorVisible = false;
-
 		std::vector<TextEditorInformation> m_TextEditors;
 		TextEditorInformation* m_SelectedEditor = nullptr;
 		unsigned int nextID = 0;

@@ -14,7 +14,7 @@
 #include "Dymatic/Core/Input.h"
 #include "Dymatic/Core/KeyCodes.h"
 #include "Dymatic/Core/MouseCodes.h"
-#include "Dymatic/Renderer/OrthographicCameraController.h"
+#include "Dymatic/Core/GamepadCodes.h"
 
 #include "Dymatic/ImGui/ImGuiLayer.h"
 
@@ -23,10 +23,11 @@
 #include "Dymatic/Scene/ScriptableEntity.h"
 #include "Dymatic/Scene/Components.h"
 
-// ---Renderer------------------------
+#include "Dymatic/Project/Project.h"
+
 #include "Dymatic/Renderer/Renderer.h"
 #include "Dymatic/Renderer/Renderer2D.h"
-#include "Dymatic/Renderer/Renderer3D.h"
+#include "Dymatic/Renderer/SceneRenderer.h"
 #include "Dymatic/Renderer/RenderCommand.h"
 
 #include "Dymatic/Renderer/Buffer.h"
@@ -34,6 +35,3 @@
 #include "Dymatic/Renderer/Framebuffer.h"
 #include "Dymatic/Renderer/Texture.h"
 #include "Dymatic/Renderer/VertexArray.h"
-
-#include "Dymatic/Renderer/OrthographicCamera.h"
-// -----------------------------------

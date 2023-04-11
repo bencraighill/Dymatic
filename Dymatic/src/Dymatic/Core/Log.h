@@ -16,11 +16,19 @@ namespace Dymatic {
 	class Log
 	{
 	public:
+		struct Message
+		{
+			std::string Text;
+			int Level;
+		};
+
 		static void Init();
 
 		static void HideConsole();
 		static void ShowConsole();
 		static bool IsConsoleVisible();
+
+		static const std::vector<Message>& GetMessages();
 
 		static Ref<spdlog::logger>& GetCoreLogger() { return s_CoreLogger; }
 		static Ref<spdlog::logger>& GetClientLogger() { return s_ClientLogger; }

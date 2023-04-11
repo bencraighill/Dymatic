@@ -111,7 +111,7 @@ namespace Dymatic {
 		glGetTextureSubImage(m_RendererID, 0, 0, 0, 0, m_Width, m_Height, 1, Utils::DymaticTextureFormatToGLFormat(m_Format), Utils::DymaticTextureFormatToGLType(m_Format), m_Width * m_Height * bpp, data);
 	}
 
-	void OpenGLTexture2D::SetData(void* data, uint32_t size)
+	void OpenGLTexture2D::SetData(const void* data, uint32_t size)
 	{
 		DY_PROFILE_FUNCTION();
 
@@ -132,6 +132,38 @@ namespace Dymatic {
 		DY_PROFILE_FUNCTION();
 
 		glBindImageTexture(slot, m_RendererID, 0, GL_FALSE, 0, GL_READ_WRITE, Utils::DymaticTextureFormatToGLInternalFormat(m_Format));
+	}
+
+
+
+	OpenGLTexture3D::OpenGLTexture3D(uint32_t width, uint32_t height, uint32_t depth, TextureFormat format)
+		: m_Width(width), m_Height(height), m_Depth(depth), m_Format(format)
+	{
+	}
+
+	OpenGLTexture3D::~OpenGLTexture3D()
+	{
+
+	}
+
+	void OpenGLTexture3D::GetData(void* data, uint32_t size)
+	{
+
+	}
+
+	void OpenGLTexture3D::SetData(const void* data, uint32_t size)
+	{
+
+	}
+
+	void OpenGLTexture3D::Bind(uint32_t slot /*= 0*/) const
+	{
+
+	}
+
+	void OpenGLTexture3D::BindTexture(uint32_t slot /*= 0*/) const
+	{
+
 	}
 
 	OpenGLTextureCube::OpenGLTextureCube(uint32_t width, uint32_t height, uint32_t levels, TextureFormat format)
@@ -165,7 +197,7 @@ namespace Dymatic {
 	{
 	}
 
-	void OpenGLTextureCube::SetData(void* data, uint32_t size)
+	void OpenGLTextureCube::SetData(const void* data, uint32_t size)
 	{
 		//glTextureSubImage3D(m_RendererID, 0, 0, 0, i, m_Width, m_Height, 1, Utils::DymaticTextureFormatToGLFormat(m_Format), Utils::DymaticTextureFormatToGLType(m_Format),  data);
 	}

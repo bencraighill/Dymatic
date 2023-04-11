@@ -1,5 +1,7 @@
 #include "ConsoleWindow.h"
 
+#include "Settings/Preferences.h"
+
 #include "Dymatic/Math/StringUtils.h"
 #include "Dymatic/Math/Math.h"
 
@@ -18,93 +20,93 @@ namespace Dymatic {
 	void ConsoleWindow::OnEvent(Event& e)
 	{
 		EventDispatcher dispatcher(e);
-
 		dispatcher.Dispatch<KeyPressedEvent>(DY_BIND_EVENT_FN(ConsoleWindow::OnKeyPressed));
 	}
 
 	bool ConsoleWindow::OnKeyPressed(KeyPressedEvent& e)
 	{
 		if (e.GetKeyCode() == Key::Enter)
-		{
 			m_CommandLineEnter = true;
-		}
 		return false;
 	}
 
 	void ConsoleWindow::OnImGuiRender(Timestep ts)
 	{
-		if (m_ConsoleWindowVisible)
+		auto& consoleVisible = Preferences::GetEditorWindowVisible(Preferences::EditorWindow::Console);
+		if (!consoleVisible)
+			return;
+		
+		if (ImGui::Begin(CHARACTER_ICON_CONSOLE " Console", &consoleVisible))
 		{
-			ImGui::Begin((std::string(CHARACTER_WINDOW_ICON_CONSOLE) + " Console").c_str(), &m_ConsoleWindowVisible);
-			if (false)
+#if 0
+			ImGui::BeginChild("##MainLogView", ImGui::GetContentRegionAvail() - ImVec2(0, 30));
+			for (int i = 0; i < m_LogList.size(); i++)
 			{
-				ImGui::BeginChild("##MainLogView", ImGui::GetContentRegionAvail() - ImVec2(0, 30));
-				for (int i = 0; i < m_LogList.size(); i++)
+				static std::string types[6] = { "[none]", "[trace]", "[info]", "[warning]", "[error]", "[critical]" };
+				static ImVec4 typecolors[6] = { ImGui::GetStyleColorVec4(ImGuiCol_Text), ImVec4(0.9f, 0.9f, 0.9f, 1.0f), ImVec4(0.2f, 0.8f, 0.2f, 1.0f), ImVec4(1.0f, 1.0f, 0.6f, 1.0f), ImVec4(1.0f, 0.4f, 0.5f, 1.0f), ImVec4(1.0f, 1.0f, 1.0f, 1.0f) };
+				int typeIndex = 0;
+				int closestIndex = 99999;
+				for (int x = 0; x < 6; x++)
 				{
-					static std::string types[6] = { "[none]", "[trace]", "[info]", "[warning]", "[error]", "[critical]" };
-					static ImVec4 typecolors[6] = { ImGui::GetStyleColorVec4(ImGuiCol_Text), ImVec4(0.9f, 0.9f, 0.9f, 1.0f), ImVec4(0.2f, 0.8f, 0.2f, 1.0f), ImVec4(1.0f, 1.0f, 0.6f, 1.0f), ImVec4(1.0f, 0.4f, 0.5f, 1.0f), ImVec4(1.0f, 1.0f, 1.0f, 1.0f) };
-					int typeIndex = 0;
-					int closestIndex = 99999;
-					for (int x = 0; x < 6; x++)
-					{
-						if (m_LogList[i].find(types[x]) != std::string::npos && m_LogList[i].find(types[x]) < closestIndex) { typeIndex = x; closestIndex = m_LogList[i].find(types[x]); }
-					}
+					if (m_LogList[i].find(types[x]) != std::string::npos && m_LogList[i].find(types[x]) < closestIndex) { typeIndex = x; closestIndex = m_LogList[i].find(types[x]); }
+				}
 
-					ImGui::PushStyleColor(ImGuiCol_Text, typecolors[typeIndex]);
-					if (typeIndex == 5)
-					{
-						auto cursorPos = ImGui::GetCursorPos();
-						ImGui::Text(m_LogList[i].c_str());
-						ImGui::GetWindowDrawList()->AddRectFilled(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImGui::ColorConvertFloat4ToU32(ImVec4(0.9f, 0.1f, 0.2f, 1.0f)));
-						ImGui::SetCursorPos(cursorPos);
-					}
+				ImGui::PushStyleColor(ImGuiCol_Text, typecolors[typeIndex]);
+				if (typeIndex == 5)
+				{
+					auto cursorPos = ImGui::GetCursorPos();
 					ImGui::Text(m_LogList[i].c_str());
-					ImGui::SetScrollHereY(0.5f);
-					ImGui::PopStyleColor();
+					ImGui::GetWindowDrawList()->AddRectFilled(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImGui::ColorConvertFloat4ToU32(ImVec4(0.9f, 0.1f, 0.2f, 1.0f)));
+					ImGui::SetCursorPos(cursorPos);
 				}
-
-				ImGui::EndChild();
-
-				static int buttonWidth = 60;
-				ImGui::PushItemWidth(-buttonWidth);
-
-				char buffer[256];
-				memset(buffer, 0, sizeof(buffer));
-				std::strncpy(buffer, (m_CommandBuffer).c_str(), sizeof(buffer));
-				if (ImGui::InputTextWithHint("##CommandLineInput", ">>> ", buffer, sizeof(buffer)))
-				{
-					m_CommandBuffer = std::string(buffer);
-				}
-				bool commandLineActive = ImGui::IsItemActive();
-				if (m_CommandLineSetFocus)
-				{
-					ImGui::SetKeyboardFocusHere();
-					m_CommandLineSetFocus = false;
-				}
-
-				ImGui::SameLine();
-				ImGui::PushItemWidth(buttonWidth / 2);
-				bool execute = ImGui::Button("Execute");
-				ImGui::PopItemWidth();
-
-				if ((m_CommandLineActive && m_CommandLineEnter) || execute)
-				{
-					ImGui::ClearActiveID();
-					ExecuteConsoleCommand(m_CommandBuffer);
-					if (!execute) { m_CommandLineSetFocus = true; }
-					m_CommandBuffer.clear();
-				}
-				m_CommandLineActive = commandLineActive;
-
-
-				m_CommandLineEnter = false;
-
-				m_TimeSinceUpdate += ts.GetSeconds();
-				if (m_TimeSinceUpdate > 1.0f / m_UpdatesPerSecond)
-				{
-					UpdateLogList();
-				}
+				ImGui::Text(m_LogList[i].c_str());
+				ImGui::SetScrollHereY(0.5f);
+				ImGui::PopStyleColor();
 			}
+
+			ImGui::EndChild();
+
+			static int buttonWidth = 60;
+			ImGui::PushItemWidth(-buttonWidth);
+
+			char buffer[256];
+			memset(buffer, 0, sizeof(buffer));
+			std::strncpy(buffer, (m_CommandBuffer).c_str(), sizeof(buffer));
+			if (ImGui::InputTextWithHint("##CommandLineInput", ">>> ", buffer, sizeof(buffer)))
+			{
+				m_CommandBuffer = std::string(buffer);
+			}
+			bool commandLineActive = ImGui::IsItemActive();
+			if (m_CommandLineSetFocus)
+			{
+				ImGui::SetKeyboardFocusHere();
+				m_CommandLineSetFocus = false;
+			}
+
+			ImGui::SameLine();
+			ImGui::PushItemWidth(buttonWidth / 2);
+			bool execute = ImGui::Button("Execute");
+			ImGui::PopItemWidth();
+
+			if ((m_CommandLineActive && m_CommandLineEnter) || execute)
+			{
+				ImGui::ClearActiveID();
+				ExecuteConsoleCommand(m_CommandBuffer);
+				if (!execute) { m_CommandLineSetFocus = true; }
+				m_CommandBuffer.clear();
+			}
+			m_CommandLineActive = commandLineActive;
+
+
+			m_CommandLineEnter = false;
+
+			m_TimeSinceUpdate += ts.GetSeconds();
+			if (m_TimeSinceUpdate > 1.0f / m_UpdatesPerSecond)
+			{
+				UpdateLogList();
+			}
+#endif
+			
 			ImGui::End();
 		}
 	}
@@ -165,14 +167,14 @@ namespace Dymatic {
 			static float loggerSize = 100;
 		
 			//Time Spacing
-			while (ImGui::CalcTextSize(m_LogList[i].substr(0, String::Find_nth_of(m_LogList[i], "[", 1)).c_str()).x < timeSize)
+			while (ImGui::CalcTextSize(m_LogList[i].substr(0, String::FindNthOf(m_LogList[i], "[", 1)).c_str()).x < timeSize)
 			{
-				m_LogList[i].insert(String::Find_nth_of(m_LogList[i], "[", 1), " ");
+				m_LogList[i].insert(String::FindNthOf(m_LogList[i], "[", 1), " ");
 			}
 		
 			//Type Spacing
 			int nextNonSpaceIndex = -1;
-			for (int x = String::Find_nth_of(m_LogList[i], "]", 2) + 1; x < m_LogList[i].size(); x++)
+			for (int x = String::FindNthOf(m_LogList[i], "]", 2) + 1; x < m_LogList[i].size(); x++)
 			{
 				if (m_LogList[i][x] != ' ')
 				{
@@ -183,9 +185,9 @@ namespace Dymatic {
 		
 			if (nextNonSpaceIndex != -1)
 			{
-				while (ImGui::CalcTextSize(m_LogList[i].substr(String::Find_nth_of(m_LogList[i], "[", 1), nextNonSpaceIndex - String::Find_nth_of(m_LogList[i], "[", 1)).c_str()).x < typeSize)
+				while (ImGui::CalcTextSize(m_LogList[i].substr(String::FindNthOf(m_LogList[i], "[", 1), nextNonSpaceIndex - String::FindNthOf(m_LogList[i], "[", 1)).c_str()).x < typeSize)
 				{
-					m_LogList[i].insert(String::Find_nth_of(m_LogList[i], "]", 2) + 1, " ");
+					m_LogList[i].insert(String::FindNthOf(m_LogList[i], "]", 2) + 1, " ");
 					nextNonSpaceIndex++;
 				}
 			}
@@ -193,7 +195,7 @@ namespace Dymatic {
 			//Logger Spacing
 		
 			int nextNonSpaceIndexLogger = -1;
-			for (int x = String::Find_nth_of(m_LogList[i], ":", 3) + 1; x < m_LogList[i].size(); x++)
+			for (int x = String::FindNthOf(m_LogList[i], ":", 3) + 1; x < m_LogList[i].size(); x++)
 			{
 				if (m_LogList[i][x] != ' ')
 				{
@@ -206,7 +208,7 @@ namespace Dymatic {
 			{
 				while (ImGui::CalcTextSize(m_LogList[i].substr(nextNonSpaceIndex/*Uses First Next Non Index*/, nextNonSpaceIndexLogger - nextNonSpaceIndex).c_str()).x < loggerSize)
 				{
-					m_LogList[i].insert(String::Find_nth_of(m_LogList[i], ":", 3) + 1, " ");
+					m_LogList[i].insert(String::FindNthOf(m_LogList[i], ":", 3) + 1, " ");
 					nextNonSpaceIndexLogger++;
 				}
 			}

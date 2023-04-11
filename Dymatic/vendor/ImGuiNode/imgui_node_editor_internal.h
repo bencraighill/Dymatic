@@ -1054,7 +1054,7 @@ struct CreateItemAction final : EditorAction
     virtual AcceptResult Accept(const Control& control) override final;
     virtual bool Process(const Control& control) override final;
 
-    virtual ImGuiMouseCursor GetCursor() override final { return ImGuiMouseCursor_Arrow; }
+    virtual ImGuiMouseCursor GetCursor() override final { return ImGuiMouseCursor_Crosshair; }
 
     virtual void ShowMetrics() override final;
 

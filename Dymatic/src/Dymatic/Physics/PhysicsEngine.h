@@ -1,7 +1,9 @@
 #pragma once
+#include "Dymatic/Core/Timestep.h"
+#include "Dymatic/Scene/Components.h"
 
 namespace Dymatic {
-
+	
 	class PhysicsEngine
 	{
 	public:

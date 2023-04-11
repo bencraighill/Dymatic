@@ -7,7 +7,8 @@
 #include "Dymatic/Math/Math.h"
 #include "Dymatic/Math/StringUtils.h"
 
-#include "../TextSymbols.h"
+#include "Settings/Preferences.h"
+#include "TextSymbols.h"
 
 #include <iostream>
 
@@ -67,7 +68,8 @@ namespace Dymatic {
 	}
 	void CurveEditor::OnImGuiRender()
 	{
-		if (m_CurveEditorVisible)
+		auto& curveEditorVisible = Preferences::GetEditorWindowVisible(Preferences::EditorWindow::CurveEditor);
+		if (curveEditorVisible)
 		{
 			if (Input::IsKeyPressed(Key::D1))
 			{
@@ -105,7 +107,7 @@ namespace Dymatic {
 
 			previousMouseX = Input::GetMouseX();
 			previousMouseY = Input::GetMouseY();
-			ImGui::Begin((std::string(CHARACTER_WINDOW_ICON_CURVE_EDITOR) + " Curve Editor").c_str(), &m_CurveEditorVisible);
+			ImGui::Begin(CHARACTER_ICON_CURVE " Curve Editor", &curveEditorVisible);
 
 			static float panelA = ImGui::GetContentRegionAvail().x / 10 * 1.25f;
 			static float panelB = ImGui::GetContentRegionAvail().x / 10 * 6.5f;

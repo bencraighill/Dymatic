@@ -3,6 +3,7 @@
 #include "SceneCamera.h"
 #include "Dymatic/Core/UUID.h"
 #include "Dymatic/Renderer/Texture.h"
+#include "Dymatic/Renderer/Font.h"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -20,7 +21,9 @@
 
 #include "Dymatic/Renderer/Model.h"
 #include "Dymatic/Renderer/Animator.h"
-#include "Dymatic/Audio/Sound.h"
+#include "Dymatic/Audio/Audio.h"
+
+#include "Dymatic/Asset/AssetManager.h"
 
 namespace Dymatic {
 
@@ -240,6 +243,19 @@ namespace Dymatic {
 		CircleRendererComponent(const CircleRendererComponent&) = default;
 	};
 
+	struct TextComponent
+	{
+		std::string TextString;
+		glm::vec4 Color{ 1.0f, 1.0f, 1.0f, 1.0f };
+		Ref<Font> Font;
+		float Kerning = 0.0f;
+		float LineSpacing = 0.0f;
+		float MaxWidth = 0.0f;
+
+		TextComponent() = default;
+		TextComponent(const TextComponent&) = default;
+	};
+
 	struct CameraComponent
 	{
 		SceneCamera Camera;
@@ -250,39 +266,28 @@ namespace Dymatic {
 		CameraComponent(const CameraComponent&) = default;
 	};
 
+	struct ScriptComponent
+	{
+		std::string ClassName;
+
+		ScriptComponent() = default;
+		ScriptComponent(const ScriptComponent&) = default;
+	};
+
 	// Forward declaration
 	class ScriptableEntity;
 
 	struct NativeScriptComponent
 	{
 		ScriptableEntity* Instance = nullptr;
-
 		ScriptableEntity* (*InstantiateScript)();
 		void (*DestroyScript)(NativeScriptComponent*);
-
 		template<typename T>
 		void Bind()
 		{
 			InstantiateScript = []() { return static_cast<ScriptableEntity*>(new T()); };
 			DestroyScript = [](NativeScriptComponent* nsc) { delete nsc->Instance; nsc->Instance = nullptr; };
 		}
-
-		void Unbind()
-		{
-			InstantiateScript = nullptr;
-			DestroyScript = nullptr;
-		}
-
-		std::string ScriptName;
-
-		union ParamStore
-		{
-			bool Boolean;
-			int Integer;
-			float Float;
-		};
-
-		std::vector<ParamStore> Params;
 	};
 
 	// Physics
@@ -348,31 +353,32 @@ namespace Dymatic {
 	struct StaticMeshComponent
 	{
 		Ref<Model> m_Model = nullptr;
+		std::vector<Ref<Material>> m_Materials;
 		Ref<Animator> m_Animator;
 
-		StaticMeshComponent()
-		{
+		StaticMeshComponent() 
+		{ 
 			m_Animator = Animator::Create();
 		}
-		StaticMeshComponent(const StaticMeshComponent&) = default;
-		StaticMeshComponent(const std::string& path)
+		
+		StaticMeshComponent(Ref<Model> model) 
 		{
-			m_Animator = Animator::Create();
-			LoadModel(path);
+			m_Animator = Animator::Create(); 
+			SetModel(model);
 		}
+		
+		StaticMeshComponent(const StaticMeshComponent& other) = default;
 
 		inline Ref<Model> GetModel() { return m_Model; }
 		inline Ref<Animator> GetAnimator() { return m_Animator; }
 
-		void LoadModel(const std::string& path)
+		void SetModel(Ref<Model> model)
 		{
-			Ref<Model> model = Model::Create(path);
-			if (model->IsLoaded())
-			{
-				m_Model = model;
-			}
-			else
-				DY_CORE_WARN("Could not load model {0}", path);
+			m_Model = model;
+			m_Materials.clear();
+
+			if (model && model->IsLoaded())
+				m_Materials.resize(m_Model->GetMeshes().size());
 		}
 
 		void LoadAnimation(const std::string& path)
@@ -387,12 +393,6 @@ namespace Dymatic {
 			}
 			else
 				DY_CORE_WARN("Model must be loaded before animation");
-		}
-
-		void ReloadModel()
-		{
-			if (m_Model)
-				LoadModel(m_Model->GetPath());
 		}
 
 		void Update(Timestep ts)
@@ -440,6 +440,7 @@ namespace Dymatic {
 	struct SkyLightComponent
 	{
 		Ref<Texture2D> SkyboxHDRI;
+		Ref<Texture2D> SkyboxFlowMap;
 		std::string Filepath;
 		float Intensity;
 		int Type = 0;
@@ -460,24 +461,42 @@ namespace Dymatic {
 		}
 	};
 
+	struct VolumeComponent
+	{
+		VolumeComponent() = default;
+		VolumeComponent(const VolumeComponent& vc) = default;
+
+		enum class BlendType
+		{
+			Set = 0, Add
+		};
+
+		BlendType Blend = BlendType::Set;
+		float ScatteringDistribution = 0.5;
+		float ScatteringIntensity = 1.0;
+		float ExtinctionScale = 0.5;
+	};
+
 	struct AudioComponent
 	{
-	public:
-		Ref<Sound> m_Sound = nullptr;
+		Ref<Audio> AudioSound = nullptr;
+		bool Initialized = false;
+		bool StartOnAwake = false;
+		uint32_t StartPosition = 0;
 
 		AudioComponent() = default;
 		AudioComponent(const AudioComponent& ac) = default;
 		AudioComponent(const std::string& path)
 		{
-			LoadSound(path);
+			Load(path);
 		}
 
-		void LoadSound(const std::string& path)
+		void Load(const std::string& path)
 		{
-			m_Sound = Sound::Create(path);
+			Ref<Audio> audio = AssetManager::GetAsset<Audio>(path);
+			if (audio)
+				AudioSound = audio;
 		}
-
-		inline Ref<Sound> GetSound() { return m_Sound; }
 	};
 
 	struct RigidbodyComponent
@@ -529,6 +548,72 @@ namespace Dymatic {
 
 		MeshColliderComponent() = default;
 		MeshColliderComponent(const MeshColliderComponent&) = default;
+	};
+
+	struct CharacterMovementComponent
+	{
+		CharacterMovementComponent() = default;
+		CharacterMovementComponent(const CharacterMovementComponent&) = default;
+
+		float Density = 75.0f;
+		float CapsuleRadius = 0.42f;
+		float CapsuleHeight = 1.92f;
+		
+		float GravityScale = 1.0f;
+		float StepOffset = 0.45f;
+		float MaxWalkableSlope = 0.45f;
+		float MaxWalkSpeed = 6.0f;
+		float MaxAcceleration = 20.48f;
+		float BrakingDeceleration = 20.48f;
+		float GroundFriction = 8.0f;
+		float AirControl = 0.2f;
+		
+		// Runtime storage
+		glm::vec3 Velocity = glm::vec3(0.0f);
+		void* CharacterController = nullptr;
+	};
+	
+	struct VehicleMovementComponent
+	{
+		VehicleMovementComponent() = default;
+		VehicleMovementComponent(const VehicleMovementComponent&) = default;
+
+		UUID Chasis;
+		UUID Wheels[4];
+
+		float Mass;
+
+		// Runtime storage
+		uint32_t RuntimeVehicleID = 0;
+		void* VehicleController = nullptr;
+	};
+
+	struct DirectionalFieldComponent
+	{
+		DirectionalFieldComponent() = default;
+		DirectionalFieldComponent(const DirectionalFieldComponent&) = default;
+
+		glm::vec3 Force;
+	};
+
+	struct RadialFieldComponent
+	{
+		RadialFieldComponent() = default;
+		RadialFieldComponent(const RadialFieldComponent&) = default;
+
+		float Magnitude = 1.0f;
+		float Radius = 1.0f;
+		float Falloff = 0.0f;
+	};
+
+	struct BouyancyFieldComponent
+	{
+		BouyancyFieldComponent() = default;
+		BouyancyFieldComponent(const BouyancyFieldComponent&) = default;
+
+		float FluidDensity = 1.0f;
+		float LinearDamping = 2.5f;
+		float AngularDamping = 0.5f;
 	};
 
 	// UI Components
@@ -636,11 +721,18 @@ namespace Dymatic {
 	};
 
 	using AllComponents =
-		ComponentGroup<FolderComponent, TransformComponent, SpriteRendererComponent,
-			CircleRendererComponent, CameraComponent, NativeScriptComponent, Rigidbody2DComponent, 
-			BoxCollider2DComponent, CircleCollider2DComponent, StaticMeshComponent, DirectionalLightComponent, 
-			PointLightComponent, SpotLightComponent, SkyLightComponent, AudioComponent, RigidbodyComponent, 
+		ComponentGroup<
+			FolderComponent, TransformComponent,
+			SpriteRendererComponent, CircleRendererComponent, TextComponent,
+			CameraComponent, ScriptComponent, NativeScriptComponent,
+			Rigidbody2DComponent, BoxCollider2DComponent, CircleCollider2DComponent,
+			StaticMeshComponent, DirectionalLightComponent, PointLightComponent, 
+			SpotLightComponent, SkyLightComponent, VolumeComponent,
+			AudioComponent,
+			RigidbodyComponent, CharacterMovementComponent, VehicleMovementComponent, 
+			BouyancyFieldComponent, DirectionalFieldComponent, RadialFieldComponent,
 			BoxColliderComponent, SphereColliderComponent, CapsuleColliderComponent, MeshColliderComponent,
-			UICanvasComponent, UIImageComponent, UIButtonComponent>;
+			UICanvasComponent, UIImageComponent, UIButtonComponent
+		>;
 
 }

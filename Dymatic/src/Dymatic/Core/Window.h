@@ -1,4 +1,4 @@
-#pragma once
+ #pragma once
 
 #include <sstream>
 
@@ -13,12 +13,16 @@ namespace Dymatic {
 		uint32_t Width;
 		uint32_t Height;
 		bool Decorated;
+		bool StartHidden;
+		std::string Icon;
 
 		WindowProps(const std::string& title = "Dymatic Engine",
 			uint32_t width = 1600,
 			uint32_t height = 900,
-			bool decorated = true)
-			: Title(title), Width(width), Height(height), Decorated(decorated)
+			bool decorated = true,
+			bool startHidden = false,
+			std::string icon = "")
+			: Title(title), Width(width), Height(height), Decorated(decorated), StartHidden(startHidden), Icon(icon)
 		{
 		}
 	};
@@ -41,13 +45,22 @@ namespace Dymatic {
 		virtual uint32_t GetPositionY() const = 0;
 		virtual void SetPosition(int x, int y) const = 0;
 
+		virtual bool IsWindowMinimized() const = 0;
 		virtual void MinimizeWindow() const = 0;
-		virtual void MaximizeWindow() const = 0;
-		virtual void ReturnWindow() const = 0;
-
+		
 		virtual bool IsWindowMaximized() const = 0;
+		virtual void MaximizeWindow() const = 0;
+
+		virtual void RestoreWindow() const = 0;
+
+		virtual bool IsWindowFocused() const = 0;
+		virtual void FocusWindow() const = 0;
+
+		virtual void ShowWindow() const = 0;
+		virtual void HideWindow() const = 0;
 
 		virtual void SetCursor(int shape) const = 0;
+		virtual void LockCursor(bool locked) const = 0;
 
 		virtual void SetTitlebarHoveredQueryCallback(void (*)(int*)) = 0;
 		virtual void SetMinimizeHoveredQueryCallback(void (*)(int*)) = 0;

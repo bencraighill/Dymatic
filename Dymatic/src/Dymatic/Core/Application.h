@@ -33,7 +33,12 @@ namespace Dymatic {
 		std::string WorkingDirectory;
 		uint32_t WindowWidth = 1600;
 		uint32_t WindowHeight = 900;
+		bool ConsoleVisible = true;
 		bool WindowDecorated = true;
+		bool WindowStartHidden = false;
+		std::string ApplicationIcon = "";
+		std::string SplashImage = "";
+		std::string SplashName = "";
 		ApplicationCommandLineArgs CommandLineArgs;
 	};
 
@@ -48,8 +53,6 @@ namespace Dymatic {
 		void PushLayer(Layer* layer);
 		void PushOverlay(Layer* layer);
 
-		Timestep GetTimestep() { return m_Timestep; }
-
 		Window& GetWindow() { return *m_Window; }
 
 		void Close();
@@ -59,11 +62,16 @@ namespace Dymatic {
 		static Application& Get() { return *s_Instance; }
 
 		const ApplicationSpecification& GetSpecification() const { return m_Specification; }
+
+		void SubmitToMainThread(const std::function<void()>& function);
+		
 	private:
 		void Run();
 		void Draw();
 		bool OnWindowClose(WindowCloseEvent& e);
 		bool OnWindowResize(WindowResizeEvent& e);
+
+		void ExecuteMainThreadQueue();
 	private:
 		ApplicationSpecification m_Specification;
 		Scope<Window> m_Window;
@@ -72,7 +80,9 @@ namespace Dymatic {
 		bool m_Minimized = false;
 		LayerStack m_LayerStack;
 		float m_LastFrameTime = 0.0f;
-		Timestep m_Timestep = 0.0f;
+
+		std::vector<std::function<void()>> m_MainThreadQueue;
+		std::mutex m_MainThreadQueueMutex;
 	private:
 		static Application* s_Instance;
 		friend int ::main(int argc, char** argv);

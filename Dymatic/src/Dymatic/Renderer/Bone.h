@@ -30,19 +30,19 @@ namespace Dymatic {
 	class Bone
 	{
 	public:
-		static Ref<Bone> Create(const std::string& name, int ID, aiNodeAnim* channel) { return CreateRef<Bone>(name, ID, channel); }
+		static Ref<Bone> Create(const std::string& name, int ID, const aiNodeAnim* channel) { return CreateRef<Bone>(name, ID, channel); }
 
-		Bone(const std::string& name, int ID, aiNodeAnim* channel);
+		Bone(const std::string& name, int ID, const aiNodeAnim* channel);
 
 		void Update(float animationTime);
 
-		glm::mat4 GetLocalTransform() { return m_LocalTransform; }
-		std::string GetBoneName() const { return m_Name; }
+		const glm::mat4& GetLocalTransform() { return m_LocalTransform; }
+		const std::string& GetBoneName() const { return m_Name; }
 		int GetBoneID() { return m_ID; }
 
-		int GetPositionIndex(float animationTime);
-		int GetRotationIndex(float animationTime);
-		int GetScaleIndex(float animationTime);
+		uint32_t GetPositionIndex(float animationTime);
+		uint32_t GetRotationIndex(float animationTime);
+		uint32_t GetScaleIndex(float animationTime);
 
 	private:
 		float GetScaleFactor(float lastTimeStamp, float nextTimeStamp, float animationTime);
@@ -54,12 +54,12 @@ namespace Dymatic {
 		std::vector<KeyPosition> m_Positions;
 		std::vector<KeyRotation> m_Rotations;
 		std::vector<KeyScale> m_Scales;
-		int m_NumPositions;
-		int m_NumRotations;
-		int m_NumScalings;
+		uint32_t m_NumPositions;
+		uint32_t m_NumRotations;
+		uint32_t m_NumScalings;
 
 		glm::mat4 m_LocalTransform;
 		std::string m_Name;
-		int m_ID;
+		uint32_t m_ID;
 	};
 }

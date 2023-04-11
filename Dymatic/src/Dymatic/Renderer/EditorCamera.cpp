@@ -43,8 +43,6 @@ namespace Dymatic {
 	{
 		//m_Yaw = m_Pitch = 0.0f; //Lock the camera's rotation
 		{
-			m_Position = CalculatePosition();
-
 			glm::quat orientation = GetOrientation();
 			m_ViewMatrix = glm::translate(glm::mat4(1.0f), m_Position) * glm::toMat4(orientation);
 			m_ViewMatrix = glm::inverse(m_ViewMatrix);
@@ -91,11 +89,12 @@ namespace Dymatic {
 
 	void EditorCamera::OnUpdate(Timestep ts)
 	{
-		if (Input::IsKeyPressed(Key::LeftAlt) || m_FreePan)
+		const glm::vec2& mouse{ Input::GetMouseX(), Input::GetMouseY() };
+		glm::vec2 delta = (mouse - m_InitialMousePosition) * 0.003f;
+		m_InitialMousePosition = mouse;
+
+		if ((!m_BlockEvents && m_OrbitalEnabled && Input::IsKeyPressed(Key::LeftAlt)) || m_FreePan)
 		{
-			const glm::vec2& mouse{ Input::GetMouseX(), Input::GetMouseY() };
-			glm::vec2 delta = (mouse - m_InitialMousePosition) * 0.003f;
-			m_InitialMousePosition = mouse;
 
 			if (Input::IsMouseButtonPressed(Mouse::ButtonMiddle))
 				MousePan(delta);
@@ -103,13 +102,96 @@ namespace Dymatic {
 				MouseRotate(delta);
 			else if (Input::IsMouseButtonPressed(Mouse::ButtonRight))
 				MouseZoom(delta.y);
+
+			m_Position = CalculatePosition();
+			m_TargetPosition = m_Position;
+			UpdateView();
+		}
+		else if (m_FirstPersonEnabled)
+		{
+			// Keyboard Input
+			if (Input::IsMouseButtonPressed(Mouse::ButtonRight) && !m_BlockEvents || m_FreePan)
+			{
+				MouseRotate(delta);
+
+				const float mult = Input::IsKeyPressed(Key::LeftShift) || Input::IsKeyPressed(Key::RightShift) ? 2.0f : 1.0f;
+
+				if (Input::IsKeyPressed(Key::W))
+					MoveInDirection(ts, GetForwardDirection());
+				if (Input::IsKeyPressed(Key::S))
+					MoveInDirection(ts, -GetForwardDirection());
+				if (Input::IsKeyPressed(Key::D))
+					MoveInDirection(ts, GetRightDirection());
+				if (Input::IsKeyPressed(Key::A))
+					MoveInDirection(ts, -GetRightDirection());
+				if (Input::IsKeyPressed(Key::E))
+					MoveInDirection(ts, glm::vec3(0.0f, 1.0f, 0.0f));
+				if (Input::IsKeyPressed(Key::Q))
+					MoveInDirection(ts, glm::vec3(0.0f, -1.0f, 0.0f));
+			}
+
+			// Gamepad Input
+			if (Input::IsGamepadConnected(0))
+			{
+				static const float deadZone = 0.25f;
+				const float mult = Input::IsGamepadButtonPressed(0, Gamepad::LeftThumb) ? 2.0f : 1.0f;
+
+				glm::vec2 rotation = { Input::GetGamepadAxis(0, Gamepad::RightX), Input::GetGamepadAxis(0, Gamepad::RightY) };
+				if (std::abs(rotation.x) < deadZone) rotation.x = 0.0f;
+				if (std::abs(rotation.y) < deadZone) rotation.y = 0.0f;
+
+				rotation = rotation * 0.1f * mult;
+
+				MouseRotate(rotation);
+
+				if (std::abs(Input::GetGamepadAxis(0, Gamepad::LeftX)) >= deadZone)
+					MoveInDirection(ts, GetRightDirection() * Input::GetGamepadAxis(0, Gamepad::LeftX));
+				if (std::abs(Input::GetGamepadAxis(0, Gamepad::LeftY)) >= deadZone)
+					MoveInDirection(ts, GetForwardDirection() * -Input::GetGamepadAxis(0, Gamepad::LeftY));
+				if (Input::GetGamepadAxis(0, Gamepad::LeftTrigger != -1.0f))
+					MoveInDirection(ts, glm::vec3(0.0f, -1.0f * (Input::GetGamepadAxis(0, Gamepad::LeftTrigger) * 0.5f + 0.5f), 0.0f));
+				if (Input::GetGamepadAxis(0, Gamepad::RightTrigger) != -1.0f)
+					MoveInDirection(ts, glm::vec3(0.0f, 1.0f * (Input::GetGamepadAxis(0, Gamepad::RightTrigger) * 0.5f + 0.5f), 0.0f));
+
+			}
+
+			UpdateView();
 		}
 
-		UpdateView();
+		// Update our smooth camera interpolation if needed
+		if (m_CurrentTargetTime != 0.0f)
+		{
+			m_CurrentTargetTime -= ts;
+			if (m_CurrentTargetTime < 0.0f)
+				m_CurrentTargetTime = 0.0f;
+			
+			float interpolation = (m_CurrentTargetTime / m_SmoothingTime);
+			m_Position = m_TargetPosition + (m_TargetStart - m_TargetPosition) * (interpolation * interpolation);
+			m_FocalPoint = m_Position + GetForwardDirection() * m_Distance;
+			
+			UpdateView();
+		}
+	}
+
+	void EditorCamera::MoveInDirection(Timestep ts, glm::vec3 direction)
+	{
+		const float mult = Input::IsKeyPressed(Key::LeftShift) || Input::IsKeyPressed(Key::RightShift) ? 2.0f : 1.0f;
+		
+		if (m_SmoothingTime == 0.0f)
+			m_Position += direction * mult * GetMoveSpeed() * ts.GetSeconds();
+		else
+		{
+			m_TargetPosition += direction * mult * GetMoveSpeed() * ts.GetSeconds();
+			m_TargetStart = m_Position;
+			m_CurrentTargetTime = m_SmoothingTime;
+		}
 	}
 
 	void EditorCamera::OnEvent(Event& e)
 	{
+		if (m_BlockEvents)
+			return;
+
 		EventDispatcher dispatcher(e);
 		dispatcher.Dispatch<MouseScrolledEvent>(DY_BIND_EVENT_FN(EditorCamera::OnMouseScroll));
 	}

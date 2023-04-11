@@ -6,17 +6,20 @@
 
 #include "Panels/PopupsAndNotifications.h"
 #include "Panels/PreferencesPanel.h"
-#include "Panels/NodeEditor/NodeEditor.h"
+#include "Panels/Nodes/ScriptEditor.h"
+#include "Panels/Nodes/MaterialEditor.h"
 #include "Panels/TextEditor.h"
 #include "Panels/CurveEditor.h"
 #include "Panels/ImageEditor.h"
-#include "Panels/MemoryEditor.h"
+#include "Panels/MaterialEditorPanel.h"
+#include "Panels/ProfilerPanel.h"
 #include "Panels/ConsoleWindow.h"
+#include "Panels/AssetManagerPanel.h"
 #include "Panels/PerformanceAnalyser.h"
+#include "Panels/ProjectBrowser.h"
+#include "Panels/SourceControl.h"
 
-
-#include "Panels/SandboxArea.h"
-
+#include "Tools/PythonTools.h"
 #include "Dymatic/Renderer/EditorCamera.h"
 
 namespace Dymatic {
@@ -30,10 +33,11 @@ namespace Dymatic {
 		virtual void OnAttach() override;
 		virtual void OnDetach() override;
 
-		void OnUpdate(Timestep ts) override;
+		virtual void OnUpdate(Timestep ts) override;
 		virtual void OnImGuiRender() override;
-		void OnEvent(Event& e) override;
+		virtual void OnEvent(Event& e) override;
 		void UpdateKeymapEvents(std::vector<Preferences::Keymap::KeyBindEvent> event);
+		
 	private:
 		bool OnKeyPressed(KeyPressedEvent& e);
 		bool OnMouseButtonPressed(MouseButtonPressedEvent& e);
@@ -42,10 +46,19 @@ namespace Dymatic {
 		bool OnDragLeave(WindowDragLeaveEvent& e);
 		bool OnDragOver(WindowDragOverEvent& e);
 		bool OnClosed(WindowCloseEvent& e);
+		bool OnGamepadConnected(GamepadConnectedEvent& e);
+		bool OnGamepadDisconnected(GamepadDisconnectedEvent& e);
+		bool OnGamepadButtonPressed(GamepadButtonPressedEvent& e);
+		bool OnGamepadButtonReleased(GamepadButtonReleasedEvent& e);
+		bool OnGamepadAxisMoved(GamepadAxisMovedEvent& e);
 
 		void OnOverlayRender();
 
-		inline bool ViewportKeyAllowed() { return m_ViewportHovered || m_ViewportFocused; }
+		bool ViewportKeyAllowed() { return (m_ViewportHovered || m_ViewportFocused) && !m_ViewportActive; }
+
+		void NewProject();
+		void OpenProject(const std::filesystem::path& path);
+		void SaveProject();
 
 		void NewScene();
 		void AppendScene();
@@ -57,84 +70,72 @@ namespace Dymatic {
 
 		void SerializeScene(Ref<Scene> scene, const std::filesystem::path& path);
 
+		void Compile();
+
 		void OnScenePlay();
 		void OnSceneSimulate();
 		void OnSceneStop();
+		void OnScenePause();
 
-		void OnDuplicateEntity();
+		void ShowEditorWindow();
 
 		void SaveAndExit();
 		void CloseProgramWindow();
 
-		// UI Panels
-		void UI_Toolbar();
+		void SetRendererVisualizationMode(SceneRenderer::RendererVisualizationMode visualizationMode);
+		void ToggleRendererVisualizationMode();
 
-		void AddRecentFile(const std::filesystem::path& path);
-		std::vector<std::filesystem::path> GetRecentFiles();
+		void ReloadAvailableWorkspaces();
 
-		void SetShadingIndex(int index);
-
-		std::string GetCurrentFileName();
-
-		void OpenWindowLayout(const std::filesystem::path& path);
-		void SaveWindowLayout(const std::filesystem::path& path);
-	public:
-		bool m_ViewportVisible = true;
-		bool m_ToolbarVisible = true;
-		bool m_InfoVisible = true;
-		bool m_StatsVisible = false;
-		bool m_MemoryEditorVisible = false;
+		void OnOpenFile(const std::filesystem::path& path);
+		
 	private:
-		Dymatic::OrthographicCameraController m_CameraController;
-
 		float m_DeltaTime;
 
 		bool m_IsDragging = false;
-
-		// Temp
-		Ref<VertexArray> m_SquareVA;
-		Ref<Shader> m_FlatColorShader;
+		
 		Ref<Framebuffer> m_Framebuffer;
 
 		Ref<Scene> m_ActiveScene;
 		Ref<Scene> m_EditorScene;
 		std::filesystem::path m_EditorScenePath;
-		Entity m_SquareEntity;
-		Entity m_CameraEntity;
-		Entity m_SecondCamera;
+
+		std::vector<std::filesystem::path> m_AvailableWorkspaces;
+		std::filesystem::path m_WorkspaceRenameContext;
+		std::filesystem::path m_WorkspaceTarget;
 
 		Entity m_HoveredEntity;
 
-
 		EditorCamera m_EditorCamera;
 
-		//Textures
-		//Ref<Texture2D> m_CheckerboardTexture;
-
 		//Icons
-
-		//Ref<Texture2D> m_DymaticLogo = Texture2D::Create("assets/icons/DymaticLogoTransparent.png");
-		Ref<Texture2D> m_DymaticSplash = Texture2D::Create("assets/icons/DymaticSplash.png");
-		Ref<Texture2D> m_QuestionMarkIcon = Texture2D::Create("assets/icons/General/QuestionMark.png");
-		Ref<Texture2D> m_ErrorIcon = Texture2D::Create("assets/icons/General/Error.png");
+		Ref<Texture2D> m_DymaticSplash = Texture2D::Create("Resources/Icons/Branding/DymaticSplash.bmp");
+		Ref<Texture2D> m_DymaticLogo = Texture2D::Create("Resources/Icons/Branding/DymaticLogo.png");
+		Ref<Texture2D> m_QuestionMarkIcon = Texture2D::Create("Resources/Icons/General/QuestionMark.png");
+		Ref<Texture2D> m_ErrorIcon = Texture2D::Create("Resources/Icons/General/Error.png");
 
 		Ref<Texture2D> m_EditIcon;
 		Ref<Texture2D> m_LoadingCogAnimation[3];
 
-		//Shader Icons
-		//Ref<Texture2D> m_IconShaderWireframe = Texture2D::Create("assets/icons/Viewport/ShaderIconWireframe.png");
-		//Ref<Texture2D> m_IconShaderUnlit = Texture2D::Create("assets/icons/Viewport/ShaderIconUnlit.png");
-		//Ref<Texture2D> m_IconShaderSolid = Texture2D::Create("assets/icons/Viewport/ShaderIconSolid.png");
-		//Ref<Texture2D> m_IconShaderRendered = Texture2D::Create("assets/icons/Viewport/ShaderIconRendered.png");
+		Ref<Texture2D> m_SaveIcon = Texture2D::Create("Resources/Icons/Toolbar/SaveIcon.png");
+		Ref<Texture2D> m_SaveHoveredIcon = Texture2D::Create("Resources/Icons/Toolbar/SaveHoveredIcon.png");
+		Ref<Texture2D> m_CompileIcon = Texture2D::Create("Resources/Icons/Toolbar/CompileIcon.png");
+		Ref<Texture2D> m_CompileHoveredIcon = Texture2D::Create("Resources/Icons/Toolbar/CompileHoveredIcon.png");
+		Ref<Texture2D> m_SourceControlIcon = Texture2D::Create("Resources/Icons/Toolbar/SourceControlIcon.png");
+		Ref<Texture2D> m_IDEIcon = Texture2D::Create("Resources/Icons/Toolbar/IDEIcon.png");
+		Ref<Texture2D> m_SettingsIcon = Texture2D::Create("Resources/Icons/Toolbar/SettingsIcon.png");
 
-		bool m_ViewportFocused = false, m_ViewportHovered = false;
+		bool m_ViewportFocused = false, m_ViewportHovered = false, m_ViewportActive = false;
 		glm::vec2 m_ViewportSize = { 0.0f, 0.0f };
 		glm::vec2 m_ViewportBounds[2];
 
-		glm::vec4 m_SquareColor = { 0.2f, 0.3f, 0.8f, 1.0f };
-
-		int m_GizmoType = -1;
-		int m_GizmoSpace = 0;
+		int m_GizmoOperation = -1;
+		int m_GizmoMode = 0;
+		enum class GizmoPivotPoint
+		{
+			MedianPoint = 0, IndividualOrigins = 1, ActiveElement = 2
+		};
+		GizmoPivotPoint m_GizmoPivotPoint = GizmoPivotPoint::MedianPoint;
 
 		bool m_ShowPhysicsColliders = false;
 
@@ -147,11 +148,13 @@ namespace Dymatic {
 		float m_RotationSnapValue = 45.0f;
 		float m_ScaleSnapValue = 0.5f;
 
+		int m_CameraSpeedScale = 4;
+		float m_CameraBaseSpeed = 5.0f;
+
 		float m_ProgramTime = 0;
 		float m_LastSaveTime = 0;
 
-		int m_ShadingIndex = 3;
-		int m_PreviousToggleIndex = 3;
+		SceneRenderer::RendererVisualizationMode m_PreviousVisualizationMode = SceneRenderer::RendererVisualizationMode::Rendered;
 
 		// Scene View Gizmo
 		float m_YawUpdate;
@@ -160,40 +163,43 @@ namespace Dymatic {
 
 		bool m_ProjectionToggled = 0;
 
+		bool m_ViewportCommandLineOpen = false;
+		int m_ViewportCommandLineExecute = 0;
+		std::string m_ViewportCommandLineBuffer;
+
 		// Runtime
 		enum class SceneState
 		{
 			Edit = 0, Play = 1, Simulate = 2
 		};
 		SceneState m_SceneState = SceneState::Edit;
-		bool m_ScenePaused = false;
-		bool m_NextFrame = false;
 
 		// Panels
 		SceneHierarchyPanel m_SceneHierarchyPanel;
 		ContentBrowserPanel m_ContentBrowserPanel;
 
 		PreferencesPannel m_PreferencesPannel;
-		NotificationsPannel m_NotificationsPannel;
-		NodeEditorPannel m_NodeEditorPannel;
+		NotificationsPannel m_NotificationsPanel;
+		ScriptEditorPannel m_NodeEditorPannel;
+		MaterialEditor m_MaterialEditor;
 		TextEditorPannel m_TextEditor;
 		CurveEditor m_CurveEditor;
 		ImageEditor m_ImageEditor;
-		MemoryEditor m_MemoryEditor;
+		MaterialEditorPanel m_MaterialEditorPanel;
+		ProfilerPanel m_ProfilerPanel;
 		ConsoleWindow m_ConsoleWindow;
+		AssetManagerPanel m_AssetManagerPanel;
 		PerformanceAnalyser m_PerformanceAnalyser;
-
-		//Sandbox::AgentSimulation m_AgentSimulation;
-		//Sandbox::MandelbrotSet m_MandelbrotSet;
-		//Sandbox::SandSimulation m_SandSimulation;
-		//Sandbox::RopeSimulation m_RopeSimulation;
-		//Sandbox::ChessAI m_ChessAI;
-		//Sandbox::GPUSIM::GPUSimulation gpusim;
+		ProjectLauncher m_ProjectLauncher;
+		SourceControlPanel m_SourceControlPanel;
 
 		// Editor Resources
-		Ref<Texture2D> m_IconPlay, m_IconSimulate, m_IconStop, m_IconPause, m_IconNextFrame;
+		Ref<Texture2D> m_IconPlay, m_IconSimulate, m_IconStop, m_IconPause, m_IconStep;
+		Ref<Audio> m_SoundPlay, m_SoundSimulate, m_SoundStop, m_SoundPause;
 
 		bool m_ShowSplash;
+
+		friend class EditorPythonInterface;
 	};
 
 }

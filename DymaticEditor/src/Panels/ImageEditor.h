@@ -46,8 +46,6 @@ namespace Dymatic {
 		bool OnMouseScrolled(MouseScrolledEvent& e);
 
 		void OnImGuiRender();
-
-		bool& GetImageEditorVisible() { return m_ImageEditorVisible; }
 	private:
 		unsigned int GetNextLayerID() { m_NextLayerID++; return m_NextLayerID; }
 		void PutPixel(unsigned char* data, int& dataSize, glm::vec2 point);
@@ -62,8 +60,6 @@ namespace Dymatic {
 
 		void ExportImage(std::string);
 	private:
-		bool m_ImageEditorVisible = false;
-
 		unsigned int m_NextLayerID = 0;
 
 		glm::vec2 m_MousePosition = glm::vec2(0.0f, 0.0f);
@@ -76,9 +72,12 @@ namespace Dymatic {
 		std::vector<ImageLayer> m_Layers = { ImageLayer(GetNextLayerID(), "Base Layer", 300, 300) };
 		ImageLayer* m_SelectedLayer = nullptr;
 
-		Ref<Texture2D> m_CheckerboardTexture = Texture2D::Create("assets/textures/Checkerboard.png");
+		Ref<Texture2D> m_CheckerboardTexture = Texture2D::Create("Resources/Textures/Checkerboard.png");
+		
+		Ref<Texture2D> m_VisibleIcon = Texture2D::Create("Resources/Icons/SceneHierarchy/VisibleIcon.png");
+		Ref<Texture2D> m_HiddenIcon = Texture2D::Create("Resources/Icons/SceneHierarchy/HiddenIcon.png");
 
-		Ref<Texture2D> m_Brush = Texture2D::Create("assets/textures/BrushMask.png");
+		Ref<Texture2D> m_Brush = Texture2D::Create("Resources/Textures/BrushMask.png");
 		unsigned char* m_BrushData = nullptr;
 		unsigned char* m_StrokeBuffer = nullptr;
 		unsigned char* m_LayerBuffer = nullptr;

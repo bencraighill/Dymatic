@@ -12,6 +12,8 @@ class b2World;
 namespace physx
 {
 	class PxScene;
+	class PxControllerManager;
+	class VehicleManager;
 }
 
 namespace Dymatic {
@@ -27,7 +29,7 @@ namespace Dymatic {
 		static Ref<Scene> Copy(Ref<Scene> other);
 
 		Entity CreateEntity(const std::string& name = std::string());
-		Entity CreateEntityWithUUID(UUID uuid, const std::string& name = std::string());
+		Entity CreateEntityWithUUID(UUID uuid, std::string name = std::string());
 		void DestroyEntity(Entity entity);
 
 		void OnRuntimeStart();
@@ -36,14 +38,24 @@ namespace Dymatic {
 		void OnSimulationStart();
 		void OnSimulationStop();
 
-		void OnUpdateRuntime(Timestep ts, bool paused = false);
-		void OnUpdateSimulation(Timestep ts, EditorCamera& camera, Entity selectedEntity, bool paused = false);
-		void OnUpdateEditor(Timestep ts, EditorCamera& camera, Entity selectedEntity);
+		void OnUpdateRuntime(Timestep ts);
+		void OnUpdateSimulation(Timestep ts, EditorCamera& camera);
+		void OnUpdateEditor(Timestep ts, EditorCamera& camera);
 		void OnViewportResize(uint32_t width, uint32_t height);
 
-		void DuplicateEntity(Entity entity);
+		Entity DuplicateEntity(Entity entity);
+
+		Entity FindEntityByName(std::string_view name);
+		Entity GetEntityByUUID(UUID uuid);
 
 		Entity GetPrimaryCameraEntity();
+
+		bool IsRunning() const { return m_IsRunning; }
+		bool IsPaused() const { return m_IsPaused; }
+
+		void SetPaused(bool paused) { m_IsPaused = paused; }
+
+		void Step(int frames = 1);
 
 		template<typename... Components>
 		auto GetAllEntitiesWith()
@@ -69,28 +81,44 @@ namespace Dymatic {
 		void OnComponentAdded(Entity entity, T& component);
 
 		void OnPhysics2DStart();
+		void OnPhysics2DUpdate(Timestep ts);
 		void OnPhysics2DStop();
 
 		void OnPhysicsStart();
+		void OnPhysicsUpdate(Timestep ts);
 		void OnPhysicsStop();
 
-		void RenderScene(Timestep ts, EditorCamera& camera, Entity selectedEntity);
-	private:
+		void RenderSceneEditor(Timestep ts, EditorCamera& camera);
 
-		// Icons
-		Ref<Texture2D> m_LightIcon = Texture2D::Create("assets/icons/Scene/LightIcon.png");
-		Ref<Texture2D> m_SoundIcon = Texture2D::Create("assets/icons/Scene/SoundIcon.png");
+		bool IsEntitySelected(entt::entity entity);
+		inline std::unordered_set<entt::entity>& GetSelectedEntities() { return m_SelectedEntities; }
+		void ClearSelectedEntities();
+		void SetSelectedEntity(entt::entity entity);
+		void AddSelectedEntity(entt::entity entity);
+		void RemoveSelectedEntity(entt::entity entity);
+		
+	private:
 
 		UUID m_SceneID;
 		entt::registry m_Registry;
 		uint32_t m_ViewportWidth = 0, m_ViewportHeight = 0;
+		bool m_IsRunning = false;
 
 		std::map<entt::entity, entt::entity> m_Relations;
 
 		entt::entity m_SceneEntity;
 
+		bool m_IsPaused = false;
+		int m_StepFrames = 0;
+		
+		std::unordered_set<entt::entity> m_SelectedEntities;
+
 		b2World* m_Box2DWorld = nullptr;
 		physx::PxScene* m_PhysXScene = nullptr;
+		physx::PxControllerManager* m_PhysXControllerManager = nullptr;
+		physx::VehicleManager* m_PhysXVehicleManager = nullptr;
+
+		std::unordered_map<UUID, entt::entity> m_EntityMap;
 		
 		friend class Entity;
 		friend class SceneSerializer;

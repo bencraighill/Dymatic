@@ -49,13 +49,13 @@ if is_admin():
 
     # Dymatic type
     dymatic_key = winreg.CreateKey(winreg.HKEY_CLASSES_ROOT, "Dymatic")
-    winreg.SetValueEx(dymatic_key, "", 0, winreg.REG_SZ, "Dymatic Scene")
+    winreg.SetValueEx(dymatic_key, "", 0, winreg.REG_SZ, "Dymatic Project")
 
-    # .dymatic file type
-    dymatic_filetype_key = winreg.CreateKey(winreg.HKEY_CLASSES_ROOT, ".dymatic")
+    # .dyproject file type
+    dymatic_filetype_key = winreg.CreateKey(winreg.HKEY_CLASSES_ROOT, ".dyproject")
     winreg.SetValueEx(dymatic_filetype_key, "", 0, winreg.REG_SZ, "Dymatic")
-    winreg.SetValueEx(dymatic_filetype_key, "Content Type", 0, winreg.REG_SZ, "DymaticScene")
-    winreg.SetValueEx(dymatic_filetype_key, "PerceivedType", 0, winreg.REG_SZ, "Dymatic Scene")
+    winreg.SetValueEx(dymatic_filetype_key, "Content Type", 0, winreg.REG_SZ, "DymaticProject")
+    winreg.SetValueEx(dymatic_filetype_key, "PerceivedType", 0, winreg.REG_SZ, "Dymatic Project")
 
     # Default icon
     default_icon_key = winreg.CreateKey(dymatic_filetype_key, "DefaultIcon")
@@ -73,8 +73,10 @@ if is_admin():
             winreg.HKEY_CURRENT_USER,
             r"Software\Microsoft\DirectX\UserGpuPreferences",
             0, winreg.KEY_SET_VALUE)
-        path = os.path.abspath(cwd + "\\..\\..\\bin\\Release-windows-x86_64\\DymaticEditor\\DymaticEditor.exe")
-        winreg.SetValueEx(gpu_preferences, path, 0, winreg.REG_SZ, "AutoHDREnable=1;GpuPreference=2;")
+        winreg.SetValueEx(gpu_preferences, os.path.abspath(cwd + "\\..\\..\\bin\\Debug-windows-x86_64\\DymaticEditor\\DymaticEditor.exe"), 0, winreg.REG_SZ, "AutoHDREnable=1;GpuPreference=2;")
+        winreg.SetValueEx(gpu_preferences, os.path.abspath(cwd + "\\..\\..\\bin\\Debug-windows-x86_64\\DymaticRuntime\\DymaticRuntime.exe"), 0, winreg.REG_SZ, "AutoHDREnable=1;GpuPreference=2;")
+        winreg.SetValueEx(gpu_preferences, os.path.abspath(cwd + "\\..\\..\\bin\\Release-windows-x86_64\\DymaticEditor\\DymaticEditor.exe"), 0, winreg.REG_SZ, "AutoHDREnable=1;GpuPreference=2;")
+        winreg.SetValueEx(gpu_preferences, os.path.abspath(cwd + "\\..\\..\\bin\\Release-windows-x86_64\\DymaticRuntime\\DymaticRuntime.exe"), 0, winreg.REG_SZ, "AutoHDREnable=1;GpuPreference=2;")
 
     # Set .dymatic default
     subprocess.call([os.path.abspath("RegisterFiletype.bat"), "nopause"])

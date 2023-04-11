@@ -44,12 +44,24 @@ namespace Dymatic {
 		int EntityID;
 	};
 
+	struct TextVertex
+	{
+		glm::vec3 Position;
+		glm::vec4 Color;
+		glm::vec2 TexCoord;
+		float TexIndex;
+
+		// Editor-only
+		int EntityID;
+	};
+
 	struct Renderer2DData
 	{
 		static const uint32_t MaxQuads = 20000;
 		static const uint32_t MaxVertices = MaxQuads * 4;
 		static const uint32_t MaxIndices = MaxQuads * 6;
 		static const uint32_t MaxTextureSlots = 32; // TODO: RenderCaps
+		static const uint32_t MaxFontSlots = 32;
 
 		Ref<VertexArray> QuadVertexArray;
 		Ref<VertexBuffer> QuadVertexBuffer;
@@ -64,6 +76,10 @@ namespace Dymatic {
 		Ref<VertexBuffer> LineVertexBuffer;
 		Ref<Shader> LineShader;
 
+		Ref<VertexArray> TextVertexArray;
+		Ref<VertexBuffer> TextVertexBuffer;
+		Ref<Shader> TextShader;
+
 		uint32_t QuadIndexCount = 0;
 		QuadVertex* QuadVertexBufferBase = nullptr;
 		QuadVertex* QuadVertexBufferPtr = nullptr;
@@ -76,12 +92,20 @@ namespace Dymatic {
 		LineVertex* LineVertexBufferBase = nullptr;
 		LineVertex* LineVertexBufferPtr = nullptr;
 
+		uint32_t TextIndexCount = 0;
+		TextVertex* TextVertexBufferBase = nullptr;
+		TextVertex* TextVertexBufferPtr = nullptr;
+
 		float LineWidth = 2.0f;
 
 		std::array<Ref<Texture2D>, MaxTextureSlots> TextureSlots;
 		uint32_t TextureSlotIndex = 1; // 0 = white texture
 
+		std::array<Ref<Texture2D>, MaxFontSlots> FontSlots;
+		uint32_t FontSlotIndex = 0;
+
 		glm::vec4 QuadVertexPositions[4];
+		glm::vec4 CubeVertexPositions[8];
 
 		Renderer2D::Statistics Stats;
 
@@ -92,16 +116,6 @@ namespace Dymatic {
 		};
 		CameraData CameraBuffer;
 		Ref<UniformBuffer> CameraUniformBuffer;
-
-		struct MaterialData
-		{
-			glm::vec3 ambient;
-			glm::vec3 diffuse;
-			glm::vec3 specular;
-			float shininess;
-		};
-		MaterialData MaterialBuffer;
-		Ref<UniformBuffer> MaterialUniformBuffer;
 	};
 
 	static Renderer2DData s_Data;
@@ -173,17 +187,30 @@ namespace Dymatic {
 		s_Data.LineVertexArray->AddVertexBuffer(s_Data.LineVertexBuffer);
 		s_Data.LineVertexBufferBase = new LineVertex[s_Data.MaxVertices];
 
+		// Text
+		s_Data.TextVertexArray = VertexArray::Create();
+
+		s_Data.TextVertexBuffer = VertexBuffer::Create(s_Data.MaxVertices * sizeof(TextVertex));
+		s_Data.TextVertexBuffer->SetLayout({
+			{ ShaderDataType::Float3, "a_Position" },
+			{ ShaderDataType::Float4, "a_Color"    },
+			{ ShaderDataType::Float2, "a_TexCoord" },
+			{ ShaderDataType::Float,  "a_TexIndex" },
+			{ ShaderDataType::Int,    "a_EntityID" }
+			});
+		s_Data.TextVertexArray->AddVertexBuffer(s_Data.TextVertexBuffer);
+		s_Data.TextVertexArray->SetIndexBuffer(quadIB); // Use quad IB
+		s_Data.TextVertexBufferBase = new TextVertex[s_Data.MaxVertices];
+
+		// Setup base white texture
 		s_Data.WhiteTexture = Texture2D::Create(1, 1);
 		uint32_t whiteTextureData = 0xffffffff;
 		s_Data.WhiteTexture->SetData(&whiteTextureData, sizeof(uint32_t));
 
-		int32_t samplers[s_Data.MaxTextureSlots];
-		for (uint32_t i = 0; i < s_Data.MaxTextureSlots; i++)
-			samplers[i] = i;
-
 		s_Data.QuadShader = Shader::Create("assets/shaders/Renderer2D_Quad.glsl");
 		s_Data.CircleShader = Shader::Create("assets/shaders/Renderer2D_Circle.glsl");
 		s_Data.LineShader = Shader::Create("assets/shaders/Renderer2D_Line.glsl");
+		s_Data.TextShader = Shader::Create("assets/shaders/Renderer2D_Text.glsl");
 
 		// Set first texture slot to 0
 		s_Data.TextureSlots[0] = s_Data.WhiteTexture;
@@ -193,9 +220,16 @@ namespace Dymatic {
 		s_Data.QuadVertexPositions[2] = { 0.5f,  0.5f, 0.0f, 1.0f };
 		s_Data.QuadVertexPositions[3] = { -0.5f,  0.5f, 0.0f, 1.0f };
 
-		s_Data.CameraUniformBuffer = UniformBuffer::Create(sizeof(Renderer2DData::CameraData), 0);
+		s_Data.CubeVertexPositions[0] = { -0.5f, -0.5f, -0.5f, 1.0f };
+		s_Data.CubeVertexPositions[1] = { 0.5f, -0.5f, -0.5f, 1.0f };
+		s_Data.CubeVertexPositions[2] = { 0.5f,  0.5f, -0.5f, 1.0f };
+		s_Data.CubeVertexPositions[3] = { -0.5f,  0.5f, -0.5f, 1.0f };
+		s_Data.CubeVertexPositions[4] = { -0.5f, -0.5f,  0.5f, 1.0f };
+		s_Data.CubeVertexPositions[5] = { 0.5f, -0.5f,  0.5f, 1.0f };
+		s_Data.CubeVertexPositions[6] = { 0.5f,  0.5f,  0.5f, 1.0f };
+		s_Data.CubeVertexPositions[7] = { -0.5f,  0.5f,  0.5f, 1.0f };
 
-		s_Data.MaterialUniformBuffer = UniformBuffer::Create(sizeof(Renderer2DData::MaterialData), 1);
+		s_Data.CameraUniformBuffer = UniformBuffer::Create(sizeof(Renderer2DData::CameraData), 0);
 	}
 
 	void Renderer2D::Shutdown()
@@ -203,17 +237,6 @@ namespace Dymatic {
 		DY_PROFILE_FUNCTION();
 
 		delete[] s_Data.QuadVertexBufferBase;
-	}
-
-	void Renderer2D::BeginScene(const OrthographicCamera& camera)
-	{
-		DY_PROFILE_FUNCTION();
-
-		s_Data.CameraBuffer.ViewProjection = camera.GetViewProjectionMatrix();
-		s_Data.CameraBuffer.ViewPosition = camera.GetPosition();
-		s_Data.CameraUniformBuffer->SetData(&s_Data.CameraBuffer, sizeof(Renderer2DData::CameraData));
-
-		StartBatch();
 	}
 
 	void Renderer2D::BeginScene(const Camera& camera, const glm::mat4& transform)
@@ -230,10 +253,7 @@ namespace Dymatic {
 	void Renderer2D::BeginScene(const EditorCamera& camera)
 	{
 		DY_PROFILE_FUNCTION();
-
-		s_Data.MaterialBuffer.shininess = 1.0f;
-		s_Data.MaterialUniformBuffer->SetData(&s_Data.MaterialBuffer, sizeof(Renderer2DData::MaterialData));
-
+		
 		s_Data.CameraBuffer.ViewProjection = camera.GetViewProjection();
 		s_Data.CameraBuffer.ViewPosition = camera.GetPosition();
 		s_Data.CameraUniformBuffer->SetData(&s_Data.CameraBuffer, sizeof(Renderer2DData::CameraData));
@@ -252,6 +272,7 @@ namespace Dymatic {
 	{
 		s_Data.QuadIndexCount = 0;
 		s_Data.QuadVertexBufferPtr = s_Data.QuadVertexBufferBase;
+		s_Data.TextureSlotIndex = 1;
 
 		s_Data.CircleIndexCount = 0;
 		s_Data.CircleVertexBufferPtr = s_Data.CircleVertexBufferBase;
@@ -259,7 +280,7 @@ namespace Dymatic {
 		s_Data.LineVertexCount = 0;
 		s_Data.LineVertexBufferPtr = s_Data.LineVertexBufferBase;
 
-		s_Data.TextureSlotIndex = 1;
+		StartTextBatch();
 	}
 
 	void Renderer2D::Flush()
@@ -298,12 +319,38 @@ namespace Dymatic {
 			RenderCommand::DrawLines(s_Data.LineVertexArray, s_Data.LineVertexCount);
 			s_Data.Stats.DrawCalls++;
 		}
+
+		FlushText();
 	}
 
 	void Renderer2D::NextBatch()
 	{
 		Flush();
 		StartBatch();
+	}
+
+	void Renderer2D::FlushText()
+	{
+		if (s_Data.TextIndexCount)
+		{
+			uint32_t dataSize = (uint32_t)((uint8_t*)s_Data.TextVertexBufferPtr - (uint8_t*)s_Data.TextVertexBufferBase);
+			s_Data.TextVertexBuffer->SetData(s_Data.TextVertexBufferBase, dataSize);
+
+			// Bind textures
+			for (uint32_t i = 0; i < s_Data.FontSlotIndex; i++)
+				s_Data.FontSlots[i]->Bind(i);
+
+			s_Data.TextShader->Bind();
+			RenderCommand::DrawIndexed(s_Data.TextVertexArray, s_Data.TextIndexCount);
+			s_Data.Stats.DrawCalls++;
+		}
+	}
+
+	void Renderer2D::StartTextBatch()
+	{
+		s_Data.TextIndexCount = 0;
+		s_Data.TextVertexBufferPtr = s_Data.TextVertexBufferBase;
+		s_Data.FontSlotIndex = 0;
 	}
 
 	void Renderer2D::DrawQuad(const glm::vec2& position, const glm::vec2& size, const glm::vec4& color)
@@ -483,6 +530,91 @@ namespace Dymatic {
 		s_Data.LineVertexCount += 2;
 	}
 
+	void Renderer2D::DrawTextComponent(const glm::mat4& transform, TextComponent& tc, int entityID)
+	{
+		DY_PROFILE_FUNCTION();
+
+		if (!tc.Font)
+			return;
+
+		constexpr size_t quadVertexCount = 4;
+		
+		const float scale_x = glm::length(glm::vec3(transform[0][0], transform[1][0], transform[2][0]));
+		const float maxWidth = tc.MaxWidth / scale_x;
+
+		glm::vec2 cursor = glm::vec2(0.0f);
+
+		for (auto& character : tc.TextString)
+		{
+			if (character == '\n')
+			{
+				cursor.x = 0.0f;
+				cursor.y -= tc.Font->GetLineHeight() + tc.LineSpacing;
+				continue;
+			}
+
+			const Font::Glyph* glyph = tc.Font->GetGlyph(character);
+			if (!glyph)
+				continue;
+
+			if (!glyph->IsWhitespace)
+			{
+
+				const glm::vec2 textureCoords[] = { glyph->Min, { glyph->Max.x, glyph->Min.y }, glyph->Max, { glyph->Min.x, glyph->Max.y } };
+
+				if (s_Data.TextIndexCount >= Renderer2DData::MaxIndices)
+				{
+					FlushText();
+					StartTextBatch();
+				}
+
+				int fontIndex = 0;
+				for (uint32_t i = 1; i < s_Data.FontSlotIndex; i++)
+				{
+					if (*s_Data.FontSlots[i] == *tc.Font->GetAtlas())
+					{
+						fontIndex = i;
+						break;
+					}
+				}
+
+				if (fontIndex == 0)
+				{
+					if (s_Data.FontSlotIndex >= Renderer2DData::MaxFontSlots)
+						NextBatch();
+
+					fontIndex = s_Data.FontSlotIndex;
+					s_Data.FontSlots[s_Data.FontSlotIndex] = tc.Font->GetAtlas();
+					s_Data.FontSlotIndex++;
+				}
+
+				for (size_t i = 0; i < quadVertexCount; i++)
+				{
+					s_Data.TextVertexBufferPtr->Position = transform * glm::vec4(glyph->Size * glm::vec2(s_Data.QuadVertexPositions[i]) + cursor + glm::vec2(glyph->Left + (glyph->Size.x * 0.5f), glyph->Bottom + (glyph->Size.y * 0.5f)), 0.0f, 1.0f);
+					s_Data.TextVertexBufferPtr->Color = tc.Color;
+					s_Data.TextVertexBufferPtr->TexCoord = textureCoords[i];
+					s_Data.TextVertexBufferPtr->TexIndex = fontIndex;
+					s_Data.TextVertexBufferPtr->EntityID = entityID;
+
+					s_Data.TextVertexBufferPtr++;
+				}
+
+				s_Data.TextIndexCount += 6;
+
+				s_Data.Stats.QuadCount++;
+			}
+
+			cursor.x +=  glyph->Advance + tc.Kerning;
+
+			if (cursor.x > maxWidth && maxWidth != 0.0f && character == ' ')
+			{
+				cursor.x = 0.0f;
+				cursor.y -= tc.Font->GetLineHeight() + tc.LineSpacing;
+				continue;
+			}
+		}
+	}
+
 	void Renderer2D::DrawRect(const glm::vec3& position, const glm::vec2& size, const glm::vec4& color, int entityID)
 	{
 		glm::vec3 p0 = glm::vec3(position.x - size.x * 0.5f, position.y - size.y * 0.5f, position.z);
@@ -506,6 +638,55 @@ namespace Dymatic {
 		DrawLine(lineVertices[1], lineVertices[2], color, entityID);
 		DrawLine(lineVertices[2], lineVertices[3], color, entityID);
 		DrawLine(lineVertices[3], lineVertices[0], color, entityID);
+	}
+
+	void Renderer2D::DrawCube(const glm::vec3& position, const glm::vec3& size, const glm::vec4& color, int entityID /*= -1*/)
+	{
+		glm::vec3 p0 = glm::vec3(position.x - size.x * 0.5f, position.y - size.y * 0.5f, position.z - size.z * 0.5f);
+		glm::vec3 p1 = glm::vec3(position.x + size.x * 0.5f, position.y - size.y * 0.5f, position.z - size.z * 0.5f);
+		glm::vec3 p2 = glm::vec3(position.x + size.x * 0.5f, position.y + size.y * 0.5f, position.z - size.z * 0.5f);
+		glm::vec3 p3 = glm::vec3(position.x - size.x * 0.5f, position.y + size.y * 0.5f, position.z - size.z * 0.5f);
+		glm::vec3 p4 = glm::vec3(position.x - size.x * 0.5f, position.y - size.y * 0.5f, position.z + size.z * 0.5f);
+		glm::vec3 p5 = glm::vec3(position.x + size.x * 0.5f, position.y - size.y * 0.5f, position.z + size.z * 0.5f);
+		glm::vec3 p6 = glm::vec3(position.x + size.x * 0.5f, position.y + size.y * 0.5f, position.z + size.z * 0.5f);
+		glm::vec3 p7 = glm::vec3(position.x - size.x * 0.5f, position.y + size.y * 0.5f, position.z + size.z * 0.5f);
+
+		DrawLine(p0, p1, color, entityID);
+		DrawLine(p1, p2, color, entityID);
+		DrawLine(p2, p3, color, entityID);
+		DrawLine(p3, p0, color, entityID);
+
+		DrawLine(p4, p5, color, entityID);
+		DrawLine(p5, p6, color, entityID);
+		DrawLine(p6, p7, color, entityID);
+		DrawLine(p7, p4, color, entityID);
+		
+		DrawLine(p0, p4, color, entityID);
+		DrawLine(p1, p5, color, entityID);
+		DrawLine(p2, p6, color, entityID);
+		DrawLine(p3, p7, color, entityID);
+	}
+
+	void Renderer2D::DrawCube(const glm::mat4& transform, const glm::vec4& color, int entityID /*= -1*/)
+	{
+		glm::vec3 lineVertices[8];
+		for (size_t i = 0; i < 8; i++)
+			lineVertices[i] = transform * s_Data.CubeVertexPositions[i];
+
+		DrawLine(lineVertices[0], lineVertices[1], color, entityID);
+		DrawLine(lineVertices[1], lineVertices[2], color, entityID);
+		DrawLine(lineVertices[2], lineVertices[3], color, entityID);
+		DrawLine(lineVertices[3], lineVertices[0], color, entityID);
+
+		DrawLine(lineVertices[4], lineVertices[5], color, entityID);
+		DrawLine(lineVertices[5], lineVertices[6], color, entityID);
+		DrawLine(lineVertices[6], lineVertices[7], color, entityID);
+		DrawLine(lineVertices[7], lineVertices[4], color, entityID);
+
+		DrawLine(lineVertices[0], lineVertices[4], color, entityID);
+		DrawLine(lineVertices[1], lineVertices[5], color, entityID);
+		DrawLine(lineVertices[2], lineVertices[6], color, entityID);
+		DrawLine(lineVertices[3], lineVertices[7], color, entityID);
 	}
 
 	void Renderer2D::DrawSprite(const glm::mat4& transform, SpriteRendererComponent& src, int entityID)

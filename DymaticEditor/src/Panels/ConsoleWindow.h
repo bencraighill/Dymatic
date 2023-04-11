@@ -16,15 +16,11 @@ namespace Dymatic {
 		void OnImGuiRender(Timestep ts);
 		void UpdateLogList();
 		void ExecuteConsoleCommand(std::string input);
-
-		bool& GetConsoleWindowVisible() { return m_ConsoleWindowVisible; }
 	private:
 		void OutputToConsole(std::string string, int level);
 		bool CheckArgumentsNumber(int size, int min, int max);
 		void SystemCommand(std::string command);
 	private:
-		bool m_ConsoleWindowVisible = false;
-
 		std::vector<std::string> m_LogList;
 		int m_MaxLinesDisplayed = 5;
 

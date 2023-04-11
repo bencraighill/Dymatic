@@ -27,6 +27,7 @@
 
 namespace Dymatic {
 
+	// Scope
 	template<typename T>
 	using Scope = std::unique_ptr<T>;
 	template<typename T, typename ... Args>
@@ -34,7 +35,13 @@ namespace Dymatic {
 	{
 		return std::make_unique<T>(std::forward<Args>(args)...);
 	}
+	template<typename T, typename U>
+	constexpr Scope<T> As(Scope<U> scope)
+	{
+		return std::static_pointer_cast<T>(scope);
+	}
 
+	// Ref
 	template<typename T>
 	using Ref = std::shared_ptr<T>;
 	template<typename T, typename ... Args>
@@ -42,7 +49,25 @@ namespace Dymatic {
 	{
 		return std::make_shared<T>(std::forward<Args>(args)...);
 	}
-
+	template<typename T, typename U>
+	constexpr Ref<T>& As(Ref<U>& ref)
+	{
+		return std::static_pointer_cast<T>(ref);
+	}
+	template<typename T, typename U>
+	constexpr const Ref<T>& As(const Ref<U>& ref)
+	{
+		return std::static_pointer_cast<T>(ref);
+	}
+	
+	// WeakRef
+	template<typename T>
+	using WeakRef = std::weak_ptr<T>;
+	template<typename T, typename U>
+	constexpr WeakRef<T>& As(WeakRef<U>& ref)
+	{
+		return std::static_pointer_cast<T>(ref);
+	}
 }
 
 #include "Dymatic/Core/Log.h"

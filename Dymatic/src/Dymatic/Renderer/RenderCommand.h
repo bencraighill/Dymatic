@@ -42,6 +42,11 @@ namespace Dymatic {
 			s_RendererAPI->DrawLines(vertexArray, vertexCount);
 		}
 
+		static void DrawPoints(const Ref<VertexArray>& vertexArray, uint32_t vertexCount)
+		{
+			s_RendererAPI->DrawPoints(vertexArray, vertexCount);
+		}
+
 		static void SetLineWidth(float width)
 		{
 			s_RendererAPI->SetLineWidth(width);

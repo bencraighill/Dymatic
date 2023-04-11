@@ -33,6 +33,11 @@ namespace Dymatic {
 			case TextureFormat::RG16F:				return 8;
 			case TextureFormat::R16F:				return 4;
 
+			case TextureFormat::RGBA32F:			return 32;
+			case TextureFormat::RGB32F:				return 24;
+			case TextureFormat::RG32F:				return 16;
+			case TextureFormat::R32F:				return 8;
+
 			case TextureFormat::RED_INTEGER:		return 4;
 			case TextureFormat::DEPTH24STENCIL8:	return 4;
 			}
@@ -54,6 +59,11 @@ namespace Dymatic {
 			case TextureFormat::RGB16F:				return GL_RGB16F;
 			case TextureFormat::RG16F:				return GL_RG16F;
 			case TextureFormat::R16F:				return GL_R16F;
+
+			case TextureFormat::RGBA32F:			return GL_RGBA32F;
+			case TextureFormat::RGB32F:				return GL_RGB32F;
+			case TextureFormat::RG32F:				return GL_RG32F;
+			case TextureFormat::R32F:				return GL_R32F;
 
 			case TextureFormat::RED_INTEGER:		return GL_R32I;
 			case TextureFormat::DEPTH24STENCIL8:	return GL_DEPTH24_STENCIL8;
@@ -77,6 +87,11 @@ namespace Dymatic {
 			case TextureFormat::RG16F:				return GL_RG;
 			case TextureFormat::R16F:				return GL_RED;
 
+			case TextureFormat::RGBA32F:			return GL_RGBA;
+			case TextureFormat::RGB32F:				return GL_RGB;
+			case TextureFormat::RG32F:				return GL_RG;
+			case TextureFormat::R32F:				return GL_RED;
+
 			case TextureFormat::RED_INTEGER:		return GL_RED_INTEGER;
 			case TextureFormat::DEPTH24STENCIL8:	return GL_DEPTH_STENCIL;
 			}
@@ -98,6 +113,11 @@ namespace Dymatic {
 			case TextureFormat::RGB16F:				return GL_FLOAT;
 			case TextureFormat::RG16F:				return GL_FLOAT;
 			case TextureFormat::R16F:				return GL_FLOAT;
+
+			case TextureFormat::RGBA32F:			return GL_FLOAT;
+			case TextureFormat::RGB32F:				return GL_FLOAT;
+			case TextureFormat::RG32F:				return GL_FLOAT;
+			case TextureFormat::R32F:				return GL_FLOAT;
 
 			case TextureFormat::RED_INTEGER:		return GL_INT;
 			case TextureFormat::DEPTH24STENCIL8:	return GL_UNSIGNED_INT_24_8;

@@ -61,8 +61,7 @@ namespace Dymatic {
 		int GetNextCurveID() { m_NextCurveID++; return m_NextCurveID; }
 
 		void OnEvent(Event& e);
-
-		bool& GetCurveEditorVisible() { return m_CurveEditorVisible; }
+		
 	private:
 		bool OnKeyPressed(KeyPressedEvent& e);
 		bool OnMouseButtonPressed(MouseButtonPressedEvent& e);
@@ -70,8 +69,6 @@ namespace Dymatic {
 
 		std::string ConvertCurveTypeToString(CurveType type);
 	private:
-		bool m_CurveEditorVisible = false;
-
 		std::vector<Channel> m_Channels;
 
 		std::vector<int> m_SelectedPoints = {5, 6};

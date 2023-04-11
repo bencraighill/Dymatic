@@ -8,7 +8,8 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/glm.hpp>
 
-#include "../TextSymbols.h"
+#include "Settings/Preferences.h"
+#include "TextSymbols.h"
 
 #include "blur_uchar_rgb.h"
 
@@ -53,7 +54,7 @@ namespace Dymatic {
 
 	void ImageEditor::OnEvent(Event& e)
 	{
-		if (m_ImageEditorVisible)
+		if (Preferences::GetEditorWindowVisible(Preferences::EditorWindow::ImageEditor))
 		{
 			EventDispatcher dispatcher(e);
 
@@ -71,7 +72,7 @@ namespace Dymatic {
 
 	bool ImageEditor::OnMouseButtonPressed(MouseButtonPressedEvent& e)
 	{
-		if (m_ImageEditorVisible)
+		if (Preferences::GetEditorWindowVisible(Preferences::EditorWindow::ImageEditor))
 		{
 			switch (e.GetMouseButton())
 			{
@@ -96,7 +97,7 @@ namespace Dymatic {
 
 	bool ImageEditor::OnMouseButtonReleased(MouseButtonReleasedEvent& e)
 	{
-		if (m_ImageEditorVisible)
+		if (Preferences::GetEditorWindowVisible(Preferences::EditorWindow::ImageEditor))
 		{
 			switch (e.GetMouseButton())
 			{
@@ -141,9 +142,9 @@ namespace Dymatic {
 
 	void ImageEditor::OnImGuiRender()
 	{
-		if (m_ImageEditorVisible)
+		if (auto& imageEditorVisible = Preferences::GetEditorWindowVisible(Preferences::EditorWindow::ImageEditor))
 		{
-			ImGui::Begin((std::string(CHARACTER_WINDOW_ICON_IMAGE_EDITOR) + " Image Editor").c_str(), &m_ImageEditorVisible, ImGuiWindowFlags_MenuBar);
+			ImGui::Begin(CHARACTER_ICON_IMAGE " Image Editor", &imageEditorVisible, ImGuiWindowFlags_MenuBar);
 
 			// Menu Bar
 
@@ -438,9 +439,9 @@ namespace Dymatic {
 
 				if (ImGui::BeginPopupContextWindow())
 				{
-					if (ImGui::MenuItem((std::string(CHARACTER_PROPERTIES_ICON_DELETE) + " Delete").c_str()))
+					if (ImGui::MenuItem((std::string(CHARACTER_ICON_DELETE) + " Delete").c_str()))
 						layerDeleted = true;
-					if (ImGui::MenuItem((std::string(CHARACTER_PROPERTIES_ICON_DUPLICATE) + " Duplicate").c_str()))
+					if (ImGui::MenuItem((std::string(CHARACTER_ICON_DUPLICATE) + " Duplicate").c_str()))
 					{
 						bool selected = m_SelectedLayer != NULL;
 						unsigned int id;
@@ -468,8 +469,9 @@ namespace Dymatic {
 
 				ImGui::BeginGroup();
 				ImGui::Dummy(ImVec2(0, 1.0f));
-				bool visibilityButton = ImGui::Button(m_Layers[i].Visible ? CHARACTER_IMAGE_EDITOR_VISIBLE : "", ImVec2(22.5f, 22.5f)); 
-				if (visibilityButton) { m_Layers[i].Visible = !m_Layers[i].Visible; }
+				bool visibilityButton = ImGui::ImageButton((ImTextureID)((m_Layers[i].Visible ? m_VisibleIcon : m_HiddenIcon)->GetRendererID()), ImVec2(22.5f, 22.5f), { 0, 1 }, { 1, 0 });
+				if (visibilityButton)
+					m_Layers[i].Visible = !m_Layers[i].Visible;
 				ImGui::EndGroup();
 				ImGui::SameLine();
 
@@ -527,9 +529,7 @@ namespace Dymatic {
 				// End Editable Text Box
 
 				if (ImGui::IsWindowHovered() && ImGui::IsMouseClicked(0) && !visibilityButton)
-				{
 					m_SelectedLayer = &m_Layers[i];
-				}
 
 				ImGui::EndChild();
 				ImGui::PopID();

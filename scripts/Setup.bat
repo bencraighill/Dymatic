@@ -1,3 +1,3 @@
 @echo off
-py Setup.py
+python Setup.py
 PAUSE

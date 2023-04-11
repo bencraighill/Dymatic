@@ -1,2 +1,2 @@
 @echo off
-py RegisterDymatic.py
+python RegisterDymatic.py

@@ -23,13 +23,22 @@ namespace Dymatic {
 		uint32_t GetPositionY() const override;
 		void SetPosition(int x, int y) const override;
 
+		bool IsWindowMinimized() const override;
 		void MinimizeWindow() const override;
-		void MaximizeWindow() const override;
-		void ReturnWindow() const override;
-
+		
 		bool IsWindowMaximized() const override;
+		void MaximizeWindow() const override;
+
+		void RestoreWindow() const override;
+
+		bool IsWindowFocused() const override;
+		void FocusWindow() const override;
+
+		void ShowWindow() const override;
+		void HideWindow() const override;
 
 		void SetCursor(int shape) const override;
+		void LockCursor(bool locked) const override;
 
 		void SetTitlebarHoveredQueryCallback(void (*)(int*)) override;
 		void SetMinimizeHoveredQueryCallback(void (*)(int*)) override;

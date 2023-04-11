@@ -10,15 +10,24 @@ project "CrashManager"
 	files
 	{
 		"src/**.h",
-		"src/**.cpp"
+		"src/**.cpp",
+		"CrashManager.rc"
 	}
 
 	includedirs
 	{
+		"%{wks.location}/CrashManager/src",
+
 		"%{wks.location}/Dymatic/vendor/spdlog/include",
 		"%{wks.location}/Dymatic/src",
 		"%{wks.location}/Dymatic/vendor",
-		"%{IncludeDir.glm}"
+		"%{IncludeDir.glm}",
+		"%{IncludeDir.entt}",
+		"%{IncludeDir.filewatch}",
+		"%{IncludeDir.assimp}",
+		"%{IncludeDir.yaml_cpp}",
+		"%{IncludeDir.ImGuizmo}",
+		"%{IncludeDir.ImGuiNode}"
 	}
 
 	links
@@ -34,12 +43,34 @@ project "CrashManager"
 		runtime "Debug"
 		symbols "on"
 
+		postbuildcommands
+		{
+			"{COPYDIR} \"%{LibraryDir.VulkanSDK_DebugDLL}\" \"%{cfg.targetdir}\"",
+			"{COPYDIR} \"%{LibraryDir.PhysX_DebugDLL}\" \"%{cfg.targetdir}\"",
+			"{COPYDIR} \"%{LibraryDir.assimp_DebugDLL}\" \"%{cfg.targetdir}\"",
+			"{COPYDIR} \"%{LibraryDir.irrKlang_DLL}\" \"%{cfg.targetdir}\""
+		}
+
 	filter "configurations:Release"
 		defines "DY_RELEASE"
 		runtime "Release"
 		optimize "on"
 
+		postbuildcommands
+		{
+			"{COPYDIR} \"%{LibraryDir.PhysX_ReleaseDLL}\" \"%{cfg.targetdir}\"",
+			"{COPYDIR} \"%{LibraryDir.assimp_ReleaseDLL}\" \"%{cfg.targetdir}\"",
+			"{COPYDIR} \"%{LibraryDir.irrKlang_DLL}\" \"%{cfg.targetdir}\""
+		}
+
 	filter "configurations:Dist"
 		defines "DY_DIST"
 		runtime "Release"
 		optimize "on"
+
+		postbuildcommands
+		{
+			"{COPYDIR} \"%{LibraryDir.PhysX_ReleaseDLL}\" \"%{cfg.targetdir}\"",
+			"{COPYDIR} \"%{LibraryDir.assimp_ReleaseDLL}\" \"%{cfg.targetdir}\"",
+			"{COPYDIR} \"%{LibraryDir.irrKlang_DLL}\" \"%{cfg.targetdir}\""
+		}

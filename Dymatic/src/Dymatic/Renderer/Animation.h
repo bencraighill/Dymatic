@@ -13,12 +13,11 @@
 
 namespace Dymatic {
 
-	struct AssimpNodeData
+	struct BoneNodeData
 	{
-		glm::mat4 transformation;
-		std::string name;
-		int childrenCount;
-		std::vector<AssimpNodeData> children;
+		glm::mat4 Transformation;
+		std::string Name;
+		std::vector<BoneNodeData> Children;
 	};
 
 	class Animation
@@ -35,20 +34,20 @@ namespace Dymatic {
 
 		inline float GetTicksPerSecond() { return m_TicksPerSecond; }
 		inline float GetDuration() { return m_Duration; }
-		inline const AssimpNodeData& GetRootNode() { return m_RootNode; }
-		inline const std::map<std::string, BoneInfo>& GetBoneIDMap() { return m_BoneInfoMap; }
+		inline const BoneNodeData& GetRootNode() { return m_RootNode; }
+		inline std::map<std::string, BoneInfo>& GetBoneIDMap() { return m_BoneInfoMap; }
 
 		inline bool IsLoaded() { return m_IsLoaded; }
 
 	private:
 		void ReadMissingBones(const aiAnimation* animation, Ref<Model> model);
-		void ReadHeirarchyData(AssimpNodeData& dest, const aiNode* src);
+		void ReadHeirarchyData(BoneNodeData& dest, const aiNode* src);
 
 	private:
 		float m_Duration;
-		int m_TicksPerSecond;
+		uint32_t m_TicksPerSecond;
 		std::vector<Ref<Bone>> m_Bones;
-		AssimpNodeData m_RootNode;
+		BoneNodeData m_RootNode;
 		std::map<std::string, BoneInfo> m_BoneInfoMap;
 
 		bool m_IsLoaded = false;

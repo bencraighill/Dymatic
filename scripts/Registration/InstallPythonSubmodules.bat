@@ -1,3 +1,3 @@
-py -m pip install --upgrade pip
-py -m pip install --upgrade winshell
-py -m pip install --upgrade pywin32
+python -m pip install --upgrade pip
+python -m pip install --upgrade winshell
+python -m pip install --upgrade pywin32

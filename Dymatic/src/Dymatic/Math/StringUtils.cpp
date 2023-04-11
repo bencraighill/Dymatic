@@ -12,7 +12,23 @@ namespace Dymatic::String {
 		return (text.substr(0, finalCheck));
 	}
 
-	int Find_nth_of(const std::string& str, const std::string& find, int nth)
+	int FindNthOf(const std::string& str, const std::string& find, int nth)
+	{
+		size_t  pos = 0;
+		int     cnt = 0;
+
+		while (cnt != nth)
+		{
+			pos += 1;
+			pos = str.find(find, pos);
+			if (pos == std::string::npos)
+				return -1;
+			cnt++;
+		}
+		return pos;
+	}
+	
+	int FindNthOf(const std::string& str, char find, int nth)
 	{
 		size_t  pos = 0;
 		int     cnt = 0;
@@ -115,5 +131,4 @@ namespace Dymatic::String {
 		delete[] buf;
 		return r;
 	}
-
 }

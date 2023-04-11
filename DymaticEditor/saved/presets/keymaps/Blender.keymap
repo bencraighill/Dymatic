@@ -46,11 +46,25 @@
   Ctrl: false
   Alt: true
   Shift: false
+- Bind: Scene Simulate
+  Enabled: true
+  Key: S
+  Repeats: false
+  Ctrl: false
+  Alt: true
+  Shift: false
 - Bind: Scene Stop
   Enabled: true
   Key: Escape
   Repeats: false
   Ctrl: false
+  Alt: false
+  Shift: false
+- Bind: Reload Assembly
+  Enabled: true
+  Key: R
+  Repeats: false
+  Ctrl: true
   Alt: false
   Shift: false
 - Bind: Gizmo None
@@ -102,35 +116,49 @@
   Ctrl: false
   Alt: false
   Shift: false
-- Bind: Shading Type Wireframe
+- Bind: Visualization Rendered
   Enabled: true
   Key: F1
   Repeats: false
   Ctrl: false
   Alt: false
   Shift: false
-- Bind: Shading Type Unlit
+- Bind: Visualization Wireframe
   Enabled: true
   Key: F2
   Repeats: false
   Ctrl: false
   Alt: false
   Shift: false
-- Bind: Shading Type Solid
+- Bind: Visualization Lighting Only
   Enabled: true
   Key: F3
   Repeats: false
   Ctrl: false
   Alt: false
   Shift: false
-- Bind: Shading Type Rendered
+- Bind: Visualization Albedo
   Enabled: true
   Key: F4
   Repeats: false
   Ctrl: false
   Alt: false
   Shift: false
-- Bind: Toggle Shading Type
+- Bind: Visualization Normal
+  Enabled: true
+  Key: F5
+  Repeats: false
+  Ctrl: false
+  Alt: false
+  Shift: false
+- Bind: Visualization Entity ID
+  Enabled: true
+  Key: F6
+  Repeats: false
+  Ctrl: false
+  Alt: false
+  Shift: false
+- Bind: Toggle Visualization
   Enabled: true
   Key: Z
   Repeats: false

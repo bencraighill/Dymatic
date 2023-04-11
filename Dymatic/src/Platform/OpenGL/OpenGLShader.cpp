@@ -424,7 +424,7 @@ namespace Dymatic {
 		glUseProgram(0);
 	}
 
-	void OpenGLShader::Dispatch(int num_groups_x, int num_groups_y, int num_groups_z) const
+	void OpenGLShader::Dispatch(int numGroupsX, int numGroupsY, int numGroupsZ) const
 	{
 		DY_PROFILE_FUNCTION();
 
@@ -432,7 +432,7 @@ namespace Dymatic {
 
 		if (m_VulkanSPIRV.find(GL_COMPUTE_SHADER) != m_VulkanSPIRV.end())
 		{
-			glDispatchCompute(num_groups_x, num_groups_y, num_groups_z);
+			glDispatchCompute(numGroupsX, numGroupsY, numGroupsZ);
 			glMemoryBarrier(GL_ALL_BARRIER_BITS);
 		}
 	}

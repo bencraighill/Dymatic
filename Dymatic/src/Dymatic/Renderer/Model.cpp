@@ -2,14 +2,27 @@
 #include "Dymatic/Renderer/Model.h"
 
 #include "Dymatic/Renderer/AssimpGLMHelpers.h"
+#include <assimp/version.h>
 
 namespace Dymatic {
 
-	void Model::Draw(Ref<Shader> shader, bool bind_material)
+	void Model::UpdateBlendShapes()
 	{
-		shader->Bind();
 		for (auto& mesh : m_Meshes)
-			mesh->Draw(bind_material);
+		{
+			std::vector<MeshVertex> blendedVerticies = mesh->GetVerticies();
+
+			auto& blendShapes = mesh->GetBlendShapes();
+			for (auto& [name, blendShapeVerticies] : blendShapes)
+			{
+				for (uint32_t i = 0; i < blendShapeVerticies.size(); i++)
+				{
+					blendedVerticies[i].Position += blendShapeVerticies[i] * m_BlendShapeWeights[name];
+				}
+			}
+
+			mesh->m_MeshVertexBuffer->SetData(blendedVerticies.data(), blendedVerticies.size() * sizeof(MeshVertex));
+		}
 	}
 
 	void Model::LoadModel(const std::string& path)
@@ -32,22 +45,24 @@ namespace Dymatic {
 
 	void Model::ProcessNode(aiNode* node, const aiScene* scene)
 	{
-		for (size_t i = 0; i < node->mNumMeshes; i++)
+		m_Meshes.reserve(node->mNumMeshes);
+		for (uint32_t i = 0; i < node->mNumMeshes; i++)
 		{
 			aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
 			m_Meshes.push_back(ProcessMesh(mesh, scene));
 		}
 
-		for (size_t i = 0; i < node->mNumChildren; i++)
+		for (uint32_t i = 0; i < node->mNumChildren; i++)
 			ProcessNode(node->mChildren[i], scene);
 	}
 
 	Ref<Mesh> Model::ProcessMesh(aiMesh* mesh, const aiScene* scene)
-	{
+	{	
+		// Process verticies
 		std::vector<MeshVertex> verticies;
-		std::vector<uint32_t> indicies;
+		verticies.reserve(mesh->mNumVertices);
 
-		for (size_t i = 0; i < mesh->mNumVertices; i++)
+		for (uint32_t i = 0; i < mesh->mNumVertices; i++)
 		{
 			MeshVertex vertex;
 			SetVertexBoneDataToDefault(vertex);
@@ -81,11 +96,24 @@ namespace Dymatic {
 			verticies.push_back(vertex);
 		}
 
-		for (size_t i = 0; i < mesh->mNumFaces; i++)
+		// Process indicies
+		std::vector<uint32_t> indicies;
+		for (uint32_t i = 0; i < mesh->mNumFaces; i++)
 		{
 			aiFace face = mesh->mFaces[i];
-			for (size_t j = 0; j < face.mNumIndices; j++)
+			for (uint32_t j = 0; j < face.mNumIndices; j++)
 				indicies.push_back(face.mIndices[j]);
+		}
+
+		// Process blend shapes
+		std::unordered_map<std::string, std::vector<glm::vec3>> blendShapes;
+		blendShapes.reserve(mesh->mNumAnimMeshes);
+		for (uint32_t i = 0; i < mesh->mNumAnimMeshes; i++)
+		{
+			aiAnimMesh* animMesh = mesh->mAnimMeshes[i];
+			m_BlendShapeWeights[animMesh->mName.C_Str()] = 0.0f;
+			for (uint32_t i = 0; i < animMesh->mNumVertices; i++)
+				blendShapes[animMesh->mName.C_Str()].push_back(AssimpGLMHelpers::GetGLMVec(animMesh->mVertices[i]) - verticies[i].Position);
 		}
 
 		// Process Materials
@@ -112,12 +140,12 @@ namespace Dymatic {
 
 		ExtractBoneWeightForVertices(verticies, mesh, scene);
 
-		return Mesh::Create(mesh->mName.C_Str(), verticies, indicies, mat);
+		return Mesh::Create(mesh->mName.C_Str(), verticies, indicies, blendShapes, mat);
 	}
 
 	void Model::SetVertexBoneData(MeshVertex& vertex, int boneID, float weight)
 	{
-		for (size_t i = 0; i < MAX_BONE_INFLUENCE; ++i)
+		for (uint32_t i = 0; i < MAX_BONE_INFLUENCE; ++i)
 		{
 			if (vertex.m_BoneIDs[i] < 0)
 			{
@@ -130,7 +158,7 @@ namespace Dymatic {
 
 	void Model::ExtractBoneWeightForVertices(std::vector<MeshVertex>& vertices, aiMesh* mesh, const aiScene* scene)
 	{
-		for (size_t boneIndex = 0; boneIndex < mesh->mNumBones; ++boneIndex)
+		for (uint32_t boneIndex = 0; boneIndex < mesh->mNumBones; ++boneIndex)
 		{
 			int boneID = -1;
 			std::string boneName = mesh->mBones[boneIndex]->mName.C_Str();
@@ -166,14 +194,14 @@ namespace Dymatic {
 		const auto directory = m_Path.substr(0, m_Path.find_last_of("/\\"));
 
 		std::vector<Ref<Texture2D>> textures;
-		for (size_t i = 0; i < mat->GetTextureCount(type); i++)
+		for (uint32_t i = 0; i < mat->GetTextureCount(type); i++)
 		{
 			aiString str;
 			mat->GetTexture(type, i, &str);
 
 			// Check if texture has been loaded already.
 			bool skip = false;
-			for (size_t j = 0; j < m_TexturesLoaded.size(); j++)
+			for (uint32_t j = 0; j < m_TexturesLoaded.size(); j++)
 			{
 				if (std::strcmp(m_TexturesLoaded[j].path, str.C_Str()) == 0)
 				{
@@ -199,7 +227,7 @@ namespace Dymatic {
 
 	void Model::SetVertexBoneDataToDefault(MeshVertex& vertex)
 	{
-		for (size_t i = 0; i < MAX_BONE_INFLUENCE; i++)
+		for (uint32_t i = 0; i < MAX_BONE_INFLUENCE; i++)
 		{
 			vertex.m_BoneIDs[i] = -1;
 			vertex.m_Weights[i] = 0.0f;

@@ -3,10 +3,11 @@
 
 #include "Components.h"
 #include "ScriptableEntity.h"
-#include "ScriptEngine.h"
+#include "Dymatic/Scripting/ScriptEngine.h"
 #include "Dymatic/Renderer/Renderer2D.h"
-#include "Dymatic/Renderer/Renderer3D.h"
+#include "Dymatic/Renderer/SceneRenderer.h"
 #include "Dymatic/Audio/AudioEngine.h"
+#include "Dymatic/Physics/PhysicsEngine.h"
 
 #include <glm/glm.hpp>
 
@@ -20,21 +21,25 @@
 #include "box2d/b2_circle_shape.h"
 
 // PhysX
-#ifdef DY_RELEASE
-#define NDEBUG
-#endif
-#include <PxPhysics.h>
-#include <PxPhysicsAPI.h>
+#include "Dymatic/Physics/PhysX.h"
+#include "Dymatic/Physics/Vehicle/VehiclePhysics.h"
+#include <PsThread.h>
 
 #include "Dymatic/Math/Math.h"
+
+#include "Dymatic/Core/Input.h"
 
 namespace Dymatic {
 
 	extern physx::PxPhysics* g_PhysicsEngine;
 	extern physx::PxCooking* g_PhysicsCooking;
+	extern physx::PxMaterial* g_DefaultMaterial;
 
+	static bool s_Init = false;
 	static Ref<Model> s_ArrowModel = nullptr;
 	static Ref<Model> s_CameraModel = nullptr;
+	static Ref<Texture2D> m_LightIcon = nullptr;
+	static Ref<Texture2D> m_SoundIcon = nullptr;
 
 	static std::unordered_map<UUID, Scene*> s_ActiveScenes;
 
@@ -55,10 +60,14 @@ namespace Dymatic {
 		m_SceneEntity = m_Registry.create();
 		m_Registry.emplace<SceneComponent>(m_SceneEntity, m_SceneID);
 
-		if (s_ArrowModel == nullptr)
-			s_ArrowModel = Model::Create("assets/objects/arrow/arrow.fbx");
-		if (s_CameraModel == nullptr)
-			s_CameraModel = Model::Create("assets/objects/camera/camera.fbx");
+		if (!s_Init)
+		{
+			s_ArrowModel = Model::Create("Resources/Objects/arrow/arrow.fbx");
+			s_CameraModel = Model::Create("Resources/Objects/camera/camera.fbx");
+
+			m_LightIcon = Texture2D::Create("Resources/Icons/Scene/LightIcon.png");
+			m_SoundIcon = Texture2D::Create("Resources/Icons/Scene/SoundIcon.png");
+		}
 	}
 
 	Scene::~Scene()
@@ -136,33 +145,74 @@ namespace Dymatic {
 		return CreateEntityWithUUID(UUID(), name);
 	}
 
-	Entity Scene::CreateEntityWithUUID(UUID uuid, const std::string& name)
+	Entity Scene::CreateEntityWithUUID(UUID uuid, std::string name)
 	{
 		Entity entity = { m_Registry.create(), this };
 		entity.AddComponent<IDComponent>(uuid);
 		entity.AddComponent<TransformComponent>();
 		auto& tag = entity.AddComponent<TagComponent>();
 		tag.Tag = name.empty() ? "Entity" : name;
+
+		m_EntityMap[uuid] = entity;
+		
 		return entity;
 	}
 
 	void Scene::DestroyEntity(Entity entity)
 	{
+		m_EntityMap.erase(entity.GetUUID());
 		m_Registry.destroy(entity);
 	}
 
 	void Scene::OnRuntimeStart()
 	{
+		m_IsRunning = true;
+
 		s_ActiveScenes[m_SceneID] = this;
 		OnPhysics2DStart();
 		OnPhysicsStart();
+
+		// Scripting
+		{
+			ScriptEngine::OnRuntimeStart(this);
+			// Instantiate all script entities
+
+			auto view = m_Registry.view<ScriptComponent>();
+			for (auto e : view)
+			{
+				Entity entity = { e, this };
+				ScriptEngine::OnCreateEntity(entity);
+			}
+		}
 	}
 
 	void Scene::OnRuntimeStop()
 	{
+		m_IsRunning = false;
+		
 		s_ActiveScenes.erase(m_SceneID);
 		OnPhysics2DStop();
 		OnPhysicsStop();
+
+		// Scripting
+		{
+			auto view = m_Registry.view<ScriptComponent>();
+			for (auto e : view)
+			{
+				Entity entity = { e, this };
+				ScriptEngine::OnDestroyEntity(entity);
+			}
+
+			ScriptEngine::OnRuntimeStop();
+		}
+
+		auto view = m_Registry.view<AudioComponent>();
+		for (auto entity : view)
+		{
+			auto ac = view.get<AudioComponent>(entity);
+			ac.AudioSound->Stop();
+			ac.Initialized = false;
+		}
 	}
 
 	void Scene::OnSimulationStart()
@@ -179,7 +229,7 @@ namespace Dymatic {
 		OnPhysicsStop();
 	}
 
-	void Scene::OnUpdateRuntime(Timestep ts, bool paused)
+	void Scene::OnUpdateRuntime(Timestep ts)
 	{
 		// Get Main Camera
 		SceneCamera* mainCamera = nullptr;
@@ -200,81 +250,37 @@ namespace Dymatic {
 			}
 		}
 
-		if (!paused)
+		if (!m_IsPaused || m_StepFrames-- > 0)
 		{
 			// Update scripts
 			{
+				// C# Entity OnUpdate
+				auto view = m_Registry.view<ScriptComponent>();
+				for (auto e : view)
+				{
+					Entity entity = { e, this };
+					ScriptEngine::OnUpdateEntity(entity, ts);
+				}
+
 				m_Registry.view<NativeScriptComponent>().each([=](auto entity, auto& nsc)
 					{
 						// TODO: Move to Scene::OnScenePlay
-						ScriptEngine::BindScript(nsc);
-						if (nsc.InstantiateScript)
+						if (!nsc.Instance)
 						{
-							if (!nsc.Instance)
-							{
-								nsc.Instance = nsc.InstantiateScript();
-								ScriptEngine::InstantiateScript(nsc);
-								nsc.Instance->m_Entity = Entity{ entity, this };
-								nsc.Instance->OnCreate();
-							}
-
-							nsc.Instance->OnUpdate(ts);
+							nsc.Instance = nsc.InstantiateScript();
+							nsc.Instance->m_Entity = Entity{ entity, this };
+							nsc.Instance->OnCreate();
 						}
+
+						nsc.Instance->OnUpdate(ts);
 					});
 			}
 
-			// Update physics - Box2D
-			{
-				const int32_t velocityIterations = 6;
-				const int32_t positionIterations = 2;
-				m_Box2DWorld->Step(ts, velocityIterations, positionIterations);
+			// Update Physics 2D
+			OnPhysics2DUpdate(ts);
 
-				// retrieve transform from box2d
-				auto view = m_Registry.view<Rigidbody2DComponent>();
-				for (auto e : view)
-				{
-					Entity entity = { e, this };
-					auto& transform = entity.GetComponent<TransformComponent>();
-					auto& rb2d = entity.GetComponent<Rigidbody2DComponent>();
-					b2Body* body = (b2Body*)rb2d.RuntimeBody;
-					const auto& position = body->GetPosition();
-					transform.Translation.x = position.x;
-					transform.Translation.y = position.y;
-					transform.Rotation.z = body->GetAngle();
-				}
-
-			}
-
-			// Update Physics - PhysX
-			{
-				m_PhysXScene->simulate(ts);
-				m_PhysXScene->fetchResults(true);
-
-				auto view = m_Registry.view<RigidbodyComponent>();
-				for (auto e : view)
-				{
-					Entity entity = { e, this };
-					auto& transform = entity.GetComponent<TransformComponent>();
-					auto& rbc = entity.GetComponent<RigidbodyComponent>();
-					if (rbc.Type == RigidbodyComponent::BodyType::Dynamic)
-					{
-						auto body = (physx::PxRigidDynamic*)rbc.RuntimeBody;
-						const auto& PXtransform = body->getGlobalPose();
-						body->wakeUp();
-						transform.Translation.x = PXtransform.p.x;
-						transform.Translation.y = PXtransform.p.y;
-						transform.Translation.z = PXtransform.p.z;
-
-						glm::quat rot;
-						rot.x = PXtransform.q.x;
-						rot.y = PXtransform.q.y;
-						rot.z = PXtransform.q.z;
-						rot.w = PXtransform.q.w;
-
-						transform.Rotation = glm::eulerAngles(rot);
-					}
-				}
-			}
+			// Update Physics
+			OnPhysicsUpdate(ts);
 
 			// Update Audio
 			if (mainCamera)
@@ -283,12 +289,16 @@ namespace Dymatic {
 				for (auto entity : view)
 				{
 					auto [transform, ac] = view.get<TransformComponent, AudioComponent>(entity);
-					if (ac.GetSound())
+					if (ac.AudioSound)
 					{
-						if (!ac.GetSound()->IsInitalizedInternal())
-							ac.GetSound()->OnBeginSceneInternal();
+						if (!ac.Initialized)
+						{
+							if (ac.StartOnAwake)
+								ac.AudioSound->Play(ac.StartPosition);
+							ac.Initialized = true;
+						}
 
-						ac.GetSound()->SetPositionInternal(GetWorldTransform({ entity, this })[3]);
+						ac.AudioSound->SetPosition(GetWorldTransform({ entity, this })[3]);
 					}
 				}
 				AudioEngine::Update(cameraTransform[3], cameraTransform * glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
@@ -298,9 +308,11 @@ namespace Dymatic {
 		// Renderer
 		if (mainCamera)
 		{
-			Renderer3D::BeginScene(*mainCamera, cameraTransform);
-			Renderer3D::UpdateTimestep(ts);
-
+			SceneRenderer::BeginScene(*mainCamera, cameraTransform);
+			
+			if (!m_IsPaused || m_StepFrames-- > 0)
+				SceneRenderer::UpdateTimestep(ts);
+			
 			// Submit Lights
 			{
 				auto view = m_Registry.view<TransformComponent, DirectionalLightComponent>();
@@ -308,7 +320,7 @@ namespace Dymatic {
 				{
 					auto [transform, light] = view.get<TransformComponent, DirectionalLightComponent>(entity);
 					//Renderer3D::SubmitDirectionalLight(transform.GetTransform(), light);
-					Renderer3D::SubmitDirectionalLight(GetWorldTransform({ entity, this }), light);
+					SceneRenderer::SubmitDirectionalLight(GetWorldTransform({ entity, this }), light);
 				}
 			}
 			{
@@ -317,7 +329,7 @@ namespace Dymatic {
 				{
 					auto [transform, light] = view.get<TransformComponent, PointLightComponent>(entity);
 					//Renderer3D::SubmitPointLight(transform.GetTransform(), light);
-					Renderer3D::SubmitPointLight(GetWorldTransform({ entity, this }), light);
+					SceneRenderer::SubmitPointLight(GetWorldTransform({ entity, this }), light);
 				}
 			}
 			{
@@ -326,20 +338,21 @@ namespace Dymatic {
 				{
 					auto [transform, light] = view.get<TransformComponent, SpotLightComponent>(entity);
 					//Renderer3D::SubmitSpotLight(transform.GetTransform(), light);
-					Renderer3D::SubmitSpotLight(GetWorldTransform({ entity, this }), light);
+					SceneRenderer::SubmitSpotLight(GetWorldTransform({ entity, this }), light);
 				}
 			}
-			Renderer3D::SubmitLightSetup();
-
+			
+			SceneRenderer::SubmitLightSetup();
+			
 			{
 				auto view = m_Registry.view<TransformComponent, SkyLightComponent>();
 				for (auto entity : view)
 				{
 					auto [transform, light] = view.get<TransformComponent, SkyLightComponent>(entity);
-					Renderer3D::SubmitSkyLight(light);
+					SceneRenderer::SubmitSkyLight(light);
 				}
 			}
-
+			
 			// Draw static meshes
 			{
 				auto view = m_Registry.view<TransformComponent, StaticMeshComponent>();
@@ -347,14 +360,24 @@ namespace Dymatic {
 				{
 					auto [transform, mesh] = view.get<TransformComponent, StaticMeshComponent>(entity);
 					mesh.Update(ts);
-					Renderer3D::SubmitStaticMesh(GetWorldTransform({ entity, this }), mesh, (int)entity);
+					SceneRenderer::SubmitStaticMesh(GetWorldTransform({ entity, this }), mesh, (int)entity);
 					//Renderer3D::SubmitStaticMesh(transform.GetTransform(), mesh, (int)entity);
 				}
 			}
-
-			Renderer3D::RenderScene();
-
-			Renderer3D::EndScene();
+			
+			// Submit lighting volumes
+			{
+				auto view = m_Registry.view<TransformComponent, VolumeComponent>();
+				for (auto entity : view)
+				{
+					auto [transform, volume] = view.get<TransformComponent, VolumeComponent>(entity);
+					SceneRenderer::SubmitVolume(transform, volume);
+				}
+			}
+			
+			SceneRenderer::RenderScene();
+			
+			SceneRenderer::EndScene();
 
 			Renderer2D::BeginScene(*mainCamera, cameraTransform);
 
@@ -378,6 +401,16 @@ namespace Dymatic {
 
 					//Renderer2D::DrawCircle(transform.GetTransform(), circle.Color, circle.Thickness, circle.Fade, (int)entity);
 					Renderer2D::DrawCircle(GetWorldTransform({ entity, this }), circle.Color, circle.Thickness, circle.Fade, (int)entity);
+				}
+			}
+
+			// Draw Text
+			{
+				auto view = m_Registry.view<TransformComponent, TextComponent>();
+				for (auto entity : view)
+				{
+					auto [transform, text] = view.get<TransformComponent, TextComponent>(entity);
+					Renderer2D::DrawTextComponent(GetWorldTransform({ entity, this }), text, (int)entity);
 				}
 			}
 
@@ -405,76 +438,42 @@ namespace Dymatic {
 
 	}
 
-	void Scene::OnUpdateSimulation(Timestep ts, EditorCamera& camera, Entity selectedEntity, bool paused)
+	void Scene::OnUpdateSimulation(Timestep ts, EditorCamera& camera)
 	{
-		if (!paused)
+		if (!m_IsPaused || m_StepFrames-- > 0)
 		{
-			// Update physics - Box2D
-			{
-				const int32_t velocityIterations = 6;
-				const int32_t positionIterations = 2;
-				m_Box2DWorld->Step(ts, velocityIterations, positionIterations);
+			// Update Physics 2D
+			OnPhysics2DUpdate(ts);
 
-				// retrieve transform from box2d
-				auto view = m_Registry.view<Rigidbody2DComponent>();
-				for (auto e : view)
-				{
-					Entity entity = { e, this };
-					auto& transform = entity.GetComponent<TransformComponent>();
-					auto& rb2d = entity.GetComponent<Rigidbody2DComponent>();
-					b2Body* body = (b2Body*)rb2d.RuntimeBody;
-					const auto& position = body->GetPosition();
-					transform.Translation.x = position.x;
-					transform.Translation.y = position.y;
-					transform.Rotation.z = body->GetAngle();
-				}
+			// Update Physics
+			OnPhysicsUpdate(ts);
 
-			}
+			// Update Renderer Time
+			SceneRenderer::UpdateTimestep(ts);
 
-			// Update Physics - PhysX
-			{
-				m_PhysXScene->simulate(ts);
-				m_PhysXScene->fetchResults(true);
-
-				auto view = m_Registry.view<RigidbodyComponent>();
-				for (auto e : view)
-				{
-					Entity entity = { e, this };
-					auto& transform = entity.GetComponent<TransformComponent>();
-					auto& rbc = entity.GetComponent<RigidbodyComponent>();
-					if (rbc.Type == RigidbodyComponent::BodyType::Dynamic)
-					{
-						auto body = (physx::PxRigidDynamic*)rbc.RuntimeBody;
-						const auto& PXtransform = body->getGlobalPose();
-						body->wakeUp();
-						transform.Translation.x = PXtransform.p.x;
-						transform.Translation.y = PXtransform.p.y;
-						transform.Translation.z = PXtransform.p.z;
-
-						glm::quat rot;
-						rot.x = PXtransform.q.x;
-						rot.y = PXtransform.q.y;
-						rot.z = PXtransform.q.z;
-						rot.w = PXtransform.q.w;
-
-						transform.Rotation = glm::eulerAngles(rot);
-					}
-				}
-			}
+			AudioEngine::Update(camera.GetPosition(), camera.GetForwardDirection());
 		}
-
+		
 		// Render
-		RenderScene(ts, camera, selectedEntity);
+		RenderSceneEditor(ts, camera);
 	}
 
-	void Scene::OnUpdateEditor(Timestep ts, EditorCamera& camera, Entity selectedEntity)
+	void Scene::OnUpdateEditor(Timestep ts, EditorCamera& camera)
 	{
+		// Update Renderer Time
+		SceneRenderer::UpdateTimestep(ts);
+
+		AudioEngine::Update(camera.GetPosition(), camera.GetForwardDirection());
+		
 		// Render
-		RenderScene(ts, camera, selectedEntity);
+		RenderSceneEditor(ts, camera);
 	}
 
 	void Scene::OnViewportResize(uint32_t width, uint32_t height)
 	{
+		if (m_ViewportWidth == width && m_ViewportHeight == height)
+			return;
+
 		m_ViewportWidth = width;
 		m_ViewportHeight = height;
 
@@ -488,12 +487,6 @@ namespace Dymatic {
 		}
 	}
 
-	void Scene::DuplicateEntity(Entity entity)
-	{
-		Entity newEntity = CreateEntity(entity.GetName());
-		CopyComponentIfExists(AllComponents{}, newEntity, entity);
-	}
-
 	Entity Scene::GetPrimaryCameraEntity()
 	{
 		auto view = m_Registry.view<CameraComponent>();
@@ -503,6 +496,38 @@ namespace Dymatic {
 			if (camera.Primary)
 				return Entity{ entity, this };
 		}
+		return {};
+	}
+	
+	Entity Scene::DuplicateEntity(Entity entity)
+	{
+		Entity newEntity = CreateEntity(entity.GetName());
+		CopyComponentIfExists(AllComponents{}, newEntity, entity);
+		return newEntity;
+	}
+
+	void Scene::Step(int frames)
+	{
+		m_StepFrames = frames;
+	}
+
+	Entity Scene::FindEntityByName(std::string_view name)
+	{
+		auto view = m_Registry.view<TagComponent>();
+		for (auto entity : view)
+		{
+			const TagComponent& tc = view.get<TagComponent>(entity);
+			if (tc.Tag == name)
+				return Entity{ entity, this };
+		}
+		return {};
+	}
+
+	Entity Scene::GetEntityByUUID(UUID uuid)
+	{
+		if (m_EntityMap.find(uuid) != m_EntityMap.end())
+			return { m_EntityMap.at(uuid), this };
+
 		return {};
 	}
 
@@ -517,6 +542,36 @@ namespace Dymatic {
 			if (relation.second == entity)
 				return true;
 		return false;
+	}
+
+	bool Scene::IsEntitySelected(entt::entity entity)
+	{
+		return m_SelectedEntities.find(entity) != m_SelectedEntities.end();
+	}
+
+	void Scene::ClearSelectedEntities()
+	{
+		m_SelectedEntities.clear();
+	}
+
+	void Scene::SetSelectedEntity(entt::entity entity)
+	{
+		if (entity == entt::null)
+			m_SelectedEntities.clear();
+		else if (m_SelectedEntities.find(entity) == m_SelectedEntities.end())
+			m_SelectedEntities = { entity };
+	}
+
+	void Scene::AddSelectedEntity(entt::entity entity)
+	{
+		if (entity != entt::null)
+			m_SelectedEntities.insert(entity);
+	}
+
+	void Scene::RemoveSelectedEntity(entt::entity entity)
+	{
+		if (m_SelectedEntities.find(entity) != m_SelectedEntities.end())
+			m_SelectedEntities.erase(entity);
 	}
 
 	Entity Scene::GetEntityParent(Entity entity)
@@ -624,6 +679,27 @@ namespace Dymatic {
 		}
 	}
 
+	void Scene::OnPhysics2DUpdate(Timestep ts)
+	{
+		const int32_t velocityIterations = 6;
+		const int32_t positionIterations = 2;
+		m_Box2DWorld->Step(ts, velocityIterations, positionIterations);
+
+		// retrieve transform from box2d
+		auto view = m_Registry.view<Rigidbody2DComponent>();
+		for (auto e : view)
+		{
+			Entity entity = { e, this };
+			auto& transform = entity.GetComponent<TransformComponent>();
+			auto& rb2d = entity.GetComponent<Rigidbody2DComponent>();
+			b2Body* body = (b2Body*)rb2d.RuntimeBody;
+			const auto& position = body->GetPosition();
+			transform.Translation.x = position.x;
+			transform.Translation.y = position.y;
+			transform.Rotation.z = body->GetAngle();
+		}
+	}
+
 	void Scene::OnPhysics2DStop()
 	{
 		// Destroy box2d world
@@ -631,17 +707,58 @@ namespace Dymatic {
 		m_Box2DWorld = nullptr;
 	}
 
+	static PxFilterFlags VehicleFilterShader(
+		PxFilterObjectAttributes attributes0, PxFilterData filterData0,
+		PxFilterObjectAttributes attributes1, PxFilterData filterData1,
+		PxPairFlags& pairFlags, const void* constantBlock, PxU32 constantBlockSize)
+	{
+		PX_UNUSED(constantBlock);
+		PX_UNUSED(constantBlockSize);
+
+		// let triggers through
+		if (PxFilterObjectIsTrigger(attributes0) || PxFilterObjectIsTrigger(attributes1))
+		{
+			pairFlags = PxPairFlag::eTRIGGER_DEFAULT;
+			return PxFilterFlags();
+		}
+
+
+
+		// use a group-based mechanism for all other pairs:
+		// - Objects within the default group (mask 0) always collide
+		// - By default, objects of the default group do not collide
+		//   with any other group. If they should collide with another
+		//   group then this can only be specified through the filter
+		//   data of the default group objects (objects of a different
+		//   group can not choose to do so)
+		// - For objects that are not in the default group, a bitmask
+		//   is used to define the groups they should collide with
+		if ((filterData0.word0 != 0 || filterData1.word0 != 0) &&
+			!(filterData0.word0 & filterData1.word1 || filterData1.word0 & filterData0.word1))
+			return PxFilterFlag::eSUPPRESS;
+
+		pairFlags = PxPairFlag::eCONTACT_DEFAULT;
+
+		// The pairFlags for each object are stored in word2 of the filter data. Combine them.
+		pairFlags |= PxPairFlags(PxU16(filterData0.word2 | filterData1.word2));
+		return PxFilterFlags();
+	}
+
 	void Scene::OnPhysicsStart()
 	{
 		// Setup PhysX
 		{
-			physx::PxDefaultCpuDispatcher* mDispatcher = nullptr;
-
 			physx::PxSceneDesc sceneDesc(g_PhysicsEngine->getTolerancesScale());
 			sceneDesc.gravity = physx::PxVec3(0.0f, -9.81f, 0.0f);
-			mDispatcher = physx::PxDefaultCpuDispatcherCreate(0);
-			sceneDesc.cpuDispatcher = mDispatcher;
-			sceneDesc.filterShader = physx::PxDefaultSimulationFilterShader;
+			sceneDesc.cpuDispatcher = physx::PxDefaultCpuDispatcherCreate(shdfnd::Thread::getNbPhysicalCores() - 1);
+			{
+				sceneDesc.filterShader = VehicleFilterShader;//physx::PxDefaultSimulationFilterShader;
+				sceneDesc.flags |= PxSceneFlag::eENABLE_PCM;
+				//sceneDesc.flags |= PxSceneFlag::eENABLE_STABILIZATION;
+				sceneDesc.flags |= PxSceneFlag::eENABLE_ACTIVE_ACTORS;
+				//sceneDesc.flags |= PxSceneFlag::eREQUIRE_RW_LOCK;
+			}
+			
 			m_PhysXScene = g_PhysicsEngine->createScene(sceneDesc);
 
 			physx::PxPvdSceneClient* pvdClient = m_PhysXScene->getScenePvdClient();
@@ -652,159 +769,526 @@ namespace Dymatic {
 				pvdClient->setScenePvdFlag(physx::PxPvdSceneFlag::eTRANSMIT_SCENEQUERIES, true);
 			}
 
-			auto mMaterial = g_PhysicsEngine->createMaterial(0.5f, 0.5f, 0.6f);
+			// Setup Rigid Body Components
+			{
+				PxFilterData simFilterData;
+				simFilterData.word0 = COLLISION_FLAG_DRIVABLE_OBSTACLE;
+				simFilterData.word1 = COLLISION_FLAG_DRIVABLE_OBSTACLE_AGAINST;
+				PxFilterData qryFilterData;
+				SetupDrivableShapeQueryFilterData(&qryFilterData);
+				
+				auto view = m_Registry.view<RigidbodyComponent>();
+				for (auto e : view)
+				{
+					Entity entity = { e, this };
 
+					auto& transform = entity.GetComponent<TransformComponent>();
+					auto& rbc = entity.GetComponent<RigidbodyComponent>();
+
+					physx::PxRigidActor* body;
+					physx::PxVec3 pos{ transform.Translation.x, transform.Translation.y, transform.Translation.z };
+					glm::quat q{ transform.Rotation };
+					physx::PxQuat rot{ q.x, q.y, q.z, q.w };
+
+					if (rbc.Type == RigidbodyComponent::BodyType::Static)
+					{
+						body = g_PhysicsEngine->createRigidStatic(physx::PxTransform(pos, rot));
+					}
+					else
+					{
+						physx::PxRigidDynamic* dynamic = g_PhysicsEngine->createRigidDynamic(physx::PxTransform(pos, rot));
+						physx::PxRigidBodyExt::updateMassAndInertia(*dynamic, rbc.Density);
+						body = dynamic;
+					}
+
+					if (entity.HasComponent<BoxColliderComponent>())
+					{
+						auto& bcc = entity.GetComponent<BoxColliderComponent>();
+						auto shape = g_PhysicsEngine->createShape(physx::PxBoxGeometry(bcc.Size.x * transform.Scale.x, bcc.Size.y * transform.Scale.y, bcc.Size.z * transform.Scale.z), *g_DefaultMaterial);
+						
+						shape->setSimulationFilterData(simFilterData);
+						shape->setQueryFilterData(qryFilterData);
+						
+						body->attachShape(*shape);
+						shape->release();
+					}
+
+					if (entity.HasComponent<SphereColliderComponent>())
+					{
+						auto& scc = entity.GetComponent<SphereColliderComponent>();
+						float scale = std::max({ transform.Scale.x, transform.Scale.y, transform.Scale.z });
+						auto shape = g_PhysicsEngine->createShape(physx::PxSphereGeometry(scc.Radius * scale), *g_DefaultMaterial);
+						body->attachShape(*shape);
+						shape->release();
+					}
+
+					if (entity.HasComponent<CapsuleColliderComponent>())
+					{
+						auto& ccc = entity.GetComponent<CapsuleColliderComponent>();
+						float scale = std::max(transform.Scale.y, transform.Scale.z);
+						auto shape = g_PhysicsEngine->createShape(physx::PxCapsuleGeometry(ccc.Radius * transform.Scale.x, ccc.HalfHeight * scale), *g_DefaultMaterial);
+						body->attachShape(*shape);
+						shape->release();
+					}
+
+					if (entity.HasComponent<MeshColliderComponent>())
+					{
+						auto& mcc = entity.GetComponent<MeshColliderComponent>();
+						auto& smc = entity.GetComponent<StaticMeshComponent>();
+						if (mcc.Type == MeshColliderComponent::MeshType::Triangle)
+						{
+							for (auto& mesh : smc.GetModel()->GetMeshes())
+							{
+								physx::PxTriangleMeshDesc meshDesc;
+
+								std::vector<physx::PxVec3> verts;
+								auto& verticies = mesh->GetVerticies();
+								for (auto& vertex : verticies)
+									verts.push_back({ vertex.Position.x, vertex.Position.y, vertex.Position.z });
+
+								meshDesc.points.count = verts.size();
+								meshDesc.points.stride = sizeof(physx::PxVec3);
+								meshDesc.points.data = verts.data();
+
+								meshDesc.triangles.count = verticies.size() / 3;
+								meshDesc.triangles.stride = 3 * sizeof(uint32_t);
+								meshDesc.triangles.data = mesh->GetIndicies().data();
+
+								physx::PxDefaultMemoryOutputStream writeBuffer;
+								physx::PxTriangleMeshCookingResult::Enum result;
+								bool status = g_PhysicsCooking->cookTriangleMesh(meshDesc, writeBuffer, &result);
+								if (!status)
+									DY_CORE_ASSERT(false, "Triangle Mesh cooking failure");
+
+								physx::PxDefaultMemoryInputData readBuffer(writeBuffer.getData(), writeBuffer.getSize());
+								auto mesh = g_PhysicsEngine->createTriangleMesh(readBuffer);
+								auto shape = g_PhysicsEngine->createShape(physx::PxTriangleMeshGeometry(mesh), *g_DefaultMaterial);
+
+								// Apply Scaling
+								auto holder = shape->getGeometry();
+								holder.triangleMesh().triangleMesh->acquireReference();
+								holder.triangleMesh().scale.scale = physx::PxVec3(transform.Scale.x, transform.Scale.y, transform.Scale.z);
+								shape->setGeometry(holder.any());
+								holder.triangleMesh().triangleMesh->release();
+
+								body->attachShape(*shape);
+								shape->release();
+								mesh->release();
+							}
+						}
+						else
+						{
+							for (auto& mesh : smc.GetModel()->GetMeshes())
+							{
+								physx::PxConvexMeshDesc meshDesc;
+
+								std::vector<physx::PxVec3> verts;
+								auto& verticies = mesh->GetVerticies();
+								for (auto& vertex : verticies)
+									verts.push_back({ vertex.Position.x, vertex.Position.y, vertex.Position.z });
+
+								meshDesc.points.count = verts.size();
+								meshDesc.points.stride = sizeof(physx::PxVec3);
+								meshDesc.points.data = verts.data();
+								meshDesc.flags = physx::PxConvexFlag::eCOMPUTE_CONVEX;
+
+								physx::PxDefaultMemoryOutputStream writeBuffer;
+								physx::PxConvexMeshCookingResult::Enum result;
+								bool status = g_PhysicsCooking->cookConvexMesh(meshDesc, writeBuffer, &result);
+								if (!status)
+									DY_CORE_ASSERT(false, "Convex Mesh cooking failure");
+
+								physx::PxDefaultMemoryInputData readBuffer(writeBuffer.getData(), writeBuffer.getSize());
+								auto mesh = g_PhysicsEngine->createConvexMesh(readBuffer);
+								auto shape = g_PhysicsEngine->createShape(physx::PxConvexMeshGeometry(mesh), *g_DefaultMaterial);
+
+								// Apply Scaling
+								auto holder = shape->getGeometry();
+								holder.convexMesh().convexMesh->acquireReference();
+								holder.convexMesh().scale.scale = physx::PxVec3(transform.Scale.x, transform.Scale.y, transform.Scale.z);
+								shape->setGeometry(holder.any());
+								holder.convexMesh().convexMesh->release();
+
+								body->attachShape(*shape);
+								shape->release();
+								mesh->release();
+							}
+						}
+					}
+
+					// Create New Physics Material
+					{
+						auto material = g_PhysicsEngine->createMaterial(rbc.StaticFriction, rbc.DynamicFriction, rbc.Restitution);
+
+						// Setup Physics Material
+						physx::PxShape** shapes = new physx::PxShape * [body->getNbShapes()];
+						body->getShapes(shapes, body->getNbShapes());
+
+						for (PxU32 i = 0; i < body->getNbShapes(); i++)
+							shapes[i]->setMaterials(&material, 1);
+
+						// Clean Up
+						material->release();
+						delete[] shapes;
+					}
+
+					m_PhysXScene->addActor(*body);
+
+					rbc.RuntimeBody = body;
+				}
+			}
+
+			// Setup Characters
+			{
+				// Create the controller manager
+				m_PhysXControllerManager = PxCreateControllerManager(*m_PhysXScene);
+				m_PhysXControllerManager->setOverlapRecoveryModule(true);
+				m_PhysXControllerManager->setPreciseSweeps(true);
+				
+				auto view = m_Registry.view<CharacterMovementComponent>();
+				for (auto e : view)
+				{
+					Entity entity = { e, this };
+					
+					auto& transform = entity.GetComponent<TransformComponent>();
+					auto& cmc = entity.GetComponent<CharacterMovementComponent>();
+
+					PxCapsuleControllerDesc desc;
+					desc.position = PxExtendedVec3(transform.Translation.x, transform.Translation.y, transform.Translation.z);
+					desc.density = cmc.Density;
+					desc.radius = cmc.CapsuleRadius;
+					desc.height = std::clamp(cmc.CapsuleHeight, cmc.CapsuleRadius, 2.0f * cmc.CapsuleRadius);
+					desc.stepOffset = cmc.StepOffset;
+					desc.slopeLimit = cosf(glm::radians(cmc.MaxWalkableSlope));
+					desc.material = g_DefaultMaterial;
+
+					PxController* controller = m_PhysXControllerManager->createController(desc);
+					cmc.CharacterController = controller;
+					cmc.Velocity = glm::vec3(0.0f);
+				}
+			}
+
+			// Setup Vehicles
+			{
+				PxMaterial* StandardMaterials[1] = { g_DefaultMaterial };
+				PxVehicleDrivableSurfaceType VehicleDrivableSurfaceTypes[1] = {0};
+				m_PhysXVehicleManager = new physx::VehicleManager;
+				m_PhysXVehicleManager->init(*g_PhysicsEngine, (const PxMaterial**)StandardMaterials, VehicleDrivableSurfaceTypes);
+				
+				auto view = m_Registry.view<VehicleMovementComponent>();
+				for (auto e : view)
+				{
+					Entity entity = { e, this };
+
+					auto& transform = entity.GetComponent<TransformComponent>();
+					auto& vmc = entity.GetComponent<VehicleMovementComponent>();
+
+					PxMaterial* vehicleMaterial = g_PhysicsEngine->createMaterial(0.0f, 0.0f, 0.0f);
+					const float chassisMass = 1500.0f;
+
+					const PxF32 x = 2.5f * 0.5f;
+					const PxF32 y = 2.0f * 0.5f;
+					const PxF32 z = 5.0f * 0.5f;
+					PxVec3 verts[8] =
+					{
+						PxVec3( 1.20966995,1.94801998,-2.36412978),
+						PxVec3( 1.20966995,1.94801998,2.36412978),
+						PxVec3( 1.20966995,0.149092987,2.36412978),
+						PxVec3( 1.20966995,0.149092987,-2.36412978),
+						PxVec3(-1.20966995,1.94801998,-2.36412978),
+						PxVec3(-1.20966995,1.94801998,2.36412978),
+						PxVec3(-1.20966995,0.149092987,2.36412978),
+						PxVec3(-1.20966995,0.149092987,-2.36412978)
+					};
+
+					physx::PxConvexMesh* chassisMesh = createConvexMesh(verts, 8, *g_PhysicsEngine, *g_PhysicsCooking);
+
+					//createWheelConvexMesh();
+					physx::PxConvexMesh* wheelMeshes[4] = {
+						createCylinderConvexMesh(0.3f, 0.5f, 16, *g_PhysicsEngine, *g_PhysicsCooking),
+						createCylinderConvexMesh(0.3f, 0.5f, 16, *g_PhysicsEngine, *g_PhysicsCooking),
+						createCylinderConvexMesh(0.3f, 0.5f, 16, *g_PhysicsEngine, *g_PhysicsCooking),
+						createCylinderConvexMesh(0.3f, 0.5f, 16, *g_PhysicsEngine, *g_PhysicsCooking)
+					};
+					const PxVec3 wheelCentreOffsets[4] = {						
+						physx::PxVec3(-0.920349956f, -0.295977980f, 1.38437998f),
+						physx::PxVec3(0.919347942f, -0.295977980f, 1.38437998),
+						physx::PxVec3(-0.920349956, -0.295978993, -1.38437998f),
+						physx::PxVec3(0.919347942, -0.295978993,  -1.63789999)
+					};
+
+					auto rotation = glm::quat(transform.Rotation);
+
+					vmc.RuntimeVehicleID = m_PhysXVehicleManager->create4WVehicle(*m_PhysXScene, *g_PhysicsEngine, *g_PhysicsCooking,
+						*vehicleMaterial, chassisMass, wheelCentreOffsets, chassisMesh, wheelMeshes,
+						physx::PxTransform(
+							PxVec3(
+								transform.Translation.x,
+								transform.Translation.y,
+								transform.Translation.z
+							),
+							PxQuat(
+								rotation.x,
+								rotation.y,
+								rotation.z,
+								rotation.w
+							)
+						),
+						true
+					);
+					
+					vmc.VehicleController = new VehicleController;
+				}
+			}
+		}
+	}
+
+	void Scene::OnPhysicsUpdate(Timestep ts)
+	{
+		// Update Vehicle Components
+		{
+			auto view = m_Registry.view<VehicleMovementComponent>();
+			for (auto e : view)
+			{
+				Entity entity = { e, this };
+				auto& transform = entity.GetComponent<TransformComponent>();
+				auto& vmc = entity.GetComponent<VehicleMovementComponent>();
+
+				// Update transform
+				{
+					auto body = m_PhysXVehicleManager->getVehicle(vmc.RuntimeVehicleID)->getRigidDynamicActor();
+					body->wakeUp();
+					const auto& PXtransform = body->getGlobalPose();
+					transform.Translation.x = PXtransform.p.x;
+					transform.Translation.y = PXtransform.p.y;
+					transform.Translation.z = PXtransform.p.z;
+
+					glm::quat rot;
+					rot.x = PXtransform.q.x;
+					rot.y = PXtransform.q.y;
+					rot.z = PXtransform.q.z;
+					rot.w = PXtransform.q.w;
+
+					transform.Rotation = glm::eulerAngles(rot);
+				}
+
+				{
+					PxSceneReadLock scopedLock(*m_PhysXScene);
+					((VehicleController*)vmc.VehicleController)->update(ts, m_PhysXVehicleManager->getVehicleWheelQueryResults(vmc.RuntimeVehicleID), *m_PhysXVehicleManager->getVehicle(vmc.RuntimeVehicleID));
+
+					// NOTE: ensure input header is removed
+					((VehicleController*)vmc.VehicleController)->setCarKeyboardInputs(
+						Input::IsKeyPressed(Key::W),
+						Input::IsKeyPressed(Key::S),
+						Input::IsKeyPressed(Key::L),
+						Input::IsKeyPressed(Key::A),
+						Input::IsKeyPressed(Key::D),
+						false,
+						false
+					);
+				}
+			}
+
+			m_PhysXVehicleManager->suspensionRaycasts(m_PhysXScene);
+			m_PhysXVehicleManager->update(ts, m_PhysXScene->getGravity());
+		}
+
+		// Update Physics Scene
+		{
+			m_PhysXScene->simulate(ts);
+			m_PhysXScene->fetchResults(true);
+		}
+
+		// Update Character Controllers
+		{
+			auto view = m_Registry.view<CharacterMovementComponent>();
+			for (auto e : view)
+			{
+				Entity entity = { e, this };
+				auto& transform = entity.GetComponent<TransformComponent>();
+				auto& cmc = entity.GetComponent<CharacterMovementComponent>();
+
+				if (PxCapsuleController* characterController = ((PxCapsuleController*)cmc.CharacterController))
+				{		
+					// Check if character is falling
+					PxControllerState cctState;
+					characterController->getState(cctState);
+					bool isFalling = (cctState.collisionFlags & PxControllerCollisionFlag::eCOLLISION_DOWN) == 0;
+
+					// Update stored Y Velocity - Accelerate downwards if falling or reset to 0 if not
+					cmc.Velocity.y = isFalling ? cmc.Velocity.y + m_PhysXScene->getGravity().y * cmc.GravityScale * ts : 0.0f;
+
+					if (!isFalling && Input::IsKeyPressed(Key::Space))
+						cmc.Velocity.y = 6.0f;
+					
+					// Poll inputs
+					const float xInput = Input::IsKeyPressed(Key::W) ? 1.0f : Input::IsKeyPressed(Key::S) ? -1.0f : 0.0f;
+					const float zInput = Input::IsKeyPressed(Key::D) ? 1.0f : Input::IsKeyPressed(Key::A) ? -1.0f : 0.0f;
+					
+					// Update horizontal velocity components
+					cmc.Velocity.x = std::clamp(cmc.Velocity.x + cmc.MaxAcceleration * (isFalling ? cmc.AirControl : 1.0f) * xInput, -std::abs(cmc.MaxWalkSpeed), std::abs(cmc.MaxWalkSpeed));
+					cmc.Velocity.z = std::clamp(cmc.Velocity.z + cmc.MaxAcceleration * (isFalling ? cmc.AirControl : 1.0f) * zInput, -std::abs(cmc.MaxWalkSpeed), std::abs(cmc.MaxWalkSpeed));
+
+					// Apply friction force
+					if (!isFalling)
+						cmc.Velocity += -cmc.Velocity * cmc.GroundFriction * ts.GetSeconds();
+
+					// Move the character controller in PhysX world
+					const glm::vec3 displacement = cmc.Velocity * ts.GetSeconds();
+					characterController->move(PxVec3(displacement.x, displacement.y, displacement.z), 0.0f, ts, PxControllerFilters());
+					
+					// Update entity position
+					const PxExtendedVec3 position = characterController->getPosition();
+					transform.Translation = glm::vec3(position.x, position.y, position.z);
+
+					glm::vec3 horizontalVelocity = glm::vec3(cmc.Velocity.x, 0.0f, cmc.Velocity.z);
+					if (glm::length(horizontalVelocity) != 0.0f)
+					{
+						glm::vec3 horizontalDirection = glm::normalize(horizontalVelocity);
+						transform.Rotation.y = glm::degrees(glm::eulerAngles(glm::quatLookAt(horizontalDirection, glm::vec3(0, 1, 0)))).y;
+					}
+				}
+			}
+		}
+
+		// Update Rigid Body
+		{
 			auto view = m_Registry.view<RigidbodyComponent>();
 			for (auto e : view)
 			{
 				Entity entity = { e, this };
-
 				auto& transform = entity.GetComponent<TransformComponent>();
 				auto& rbc = entity.GetComponent<RigidbodyComponent>();
-
-				physx::PxRigidActor* body;
-				physx::PxVec3 pos{ transform.Translation.x, transform.Translation.y, transform.Translation.z };
-				glm::quat q{ transform.Rotation };
-				physx::PxQuat rot{ q.x, q.y, q.z, q.w };
-
-
-				if (rbc.Type == RigidbodyComponent::BodyType::Static)
+				if (rbc.Type == RigidbodyComponent::BodyType::Dynamic)
 				{
-					body = g_PhysicsEngine->createRigidStatic(physx::PxTransform(pos, rot));
+					auto body = (physx::PxRigidDynamic*)rbc.RuntimeBody;
+					const auto& PXtransform = body->getGlobalPose();
+					body->wakeUp();
+					transform.Translation.x = PXtransform.p.x;
+					transform.Translation.y = PXtransform.p.y;
+					transform.Translation.z = PXtransform.p.z;
+
+					glm::quat rot;
+					rot.x = PXtransform.q.x;
+					rot.y = PXtransform.q.y;
+					rot.z = PXtransform.q.z;
+					rot.w = PXtransform.q.w;
+
+					transform.Rotation = glm::eulerAngles(rot);
 				}
-				else
-				{
-					physx::PxRigidDynamic* dynamic = g_PhysicsEngine->createRigidDynamic(physx::PxTransform(pos, rot));
-					physx::PxRigidBodyExt::updateMassAndInertia(*dynamic, rbc.Density);
-					body = dynamic;
-				}
+			}
+		}
 
-				if (entity.HasComponent<BoxColliderComponent>())
-				{
-					auto& bcc = entity.GetComponent<BoxColliderComponent>();
-					auto shape = g_PhysicsEngine->createShape(physx::PxBoxGeometry(bcc.Size.x * transform.Scale.x, bcc.Size.y * transform.Scale.y, bcc.Size.z * transform.Scale.z), *mMaterial);
-					body->attachShape(*shape);
-					shape->release();
-				}
+		// Update Directional Field
+		{
+			auto view = m_Registry.view<TransformComponent, DirectionalFieldComponent>();
+			for (auto entity : view)
+			{
+				auto [transform, dfc] = view.get<TransformComponent, DirectionalFieldComponent>(entity);
+				auto& translation = transform.Translation;
+				auto& scale = transform.Scale;
 
-				if (entity.HasComponent<SphereColliderComponent>())
-				{
-					auto& scc = entity.GetComponent<SphereColliderComponent>();
-					float scale = std::max({ transform.Scale.x, transform.Scale.y, transform.Scale.z });
-					auto shape = g_PhysicsEngine->createShape(physx::PxSphereGeometry(scc.Radius * scale), *mMaterial);
-					body->attachShape(*shape);
-					shape->release();
-				}
+				PxBounds3 fieldBounds = PxBounds3(
+					PxVec3(-1.0f * scale.x + translation.x, -1.0f * scale.y + translation.y, -1.0f * scale.z + translation.z), 
+					PxVec3( 1.0f * scale.x + translation.x,  1.0f * scale.y + translation.y,  1.0f * scale.z + translation.z)
+				);
 
-				if (entity.HasComponent<CapsuleColliderComponent>())
+				auto view = m_Registry.view<RigidbodyComponent>();
+				for (auto entity : view)
 				{
-					auto& ccc = entity.GetComponent<CapsuleColliderComponent>();
-					float scale = std::max(transform.Scale.y, transform.Scale.z);
-					auto shape = g_PhysicsEngine->createShape(physx::PxCapsuleGeometry(ccc.Radius * transform.Scale.x, ccc.HalfHeight * scale), *mMaterial);
-					body->attachShape(*shape);
-					shape->release();
-				}
+					auto rbc = view.get<RigidbodyComponent>(entity);
 
-				if (entity.HasComponent<MeshColliderComponent>())
-				{
-					auto& mcc = entity.GetComponent<MeshColliderComponent>();
-					auto& smc = entity.GetComponent<StaticMeshComponent>();
-					if (mcc.Type == MeshColliderComponent::MeshType::Triangle)
+					if (rbc.Type == RigidbodyComponent::BodyType::Dynamic)
 					{
-						for (auto& mesh : smc.GetModel()->GetMeshes())
+						auto* actor = (PxRigidDynamic*)rbc.RuntimeBody;
+						auto& bounds = actor->getWorldBounds();
+						if (bounds.intersects(fieldBounds))
 						{
-							physx::PxTriangleMeshDesc meshDesc;
-
-							std::vector<physx::PxVec3> verts;
-							for (auto& vertex : mesh->m_Verticies)
-								verts.push_back({ vertex.Position.x, vertex.Position.y, vertex.Position.z });
-
-							meshDesc.points.count = verts.size();
-							meshDesc.points.stride = sizeof(physx::PxVec3);
-							meshDesc.points.data = verts.data();
-
-							meshDesc.triangles.count = mesh->m_Verticies.size() / 3;
-							meshDesc.triangles.stride = 3 * sizeof(uint32_t);
-							meshDesc.triangles.data = mesh->m_Indicies.data();
-
-							physx::PxDefaultMemoryOutputStream writeBuffer;
-							physx::PxTriangleMeshCookingResult::Enum result;
-							bool status = g_PhysicsCooking->cookTriangleMesh(meshDesc, writeBuffer, &result);
-							if (!status)
-								DY_CORE_ASSERT(false, "Triangle Mesh cooking failure");
-
-							physx::PxDefaultMemoryInputData readBuffer(writeBuffer.getData(), writeBuffer.getSize());
-							auto mesh = g_PhysicsEngine->createTriangleMesh(readBuffer);
-							auto shape = g_PhysicsEngine->createShape(physx::PxTriangleMeshGeometry(mesh), *mMaterial);
-
-							// Apply Scaling
-							auto holder = shape->getGeometry();
-							holder.triangleMesh().triangleMesh->acquireReference();
-							holder.triangleMesh().scale.scale = physx::PxVec3(transform.Scale.x, transform.Scale.y, transform.Scale.z);
-							shape->setGeometry(holder.any());
-							holder.triangleMesh().triangleMesh->release();
-
-							body->attachShape(*shape);
-							shape->release();
-							mesh->release();
-						}
-					}
-					else
-					{
-						for (auto& mesh : smc.GetModel()->GetMeshes())
-						{
-							physx::PxConvexMeshDesc meshDesc;
-
-							std::vector<physx::PxVec3> verts;
-							for (auto& vertex : mesh->m_Verticies)
-								verts.push_back({ vertex.Position.x, vertex.Position.y, vertex.Position.z });
-
-							meshDesc.points.count = verts.size();
-							meshDesc.points.stride = sizeof(physx::PxVec3);
-							meshDesc.points.data = verts.data();
-							meshDesc.flags = physx::PxConvexFlag::eCOMPUTE_CONVEX;
-
-							physx::PxDefaultMemoryOutputStream writeBuffer;
-							physx::PxConvexMeshCookingResult::Enum result;
-							bool status = g_PhysicsCooking->cookConvexMesh(meshDesc, writeBuffer, &result);
-							if (!status)
-								DY_CORE_ASSERT(false, "Convex Mesh cooking failure");
-
-							physx::PxDefaultMemoryInputData readBuffer(writeBuffer.getData(), writeBuffer.getSize());
-							auto mesh = g_PhysicsEngine->createConvexMesh(readBuffer);
-							auto shape = g_PhysicsEngine->createShape(physx::PxConvexMeshGeometry(mesh), *mMaterial);
-
-							// Apply Scaling
-							auto holder = shape->getGeometry();
-							holder.convexMesh().convexMesh->acquireReference();
-							holder.convexMesh().scale.scale = physx::PxVec3(transform.Scale.x, transform.Scale.y, transform.Scale.z);
-							shape->setGeometry(holder.any());
-							holder.convexMesh().convexMesh->release();
-
-							body->attachShape(*shape);
-							shape->release();
-							mesh->release();
+							actor->addForce(PxVec3(dfc.Force.x, dfc.Force.y, dfc.Force.z), PxForceMode::eFORCE);
 						}
 					}
 				}
+			}
+		}
 
-				// Create New Physics Material
-				auto material = g_PhysicsEngine->createMaterial(rbc.StaticFriction, rbc.DynamicFriction, rbc.Restitution);
+		// Update Radial Field
+		{
+			auto view = m_Registry.view<TransformComponent, RadialFieldComponent>();
+			for (auto entity : view)
+			{
+				auto [fieldTransform, rfc] = view.get<TransformComponent, RadialFieldComponent>(entity);
+				auto translation = fieldTransform.Translation;
 
-				// Setup Physics Material
-				physx::PxShape** shapes = new physx::PxShape*[body->getNbShapes()];
-				body->getShapes(shapes, body->getNbShapes());
+				auto view = m_Registry.view<TransformComponent, RigidbodyComponent>();
+				for (auto entity : view)
+				{
+					auto [transform, rbc] = view.get<TransformComponent, RigidbodyComponent>(entity);
 
-				for (size_t i = 0; i < body->getNbShapes(); i++)
-					shapes[i]->setMaterials(&material, 1);
+					if (rbc.Type == RigidbodyComponent::BodyType::Dynamic)
+					{
+						const float distance = glm::distance(fieldTransform.Translation, transform.Translation);
+						if (distance <= rfc.Radius)
+						{	
+							const float magnitude = rfc.Magnitude * (1.0f / (std::exp(distance * rfc.Falloff)));
+							const auto direction = glm::normalize(transform.Translation - fieldTransform.Translation);
 
-				// Clean Up
-				material->release();
-				delete[] shapes;
+							auto* actor = (PxRigidDynamic*)rbc.RuntimeBody;
+							actor->addForce(PxVec3(direction.x * magnitude, direction.y * magnitude, direction.z * magnitude), PxForceMode::eFORCE);
+						}
+					}
+				}
+			}
+		}
+		
+		// Update Bouyancy Fields
+		{
+			auto view = m_Registry.view<TransformComponent, BouyancyFieldComponent>();
+			for (auto entity : view)
+			{
+				auto [transform, bfc] = view.get<TransformComponent, BouyancyFieldComponent>(entity);
+				auto& translation = transform.Translation;
+				auto& scale = transform.Scale;
 
-				m_PhysXScene->addActor(*body);
+				PxBounds3 fieldBounds = PxBounds3(
+					PxVec3(-1.0f * scale.x + translation.x, -1.0f * scale.y + translation.y, -1.0f * scale.z + translation.z),
+					PxVec3(1.0f * scale.x + translation.x, 1.0f * scale.y + translation.y, 1.0f * scale.z + translation.z)
+				);
 
-				rbc.RuntimeBody = body;
+				auto view = m_Registry.view<RigidbodyComponent>();
+				for (auto entity : view)
+				{
+					auto rbc = view.get<RigidbodyComponent>(entity);
+
+					if (rbc.Type == RigidbodyComponent::BodyType::Dynamic)
+					{
+						auto* actor = (PxRigidDynamic*)rbc.RuntimeBody;
+						auto& bounds = actor->getWorldBounds();
+						if (bounds.intersects(fieldBounds))
+						{
+							PxBounds3 intersection;
+							intersection.minimum.x = std::max(bounds.minimum.x, fieldBounds.minimum.x);
+							intersection.minimum.y = std::max(bounds.minimum.y, fieldBounds.minimum.y);
+							intersection.minimum.z = std::max(bounds.minimum.z, fieldBounds.minimum.z);
+							intersection.maximum.x = std::min(bounds.maximum.x, fieldBounds.maximum.x);
+							intersection.maximum.y = std::min(bounds.maximum.y, fieldBounds.maximum.y);
+							intersection.maximum.z = std::min(bounds.maximum.z, fieldBounds.maximum.z);
+							auto& boundsDims = bounds.getDimensions();
+							auto& intersectionDims = intersection.getDimensions();
+							float percentage = abs(intersectionDims.x * intersectionDims.y * intersectionDims.z) / abs(boundsDims.x * boundsDims.y * boundsDims.z);
+
+							const float& mass = actor->getMass();
+							const float& density = rbc.Density;
+							const float volume = mass / density;
+
+							float bouyancy = (volume * percentage) * bfc.FluidDensity * -m_PhysXScene->getGravity().y;
+
+							actor->setLinearDamping(bfc.LinearDamping);
+							actor->setAngularDamping(bfc.AngularDamping);
+
+							actor->addForce(PxVec3(0.0f, bouyancy, 0.0f), PxForceMode::eFORCE);
+						}
+					}
+				}
 			}
 		}
 	}
@@ -814,6 +1298,24 @@ namespace Dymatic {
 		// Destroy PhysX World
 		m_PhysXScene->release();
 		m_PhysXScene = nullptr;
+
+		// Clean up controllers
+		m_PhysXControllerManager->purgeControllers();
+
+		// Clean up Vehicles
+		{
+			m_PhysXVehicleManager->shutdown();
+			delete m_PhysXVehicleManager;
+
+			auto view = m_Registry.view<VehicleMovementComponent>();
+			for (auto e : view)
+			{
+				Entity entity = { e, this };
+
+				auto& vmc = entity.GetComponent<VehicleMovementComponent>();
+				delete vmc.VehicleController;
+			}
+		}
 	}
 
 	static void DrawDebugSphere(glm::vec3 position, float radius, glm::vec4 color = glm::vec4(1.0f))
@@ -840,22 +1342,9 @@ namespace Dymatic {
 		}
 	}
 
-	void Scene::RenderScene(Timestep ts, EditorCamera& camera, Entity selectedEntity)
+	void Scene::RenderSceneEditor(Timestep ts, EditorCamera& camera)
 	{
-		Renderer3D::BeginScene(camera);
-		Renderer3D::UpdateTimestep(ts);
-
-		// TODO: Move to OnSceneStop()
-		auto view = m_Registry.view<TransformComponent, AudioComponent>();
-		for (auto entity : view)
-		{
-			auto [transform, ac] = view.get<TransformComponent, AudioComponent>(entity);
-			if (ac.GetSound())
-			{
-				if (ac.GetSound()->IsInitalizedInternal())
-					ac.GetSound()->OnEndSceneInternal();
-			}
-		}
+		SceneRenderer::BeginScene(camera);
 
 		// Submit Lights
 		{
@@ -864,7 +1353,7 @@ namespace Dymatic {
 			{
 				auto [transform, light] = view.get<TransformComponent, DirectionalLightComponent>(entity);
 				//Renderer3D::SubmitDirectionalLight(transform.GetTransform(), light);
-				Renderer3D::SubmitDirectionalLight(GetWorldTransform({ entity, this }), light);
+				SceneRenderer::SubmitDirectionalLight(GetWorldTransform({ entity, this }), light);
 			}
 		}
 		{
@@ -873,7 +1362,7 @@ namespace Dymatic {
 			{
 				auto [transform, light] = view.get<TransformComponent, PointLightComponent>(entity);
 				//Renderer3D::SubmitPointLight(transform.GetTransform(), light);
-				Renderer3D::SubmitPointLight(GetWorldTransform({ entity, this }), light);
+				SceneRenderer::SubmitPointLight(GetWorldTransform({ entity, this }), light);
 			}
 		}
 		{
@@ -882,21 +1371,21 @@ namespace Dymatic {
 			{
 				auto [transform, light] = view.get<TransformComponent, SpotLightComponent>(entity);
 				//Renderer3D::SubmitSpotLight(transform.GetTransform(), light);
-				Renderer3D::SubmitSpotLight(GetWorldTransform({ entity, this }), light);
+				SceneRenderer::SubmitSpotLight(GetWorldTransform({ entity, this }), light);
 			}
 		}
-		Renderer3D::SubmitLightSetup();
+		SceneRenderer::SubmitLightSetup();
 
 		{
 			auto view = m_Registry.view<TransformComponent, SkyLightComponent>();
 			for (auto entity : view)
 			{
 				auto [transform, light] = view.get<TransformComponent, SkyLightComponent>(entity);
-				Renderer3D::SubmitSkyLight(light);
+				SceneRenderer::SubmitSkyLight(light);
 			}
 		}
 
-		// Draw static meshes
+		// Submit static meshes
 		{
 			auto view = m_Registry.view<TransformComponent, StaticMeshComponent>();
 			for (auto entity : view)
@@ -904,7 +1393,17 @@ namespace Dymatic {
 				auto [transform, mesh] = view.get<TransformComponent, StaticMeshComponent>(entity);
 				mesh.Update(ts);
 				//Renderer3D::SubmitStaticMesh(transform.GetTransform(), mesh, (int)entity);
-				Renderer3D::SubmitStaticMesh(GetWorldTransform({ entity, this }), mesh, (int)entity);
+				SceneRenderer::SubmitStaticMesh(GetWorldTransform({ entity, this }), mesh, (int)entity, IsEntitySelected(entity));
+			}
+		}
+
+		// Submit lighting volumes
+		{
+			auto view = m_Registry.view<TransformComponent, VolumeComponent>();
+			for (auto entity : view)
+			{
+				auto [transform, volume] = view.get<TransformComponent, VolumeComponent>(entity);
+				SceneRenderer::SubmitVolume(transform, volume);
 			}
 		}
 
@@ -916,7 +1415,7 @@ namespace Dymatic {
 				{
 					auto [transform, camera] = view.get<TransformComponent, CameraComponent>(entity);
 
-					Renderer3D::SubmitModel(GetWorldTransform({ entity, this }), s_CameraModel, (int)entity);
+					SceneRenderer::SubmitModel(GetWorldTransform({ entity, this }), s_CameraModel, (int)entity, IsEntitySelected(entity));
 				}
 			}
 
@@ -925,14 +1424,14 @@ namespace Dymatic {
 				for (auto entity : view)
 				{
 					auto [dlc, camera] = view.get<TransformComponent, DirectionalLightComponent>(entity);
-					Renderer3D::SubmitModel(GetWorldTransform({ entity, this }), s_ArrowModel, (int)entity);
+					SceneRenderer::SubmitModel(GetWorldTransform({ entity, this }), s_ArrowModel, (int)entity, IsEntitySelected(entity));
 				}
 			}
 		}
 
-		Renderer3D::RenderScene();
+		SceneRenderer::RenderScene();
 
-		Renderer3D::EndScene();
+		SceneRenderer::EndScene();
 
 		Renderer2D::BeginScene(camera);
 
@@ -948,7 +1447,7 @@ namespace Dymatic {
 			auto view = m_Registry.view<TransformComponent, CameraComponent>();
 			for (auto entity : view)
 			{
-				if (entity != selectedEntity)
+				if (!IsEntitySelected(entity))
 					continue;
 
 				auto [transform, camera] = view.get<TransformComponent, CameraComponent>(entity);
@@ -992,22 +1491,37 @@ namespace Dymatic {
 			}
 		}
 
+		// Draw volume bounding box
+		{
+			auto view = m_Registry.view<TransformComponent, VolumeComponent>();
+			for (auto entity : view)
+			{
+				if (IsEntitySelected(entity))
+				{
+					auto [transform, volume] = view.get<TransformComponent, VolumeComponent>(entity);
+					Renderer2D::DrawCube(transform.Translation, transform.Scale, glm::vec4(0.2f, 0.1f, 0.9f, 1.0f), int(entity));
+				}
+			}
+		}
+
 		// Draw Audio Debug Sphere
 		{
 			auto view = m_Registry.view<TransformComponent, AudioComponent>();
 			for (auto entity : view)
 			{
-				auto [transform, ac] = view.get<TransformComponent, AudioComponent>(entity);
+				if (IsEntitySelected(entity))
+				{
+					auto [transform, ac] = view.get<TransformComponent, AudioComponent>(entity);
+					if (ac.AudioSound)
+					{
+						float distance = glm::distance(transform.Translation, camera.GetPosition());
+						auto transformation = glm::translate(glm::mat4(1.0f), glm::vec3(GetWorldTransform({ entity, this })[3])) * glm::rotate(glm::mat4(1.0f), camera.GetYaw(), glm::vec3{ 0.0f, -1.0f, 0.0f })
+							* glm::rotate(glm::mat4(1.0f), camera.GetPitch(), glm::vec3{ -1.0f, 0.0f, 0.0f }) * glm::scale(glm::mat4(1.0f), glm::vec3(distance < 5.0f ? distance / 5.0f : 1.0f));
 
-				float distance = glm::distance(transform.Translation, camera.GetPosition());
-				auto transformation = glm::translate(glm::mat4(1.0f), glm::vec3(GetWorldTransform({ entity, this })[3])) * glm::rotate(glm::mat4(1.0f), camera.GetYaw(), glm::vec3{ 0.0f, -1.0f, 0.0f })
-					* glm::rotate(glm::mat4(1.0f), camera.GetPitch(), glm::vec3{ -1.0f, 0.0f, 0.0f }) * glm::scale(glm::mat4(1.0f), glm::vec3(distance < 5.0f ? distance / 5.0f : 1.0f));
-
-				Renderer2D::DrawQuad(transformation, m_SoundIcon, 1.0f, glm::vec4(1.0f), (int)entity);
-
-				if (entity == selectedEntity)
-					if (ac.GetSound())
-						DrawDebugSphere(transformation[3], ac.GetSound()->GetRadius());
+						Renderer2D::DrawQuad(transformation, m_SoundIcon, 1.0f, glm::vec4(1.0f), (int)entity);
+						DrawDebugSphere(transformation[3], ac.AudioSound->GetRadius());
+					}
+				}
 			}
 		}
 
@@ -1024,7 +1538,7 @@ namespace Dymatic {
 
 				Renderer2D::DrawQuad(transformation, m_LightIcon, 1.0f, glm::vec4(light.Color, 1.0f), (int)entity);
 
-				if (entity == selectedEntity)
+				if (IsEntitySelected(entity))
 					DrawDebugSphere(transformation[3], light.Radius, glm::vec4(light.Color, 1.0f));
 			}
 		}
@@ -1049,6 +1563,16 @@ namespace Dymatic {
 				auto [transform, circle] = view.get<TransformComponent, CircleRendererComponent>(entity);
 				//Renderer2D::DrawCircle(transform.GetTransform(), circle.Color, circle.Thickness, circle.Fade, (int)entity);
 				Renderer2D::DrawCircle(GetWorldTransform({ entity, this }), circle.Color, circle.Thickness, circle.Fade, (int)entity);
+			}
+		}
+
+		// Draw Text
+		{
+			auto view = m_Registry.view<TransformComponent, TextComponent>();
+			for (auto entity : view)
+			{
+				auto [transform, text] = view.get<TransformComponent, TextComponent>(entity);
+				Renderer2D::DrawTextComponent(GetWorldTransform({ entity, this }), text, (int)entity);
 			}
 		}
 
@@ -1152,6 +1676,16 @@ namespace Dymatic {
 	}
 
 	template<>
+	void Scene::OnComponentAdded<ScriptComponent>(Entity entity, ScriptComponent& component)
+	{
+	}
+
+	template<>
+	void Scene::OnComponentAdded<NativeScriptComponent>(Entity entity, NativeScriptComponent& component)
+	{
+	}
+
+	template<>
 	void Scene::OnComponentAdded<SpriteRendererComponent>(Entity entity, SpriteRendererComponent& component)
 	{
 	}
@@ -1162,17 +1696,17 @@ namespace Dymatic {
 	}
 
 	template<>
+	void Scene::OnComponentAdded<TextComponent>(Entity entity, TextComponent& component)
+	{
+	}
+
+	template<>
 	void Scene::OnComponentAdded<ParticleSystemComponent>(Entity entity, ParticleSystemComponent& component)
 	{
 	}
 
 	template<>
 	void Scene::OnComponentAdded<TagComponent>(Entity entity, TagComponent& component)
-	{
-	}
-
-	template<>
-	void Scene::OnComponentAdded<NativeScriptComponent>(Entity entity, NativeScriptComponent& component)
 	{
 	}
 
@@ -1217,12 +1751,42 @@ namespace Dymatic {
 	}
 
 	template<>
+	void Scene::OnComponentAdded<VolumeComponent>(Entity entity, VolumeComponent& component)
+	{
+	}
+
+	template<>
 	void Scene::OnComponentAdded<AudioComponent>(Entity entity, AudioComponent& component)
 	{
 	}
 
 	template<>
 	void Scene::OnComponentAdded<RigidbodyComponent>(Entity entity, RigidbodyComponent& component)
+	{
+	}
+
+	template<>
+	void Scene::OnComponentAdded<CharacterMovementComponent>(Entity entity, CharacterMovementComponent& component)
+	{
+	}
+	
+	template<>
+	void Scene::OnComponentAdded<VehicleMovementComponent>(Entity entity, VehicleMovementComponent& component)
+	{
+	}
+
+	template<>
+	void Scene::OnComponentAdded<DirectionalFieldComponent>(Entity entity, DirectionalFieldComponent& component)
+	{
+	}
+
+	template<>
+	void Scene::OnComponentAdded<RadialFieldComponent>(Entity entity, RadialFieldComponent& component)
+	{
+	}
+
+	template<>
+	void Scene::OnComponentAdded<BouyancyFieldComponent>(Entity entity, BouyancyFieldComponent& component)
 	{
 	}
 

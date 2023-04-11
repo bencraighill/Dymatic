@@ -3,10 +3,12 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include <imgui/imgui.h>
 #include <imgui/imgui_internal.h>
+#include <imgui/imgui_stdlib.h>
 
 #include <glm/gtc/type_ptr.hpp>
 
-#include "../Preferences.h"
+#include "Settings/Preferences.h"
+#include "Tools/PythonTools.h"
 
 #include "../TextSymbols.h"
 #include "Dymatic/Math/Math.h"
@@ -18,17 +20,7 @@ namespace Dymatic {
 
 	PreferencesPannel::PreferencesPannel()
 	{
-		Preferences::LoadPreferences("saved/presets/DefaultPreferences.prefs");
-		Preferences::LoadPreferences("saved/SavedPreferences.prefs");
-
-		Preferences::LoadTheme("saved/presets/themes/DymaticDark.dytheme");
-		Preferences::LoadTheme("saved/SavedTheme.dytheme");
-
-		Preferences::LoadKeymap("saved/presets/keymaps/DymaticDefault.keymap");
-		Preferences::LoadKeymap("saved/SavedKeymap.keymap");
-
 		LoadPresetLayout();
-
 		RefreshPlugins();
 	}
 
@@ -67,7 +59,7 @@ namespace Dymatic {
 
 		if (m_PreferencesPanelVisible)
 		{
-			ImGui::Begin((std::string(CHARACTER_WINDOW_ICON_PREFERENCES) + " Preferences").c_str(), &m_PreferencesPanelVisible, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+			ImGui::Begin(CHARACTER_ICON_PREFERENCES " Preferences", &m_PreferencesPanelVisible, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
 
 			if (ImGui::BeginTable("##PreferencesSplitterTable", 2, ImGuiTableFlags_Resizable | ImGuiTableFlags_SizingStretchSame))
 			{
@@ -301,6 +293,16 @@ namespace Dymatic {
 						ImGui::TreePop();
 					}
 
+					if (ImGui::TreeNodeEx("Console", treeNodeFlags))
+					{
+						EditThemeColor(ImGuiCol_LogTrace);
+						EditThemeColor(ImGuiCol_LogInfo);
+						EditThemeColor(ImGuiCol_LogWarn);
+						EditThemeColor(ImGuiCol_LogError);
+						EditThemeColor(ImGuiCol_LogCritical);
+						ImGui::TreePop();
+					}
+
 					if (ImGui::TreeNodeEx("Checkboxes", treeNodeFlags))
 					{
 						EditThemeColor(ImGuiCol_CheckMark);
@@ -364,133 +366,205 @@ namespace Dymatic {
 				}
 				else if (m_CurrentCategory == Plugins)
 				{
-					ImGui::Text("Load Plugins");
-					ImGui::SameLine();
-					if (ImGui::Button("Refresh"))
-						RefreshPlugins();
-					for (auto& plugin : m_PluginInfo)
+					// DLL based plugins
+					ImGui::SetNextItemWidth(-1);
+					ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2{ 4, 4 });
+					bool open = ImGui::TreeNodeEx("DLL Plugins", treeNodeFlags | ImGuiTreeNodeFlags_DefaultOpen);
+					ImGui::PopStyleVar();
+					if (open)
 					{
-						const float width = ImGui::GetContentRegionAvailWidth();
+						ImGui::Text("Load Plugins");
+						ImGui::SameLine();
+						if (ImGui::Button("Refresh"))
+							RefreshPlugins();
+						for (auto& plugin : m_PluginInfo)
+						{
+							const float width = ImGui::GetContentRegionAvailWidth();
 
-						ImGui::PushID(plugin.path.c_str());
+							ImGui::PushID(plugin.path.c_str());
+							ImGui::SetNextItemWidth(-1);
+							ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2{ 4, 4 });
+							bool open = ImGui::TreeNodeEx(("  " + plugin.name).c_str(), treeNodeFlags);
+							ImGui::PopStyleVar();
+							if (ImGui::IsItemHovered() && GImGui->HoveredIdTimer > 0.5f)
+								ImGui::SetTooltip(plugin.path.string().c_str());
+							ImGui::SameLine(width - 25.0f);
+							if (ImGui::Checkbox("##PluginCheckbox", &plugin.enabled))
+								WritePluginManifest();
+							if (open)
+							{
+								ImGui::Text("Path: ");
+								ImGui::SameLine();
+								ImGui::TextDisabled(plugin.path.string().c_str());
+
+								if (!plugin.version.empty())
+								{
+									ImGui::Text("Version: ");
+									ImGui::SameLine();
+									ImGui::TextDisabled(plugin.version.c_str());
+								}
+
+								{
+									ImGui::Text("Developer: ");
+									ImGui::SameLine();
+									if (plugin.developer.empty())
+									{
+										ImGui::TextDisabled("Unknown");
+										ImGui::SameLine();
+										ImGui::PushStyleColor(ImGuiCol_Button, {});
+										ImGui::PushStyleColor(ImGuiCol_ButtonHovered, {});
+										ImGui::PushStyleColor(ImGuiCol_ButtonActive, {});
+										ImGui::Button("(WARNING)", ImVec2(0.0f, ImGui::GetTextLineHeight()));
+										ImGui::PopStyleColor(3);
+										if (ImGui::IsItemHovered())
+											ImGui::SetTooltip("WARNING: This plugin comes from an unknown developer. Please ensure it has a reputable source.");
+									}
+									else
+										ImGui::TextDisabled(plugin.developer.c_str());
+								}
+
+								if (!plugin.description.empty())
+								{
+									ImGui::Text("Description: ");
+									ImGui::SameLine();
+									ImGui::PushTextWrapPos(ImGui::GetWindowContentRegionMax().x - ImGui::GetStyle().FramePadding.x * 2.0f);
+									ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+									ImGui::TextWrapped(plugin.description.c_str());
+									ImGui::PopStyleColor();
+									ImGui::PopTextWrapPos();
+								}
+
+								if (!plugin.params.empty())
+								{
+									if (ImGui::TreeNodeEx("Parameters", ImGuiTreeNodeFlags_None))
+									{
+										for (auto& param : plugin.params)
+										{
+											bool default = true;
+
+											ImGui::Text(param.name.c_str());
+											ImGui::SameLine();
+											switch (param.type)
+											{
+											case PluginInfo::PluginParam::Bool:
+												ImGui::Checkbox("##Bool", &param.data.Bool);
+												if (ImGui::IsItemDeactivatedAfterEdit()) WritePluginManifest();
+												default = param.data.Bool == param.defaultValue.Bool;
+												break;
+											case PluginInfo::PluginParam::Int:
+												ImGui::InputInt("##Int", &param.data.Int, 0);
+												if (ImGui::IsItemDeactivatedAfterEdit()) WritePluginManifest();
+												default = param.data.Int == param.defaultValue.Int;
+												break;
+											case PluginInfo::PluginParam::Float:
+												ImGui::InputFloat("##Float", &param.data.Float);
+												if (ImGui::IsItemDeactivatedAfterEdit()) WritePluginManifest();
+												default = param.data.Float == param.defaultValue.Float;
+												break;
+											case PluginInfo::PluginParam::String:
+												char buffer[256];
+												memset(buffer, 0, sizeof(buffer));
+												std::strncpy(buffer, param.data.String.c_str(), sizeof(buffer));
+												ImGui::InputText("##String", buffer, sizeof(buffer));
+												if (ImGui::IsItemDeactivatedAfterEdit())
+												{
+													std::string string = buffer;
+													if (string.find(",") == std::string::npos)
+													{
+														param.data.String = string;
+														WritePluginManifest();
+													}
+												}
+												default = param.data.String == param.defaultValue.String;
+												break;
+											}
+
+											if (!default)
+											{
+												ImGui::GetWindowDrawList()->AddCircleFilled(ImVec2(ImGui::GetItemRectMax().x + 10.0f, (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f), 4.0f, ImGui::GetColorU32(ImGuiCol_Text));
+												if (ImGui::BeginPopupContextItem())
+												{
+													if (ImGui::MenuItem("Reset to Default"))
+													{
+														param.data = param.defaultValue;
+														WritePluginManifest();
+													}
+													ImGui::EndPopup();
+												}
+											}
+										}
+										ImGui::TreePop();
+									}
+								}
+
+								ImGui::TreePop();
+							}
+							ImGui::PopID();
+						}
+						ImGui::TreePop();
+					}
+					
+					// Python script plugins
+					{
 						ImGui::SetNextItemWidth(-1);
 						ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2{ 4, 4 });
-						bool open = ImGui::TreeNodeEx(("  " + plugin.name).c_str(), treeNodeFlags);
+						bool open = ImGui::TreeNodeEx("Python Script Plugins", treeNodeFlags | ImGuiTreeNodeFlags_DefaultOpen);
 						ImGui::PopStyleVar();
-						if (ImGui::IsItemHovered() && GImGui->HoveredIdTimer > 0.5f)
-							ImGui::SetTooltip(plugin.path.string().c_str());
-						ImGui::SameLine(width - 25.0f);
-						if (ImGui::Checkbox("##PluginCheckbox", &plugin.enabled))
-							WritePluginManifest();
 						if (open)
 						{
-							ImGui::Text("Path: ");
-							ImGui::SameLine();
-							ImGui::TextDisabled(plugin.path.string().c_str());
+							const float width = ImGui::GetContentRegionAvailWidth();
 
-							if (!plugin.version.empty())
+							auto& pluginPaths = Preferences::GetData().PythonPluginPaths;
+							for (uint32_t index = 0; index < pluginPaths.size(); index++)
 							{
-								ImGui::Text("Version: ");
-								ImGui::SameLine();
-								ImGui::TextDisabled(plugin.version.c_str());
-							}
+								auto& plugin = pluginPaths[index];
 
-							{
-								ImGui::Text("Developer: ");
+								ImGui::PushID(index);
+								ImGui::SetNextItemWidth(width * 0.35f);
+								ImGui::InputText("##PythonScriptName", &plugin.filename().string(), ImGuiInputTextFlags_ReadOnly);
+
 								ImGui::SameLine();
-								if (plugin.developer.empty())
+
+								ImGui::SetNextItemWidth(ImGui::GetContentRegionAvailWidth() - 60.0f - ImGui::GetStyle().FramePadding.x * 6.0f);
+								ImGui::InputText("##PythonScriptPath", &plugin.parent_path().string(), ImGuiInputTextFlags_ReadOnly);
+
+								ImGui::SameLine();
+
+								if (ImGui::Button(CHARACTER_ICON_RESTART, ImVec2(30.0f, ImGui::GetTextLineHeight() + ImGui::GetStyle().FramePadding.y * 2.0f)))
 								{
-									ImGui::TextDisabled("Unknown");
-									ImGui::SameLine();
-									ImGui::PushStyleColor(ImGuiCol_Button, {});
-									ImGui::PushStyleColor(ImGuiCol_ButtonHovered, {});
-									ImGui::PushStyleColor(ImGuiCol_ButtonActive, {});
-									ImGui::Button("(WARNING)", ImVec2(0.0f, ImGui::GetTextLineHeight()));
-									ImGui::PopStyleColor(3);
-									if (ImGui::IsItemHovered())
-										ImGui::SetTooltip("WARNING: This plugin comes from an unknown developer. Please ensure it has a reputable source.");
+									PythonTools::ReloadPlugin(plugin);
 								}
-								else
-									ImGui::TextDisabled(plugin.developer.c_str());
-							}
 
-							if (!plugin.description.empty())
-							{
-								ImGui::Text("Description: ");
 								ImGui::SameLine();
-								ImGui::PushTextWrapPos(ImGui::GetWindowContentRegionMax().x - ImGui::GetStyle().FramePadding.x * 2.0f);
-								ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-								ImGui::TextWrapped(plugin.description.c_str());
-								ImGui::PopStyleColor();
-								ImGui::PopTextWrapPos();
+								
+								if (ImGui::Button(CHARACTER_ICON_CROSS, ImVec2(30.0f, ImGui::GetTextLineHeight() + ImGui::GetStyle().FramePadding.y * 2.0f)))
+								{
+									PythonTools::UnloadPlugin(plugin);
+									pluginPaths.erase(pluginPaths.begin() + index);
+									index--;
+								}
+								
+								ImGui::PopID();
 							}
 
-							if (!plugin.params.empty())
+							ImGui::Dummy(ImVec2(0.0f, 5.0f));
+
 							{
-								if (ImGui::TreeNodeEx("Parameters", ImGuiTreeNodeFlags_None))
+								if (ImGui::Button("Browse", ImVec2(-1, 30.0f)))
 								{
-									for (auto& param : plugin.params)
+									std::string path = FileDialogs::OpenFile("Python Script (*.py)\0*.py\0");
+									if (!path.empty())
 									{
-										bool default = true;
-
-										ImGui::Text(param.name.c_str());
-										ImGui::SameLine();
-										switch (param.type)
-										{
-										case PluginInfo::PluginParam::Bool:
-											ImGui::Checkbox("##Bool", &param.data.Bool);
-											if (ImGui::IsItemDeactivatedAfterEdit()) WritePluginManifest();
-											default = param.data.Bool == param.defaultValue.Bool;
-											break;
-										case PluginInfo::PluginParam::Int:
-											ImGui::InputInt("##Int", &param.data.Int, 0);
-											if (ImGui::IsItemDeactivatedAfterEdit()) WritePluginManifest();
-											default = param.data.Int == param.defaultValue.Int;
-											break;
-										case PluginInfo::PluginParam::Float:
-											ImGui::InputFloat("##Float", &param.data.Float);
-											if (ImGui::IsItemDeactivatedAfterEdit()) WritePluginManifest();
-											default = param.data.Float == param.defaultValue.Float;
-											break;
-										case PluginInfo::PluginParam::String:
-											char buffer[256];
-											memset(buffer, 0, sizeof(buffer));
-											std::strncpy(buffer, param.data.String.c_str(), sizeof(buffer));
-											ImGui::InputText("##String", buffer, sizeof(buffer));
-											if (ImGui::IsItemDeactivatedAfterEdit())
-											{
-												std::string string = buffer;
-												if (string.find(",") == std::string::npos)
-												{
-													param.data.String = string;
-													WritePluginManifest();
-												}
-											}
-											default = param.data.String == param.defaultValue.String;
-											break;
-										}
-
-										if (!default)
-										{
-											ImGui::GetWindowDrawList()->AddCircleFilled(ImVec2(ImGui::GetItemRectMax().x + 10.0f, (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f), 4.0f, ImGui::GetColorU32(ImGuiCol_Text));
-											if (ImGui::BeginPopupContextItem())
-											{
-												if (ImGui::MenuItem("Reset to Default"))
-												{
-													param.data = param.defaultValue;
-													WritePluginManifest();
-												}
-												ImGui::EndPopup();
-											}
-										}
+										std::filesystem::path filepath = path;
+										filepath.make_preferred();
+										Preferences::GetData().PythonPluginPaths.push_back(filepath);
+										PythonTools::LoadPlugin(filepath);
 									}
-									ImGui::TreePop();
 								}
 							}
 
 							ImGui::TreePop();
 						}
-						ImGui::PopID();
 					}
 				}
 				else if (m_CurrentCategory == Input)
@@ -629,15 +703,17 @@ namespace Dymatic {
 						static bool vis = true;
 						if (m_KeyBindSearchBar == "")
 						{
-							open = ImGui::TreeNodeEx("3D View", treeNodeFlags); vis = false;
+							open = ImGui::TreeNodeEx("Viewport", treeNodeFlags); vis = false;
 						}
-						else if (vis) ImGui::Text("3D View");
+						else if (vis) ImGui::Text("Viewport");
 						if (open)
 						{
 							bool visible = false;
 							if (KeyBindInputButton(Preferences::Keymap::SelectObjectBind)) visible = true;
 							if (KeyBindInputButton(Preferences::Keymap::SceneStartBind)) visible = true;
+							if (KeyBindInputButton(Preferences::Keymap::SceneSimulateBind)) visible = true;
 							if (KeyBindInputButton(Preferences::Keymap::SceneStopBind)) visible = true;
+							if (KeyBindInputButton(Preferences::Keymap::ReloadAssembly)) visible = true;
 							if (KeyBindInputButton(Preferences::Keymap::GizmoNoneBind)) visible = true;
 							if (KeyBindInputButton(Preferences::Keymap::GizmoTranslateBind)) visible = true;
 							if (KeyBindInputButton(Preferences::Keymap::GizmoRotateBind)) visible = true;
@@ -645,16 +721,19 @@ namespace Dymatic {
 							if (KeyBindInputButton(Preferences::Keymap::CreateBind)) visible = true;
 							if (KeyBindInputButton(Preferences::Keymap::DuplicateBind)) visible = true;
 							if (KeyBindInputButton(Preferences::Keymap::DeleteBind)) visible = true;
-							if (KeyBindInputButton(Preferences::Keymap::ShadingTypeWireframeBind)) visible = true;
-							if (KeyBindInputButton(Preferences::Keymap::ShadingTypeUnlitBind)) visible = true;
-							if (KeyBindInputButton(Preferences::Keymap::ShadingTypeSolidBind)) visible = true;
-							if (KeyBindInputButton(Preferences::Keymap::ShadingTypeRenderedBind)) visible = true;
-							if (KeyBindInputButton(Preferences::Keymap::ToggleShadingTypeBind)) visible = true;
+							if (KeyBindInputButton(Preferences::Keymap::VisualizationRenderedBind)) visible = true;
+							if (KeyBindInputButton(Preferences::Keymap::VisualizationWireframeBind)) visible = true;
+							if (KeyBindInputButton(Preferences::Keymap::VisualizationLightingOnlyBind)) visible = true;
+							if (KeyBindInputButton(Preferences::Keymap::VisualizationAlbedoBind)) visible = true;
+							if (KeyBindInputButton(Preferences::Keymap::VisualizationNormalBind)) visible = true;
+							if (KeyBindInputButton(Preferences::Keymap::VisualizationEntityIDBind)) visible = true;
+							if (KeyBindInputButton(Preferences::Keymap::ToggleVisualizationBind)) visible = true;
 							if (KeyBindInputButton(Preferences::Keymap::ViewFrontBind)) visible = true;
 							if (KeyBindInputButton(Preferences::Keymap::ViewSideBind)) visible = true;
 							if (KeyBindInputButton(Preferences::Keymap::ViewTopBind)) visible = true;
 							if (KeyBindInputButton(Preferences::Keymap::ViewFlipBind)) visible = true;
 							if (KeyBindInputButton(Preferences::Keymap::ViewProjectionBind)) visible = true;
+							if (KeyBindInputButton(Preferences::Keymap::OpenCommandLineBind)) visible = true;
 							vis = visible;
 							if (m_KeyBindSearchBar == "") ImGui::TreePop();
 						}
@@ -735,7 +814,18 @@ namespace Dymatic {
 							ImGui::SameLine();
 							ImGui::Text("Devenv Path");
 						}
+						ImGui::TreePop();
+					}
 
+					if (ImGui::TreeNodeEx("Source Control", treeNodeFlags | ImGuiTreeNodeFlags_DefaultOpen))
+					{
+						char buffer[256];
+						memset(buffer, 0, sizeof(buffer));
+						std::strncpy(buffer, Preferences::GetData().GitExecutablePath.c_str(), sizeof(buffer));
+						if (ImGui::InputText("##GitExecutablePath", buffer, sizeof(buffer)))
+							Preferences::GetData().GitExecutablePath = std::string(buffer);
+						ImGui::SameLine();
+						ImGui::Text("Git Executable Path");
 						ImGui::TreePop();
 					}
 				}

@@ -3,8 +3,8 @@
 #include "Dymatic.h"
 #include "Dymatic/Core/Base.h"
 
-#include "../Plugins/PluginLoader.h"
-#include "../Preferences.h"
+#include "Settings/Preferences.h"
+#include "Tools/PluginLoader.h"
 
 namespace Dymatic {
 
@@ -60,8 +60,6 @@ namespace Dymatic {
 		bool m_SearchByNameKey = true;
 
 		Preferences::Keymap::KeyBindEvent m_ButtonActive = Preferences::Keymap::KeyBindEvent::INVALID_BIND;
-
-		std::string m_RecentThemePath = "";
 
 		std::vector<PluginInfo> m_PluginInfo;
 

@@ -41,9 +41,14 @@ project "Dymatic"
 		"%{IncludeDir.assimp}",
 		"%{IncludeDir.Box2D}",
 		"%{IncludeDir.irrKlang}",
+		"%{IncludeDir.SDL}",
 		"%{IncludeDir.PhysX}",
 		"%{IncludeDir.PhysXShared}",
-		"%{IncludeDir.Box2D}",
+		"%{IncludeDir.PhysXToolkit}",
+		"%{IncludeDir.PhysXFoundation}",
+		"%{IncludeDir.msdf_atlas_gen}",
+		"%{IncludeDir.msdfgen}",
+		"%{IncludeDir.filewatch}",
 		"%{IncludeDir.GLFW}",
 		"%{IncludeDir.Glad}",
 		"%{IncludeDir.ImGui}",
@@ -52,6 +57,7 @@ project "Dymatic"
 		"%{IncludeDir.stb_image}",
 		"%{IncludeDir.CSplash}",
 		"%{IncludeDir.entt}",
+		"%{IncludeDir.mono}",
 		"%{IncludeDir.yaml_cpp}",
 		"%{IncludeDir.ImGuizmo}",
 		"%{IncludeDir.VulkanSDK}"
@@ -59,14 +65,16 @@ project "Dymatic"
 
 	links
 	{
-		"%{Library.assimp}",
 		"Box2D",
 		"GLFW",
 		"Glad",
 		"ImGui",
 		"%{Library.irrKlang}",
 		"yaml-cpp",
-		"opengl32.lib"
+		"msdf-atlas-gen",
+		"msdfgen",
+		"opengl32.lib",
+		"%{Library.mono}",
 	}
 
 	filter "files:vendor/ImGuizmo/**.cpp"
@@ -79,6 +87,17 @@ project "Dymatic"
 		{
 		}
 
+		links
+		{
+			"%{Library.WinSock}",
+			"%{Library.WinMM}",
+			"%{Library.WinVersion}",
+			"%{Library.BCrypt}",
+			"%{Library.SetupAPI}",
+			"%{Library.HID}",
+			"%{Library.DbgHelp}",
+		}
+
 	filter "configurations:Debug"
 		defines "DY_DEBUG"
 		runtime "Debug"
@@ -86,6 +105,10 @@ project "Dymatic"
 
 		links
 		{
+			"%{Library.assimp_Debug}",
+
+			"%{Library.SDL_Debug}",
+
 			"%{Library.ShaderC_Debug}",
 			"%{Library.SPIRV_Cross_Debug}",
 			"%{Library.SPIRV_Cross_GLSL_Debug}",
@@ -113,6 +136,10 @@ project "Dymatic"
 
 		links
 		{
+			"%{Library.assimp_Release}",
+
+			"%{Library.SDL_Release}",
+
 			"%{Library.ShaderC_Release}",
 			"%{Library.SPIRV_Cross_Release}",
 			"%{Library.SPIRV_Cross_GLSL_Release}",
@@ -140,6 +167,10 @@ project "Dymatic"
 
 		links
 		{
+			"%{Library.assimp_Release}",
+
+			"%{Library.SDL_Debug}",
+
 			"%{Library.ShaderC_Release}",
 			"%{Library.SPIRV_Cross_Release}",
 			"%{Library.SPIRV_Cross_GLSL_Release}",

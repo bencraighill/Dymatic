@@ -113,7 +113,7 @@ static const float c_LinkSelectThickness        = 5.0f;  // canvas pixels
 static const float c_NavigationZoomMargin       = 0.1f;  // percentage of visible bounds
 static const float c_MouseZoomDuration          = 0.15f; // seconds
 static const float c_SelectionFadeOutDuration   = 0.15f; // seconds
-static const auto  c_ScrollButtonIndex          = 2;
+static const auto  c_ScrollButtonIndex          = 1;
 
 
 //------------------------------------------------------------------------------
@@ -2981,6 +2981,8 @@ bool ed::NavigateAction::Process(const Control& control)
 
 //         if (IsActive && Animation.IsPlaying())
 //             Animation.Target = Animation.Target - ScrollDelta * Animation.TargetZoom;
+
+        ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
     }
     else
     {

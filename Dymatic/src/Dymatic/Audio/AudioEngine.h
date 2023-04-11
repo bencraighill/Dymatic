@@ -1,5 +1,5 @@
 #pragma once
-#include "Dymatic/Audio/Sound.h"
+#include "Dymatic/Audio/Audio.h"
 
 namespace Dymatic {
 
@@ -7,8 +7,12 @@ namespace Dymatic {
 	{
 	public:
 		static void Init();
-		static void Update(glm::vec3 listener_pos, glm::vec3 listener_direction);
+		static void Update();
+		static void Update(glm::vec3 listenerPosition, glm::vec3 listenerDirection);
 		static void Shutdown();
+
+		static void SetGlobalVolume(float volume);
+		inline static float GetGlobalVolume();
 	};
 
 }

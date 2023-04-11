@@ -16,7 +16,8 @@
 #include "Dymatic.h"
 #include "Dymatic/Core/Base.h"
 
-#include "../TextSymbols.h"
+#include "Settings/Preferences.h"
+#include "TextSymbols.h"
 
 //Opening Files
 #include "Dymatic/Utils/PlatformUtils.h"
@@ -3740,8 +3741,6 @@ const TextEditor::LanguageDefinition& TextEditor::LanguageDefinition::Lua()
 
 namespace Dymatic {
 
-	extern const std::filesystem::path g_AssetPath;
-
 	static ImU32   TabBarCalcTabID(ImGuiTabBar* tab_bar, const char* label)
 	{
 		if (tab_bar->Flags & ImGuiTabBarFlags_DockNode)
@@ -3763,9 +3762,11 @@ namespace Dymatic {
 
 	void TextEditorPannel::OnImGuiRender()
 	{
+		auto& textEditorVisible = Preferences::GetEditorWindowVisible(Preferences::EditorWindow::TextEditor);
+
 		auto& io = ImGui::GetIO();
 
-		if (m_TextEditorVisible)
+		if (textEditorVisible)
 		{
 			for (int i = 0; i < m_TextEditors.size(); i++)
 			{
@@ -3795,7 +3796,7 @@ namespace Dymatic {
 			
 
 			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-			ImGui::Begin((std::string(CHARACTER_WINDOW_ICON_TEXT_EDITOR) + " Text Editor").c_str(), &m_TextEditorVisible, ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoNav);
+			ImGui::Begin(CHARACTER_ICON_TEXT_EDIT " Text Editor", &textEditorVisible, ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoNav);
 			ImGui::PopStyleVar();
 			ImGui::BeginMenuBar();
 			if (ImGui::BeginMenu("File"))
@@ -3922,7 +3923,8 @@ namespace Dymatic {
 				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_ITEM"))
 				{
 					const wchar_t* path = (const wchar_t*)payload->Data;
-					OpenTextFileByFilepath((g_AssetPath / String::WideStringToString(path)).string());
+					std::filesystem::path filePath(path);
+					OpenTextFileByFilepath((filePath).string());
 				}
 				ImGui::EndDragDropTarget();
 			}
@@ -3934,7 +3936,6 @@ namespace Dymatic {
 	void TextEditorPannel::OnEvent(Event& e)
 	{
 		EventDispatcher dispatcher(e);
-
 		dispatcher.Dispatch<MouseScrolledEvent>(DY_BIND_EVENT_FN(TextEditorPannel::OnMouseScrolled));
 	}
 
@@ -3943,9 +3944,31 @@ namespace Dymatic {
 		return false;
 	}
 
+	void TextEditorPannel::Duplicate()
+	{
+		if (Preferences::GetEditorWindowVisible(Preferences::EditorWindow::TextEditor) && m_SelectedEditor && !m_SelectedEditor->textEditor.IsReadOnly())
+			m_SelectedEditor->textEditor.Duplicate();
+	}
+
+	void TextEditorPannel::SwapLineUp()
+	{
+		if (Preferences::GetEditorWindowVisible(Preferences::EditorWindow::TextEditor) && m_SelectedEditor && !m_SelectedEditor->textEditor.IsReadOnly())
+			m_SelectedEditor->textEditor.SwapLineDown();
+	}
+
+	void TextEditorPannel::SwapLineDown()
+	{
+		if (Preferences::GetEditorWindowVisible(Preferences::EditorWindow::TextEditor) && m_SelectedEditor && !m_SelectedEditor->textEditor.IsReadOnly())
+			m_SelectedEditor->textEditor.SwapLineDown();
+	}
+
+	void Duplicate() {  }
+	void SwapLineUp() {  }
+	void SwapLineDown() {  }
+
 	void TextEditorPannel::SwitchCStyleHeader()
 	{
-		if (m_SelectedEditor != NULL && m_TextEditorVisible)
+		if (m_SelectedEditor != nullptr && Preferences::GetEditorWindowVisible(Preferences::EditorWindow::TextEditor))
 		{
 			if (m_SelectedEditor->Filepath.find(".") != std::string::npos)
 			{

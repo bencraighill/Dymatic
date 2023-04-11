@@ -16,20 +16,34 @@ project "DymaticEditor"
 
 	includedirs
 	{
+		"%{wks.location}/DymaticEditor/src",
+
 		"%{wks.location}/Dymatic/vendor/spdlog/include",
 		"%{wks.location}/Dymatic/src",
 		"%{wks.location}/Dymatic/vendor",
 		"%{IncludeDir.glm}",
 		"%{IncludeDir.entt}",
+		"%{IncludeDir.filewatch}",
 		"%{IncludeDir.assimp}",
 		"%{IncludeDir.yaml_cpp}",
 		"%{IncludeDir.ImGuizmo}",
-		"%{IncludeDir.ImGuiNode}"
+		"%{IncludeDir.ImGuiNode}",
+
+		"%{wks.location}/DymaticEditor/vendor/git2/include",
+		"%{wks.location}/DymaticEditor/vendor/pybind11/include",
+		"%{wks.location}/DymaticEditor/vendor/Python/include"
 	}
 
 	links
 	{
-		"Dymatic"
+		"Dymatic",
+
+		"vendor/git2/Lib/git2.lib"
+	}
+
+	libdirs
+	{
+		"vendor/Python/lib"
 	}
 
 	filter "system:windows"
@@ -44,8 +58,11 @@ project "DymaticEditor"
 		{
 			"{COPYDIR} \"%{LibraryDir.VulkanSDK_DebugDLL}\" \"%{cfg.targetdir}\"",
 			"{COPYDIR} \"%{LibraryDir.PhysX_DebugDLL}\" \"%{cfg.targetdir}\"",
-			"{COPYDIR} \"%{LibraryDir.assimp_DLL}\" \"%{cfg.targetdir}\"",
-			"{COPYDIR} \"%{LibraryDir.irrKlang_DLL}\" \"%{cfg.targetdir}\""
+			"{COPYDIR} \"%{LibraryDir.assimp_DebugDLL}\" \"%{cfg.targetdir}\"",
+			"{COPYDIR} \"%{LibraryDir.irrKlang_DLL}\" \"%{cfg.targetdir}\"",
+
+			"{COPYDIR} \"%{wks.location}/DymaticEditor/vendor/git2/Bin/git2.dll\" \"%{cfg.targetdir}\"",
+			"{COPYDIR} \"%{wks.location}/DymaticEditor/vendor/Python/bin/\" \"%{cfg.targetdir}\""
 		}
 
 	filter "configurations:Release"
@@ -55,9 +72,12 @@ project "DymaticEditor"
 
 		postbuildcommands
 		{
-			"{COPYDIR} \"%{LibraryDir.PhysX_DebugDLL}\" \"%{cfg.targetdir}\"",
-			"{COPYDIR} \"%{LibraryDir.assimp_DLL}\" \"%{cfg.targetdir}\"",
-			"{COPYDIR} \"%{LibraryDir.irrKlang_DLL}\" \"%{cfg.targetdir}\""
+			"{COPYDIR} \"%{LibraryDir.PhysX_ReleaseDLL}\" \"%{cfg.targetdir}\"",
+			"{COPYDIR} \"%{LibraryDir.assimp_ReleaseDLL}\" \"%{cfg.targetdir}\"",
+			"{COPYDIR} \"%{LibraryDir.irrKlang_DLL}\" \"%{cfg.targetdir}\"",
+
+			"{COPYDIR} \"%{wks.location}/DymaticEditor/vendor/git2/Bin/git2.dll\" \"%{cfg.targetdir}\"",
+			"{COPYDIR} \"%{wks.location}/DymaticEditor/vendor/Python/bin/\" \"%{cfg.targetdir}\""
 		}
 
 	filter "configurations:Dist"
@@ -67,7 +87,10 @@ project "DymaticEditor"
 
 		postbuildcommands
 		{
-			"{COPYDIR} \"%{LibraryDir.PhysX_DebugDLL}\" \"%{cfg.targetdir}\"",
-			"{COPYDIR} \"%{LibraryDir.assimp_DLL}\" \"%{cfg.targetdir}\"",
-			"{COPYDIR} \"%{LibraryDir.irrKlang_DLL}\" \"%{cfg.targetdir}\""
+			"{COPYDIR} \"%{LibraryDir.PhysX_ReleaseDLL}\" \"%{cfg.targetdir}\"",
+			"{COPYDIR} \"%{LibraryDir.assimp_ReleaseDLL}\" \"%{cfg.targetdir}\"",
+			"{COPYDIR} \"%{LibraryDir.irrKlang_DLL}\" \"%{cfg.targetdir}\"",
+
+			"{COPYDIR} \"%{wks.location}/DymaticEditor/vendor/git2/Bin/git2.dll\" \"%{cfg.targetdir}\"",
+			"{COPYDIR} \"%{wks.location}/DymaticEditor/vendor/Python/bin/\" \"%{cfg.targetdir}\""
 		}

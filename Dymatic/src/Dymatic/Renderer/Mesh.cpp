@@ -6,21 +6,14 @@
 
 namespace Dymatic {
 
-	void Mesh::Draw(bool bindMaterial)
+	void Mesh::Draw()
+	{
+		RenderCommand::DrawIndexed(m_MeshVertexArray, m_MeshIndexBuffer->GetCount());
+	}
+
+	void Mesh::UpdateVertexData()
 	{
 		m_MeshVertexBuffer->SetData(m_Verticies.data(), m_Verticies.size() * sizeof(MeshVertex));
-
-		if (bindMaterial)
-			m_Material->Bind();
-
-		if (m_Material->m_MaterialData.BlendMode == Material::Masked)
-		{
-			glDisable(GL_CULL_FACE);
-			RenderCommand::DrawIndexed(m_MeshVertexArray, m_MeshIndexBuffer->GetCount());
-			glEnable(GL_CULL_FACE);
-		}
-		else
-			RenderCommand::DrawIndexed(m_MeshVertexArray, m_MeshIndexBuffer->GetCount());
 	}
 
 	void Mesh::SetupMesh()

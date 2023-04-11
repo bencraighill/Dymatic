@@ -5,7 +5,7 @@
 MAINICON ICON "../Resources/Branding/Logo/DymaticLogo.ico"
 
 VS_VERSION_INFO VERSIONINFO
-FILEVERSION 1, 2, 4, 0
+FILEVERSION 23, 1, 0, 0
 FILEFLAGSMASK 0x3FL
 FILEFLAGS 0x0L
 FILEOS 0x4L
@@ -18,10 +18,10 @@ BLOCK "040904E4"
 BEGIN
 VALUE "CompanyName", "Dymatic Technologies"
 VALUE "FileDescription", "Dymatic Editor"
-VALUE "LegalCopyright", "© 2022 Dymatic Technologies"
+VALUE "LegalCopyright", "© 2023 Dymatic Technologies"
 VALUE "ProductName", "Dymatic Editor"
-VALUE "ProductVersion", "DymaticEditor-1.2.4-Development"
-VALUE "FileVersion", "1, 2, 4, 0"
+VALUE "ProductVersion", "DymaticEditor-23.1.0-Development"
+VALUE "FileVersion", "23, 1, 0, 0"
 VALUE "LegalTrademarks1", "Dymatic Engine®, All Rights Reserved"
 VALUE "OriginalFilename", "DymaticEditor.exe"
 VALUE "fileos", "Microsoft Windows 11"

@@ -20,3 +20,6 @@
 	path = Dymatic/vendor/imgui
 	url = https://github.com/BenC25/imgui.git
 	branch = docking
+[submodule "Dymatic/vendor/msdf-atlas-gen"]
+	path = Dymatic/vendor/msdf-atlas-gen
+	url = https://github.com/BenC25/msdf-atlas-gen.git

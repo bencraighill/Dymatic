@@ -14,7 +14,8 @@ namespace Dymatic {
 		WindowClose, WindowDragEnter, WindowDragLeave, WindowDragOver, WindowDrop, WindowResize, WindowFocus, WindowLostFocus, WindowMoved,
 		AppTick, AppUpdate, AppRender,
 		KeyPressed, KeyReleased, KeyTyped,
-		MouseButtonPressed, MouseButtonReleased, MouseMoved, MouseScrolled
+		MouseButtonPressed, MouseButtonReleased, MouseMoved, MouseScrolled,
+		GamepadConnected, GamepadDisconnected, GamepadButtonPressed, GamepadButtonReleased, GamepadAxisMoved
 	};
 
 	enum EventCategory
@@ -24,7 +25,8 @@ namespace Dymatic {
 		EventCategoryInput         = BIT(1),
 		EventCategoryKeyboard      = BIT(2),
 		EventCategoryMouse         = BIT(3),
-		EventCategoryMouseButton   = BIT(4)
+		EventCategoryMouseButton   = BIT(4),
+		EventCategoryGamepad	   = BIT(5)
 		
 	};
 

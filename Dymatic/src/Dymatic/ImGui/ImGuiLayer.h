@@ -5,6 +5,7 @@
 #include "Dymatic/Events/ApplicationEvent.h"
 #include "Dymatic/Events/KeyEvent.h"
 #include "Dymatic/Events/MouseEvent.h"
+#include "Dymatic/Events/GamepadEvent.h"
 
 namespace Dymatic {
 

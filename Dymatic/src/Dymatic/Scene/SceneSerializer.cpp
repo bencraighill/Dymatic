@@ -3,112 +3,31 @@
 
 #include "Entity.h"
 #include "Components.h"
+#include "Dymatic/Scripting/ScriptEngine.h"
+#include "Dymatic/Core/UUID.h"
+
+#include "Dymatic/Project/Project.h"
+
+#include "Dymatic/Asset/AssetManager.h"
 
 #include <fstream>
 
 #include <yaml-cpp/yaml.h>
+#include "Dymatic/Utils/YAMLUtils.h"
 
-#include "Dymatic/Scene/ScriptEngine.h"
-
-namespace YAML {
-
-	template<>
-	struct convert<glm::vec2>
-	{
-		static Node encode(const glm::vec2& rhs)
-		{
-			Node node;
-			node.push_back(rhs.x);
-			node.push_back(rhs.y);
-			node.SetStyle(EmitterStyle::Flow);
-			return node;
-		}
-
-		static bool decode(const Node& node, glm::vec2& rhs)
-		{
-			if (!node.IsSequence() || node.size() != 2)
-				return false;
-
-			rhs.x = node[0].as<float>();
-			rhs.y = node[1].as<float>();
-			return true;
-		}
-	};
-
-	template<>
-	struct convert<glm::vec3>
-	{
-		static Node encode(const glm::vec3& rhs)
-		{
-			Node node;
-			node.push_back(rhs.x);
-			node.push_back(rhs.y);
-			node.push_back(rhs.z);
-			node.SetStyle(EmitterStyle::Flow);
-			return node;
-		}
-
-		static bool decode(const Node& node, glm::vec3& rhs)
-		{
-			if (!node.IsSequence() || node.size() != 3)
-				return false;
-
-			rhs.x = node[0].as<float>();
-			rhs.y = node[1].as<float>();
-			rhs.z = node[2].as<float>();
-			return true;
-		}
-	};
-
-	template<>
-	struct convert<glm::vec4>
-	{
-		static Node encode(const glm::vec4& rhs)
-		{
-			Node node;
-			node.push_back(rhs.x);
-			node.push_back(rhs.y);
-			node.push_back(rhs.z);
-			node.push_back(rhs.w);
-			node.SetStyle(EmitterStyle::Flow);
-			return node;
-		}
-
-		static bool decode(const Node& node, glm::vec4& rhs)
-		{
-			if (!node.IsSequence() || node.size() != 4)
-				return false;
-
-			rhs.x = node[0].as<float>();
-			rhs.y = node[1].as<float>();
-			rhs.z = node[2].as<float>();
-			rhs.w = node[3].as<float>();
-			return true;
-		}
-	};
-
-}
 namespace Dymatic {
 
-	YAML::Emitter& operator<<(YAML::Emitter& out, const glm::vec2& v)
-	{
-		out << YAML::Flow;
-		out << YAML::BeginSeq << v.x << v.y << YAML::EndSeq;
-		return out;
-	}
+#define WRITE_SCRIPT_FIELD(FieldType, Type)            \
+			case ScriptFieldType::FieldType:           \
+				out << scriptField.GetValue<Type>();   \
+				break
 
-	YAML::Emitter& operator<<(YAML::Emitter& out, const glm::vec3& v)
-	{
-		out << YAML::Flow;
-		out << YAML::BeginSeq << v.x << v.y << v.z << YAML::EndSeq;
-		return out;
-	}
-
-	YAML::Emitter& operator<<(YAML::Emitter& out, const glm::vec4& v)
-	{
-		out << YAML::Flow;
-		out << YAML::BeginSeq << v.x << v.y << v.z << v.w << YAML::EndSeq;
-		return out;
+#define READ_SCRIPT_FIELD(FieldType, Type)             \
+	case ScriptFieldType::FieldType:                   \
+	{                                                  \
+		Type data = scriptField["Data"].as<Type>();    \
+		fieldInstance.SetValue(data);                  \
+		break;                                         \
 	}
 
 	static std::string RigidBody2DBodyTypeToString(Rigidbody2DComponent::BodyType bodyType)
@@ -237,6 +156,60 @@ namespace Dymatic {
 			out << YAML::EndMap; // CameraComponent
 		}
 
+		if (entity.HasComponent<ScriptComponent>())
+		{
+			auto& scriptComponent = entity.GetComponent<ScriptComponent>();
+
+			out << YAML::Key << "ScriptComponent";
+			out << YAML::BeginMap; // ScriptComponent
+			out << YAML::Key << "ClassName" << YAML::Value << scriptComponent.ClassName;
+
+			// Fields
+			Ref<ScriptClass> entityClass = ScriptEngine::GetEntityClass(scriptComponent.ClassName);
+			const auto& fields = entityClass->GetFields();
+			if (fields.size() > 0)
+			{
+				out << YAML::Key << "ScriptFields" << YAML::Value;
+				auto& entityFields = ScriptEngine::GetScriptFieldMap(entity);
+				out << YAML::BeginSeq;
+				for (const auto& [name, field] : fields)
+				{
+					if (entityFields.find(name) == entityFields.end())
+						continue;
+
+					out << YAML::BeginMap; // ScriptField
+					out << YAML::Key << "Name" << YAML::Value << name;
+					out << YAML::Key << "Type" << YAML::Value << Utils::ScriptFieldTypeToString(field.Type);
+
+					out << YAML::Key << "Data" << YAML::Value;
+					ScriptFieldInstance& scriptField = entityFields.at(name);
+
+					switch (field.Type)
+					{
+						WRITE_SCRIPT_FIELD(Float, float);
+						WRITE_SCRIPT_FIELD(Double, double);
+						WRITE_SCRIPT_FIELD(Bool, bool);
+						WRITE_SCRIPT_FIELD(Char, char);
+						WRITE_SCRIPT_FIELD(Byte, int8_t);
+						WRITE_SCRIPT_FIELD(Short, int16_t);
+						WRITE_SCRIPT_FIELD(Int, int32_t);
+						WRITE_SCRIPT_FIELD(Long, int64_t);
+						WRITE_SCRIPT_FIELD(UShort, uint16_t);
+						WRITE_SCRIPT_FIELD(UInt, uint32_t);
+						WRITE_SCRIPT_FIELD(ULong, uint64_t);
+						WRITE_SCRIPT_FIELD(Vector2, glm::vec2);
+						WRITE_SCRIPT_FIELD(Vector3, glm::vec3);
+						WRITE_SCRIPT_FIELD(Vector4, glm::vec4);
+						WRITE_SCRIPT_FIELD(Entity, UUID);
+					}
+					out << YAML::EndMap; // ScriptFields
+				}
+				out << YAML::EndSeq;
+			}
+
+			out << YAML::EndMap; // ScriptComponent
+		}
+
 		if (entity.HasComponent<SpriteRendererComponent>())
 		{
 			out << YAML::Key << "SpriteRendererComponent";
@@ -245,7 +218,7 @@ namespace Dymatic {
 			auto& spriteRendererComponent = entity.GetComponent<SpriteRendererComponent>();
 			out << YAML::Key << "Color" << YAML::Value << spriteRendererComponent.Color;
 			if (spriteRendererComponent.Texture)
-				out << YAML::Key << "TexturePath" << YAML::Value << spriteRendererComponent.Texture->GetPath();
+				out << YAML::Key << "Texture" << YAML::Value << spriteRendererComponent.Texture->Handle;
 
 			out << YAML::Key << "TilingFactor" << YAML::Value << spriteRendererComponent.TilingFactor;
 
@@ -263,6 +236,22 @@ namespace Dymatic {
 			out << YAML::Key << "Fade" << YAML::Value << circleRendererComponent.Fade;
 
 			out << YAML::EndMap; // CircleRendererComponent
+		}
+
+		if (entity.HasComponent<TextComponent>())
+		{
+			out << YAML::Key << "TextComponent";
+			out << YAML::BeginMap; // TextComponent
+
+			auto& textComponent = entity.GetComponent<TextComponent>();
+			out << YAML::Key << "TextString" << YAML::Value << textComponent.TextString;
+			out << YAML::Key << "Color" << YAML::Value << textComponent.Color;
+			out << YAML::Key << "Font" << YAML::Value << (textComponent.Font ? textComponent.Font->Handle : 0);
+			out << YAML::Key << "Kerning" << YAML::Value << textComponent.Kerning;
+			out << YAML::Key << "LineSpacing" << YAML::Value << textComponent.LineSpacing;
+			out << YAML::Key << "MaxWidth" << YAML::Value << textComponent.MaxWidth;
+
+			out << YAML::EndMap; // TextComponent
 		}
 
 		if (entity.HasComponent<ParticleSystemComponent>())
@@ -343,40 +332,7 @@ namespace Dymatic {
 
 			out << YAML::EndMap; // CircleCollider2DComponent
 		}
-
-		if (entity.HasComponent<NativeScriptComponent>())
-		{
-			out << YAML::Key << "NativeScriptComponent";
-			out << YAML::BeginMap; // NativeScriptComponent
 		
-			auto& nsc = entity.GetComponent<NativeScriptComponent>();
-			out << YAML::Key << "Name" << YAML::Value << nsc.ScriptName;
-			out << YAML::Key << "Parameters";
-			out << YAML::BeginSeq;
-			
-			std::vector<ScriptEngine::ParamData> data;
-			ScriptEngine::GetScriptParamData(nsc.ScriptName, data);
-			for (size_t i = 0; i < nsc.Params.size() && i < data.size(); i++)
-			{
-				out << YAML::Value;
-				switch (data[i].type)
-				{
-				case ScriptEngine::ParamData::Boolean:
-					out << nsc.Params[i].Boolean;
-					break;
-				case ScriptEngine::ParamData::Float:
-					out << nsc.Params[i].Float;
-					break;
-				case ScriptEngine::ParamData::Integer:
-					out << nsc.Params[i].Integer;
-					break;
-				}
-			}
-			out << YAML::EndSeq;
-		
-			out << YAML::EndMap; // NativeScriptComponent
-		}
-
 		if (entity.HasComponent<StaticMeshComponent>())
 		{
 			out << YAML::Key << "StaticMeshComponent";
@@ -384,7 +340,14 @@ namespace Dymatic {
 
 			auto& staticMeshComponent = entity.GetComponent<StaticMeshComponent>();
 			if (staticMeshComponent.m_Model)
-				out << YAML::Key << "MeshPath" << YAML::Value << staticMeshComponent.m_Model->GetPath();
+			{
+				out << YAML::Key << "Mesh" << YAML::Value << staticMeshComponent.m_Model->Handle;
+
+				out << YAML::Key << "Materials" << YAML::Value << YAML::BeginSeq;
+				for (auto& material : staticMeshComponent.m_Materials)
+					out << YAML::Value << (material ? material->Handle : 0);
+				out << YAML::EndSeq;
+			}
 
 			out << YAML::EndMap; // StaticMeshComponent
 		}
@@ -438,8 +401,21 @@ namespace Dymatic {
 			out << YAML::BeginMap; // AudioComponent
 
 			auto& audioComponent = entity.GetComponent<AudioComponent>();
-			if (audioComponent.m_Sound)
-				out << YAML::Key << "SoundPath" << YAML::Value << audioComponent.m_Sound->GetPath();
+			if (audioComponent.AudioSound)
+			{
+				out << YAML::Key << "Sound" << YAML::Value << audioComponent.AudioSound->Handle;
+
+				// Sound Parameters
+				out << YAML::Key << "StartPosition" << YAML::Value << audioComponent.StartPosition;
+				out << YAML::Key << "StartOnAwake" << YAML::Value << audioComponent.StartOnAwake;
+				out << YAML::Key << "3D" << YAML::Value << audioComponent.AudioSound->Is3D();
+				out << YAML::Key << "Looping" << YAML::Value << audioComponent.AudioSound->IsLooping();
+				out << YAML::Key << "Volume" << YAML::Value << audioComponent.AudioSound->GetVolume();
+				out << YAML::Key << "Pan" << YAML::Value << audioComponent.AudioSound->GetPan();
+				out << YAML::Key << "Speed" << YAML::Value << audioComponent.AudioSound->GetSpeed();
+				out << YAML::Key << "Radius" << YAML::Value << audioComponent.AudioSound->GetRadius();
+				out << YAML::Key << "Echo" << YAML::Value << audioComponent.AudioSound->GetEcho();
+			}
 
 			out << YAML::EndMap; // AudioComponent
 		}
@@ -596,14 +572,71 @@ namespace Dymatic {
 					cc.FixedAspectRatio = cameraComponent["FixedAspectRatio"].as<bool>();
 				}
 
+				auto scriptComponent = entity["ScriptComponent"];
+				if (scriptComponent)
+				{
+					auto& sc = deserializedEntity.AddComponent<ScriptComponent>();
+					sc.ClassName = scriptComponent["ClassName"].as<std::string>();
+
+					auto scriptFields = scriptComponent["ScriptFields"];
+					if (scriptFields)
+					{
+						Ref<ScriptClass> entityClass = ScriptEngine::GetEntityClass(sc.ClassName);
+						
+						if (entityClass)
+						{
+							const auto& fields = entityClass->GetFields();
+							auto& entityFields = ScriptEngine::GetScriptFieldMap(deserializedEntity);
+
+							for (auto scriptField : scriptFields)
+							{
+								std::string name = scriptField["Name"].as<std::string>();
+								std::string typeString = scriptField["Type"].as<std::string>();
+								ScriptFieldType type = Utils::ScriptFieldTypeFromString(typeString);
+
+								ScriptFieldInstance& fieldInstance = entityFields[name];
+
+								DY_CORE_ASSERT(fields.find(name) != fields.end());
+
+								if (fields.find(name) == fields.end())
+									continue;
+
+								fieldInstance.Field = fields.at(name);
+
+								switch (type)
+								{
+									READ_SCRIPT_FIELD(Float, float);
+									READ_SCRIPT_FIELD(Double, double);
+									READ_SCRIPT_FIELD(Bool, bool);
+									READ_SCRIPT_FIELD(Char, char);
+									READ_SCRIPT_FIELD(Byte, int8_t);
+									READ_SCRIPT_FIELD(Short, int16_t);
+									READ_SCRIPT_FIELD(Int, int32_t);
+									READ_SCRIPT_FIELD(Long, int64_t);
+									READ_SCRIPT_FIELD(UShort, uint16_t);
+									READ_SCRIPT_FIELD(UInt, uint32_t);
+									READ_SCRIPT_FIELD(ULong, uint64_t);
+									READ_SCRIPT_FIELD(Vector2, glm::vec2);
+									READ_SCRIPT_FIELD(Vector3, glm::vec3);
+									READ_SCRIPT_FIELD(Vector4, glm::vec4);
+									READ_SCRIPT_FIELD(Entity, UUID);
+								}
+							}
+						}
+					}
+				}
+
 				auto spriteRendererComponent = entity["SpriteRendererComponent"];
 				if (spriteRendererComponent)
 				{
 					auto& src = deserializedEntity.AddComponent<SpriteRendererComponent>();
 					src.Color = spriteRendererComponent["Color"].as<glm::vec4>();
 
-					if (spriteRendererComponent["TexturePath"])
-						src.Texture = Texture2D::Create(spriteRendererComponent["TexturePath"].as<std::string>());
+					if (spriteRendererComponent["Texture"])
+					{
+						UUID texture = spriteRendererComponent["Texture"].as<UUID>();
+						src.Texture = AssetManager::GetAsset<Texture2D>(texture);
+					}
 
 					if (spriteRendererComponent["TilingFactor"])
 						src.TilingFactor = spriteRendererComponent["TilingFactor"].as<float>();
@@ -616,6 +649,24 @@ namespace Dymatic {
 					crc.Color = circleRendererComponent["Color"].as<glm::vec4>();
 					crc.Thickness = circleRendererComponent["Thickness"].as<float>();
 					crc.Fade = circleRendererComponent["Fade"].as<float>();
+				}
+
+				auto textCompontent = entity["TextComponent"];
+				if (textCompontent)
+				{
+					auto& tc = deserializedEntity.AddComponent<TextComponent>();
+					
+					tc.TextString = textCompontent["TextString"].as<std::string>();
+					tc.Color = textCompontent["Color"].as<glm::vec4>();
+					tc.Kerning = textCompontent["Kerning"].as<float>();
+					tc.LineSpacing = textCompontent["LineSpacing"].as<float>();
+					tc.MaxWidth = textCompontent["MaxWidth"].as<float>();
+
+					if (textCompontent["Font"])
+					{
+						UUID font = textCompontent["Font"].as<UUID>();
+						tc.Font = AssetManager::GetAsset<Font>(font);
+					}
 				}
 
 				auto particleSystemComponent = entity["ParticleSystemComponent"];
@@ -677,41 +728,32 @@ namespace Dymatic {
 					cc2d.RestitutionThreshold = circleCollider2DComponent["RestitutionThreshold"].as<float>();
 				}
 
-				auto nativeScriptComponent = entity["NativeScriptComponent"];
-				if (nativeScriptComponent)
-				{
-					auto& nsc = deserializedEntity.AddComponent<NativeScriptComponent>();
-					nsc.ScriptName = nativeScriptComponent["Name"].as<std::string>();
-
-
-					std::vector<ScriptEngine::ParamData> data;
-					ScriptEngine::GetScriptParamData(nsc.ScriptName, data);
-					ScriptEngine::SetupScript(nsc);
-					auto& params = nativeScriptComponent["Parameters"];
-					for (size_t i = 0; i < nsc.Params.size() && i < data.size(); i++)
-					{
-						switch (data[i].type)
-						{
-						case ScriptEngine::ParamData::Boolean:
-							nsc.Params[i].Boolean = params[i].as<bool>();
-							break;
-						case ScriptEngine::ParamData::Float:
-							nsc.Params[i].Float = params[i].as<float>();
-							break;
-						case ScriptEngine::ParamData::Integer:
-							nsc.Params[i].Integer = params[i].as<int>();
-							break;
-						}
-					}
-				}
-
 				auto staticMeshComponent = entity["StaticMeshComponent"];
 				if (staticMeshComponent)
 				{
 					auto& smc = deserializedEntity.AddComponent<StaticMeshComponent>();
-					auto& meshPath = staticMeshComponent["MeshPath"];
-					if (meshPath)
-						smc.LoadModel(meshPath.as<std::string>());
+
+					if (staticMeshComponent["Mesh"])
+					{
+						UUID mesh = staticMeshComponent["Mesh"].as<UUID>();
+						smc.m_Model = AssetManager::GetAsset<Model>(mesh);;
+						
+						if (smc.m_Model)
+						{
+							smc.m_Materials.resize(smc.m_Model->GetMeshes().size());
+							if (auto& materials = staticMeshComponent["Materials"])
+							{
+								uint32_t index = 0;
+								for (auto& material : materials)
+								{
+									UUID materialHandle = material.as<UUID>();
+									smc.m_Materials[index] = materialHandle == 0 ? nullptr : AssetManager::GetAsset<Material>(materialHandle);
+
+									index++;
+								}
+							}
+						}
+					}
 				}
 
 				auto directionalLightComponent = entity["DirectionalLightComponent"];
@@ -750,7 +792,7 @@ namespace Dymatic {
 
 					auto& skyLightPath = skyLightComponent["SkyLightPath"];
 					if (skyLightPath)
-						slc.Load(skyLightPath.as<std::string>());
+						slc.Load(Project::GetAssetFileSystemPath(skyLightPath.as<std::string>()).string());
 
 					slc.Intensity = skyLightComponent["Intensity"].as<float>();
 				}
@@ -759,8 +801,44 @@ namespace Dymatic {
 				if (audioComponent)
 				{
 					auto& ac = deserializedEntity.AddComponent<AudioComponent>();
-					if (audioComponent["SoundPath"])
-						ac.LoadSound(audioComponent["SoundPath"].as<std::string>());
+					if (auto& sound = audioComponent["Sound"])
+					{
+						ac.AudioSound = AssetManager::GetAsset<Audio>(sound.as<UUID>());
+
+						if (ac.AudioSound)
+						{
+							// Audio Parameters
+							if (auto& startPosition = audioComponent["StartPosition"])
+							{
+								auto pos = startPosition.as<uint32_t>();
+								ac.StartPosition = pos > ac.AudioSound->GetPlayLength() ? 0 : pos;
+							}
+
+							if (auto& startOnAwake = audioComponent["StartOnAwake"])
+								ac.StartOnAwake = startOnAwake.as<bool>();
+
+							if (auto& is3D = audioComponent["3D"])
+								ac.AudioSound->SetIs3D(is3D.as<bool>());
+
+							if (auto& looping = audioComponent["Looping"])
+								ac.AudioSound->SetLooping(looping.as<bool>());
+
+							if (auto& volume = audioComponent["Volume"])
+								ac.AudioSound->SetVolume(volume.as<float>());
+
+							if (auto& pan = audioComponent["Pan"])
+								ac.AudioSound->SetPan(pan.as<float>());
+
+							if (auto& speed = audioComponent["Speed"])
+								ac.AudioSound->SetSpeed(speed.as<float>());
+
+							if (auto& radius = audioComponent["Radius"])
+								ac.AudioSound->SetRadius(radius.as<float>());
+
+							if (auto& echo = audioComponent["Echo"])
+								ac.AudioSound->SetEcho(echo.as<bool>());
+						}
+					}
 				}
 
 				auto rigidbodyComponent = entity["RigidbodyComponent"];

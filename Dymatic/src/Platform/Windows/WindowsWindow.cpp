@@ -1,5 +1,7 @@
 #include "dypch.h"
 
+#include "Dymatic/Core/Application.h"
+
 #include "Platform/Windows/WindowsWindow.h"
 
 #include "Dymatic/Core/Input.h"
@@ -7,6 +9,7 @@
 #include "Dymatic/Events/ApplicationEvent.h"
 #include "Dymatic/Events/MouseEvent.h"
 #include "Dymatic/Events/KeyEvent.h"
+#include "Dymatic/Events/GamepadEvent.h"
 
 #include "Dymatic/Renderer/Renderer.h"
 
@@ -14,7 +17,10 @@
 
 #include "Dymatic/Renderer/Texture.h"
 
+#include "Dymatic/Utils/PlatformUtils.h"
+
 #include <stb_image.h>
+#include <SDL.h>
 
 namespace Dymatic {
 
@@ -51,11 +57,19 @@ namespace Dymatic {
 
 		if (s_GLFWWindowCount == 0)
 		{
-			DY_PROFILE_SCOPE("glfwInit");
-			int success = glfwInit();
-			DY_CORE_ASSERT(success, "Could not initialize GLFW!");
-			glfwSetErrorCallback(GLFWErrorCallback);
+			{
+				DY_PROFILE_SCOPE("glfwInit");
+				int success = glfwInit();
+				DY_CORE_ASSERT(success, "Could not initialize GLFW");
+				glfwSetErrorCallback(GLFWErrorCallback);
+			}
 
+			{
+				DY_PROFILE_SCOPE("SDL_Init");
+				int success = SDL_Init(SDL_INIT_EVERYTHING);
+				if (success != 0)
+					DY_CORE_ERROR("Could not initialize SDL: {}", success);
+			}
 		}
 
 		{
@@ -65,16 +79,20 @@ namespace Dymatic {
 				glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
 #endif
 			glfwWindowHint(GLFW_DECORATED, true);
+			glfwWindowHint(GLFW_VISIBLE, !props.StartHidden);
 			glfwWindowHint(GLFW_DECORATION_VISIBLE, props.Decorated);
-			m_Window = glfwCreateWindow((int)props.Width - 1, (int)props.Height, m_Data.Title.c_str(), nullptr, nullptr);
+			m_Window = glfwCreateWindow(props.Width - 1, props.Height, m_Data.Title.c_str(), nullptr, nullptr);
 			// Trigger a resize event
-			glfwSetWindowSize(m_Window, (int)props.Width, (int)props.Height);
+			glfwSetWindowSize(m_Window, props.Width, props.Height);
 			s_GLFWWindowCount++;
 
-			GLFWimage images[1];
-			images[0].pixels = stbi_load("assets/icons/DymaticLogo_Larger.png", &images[0].width, &images[0].height, 0, 4); //rgba channels 
-			glfwSetWindowIcon(m_Window, 2, images);
-			stbi_image_free(images[0].pixels);
+			if (!props.Icon.empty())
+			{
+				GLFWimage images[1];
+				images[0].pixels = stbi_load(props.Icon.c_str(), &images[0].width, &images[0].height, 0, 4); //rgba channels 
+				glfwSetWindowIcon(m_Window, 1, images);
+				stbi_image_free(images[0].pixels);
+			}
 		}
 
 		m_Context = GraphicsContext::Create(m_Window);
@@ -182,6 +200,56 @@ namespace Dymatic {
 			MouseMovedEvent event((float)xPos, (float)yPos);
 			data.EventCallback(event);
 		});
+
+		glfwSetThumbnailButtonCallback(m_Window, [](GLFWwindow* window, int index)
+		{
+			Taskbar::ThumbnailButtonCallback(index);
+		});
+		
+		glfwSetJoystickCallback([](int gamepad, int event)
+		{
+			switch (event)
+			{
+			case GLFW_CONNECTED:
+			{
+				GamepadConnectedEvent event(gamepad);
+				Application::Get().OnEvent(event);
+				break;
+			}
+			case GLFW_DISCONNECTED:
+			{
+				GamepadDisconnectedEvent event(gamepad);
+				Application::Get().OnEvent(event);
+				break;
+			}
+			}
+		});
+
+		glfwSetJoystickButtonCallback([](int gamepad, int button, int action)
+		{
+			switch (action)
+			{
+			case GLFW_PRESS:
+			{
+				GamepadButtonPressedEvent event(gamepad, button);
+				Application::Get().OnEvent(event);
+				break;
+			}
+			case GLFW_RELEASE:
+			{
+				GamepadButtonReleasedEvent event(gamepad, button);
+				Application::Get().OnEvent(event);
+				break;
+			}
+			}
+		});
+
+		glfwSetJoystickAxisCallback([](int gamepad, int axis, float axisValue)
+		{
+			GamepadAxisMovedEvent event(gamepad, axis, axisValue);
+			Application::Get().OnEvent(event);
+		});
+		
 	}
 
 	void WindowsWindow::SetSize(int width, int height) const
@@ -208,9 +276,19 @@ namespace Dymatic {
 		glfwSetWindowPos(reinterpret_cast<GLFWwindow*>(GetNativeWindow()), x, y);
 	}
 
+	bool WindowsWindow::IsWindowMinimized() const
+	{
+		return glfwGetWindowAttrib(m_Window, GLFW_ICONIFIED);
+	}
+
 	void WindowsWindow::MinimizeWindow() const
 	{
 		glfwIconifyWindow(m_Window);
+	}
+
+	bool WindowsWindow::IsWindowMaximized() const
+	{
+		return glfwGetWindowAttrib(m_Window, GLFW_MAXIMIZED);
 	}
 
 	void WindowsWindow::MaximizeWindow() const
@@ -218,14 +296,29 @@ namespace Dymatic {
 		glfwMaximizeWindow(m_Window);
 	}
 
-	void WindowsWindow::ReturnWindow() const
+	void WindowsWindow::RestoreWindow() const
 	{
 		glfwRestoreWindow(m_Window);
 	}
 
-	bool WindowsWindow::IsWindowMaximized() const
+	bool WindowsWindow::IsWindowFocused() const
 	{
-		return glfwGetWindowAttrib(m_Window, GLFW_MAXIMIZED);
+		return glfwGetWindowAttrib(m_Window, GLFW_FOCUSED);
+	}
+
+	void WindowsWindow::FocusWindow() const
+	{
+		glfwFocusWindow(m_Window);
+	}
+
+	void WindowsWindow::ShowWindow() const
+	{
+		glfwShowWindow(m_Window);
+	}
+
+	void WindowsWindow::HideWindow() const
+	{
+		glfwHideWindow(m_Window);
 	}
 
 	void WindowsWindow::SetCursor(int shape) const
@@ -247,6 +340,11 @@ namespace Dymatic {
 
 		GLFWcursor* cursor = glfwCreateStandardCursor(shape);
 		glfwSetCursor(m_Window, cursor);
+	}
+
+	void WindowsWindow::LockCursor(bool locked) const
+	{
+		glfwSetInputMode(m_Window, GLFW_CURSOR, locked ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
 	}
 
 	void WindowsWindow::SetTitlebarHoveredQueryCallback(void (*query)(int*))
@@ -279,6 +377,7 @@ namespace Dymatic {
 		if (s_GLFWWindowCount == 0)
 		{
 			glfwTerminate();
+			SDL_Quit();
 		}
 	}
 

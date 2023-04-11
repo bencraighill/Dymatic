@@ -7,34 +7,42 @@
 #include <glm/gtc/type_ptr.hpp>
 #include "Dymatic/Math/Math.h"
 
-#include "../Preferences.h"
+#include "Settings/Preferences.h"
+
+#include "Dymatic/Utils/PlatformUtils.h"
 
 #include <iomanip>
 #include <ctime>
 #include <sstream>
 
-#include "../TextSymbols.h"
+#include "TextSymbols.h"
 
 namespace Dymatic {
 
 	static std::vector<Popup> s_PopupList;
 	static std::vector<Notification> s_NotificationList;
 	static Ref<Texture2D> s_DymaticLogo;
+	static Ref<Texture2D> s_NotificationIcon;
 
-	void Popup::Create(const std::string& title, const std::string& message, std::vector<ButtonData> buttons, Ref<Texture2D> icon, bool loading)
+	void Popup::Create(const std::string& title, const std::string& message, std::vector<ButtonData> buttons, Ref<Texture2D> icon, bool loading, std::function<void()> onRender, glm::vec2 onRenderSize)
 	{
-		s_PopupList.emplace_back(title, message, buttons, icon, loading);
+		s_PopupList.emplace_back(title, message, buttons, icon, loading, onRender, onRenderSize);
 	}
 
-	Popup::Popup(const std::string& title, const std::string& message, const std::vector<ButtonData>& buttons, Ref<Texture2D> icon, bool loading)
-		: m_Title(title), m_Message(message), m_Buttons(buttons), m_Icon(icon), m_Loading(loading)
+	Popup::Popup(const std::string& title, const std::string& message, const std::vector<ButtonData>& buttons, Ref<Texture2D> icon, bool loading, std::function<void()> onRender, glm::vec2 onRenderSize)
+		: Title(title), Message(message), Buttons(buttons), Icon(icon), Loading(loading), OnRender(onRender), OnRenderSize(onRenderSize) 
 	{
+		if (loading)
+			Taskbar::SetLoading(true);
 	}
 
 	void Popup::RemoveTopmostPopup()
 	{
-		if(!s_PopupList.empty())
+		if (!s_PopupList.empty())
+		{
 			s_PopupList.erase(s_PopupList.begin());
+			Taskbar::SetLoading(false);
+		}
 	}
 
 	void Popup::OnImGuiRender(Timestep ts)
@@ -46,7 +54,7 @@ namespace Dymatic {
 
 		auto& popup = s_PopupList.front();
 
-		auto id = (popup.m_Title + "##" + std::to_string(popup.m_ID));
+		auto id = (popup.Title + "##" + std::to_string(popup.ID));
 
 		const ImVec2 window_pos = ImGui::GetWindowPos();
 		const ImVec2 window_size = ImGui::GetWindowSize();
@@ -71,17 +79,17 @@ namespace Dymatic {
 			{
 				button_width = 0.0f;
 
-				for (auto& button : popup.m_Buttons)
+				for (auto& button : popup.Buttons)
 					if (ImGui::CalcTextSize(button.Name.c_str()).x > button_width)
 						button_width = ImGui::CalcTextSize(button.Name.c_str()).x;
 				button_width += style.FramePadding.x * 2.0f;
 				button_width = std::max(button_width, min_button_width);
-				width = style.WindowPadding.x * 2.0f + button_width * popup.m_Buttons.size();
+				width = style.WindowPadding.x * 2.0f + std::max(button_width * popup.Buttons.size(), popup.OnRenderSize.x);
 				width = std::max(width, min_width);
 
 				{
 					std::string buf;
-					for (auto& character : popup.m_Message)
+					for (auto& character : popup.Message)
 						if (character == '\n')
 						{
 							if (ImGui::CalcTextSize(buf.c_str()).x + style.FramePadding.x * 2.0f > width)
@@ -94,13 +102,13 @@ namespace Dymatic {
 						width = ImGui::CalcTextSize(buf.c_str()).x + style.FramePadding.x * 2.0f + style.WindowPadding.x * 2.0f;
 				}
 
-				button_width = (width - style.WindowPadding.x * 2.0f) / (float)popup.m_Buttons.size() - style.FramePadding.x * 2.0f;
+				button_width = (width - style.WindowPadding.x * 2.0f) / (float)popup.Buttons.size() - style.FramePadding.x * 2.0f;
 
-				const float message_height = ImGui::CalcTextSize(popup.m_Message.c_str(), nullptr, false, width).y;
-				const float height = style.WindowPadding.y * 2.0f + message_height + style.FramePadding.y * 2.0f + 55.0f + (popup.m_Loading ? (barThickness + 2.0f * style.FramePadding.y + 10.0f) : 0.0f);
+				const float message_height = ImGui::CalcTextSize(popup.Message.c_str(), nullptr, false, width).y;
+				const float height = popup.OnRenderSize.y + style.WindowPadding.y * 2.0f + message_height + style.FramePadding.y * 2.0f + 55.0f + (popup.Loading ? (barThickness + 2.0f * style.FramePadding.y + 10.0f) : 0.0f);
 				
-				if (popup.m_Icon)
-					image_width = std::min(height - (ImGui::GetTextLineHeight() + style.FramePadding.y * 2.0f) - style.WindowPadding.y * 2.0f, (float)popup.m_Icon->GetHeight()) * ((float)popup.m_Icon->GetWidth() / (float)popup.m_Icon->GetHeight());
+				if (popup.Icon)
+					image_width = std::min(height - (ImGui::GetTextLineHeight() + style.FramePadding.y * 2.0f) - style.WindowPadding.y * 2.0f, (float)popup.Icon->GetHeight()) * ((float)popup.Icon->GetWidth() / (float)popup.Icon->GetHeight());
 				else
 					image_width = 0.0f;
 
@@ -110,18 +118,21 @@ namespace Dymatic {
 				ImGui::SetWindowPos(window_pos + (window_size - size) * 0.5f);
 			}
 
-			if (popup.m_Icon)
+			if (popup.Icon)
 			{
-				ImGui::Image((ImTextureID)popup.m_Icon->GetRendererID(), ImVec2(image_width, image_width / ((float)popup.m_Icon->GetWidth() / (float)popup.m_Icon->GetHeight())), { 0, 1 }, { 1, 0 });
+				ImGui::Image((ImTextureID)popup.Icon->GetRendererID(), ImVec2(image_width, image_width / ((float)popup.Icon->GetWidth() / (float)popup.Icon->GetHeight())), { 0, 1 }, { 1, 0 });
 				ImGui::SameLine();
 			}
 
 			ImGui::BeginGroup();
 			ImGui::PushTextWrapPos(ImGui::GetWindowContentRegionMax().x);
-			ImGui::TextWrapped(popup.m_Message.c_str());
+			ImGui::TextWrapped(popup.Message.c_str());
 			ImGui::PopTextWrapPos();
+			
+			if (popup.OnRender)
+				popup.OnRender();
 
-			if (popup.m_Loading)
+			if (popup.Loading)
 			{
 				ImGui::Dummy(ImVec2{ 0, 10 });
 
@@ -149,21 +160,26 @@ namespace Dymatic {
 			ImGui::Dummy(ImVec2{ 0, 10 });
 
 			size_t index = 0;
-			for (auto& button : popup.m_Buttons)
+			ButtonData* clickedButton = nullptr;
+			for (auto& button : popup.Buttons)
 			{
 				ImGui::PushID(index);
 				if (ImGui::Button(button.Name.c_str(), ImVec2(button_width, 0)))
-				{
-					button.OnPressedFunction();
-					s_PopupList.erase(s_PopupList.begin());
-					ImGui::PopID();
-					break;
-				}
+					clickedButton = &button;
 				ImGui::SameLine();
 				ImGui::PopID();
 
 				index++;
 			}
+
+			if (clickedButton)
+			{
+				if (clickedButton->OnPressedFunction)
+					clickedButton->OnPressedFunction();
+				RemoveTopmostPopup();
+			}
+				
+			
 			ImGui::EndGroup();
 
 			ImGui::EndPopup();
@@ -173,16 +189,18 @@ namespace Dymatic {
 
 	void Notification::Init()
 	{
-		s_DymaticLogo = Texture2D::Create("assets/icons/DymaticLogoTransparent.png");
+		s_DymaticLogo = Texture2D::Create("Resources/Icons/Branding/DymaticLogo.png");
+		s_NotificationIcon = Texture2D::Create("Resources/Icons/General/NotificationIcon.png");
 	}
 
 	void Notification::Create(const std::string& title, const std::string& message, const std::vector<ButtonData>& buttons, float displayTime, bool loading)
 	{
 		s_NotificationList.emplace_back(title, message, buttons,  displayTime, loading);
+		Taskbar::SetNotificationIcon(s_NotificationIcon, glm::vec3(0.32f, 0.66f, 0.89f));
 	}
 
 	Notification::Notification(const std::string& title, const std::string& message, const std::vector<ButtonData>& buttons, float displayTime, bool loading)
-		: m_Title(title), m_Message(message), m_Buttons(buttons), m_DisplayTime(displayTime), m_Loading(loading)
+		: Title(title), Message(message), Buttons(buttons), DisplayTime(displayTime), Loading(loading)
 	{
 		// Get Time String
 		auto t = std::time(nullptr);
@@ -190,15 +208,16 @@ namespace Dymatic {
 
 		std::ostringstream oss;
 		oss << std::put_time(&tm, "%H-%M-%S");
-		m_Timestamp = oss.str();
+		Timestamp = oss.str();
 
-		m_Time = ImGui::GetTime();
+		Time = ImGui::GetTime();
 	}
 
 	void Notification::Clear()
 	{
 		for (auto& notification : s_NotificationList)
 			notification._fadeOut = true;
+		Taskbar::SetNotificationIcon(nullptr);
 	}
 
 	void Notification::OnImGuiRender(Timestep ts)
@@ -213,20 +232,20 @@ namespace Dymatic {
 		{
 			auto& notification = s_NotificationList[i];
 
-			const auto titleSize = ImGui::CalcTextSize(notification.m_Title.c_str());
-			const auto messageSize = ImGui::CalcTextSize(notification.m_Message.c_str());
+			const auto titleSize = ImGui::CalcTextSize(notification.Title.c_str());
+			const auto messageSize = ImGui::CalcTextSize(notification.Message.c_str());
 			float buttonSize = 100.0f;
-			for (auto button : notification.m_Buttons)
+			for (auto button : notification.Buttons)
 				buttonSize += ImGui::CalcTextSize(button.Name.c_str()).x + style.FramePadding.x * 2.0f;
 			auto maxTextWidth = (titleSize.x > messageSize.x) ? (titleSize.x) : (messageSize.x); if (buttonSize > maxTextWidth) { maxTextWidth = buttonSize; }
 			auto WindowPosMax = ImVec2(ImGui::GetWindowPos().x + ImGui::GetContentRegionMax().x - 10.0f, ImGui::GetWindowPos().y + ImGui::GetContentRegionMax().y - 10.0f);
-			auto yMin = ImGui::GetWindowPos().y + ImGui::GetContentRegionMax().y - messageSize.y - titleSize.y * 2.0f - 20.0f - (notification.m_Buttons.size() > 0 ? 40.0f : 0.0f);
+			auto yMin = ImGui::GetWindowPos().y + ImGui::GetContentRegionMax().y - messageSize.y - titleSize.y * 2.0f - 20.0f - (notification.Buttons.size() > 0 ? 40.0f : 0.0f);
 			yMin = (WindowPosMax.y - std::max(WindowPosMax.y - yMin, 100.0f));
 			auto WindowPosMin = ImVec2(ImGui::GetWindowPos().x + ImGui::GetContentRegionMax().x - 120.0f - maxTextWidth, yMin);
 
 			notification._height = WindowPosMax.y - WindowPosMin.y;
 			for (size_t n = i + 1; n < s_NotificationList.size(); n++)
-				if (s_NotificationList[n].m_ID != notification.m_ID)
+				if (s_NotificationList[n].ID != notification.ID)
 				{
 					WindowPosMin = ImVec2(WindowPosMin.x, WindowPosMin.y - s_NotificationList[n]._height - 10.0f);
 					WindowPosMax = ImVec2(WindowPosMax.x, WindowPosMax.y - s_NotificationList[n]._height - 10.0f);
@@ -272,8 +291,8 @@ namespace Dymatic {
 				ImGui::GetForegroundDrawList()->AddCircle(imageAndCirclePos, circleRadius, ImGui::ColorConvertFloat4ToU32(textCol), (int)circleRadius - 1);
 
 				auto textPos = ImVec2(WindowPosMin.x + 100.0f, WindowPosMin.y + 10.0f);
-				ImGui::GetForegroundDrawList()->AddText(ImGui::GetIO().Fonts->Fonts[0], 18, textPos, ImGui::ColorConvertFloat4ToU32(textCol), notification.m_Title.c_str());
-				ImGui::GetForegroundDrawList()->AddText(ImVec2(textPos.x, textPos.y + 22.0f), ImGui::ColorConvertFloat4ToU32(textCol), notification.m_Message.c_str());
+				ImGui::GetForegroundDrawList()->AddText(ImGui::GetIO().Fonts->Fonts[0], 18, textPos, ImGui::ColorConvertFloat4ToU32(textCol), notification.Title.c_str());
+				ImGui::GetForegroundDrawList()->AddText(ImVec2(textPos.x, textPos.y + 22.0f), ImGui::ColorConvertFloat4ToU32(textCol), notification.Message.c_str());
 
 				ImGuiContext& g = *GImGui;
 				bool windowHovered = true;
@@ -283,7 +302,7 @@ namespace Dymatic {
 						windowHovered = false;
 
 				float currentXPos = 100.0f;
-				for (auto& button : notification.m_Buttons)
+				for (auto& button : notification.Buttons)
 				{
 					float textLength = ImGui::CalcTextSize(button.Name.c_str()).x + style.FramePadding.x * 2.0f;
 
@@ -299,6 +318,9 @@ namespace Dymatic {
 					buttonColor.w *= OverallOpacity;
 					if (!visible) { buttonColor.w *= popupOpacity; }
 
+					if (hovered)
+						ImGui::SetMouseCursor(ImGuiMouseCursor_Arrow);
+
 					ImGui::GetForegroundDrawList()->AddRectFilled(bb.Min, bb.Max, ImGui::ColorConvertFloat4ToU32(buttonColor), 3.0f);
 					ImGui::GetForegroundDrawList()->AddText(ImVec2(bb.Min.x + 2.5f, bb.Min.y), ImGui::ColorConvertFloat4ToU32(textCol), button.Name.c_str());
 					if (pressed && visible)
@@ -313,11 +335,15 @@ namespace Dymatic {
 		size_t index = 0;
 		for (auto& notification : s_NotificationList)
 		{
-			if (ImGui::GetTime() - notification.m_Time > notification.m_DisplayTime && notification.m_DisplayTime != 0.0f)
+			if (ImGui::GetTime() - notification.Time > notification.DisplayTime && notification.DisplayTime != 0.0f)
 				notification._fadeOut = true;
 
 			if (notification._fadeOut && notification._currentOpacity <= 0.1f)
+			{
 				s_NotificationList.erase(s_NotificationList.begin() + index);
+				if (s_NotificationList.empty())
+					Taskbar::SetNotificationIcon(nullptr);
+			}
 			else
 				index++;
 		}
@@ -325,12 +351,13 @@ namespace Dymatic {
 
 	void NotificationsPannel::OnImGuiRender(Timestep ts)
 	{
-		if (!m_NotificationPannelVisible)
+		auto& notificationsVisible = Preferences::GetEditorWindowVisible(Preferences::EditorWindow::Notifications);
+		if (!notificationsVisible)
 			return;
 
 		auto& style = ImGui::GetStyle();
 
-		ImGui::Begin((std::string(CHARACTER_WINDOW_ICON_NOTIFICATIONS) + " Notifications").c_str(), &m_NotificationPannelVisible);
+		ImGui::Begin(CHARACTER_ICON_NOTIFICATIONS " Notifications", &notificationsVisible);
 		ImGui::Text("Number: %d", s_NotificationList.size());
 
 		ImGui::SameLine(ImGui::GetContentRegionAvailWidth() - ImGui::CalcTextSize("Clear").x - style.FramePadding.x * 2.0f);
@@ -345,13 +372,13 @@ namespace Dymatic {
 				{
 					auto& notification = s_NotificationList[i];
 
-					ImGui::PushID(notification.m_ID);
+					ImGui::PushID(notification.ID);
 					const ImGuiTreeNodeFlags treeNodeFlags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_AllowItemOverlap | ImGuiTreeNodeFlags_FramePadding;
 					ImVec2 contentRegionAvailable = ImGui::GetContentRegionAvail();
 					ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2{ 4, 4 });
 					float lineHeight = GImGui->Font->FontSize + GImGui->Style.FramePadding.y * 2.0f;
 					ImGui::Spacing();
-					bool open = ImGui::TreeNodeEx("##NotificationTreeNode", treeNodeFlags, (notification.m_Timestamp + "  -  " + notification.m_Title).c_str());
+					bool open = ImGui::TreeNodeEx("##NotificationTreeNode", treeNodeFlags, (notification.Timestamp + "  -  " + notification.Title).c_str());
 					ImGui::PopStyleVar();
 
 					ImGui::SameLine(contentRegionAvailable.x - lineHeight * 0.5f);
@@ -360,10 +387,10 @@ namespace Dymatic {
 					if (open)
 					{
 						ImGui::Dummy(ImVec2{ 0, 5 });
-						ImGui::Text(notification.m_Message.c_str());
+						ImGui::Text(notification.Message.c_str());
 						ImGui::Dummy(ImVec2{ 0, 2 });
 						size_t index = 0;
-						for (auto& button : notification.m_Buttons)
+						for (auto& button : notification.Buttons)
 						{
 							ImGui::PushID(index);
 							ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);

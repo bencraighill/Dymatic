@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../Preferences.h"
+#include "Settings/Preferences.h"
 
 #include "Dymatic/Core/Base.h"
 #include <functional>
@@ -19,20 +19,22 @@ namespace Dymatic {
 	class Popup
 	{
 	public:
-		Popup(const std::string& title, const std::string& message, const std::vector<ButtonData>& buttons, Ref<Texture2D> icon, bool loading);
+		Popup(const std::string& title, const std::string& message, const std::vector<ButtonData>& buttons, Ref<Texture2D> icon, bool loading, std::function<void()> onRender = nullptr, glm::vec2 onRenderSize = {});
 
-		static void Create(const std::string& title, const std::string& message, std::vector<ButtonData> buttons, Ref<Texture2D> icon = nullptr, bool loading = false);
+		static void Create(const std::string& title, const std::string& message, std::vector<ButtonData> buttons, Ref<Texture2D> icon = nullptr, bool loading = false, std::function<void()> onRender = nullptr, glm::vec2 onRenderSize = {});
 		static void RemoveTopmostPopup();
 
 		static void OnImGuiRender(Timestep ts);
 
 	private:
 		// Popup Data
-		UUID m_ID;
-		Ref<Texture2D> m_Icon = nullptr;
-		std::string m_Title, m_Message;
-		std::vector<ButtonData> m_Buttons;
-		bool m_Loading = false;
+		UUID ID;
+		Ref<Texture2D> Icon = nullptr;
+		std::string Title, Message;
+		std::vector<ButtonData> Buttons;
+		bool Loading = false;
+		std::function<void()> OnRender = nullptr;
+		glm::vec2 OnRenderSize;
 	};
 
 	class Notification
@@ -48,14 +50,15 @@ namespace Dymatic {
 
 	private:
 		// Notification Data
-		UUID m_ID;
-		std::string m_Title, m_Message;
-		std::vector<ButtonData> m_Buttons;
-		float m_Time;
-		float m_DisplayTime;
-		bool m_Loading;
-		std::string m_Timestamp;
+		UUID ID;
+		std::string Title, Message;
+		std::vector<ButtonData> Buttons;
+		float Time;
+		float DisplayTime;
+		bool Loading;
+		std::string Timestamp;
 
+	private:
 		// Draw Data
 		float _height = 0.0f;
 		float _offsetMin = 0.0f;
@@ -72,10 +75,6 @@ namespace Dymatic {
 	public:
 		NotificationsPannel() = default;
 		void OnImGuiRender(Timestep ts);
-
-		bool& GetNotificationPannelVisible() { return m_NotificationPannelVisible; }
-	private:
-		bool m_NotificationPannelVisible = false;
 	};
 
 }

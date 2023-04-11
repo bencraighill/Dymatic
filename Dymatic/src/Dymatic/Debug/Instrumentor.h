@@ -22,6 +22,7 @@ namespace Dymatic {
 		FloatingPointMicroseconds Start;
 		std::chrono::microseconds ElapsedTime;
 		std::thread::id ThreadID;
+		uint32_t StackLevel;
 	};
 
 	struct InstrumentationSession
@@ -35,7 +36,7 @@ namespace Dymatic {
 		Instrumentor(const Instrumentor&) = delete;
 		Instrumentor(Instrumentor&&) = delete;
 
-		void BeginSession(const std::string& name, const std::string& filepath = "results.json")
+		void BeginSession(const std::string& name, const std::string& filepath)
 		{
 			std::lock_guard lock(m_Mutex);
 			if (m_CurrentSession)
@@ -93,6 +94,29 @@ namespace Dymatic {
 				m_OutputStream << json.str();
 				m_OutputStream.flush();
 			}
+
+			if (m_WriteFunction)
+				m_WriteFunction(result);
+		}
+
+		void SetWriteFunction(void(*writeFunction)(const ProfileResult&))
+		{
+			m_WriteFunction = writeFunction;
+		}
+
+		void StackPush()
+		{
+			m_StackLevel++;
+		}
+
+		void StackPop()
+		{
+			m_StackLevel--;
+		}
+
+		uint32_t GetStackLevel()
+		{
+			return m_StackLevel;
 		}
 
 		static Instrumentor& Get()
@@ -139,6 +163,9 @@ namespace Dymatic {
 		std::mutex m_Mutex;
 		InstrumentationSession* m_CurrentSession;
 		std::ofstream m_OutputStream;
+		
+		uint32_t m_StackLevel = 0;
+		void (*m_WriteFunction)(const ProfileResult&) = nullptr;
 	};
 
 	class InstrumentationTimer
@@ -148,10 +175,12 @@ namespace Dymatic {
 			: m_Name(name), m_Stopped(false)
 		{
 			m_StartTimepoint = std::chrono::steady_clock::now();
+			Instrumentor::Get().StackPush();
 		}
 
 		~InstrumentationTimer()
 		{
+			Instrumentor::Get().StackPop();
 			if (!m_Stopped)
 				Stop();
 		}
@@ -162,7 +191,7 @@ namespace Dymatic {
 			auto highResStart = FloatingPointMicroseconds{ m_StartTimepoint.time_since_epoch() };
 			auto elapsedTime = std::chrono::time_point_cast<std::chrono::microseconds>(endTimepoint).time_since_epoch() - std::chrono::time_point_cast<std::chrono::microseconds>(m_StartTimepoint).time_since_epoch();
 
-			Instrumentor::Get().WriteProfile({ m_Name, highResStart, elapsedTime, std::this_thread::get_id() });
+			Instrumentor::Get().WriteProfile({ m_Name, highResStart, elapsedTime, std::this_thread::get_id(), Instrumentor::Get().GetStackLevel() });
 
 			m_Stopped = true;
 		}

@@ -1,0 +1,7 @@
+Registry:
+  - Handle: 18215114936137138316
+    Type: Mesh
+    FilePath: Cube.fbx
+  - Handle: 2585612229613742785
+    Type: Texture
+    FilePath: Textures\CrateTexture.png

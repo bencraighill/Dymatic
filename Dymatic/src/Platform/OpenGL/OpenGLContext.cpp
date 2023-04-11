@@ -21,9 +21,9 @@ namespace Dymatic {
 		DY_CORE_ASSERT(status, "Failed to initialize Glad!");
 
 		DY_CORE_INFO("OpenGL Info:");
-		DY_CORE_INFO("  Vendor: {0}", glGetString(GL_VENDOR));
-		DY_CORE_INFO("  Renderer: {0}", glGetString(GL_RENDERER));
-		DY_CORE_INFO("  Version: {0}", glGetString(GL_VERSION));
+		DY_CORE_INFO("  Vendor: {0}", (const char*)glGetString(GL_VENDOR));
+		DY_CORE_INFO("  Renderer: {0}", (const char*)glGetString(GL_RENDERER));
+		DY_CORE_INFO("  Version: {0}", (const char*)glGetString(GL_VERSION));
 
 		DY_CORE_ASSERT(GLVersion.major > 4 || (GLVersion.major == 4 && GLVersion.minor >= 5), "Dymatic requires at least OpenGL version 4.5");
 	}

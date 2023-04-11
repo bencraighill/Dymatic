@@ -5,7 +5,8 @@
 namespace Dymatic::String {
 
 	std::string FloatToString(float Float);
-	int Find_nth_of(const std::string& str, const std::string& find, int nth);
+	int FindNthOf(const std::string& str, const std::string& find, int nth);
+	int FindNthOf(const std::string& str, char find, int nth);
 	void ReplaceAll(std::string& str, const std::string& from, const std::string& to);
 	void ReplaceAll(std::string& str, const char& from, const char& to);
 	std::string GetNextNameWithIndex(std::vector<std::string>& vector, std::string prefix);

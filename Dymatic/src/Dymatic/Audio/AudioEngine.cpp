@@ -20,6 +20,14 @@ namespace Dymatic {
 			g_AudioEngineInitialized = true;
 	}
 
+	void AudioEngine::Update()
+	{
+		if (!g_AudioEngineInitialized)
+			return;
+
+		g_AudioEngine->update();
+	}
+
 	void AudioEngine::Update(glm::vec3 listener_pos, glm::vec3 listener_direction)
 	{
 		if (!g_AudioEngineInitialized)
@@ -33,8 +41,31 @@ namespace Dymatic {
 	{
 		if (!g_AudioEngineInitialized)
 			return;
-
+		
 		g_AudioEngine->drop();
+
+		g_AudioEngineInitialized = false;
+		g_AudioEngine = nullptr;
+	}
+
+	static float s_GlobalVolume;
+
+	void AudioEngine::SetGlobalVolume(float volume)
+	{
+		if (!g_AudioEngineInitialized)
+			return;
+
+		s_GlobalVolume = volume;
+
+		g_AudioEngine->setSoundVolume(volume);
+	}
+
+	float AudioEngine::GetGlobalVolume()
+	{
+		if (!g_AudioEngineInitialized)
+			return 0.0f;
+
+		return s_GlobalVolume;
 	}
 
 }

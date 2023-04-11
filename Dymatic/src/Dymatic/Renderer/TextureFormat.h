@@ -17,6 +17,11 @@ namespace Dymatic {
 		RG16F,
 		R16F,
 
+		RGBA32F,
+		RGB32F,
+		RG32F,
+		R32F,
+
 		RED_INTEGER,
 
 		// Depth/Stencil

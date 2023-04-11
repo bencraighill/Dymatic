@@ -216,6 +216,15 @@ namespace Dymatic {
 		glReadPixels(x, y, 1, 1, Utils::DymaticTextureFormatToGLFormat(spec.TextureFormat), Utils::DymaticTextureFormatToGLType(spec.TextureFormat), pixelData);
 	}
 
+	void OpenGLFramebuffer::ReadPixels(uint32_t attachmentIndex, int x, int y, int width, int height, void* pixelData)
+	{
+		DY_CORE_ASSERT(attachmentIndex < m_ColorAttachments.size());
+
+		auto& spec = m_ColorAttachmentSpecifications[attachmentIndex];
+		glReadBuffer(GL_COLOR_ATTACHMENT0 + attachmentIndex);
+		glReadPixels(x, y, width, height, Utils::DymaticTextureFormatToGLFormat(spec.TextureFormat), Utils::DymaticTextureFormatToGLType(spec.TextureFormat), pixelData);
+	}
+
 	float OpenGLFramebuffer::ReadDepthPixel(int x, int y)
 	{
 		auto& spec = m_DepthAttachmentSpecification;
@@ -223,6 +232,23 @@ namespace Dymatic {
 		float pixelData;
 		glReadPixels(x, y, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &pixelData);
 		return pixelData;
+	}
+
+	void OpenGLFramebuffer::Copy(uint32_t target)
+	{
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, m_RendererID);
+		
+		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, target);
+		
+		glBlitFramebuffer(0, 0, m_Specification.Width, m_Specification.Height, 0, 0, m_Specification.Width, m_Specification.Height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+		
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+	}
+
+	void OpenGLFramebuffer::Copy(Ref<Framebuffer> target)
+	{
+		Copy(target->GetRendererID());
 	}
 
 	void OpenGLFramebuffer::ClearAttachment(uint32_t attachmentIndex, const void* value)
