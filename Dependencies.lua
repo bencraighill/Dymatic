@@ -28,15 +28,10 @@ IncludeDir["PhysXFoundation"] = "%{wks.location}/Dymatic/vendor/PhysX/physx/sour
 IncludeDir["msdf_atlas_gen"] = "%{wks.location}/Dymatic/vendor/msdf-atlas-gen/msdf-atlas-gen"
 IncludeDir["msdfgen"] = "%{wks.location}/Dymatic/vendor/msdf-atlas-gen/msdfgen"
 IncludeDir["ImGuiNode"] = "%{wks.location}/Dymatic/vendor/ImGuiNode"
-IncludeDir["CSplash"] = "%{wks.location}/Dymatic/vendor/CSplash"
-
 
 LibraryDir = {}
 
 LibraryDir["VulkanSDK"] = "%{VULKAN_SDK}/Lib"
-LibraryDir["VulkanSDK_Debug"] = "%{wks.location}/Dymatic/vendor/VulkanSDK/Lib"
-LibraryDir["VulkanSDK_DebugDLL"] = "%{wks.location}/Dymatic/vendor/VulkanSDK/Bin"
-
 LibraryDir["mono"] = "%{wks.location}/Dymatic/vendor/mono/lib/%{cfg.buildcfg}"
 
 LibraryDir["PhysX_Debug"] = "%{wks.location}/Dymatic/vendor/PhysX/Lib/debug"
@@ -57,10 +52,10 @@ Library["mono"] = "%{LibraryDir.mono}/libmono-static-sgen.lib"
 Library["Vulkan"] = "%{LibraryDir.VulkanSDK}/vulkan-1.lib"
 Library["VulkanUtils"] = "%{LibraryDir.VulkanSDK}/VkLayer_utils.lib"
 
-Library["ShaderC_Debug"] = "%{LibraryDir.VulkanSDK_Debug}/shaderc_sharedd.lib"
-Library["SPIRV_Cross_Debug"] = "%{LibraryDir.VulkanSDK_Debug}/spirv-cross-cored.lib"
-Library["SPIRV_Cross_GLSL_Debug"] = "%{LibraryDir.VulkanSDK_Debug}/spirv-cross-glsld.lib"
-Library["SPIRV_Tools_Debug"] = "%{LibraryDir.VulkanSDK_Debug}/SPIRV-Toolsd.lib"
+Library["ShaderC_Debug"] = "%{LibraryDir.VulkanSDK}/shaderc_sharedd.lib"
+Library["SPIRV_Cross_Debug"] = "%{LibraryDir.VulkanSDK}/spirv-cross-cored.lib"
+Library["SPIRV_Cross_GLSL_Debug"] = "%{LibraryDir.VulkanSDK}/spirv-cross-glsld.lib"
+Library["SPIRV_Tools_Debug"] = "%{LibraryDir.VulkanSDK}/SPIRV-Toolsd.lib"
 
 Library["ShaderC_Release"] = "%{LibraryDir.VulkanSDK}/shaderc_shared.lib"
 Library["SPIRV_Cross_Release"] = "%{LibraryDir.VulkanSDK}/spirv-cross-core.lib"

@@ -2,4 +2,5 @@ Project:
   Name: {projectName}
   StartScene: "Scenes/DefaultScene.dymatic"
   AssetDirectory: "Assets"
-  ScriptModulePath: "Scripts/Binaries/Sandbox.dll"
+  CoreModulePath: "Scripts/Binaries/DymaticScriptCore.dll"
+  ScriptModulePath: "Scripts/Binaries/{projectName}.dll"

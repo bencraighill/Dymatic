@@ -248,12 +248,12 @@ namespace Dymatic {
 
 	bool ScriptEngine::LoadAssembly(const std::filesystem::path& filepath)
 	{
-		if (!std::filesystem::exists(filepath))
-			return false;
-
 		// Create an App Domain
 		s_Data->AppDomain = mono_domain_create_appdomain("DymaticScriptRuntime", nullptr);
 		mono_domain_set(s_Data->AppDomain, true);
+
+		if (!std::filesystem::exists(filepath))
+			return false;
 
 		s_Data->CoreAssemblyFilepath = filepath;
 		s_Data->CoreAssembly = Utils::LoadMonoAssembly(filepath, s_Data->EnableDebugging);
@@ -281,27 +281,33 @@ namespace Dymatic {
 		return true;
 	}
 
-	void ScriptEngine::ReloadAssembly()
+	void ScriptEngine::SetCoreAssemblyPath(const std::filesystem::path& filepath)
 	{
-		ReloadAssembly(s_Data->AppAssemblyFilepath);
+		if (!filepath.empty())
+			s_Data->CoreAssemblyFilepath = filepath;
 	}
 
-	void ScriptEngine::ReloadAssembly(const std::filesystem::path& assemblyPath)
+	void ScriptEngine::SetAppAssemblyPath(const std::filesystem::path& filepath)
 	{
+		if (!filepath.empty())
+			s_Data->AppAssemblyFilepath = filepath;
+	}
+
+	void ScriptEngine::ReloadAssembly()
+	{
+		DY_CORE_INFO("Reloading Script Assembly...");
+
 		mono_domain_set(mono_get_root_domain(), false);
 		mono_domain_unload(s_Data->AppDomain);
 
-		s_Data->RootDomain = nullptr;
-		s_Data->AppDomain = nullptr;
+		DY_CORE_INFO("Loading Core Assembly '{}'", s_Data->CoreAssemblyFilepath);
+		LoadAssembly(s_Data->CoreAssemblyFilepath);
 
-		s_Data->CoreAssembly = nullptr;
-		s_Data->CoreAssemblyImage = nullptr;
-
+		DY_CORE_INFO("Loading App Assembly '{}'", s_Data->AppAssemblyFilepath);
 		s_Data->AppAssembly = nullptr;
 		s_Data->AppAssemblyImage = nullptr;
+		LoadAppAssembly(s_Data->AppAssemblyFilepath);
 
-		LoadAssembly(s_Data->CoreAssemblyFilepath);
-		LoadAppAssembly(assemblyPath);
 		LoadAssemblyClasses();
 
 		GenerateScriptMetadata();
@@ -361,7 +367,6 @@ namespace Dymatic {
 	void ScriptEngine::OnDestroyEntity(Entity entity)
 	{
 		UUID entityUUID = entity.GetUUID();
-
 		if (s_Data->EntityInstances.find(entityUUID) != s_Data->EntityInstances.end())
 		{
 			Ref<ScriptInstance> instance = s_Data->EntityInstances[entityUUID];

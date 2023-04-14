@@ -6,6 +6,8 @@
 
 #include "Dymatic/Renderer/Texture.h"
 
+#include "Dymatic/Physics/PhysicsEngine.h"
+
 #include "entt.hpp"
 
 class b2World;
@@ -72,10 +74,22 @@ namespace Dymatic {
 		void SetEntityParent(Entity entity, Entity parent);
 		void RemoveEntityParent(Entity entity);
 
-		// Helper Function
+		// Helper methods
 		glm::mat4 GetWorldTransform(Entity entity);
 		glm::mat4 WorldToLocalTransform(Entity entity, glm::mat4 matrix);
 
+		// Physics methods
+		RaycastHit Raycast(glm::vec3 origin, glm::vec3 direction, float distance);
+		RaycastHit Raycast(glm::vec3 start, glm::vec3 end);
+
+		// Editor methods
+		inline const bool GetShowColliders() const { return m_ShowColliders; }
+		inline void SetShowColliders(bool showColliders) { m_ShowColliders = showColliders; }
+		void DrawDebugLine(glm::vec3 start, glm::vec3 end, glm::vec4 color, float time = 0.0f);
+		void DrawDebugCube(glm::vec3 position, glm::vec3 size, glm::vec4 color, float time = 0.0f);
+		void DrawDebugSphere(glm::vec3 center, float radius, glm::vec4 color, float time = 0.0f);
+		void ClearDebugDrawing();
+		
 	private:
 		template<typename T>
 		void OnComponentAdded(Entity entity, T& component);
@@ -119,6 +133,31 @@ namespace Dymatic {
 		physx::VehicleManager* m_PhysXVehicleManager = nullptr;
 
 		std::unordered_map<UUID, entt::entity> m_EntityMap;
+
+		// Editor Data
+		bool m_ShowColliders = false;
+		struct DebugLine
+		{
+			glm::vec3 Start;
+			glm::vec3 End;
+			glm::vec4 Color;
+			float Time;
+		};
+		std::vector<DebugLine> m_DebugLines;
+		struct DebugCube
+		{
+			glm::mat4 Transform;
+			glm::vec4 Color;
+			float Time;
+		};
+		std::vector<DebugCube> m_DebugCubes;
+		struct DebugSphere
+		{
+			glm::mat4 Transform;
+			glm::vec4 Color;
+			float Time;
+		};
+		std::vector<DebugSphere> m_DebugSpheres;
 		
 		friend class Entity;
 		friend class SceneSerializer;

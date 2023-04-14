@@ -5,6 +5,8 @@
 
 #include "Dymatic/Renderer/SceneRenderer.h"
 
+#include "Version.h"
+
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
@@ -46,7 +48,11 @@ namespace Dymatic {
 		// Load the project
 		Project::Load(s_ProjectPath);
 		AssetManager::Deserialize();
-		ScriptEngine::ReloadAssembly(Project::GetScriptModulePath());
+		
+		Log::ShowConsole();
+		ScriptEngine::SetCoreAssemblyPath(Project::GetCoreModulePath());
+		ScriptEngine::SetAppAssemblyPath(Project::GetScriptModulePath());
+		ScriptEngine::ReloadAssembly();
 
 		// Open the start scene
 		m_Scene = CreateRef<Scene>();
@@ -60,8 +66,15 @@ namespace Dymatic {
 		if (Application::Get().GetSpecification().WindowStartHidden)
 			Application::Get().GetWindow().ShowWindow();
 
-		// Prevent ImGui ini dumping
-		ImGui::GetIO().IniFilename = nullptr;
+		// Setup ImGui debug overlay
+		{
+			// Prevent ini settings dumping
+			ImGui::GetIO().IniFilename = nullptr;
+
+			ImGuiLayer* imguiLayer = Application::Get().GetImGuiLayer();
+			imguiLayer->AddIconFont("assets/fonts/IconsFont.ttf", 20.0f, 0x00A9, 0x00A9); // Copyright Symbol
+			imguiLayer->AddIconFont("assets/fonts/IconsFont.ttf", 20.0f, 0x00AE, 0x00AE); // Registered Symbol
+		}
 	}
 
 	void RuntimeLayer::OnDetach()
@@ -191,15 +204,17 @@ namespace Dymatic {
 
 			// Draw Version Information
 			{
-				{
-					const char* text = "Dymatic Engine Version 23.1.0 (Development)";
-					drawList->AddText(windowPos + windowSize - ImGui::CalcTextSize(text) - style.FramePadding, ImGui::GetColorU32(ImGuiCol_TextDisabled), text);
-				}
+				const char* text[] = {
+					DY_APPLICATION_NAME,
+					u8"Version: " DY_APPLICATION_VERSION,
+					u8"Legal: " DY_VERSION_COPYRIGHT ", " DY_VERSION_TRADEMARK " " DY_APPLICATION_COPYRIGHT " " DY_APPLICATION_TRADEMARK,
+					u8"Build Information: " DY_APPLICATION_EXECUTABLE " (" __DATE__ " " __TIME__ ")",
+					u8"Dymatic Engine Version " DY_VERSION
+				};
+				uint32_t count = sizeof(text) / sizeof(text[0]);
 
-				{
-					const std::string& name = Application::Get().GetSpecification().Name;
-					drawList->AddText(windowPos + windowSize - ImGui::CalcTextSize(name.c_str()) - style.FramePadding - ImVec2(0.0f, ImGui::GetTextLineHeightWithSpacing()), ImGui::GetColorU32(ImGuiCol_TextDisabled), name.c_str());
-				}
+				for (uint32_t index = 0; index < count; index++)
+					drawList->AddText(windowPos + windowSize - ImVec2(style.FramePadding.x + ImGui::CalcTextSize(text[index]).x, style.FramePadding.y + ImGui::GetTextLineHeightWithSpacing() * ((count) - index)), ImGui::GetColorU32(ImGuiCol_TextDisabled), text[index]);
 			}
 		}
 	}

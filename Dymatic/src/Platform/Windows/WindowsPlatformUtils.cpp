@@ -162,7 +162,7 @@ namespace Dymatic {
 		{
 			HINSTANCE hInstance = GetModuleHandle(NULL);
 			HICON hIcon;
-		
+
 			// Convert Ref<Texture2D> to HICON
 			{
 				uint32_t width = icon->GetWidth();
@@ -207,7 +207,7 @@ namespace Dymatic {
 		s_ThumbnailButtons.push_back(button);
 		UpdateThumbnailButtons();
 	}
-	
+
 	void Taskbar::RemoveThumbnailButton(uint32_t index)
 	{
 		if (index < 0 || index >= s_ThumbnailButtons.size())
@@ -216,7 +216,7 @@ namespace Dymatic {
 		s_ThumbnailButtons.erase(s_ThumbnailButtons.begin() + index);
 		UpdateThumbnailButtons();
 	}
-	
+
 	void Taskbar::SetThumbnailButtons(const std::vector<ThumbnailButton>& buttons)
 	{
 		s_ThumbnailButtons = buttons;
@@ -226,7 +226,7 @@ namespace Dymatic {
 	void Taskbar::UpdateThumbnailButtons()
 	{
 		HINSTANCE hInstance = GetModuleHandle(NULL);
-		
+
 		THUMBBUTTON thumbnailButtons[MaxThumbnailButtons];
 		for (int i = 0; i < MaxThumbnailButtons; i++)
 		{
@@ -322,6 +322,52 @@ namespace Dymatic {
 		return std::string();
 	}
 
+	std::vector<std::string> FileDialogs::OpenFileMultiple(const char* filter)
+	{
+		OPENFILENAMEA ofn;
+		CHAR szFile[4096] = { 0 };
+		CHAR currentDir[256] = { 0 };
+		ZeroMemory(&ofn, sizeof(OPENFILENAME));
+		ofn.lStructSize = sizeof(OPENFILENAME);
+		ofn.hwndOwner = GetPlatformWindow();
+		ofn.lpstrFile = szFile;
+		ofn.nMaxFile = sizeof(szFile);
+		if (GetCurrentDirectoryA(256, currentDir))
+			ofn.lpstrInitialDir = currentDir;
+		ofn.lpstrFilter = filter;
+		ofn.nFilterIndex = 1;
+		ofn.Flags = OFN_EXPLORER | OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR | OFN_ALLOWMULTISELECT;
+
+		if (GetOpenFileNameA(&ofn) == TRUE)
+		{
+			std::vector<std::string> fileNames;
+			CHAR* p = szFile;
+			std::string folderPath(szFile);
+			if (folderPath.back() != '\0')
+				folderPath += '\\';
+			p += folderPath.size();
+			if (*p == '\0')
+			{
+				// Only one file was selected
+				std::string fileName(szFile);
+				fileNames.push_back(fileName);
+			}
+			else
+			{
+				// Multiple files were selected
+				while (*p)
+				{
+					std::string fileName(p);
+					fileNames.push_back(folderPath + fileName);
+					p += fileName.size() + 1;
+				}
+			}
+			return fileNames;
+		}
+
+		return {};
+	}
+
 	std::string FileDialogs::SaveFile(const char* filter)
 	{
 		OPENFILENAMEA ofn;
@@ -378,6 +424,22 @@ namespace Dymatic {
 			return std::string();
 
 		return CW2A(path);
+	}
+#pragma endregion
+
+#pragma region Monitor
+	int Monitor::GetMonitorCount()
+	{
+		int monitorCount;
+		glfwGetMonitors(&monitorCount);
+		return monitorCount;
+	}
+
+	glm::vec4 Monitor::GetMonitorWorkArea()
+	{
+		int xpos, ypos, width, height;
+		glfwGetMonitorWorkarea(glfwGetPrimaryMonitor(), &xpos, &ypos, &width, &height);
+		return glm::vec4(xpos, ypos, width, height);
 	}
 #pragma endregion
 	
@@ -684,8 +746,8 @@ namespace Dymatic {
 			
 			SplashDrawText(progress >= 0 ? fmt::format("{} ({}%)", message, progress) : message, { LONG(padding), LONG(s_SplashHeight - 20 - fontHeight), LONG(s_SplashWidth), LONG(s_SplashHeight - 20) }, fontSize, TEXT("Lato"));
 			SplashDrawText(s_SplashApplicationName, {LONG(padding), LONG(s_SplashHeight - 20 - fontHeight * 2), LONG(s_SplashWidth), LONG(s_SplashHeight - 20 - fontHeight)}, fontSize, TEXT("Tahoma"), FW_BOLD);
-			SplashDrawText("© Dymatic Technologies 2023", { LONG(s_SplashWidth - 167), LONG(s_SplashHeight - 20 - fontHeight), LONG(s_SplashWidth), LONG(s_SplashHeight - 20) }, fontSize, TEXT("Lato"), FW_THIN);
-			SplashDrawText("Version 23.1.0", { LONG(s_SplashWidth - 90), LONG(fontHeight), LONG(s_SplashWidth), LONG(fontHeight + fontHeight) }, fontSize, TEXT("Lato"), FW_THIN);
+			SplashDrawText(DY_VERSION_COPYRIGHT, { LONG(s_SplashWidth - 167), LONG(s_SplashHeight - 20 - fontHeight), LONG(s_SplashWidth), LONG(s_SplashHeight - 20) }, fontSize, TEXT("Lato"), FW_THIN);
+			SplashDrawText("Version " DY_VERSION, { LONG(s_SplashWidth - 90), LONG(fontHeight), LONG(s_SplashWidth), LONG(fontHeight + fontHeight) }, fontSize, TEXT("Lato"), FW_THIN);
 		}
 
 		// Draw Progress Bar

@@ -18,8 +18,16 @@ namespace Dymatic {
 	{
 	public:
 		static std::string OpenFile(const char* filter);
+		static std::vector<std::string> OpenFileMultiple(const char* filter);
 		static std::string SaveFile(const char* filter);
 		static std::string SelectFolder();
+	};
+
+	class Monitor
+	{
+	public:
+		static int GetMonitorCount();
+		static glm::vec4 GetMonitorWorkArea();
 	};
 
 	class Taskbar

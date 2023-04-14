@@ -60,7 +60,7 @@ namespace Dymatic {
 		if (!g_AudioEngineInitialized) return;
 		if (!m_Sound) return;
 
-		auto sound = (ISound*)m_Sound;
+		ISound* sound = (ISound*)m_Sound;
 
 		sound->stop();
 		sound->drop();

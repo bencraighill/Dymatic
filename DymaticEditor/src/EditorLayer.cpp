@@ -102,6 +102,9 @@ namespace Dymatic {
 		m_SoundSimulate = Audio::Create("Resources/Audio/EditorSimulate.wav");
 		m_SoundStop = Audio::Create("Resources/Audio/EditorStop.wav");
 		m_SoundPause = Audio::Create("Resources/Audio/EditorPause.wav");
+		m_SoundStep = Audio::Create("Resources/Audio/EditorStep.wav");
+		m_SoundCompileSuccess = Audio::Create("Resources/Audio/EditorCompileSuccess.wav");
+		m_SoundCompileFailure = Audio::Create("Resources/Audio/EditorCompileFailure.wav");
 
 		m_EditIcon = Texture2D::Create("Resources/Icons/Info/EditIcon.png");
 		m_LoadingCogAnimation[0] = Texture2D::Create("Resources/Icons/Info/LoadingCog1.png");
@@ -110,8 +113,10 @@ namespace Dymatic {
 
 		Application::Get().GetImGuiLayer()->AddIconFont("assets/fonts/IconsFont.ttf", 25.0f, 0x700, 0x713);	// Window and Viewport Icons
 		Application::Get().GetImGuiLayer()->AddIconFont("assets/fonts/IconsFont.ttf", 12.0f, 0x714, 0x71E); // Gizmo Icons
-		Application::Get().GetImGuiLayer()->AddIconFont("assets/fonts/IconsFont.ttf", 25.0f, 0x71F, 0x75D); // Icons
+		Application::Get().GetImGuiLayer()->AddIconFont("assets/fonts/IconsFont.ttf", 25.0f, 0x71F, 0x75F); // Main Icons
 
+		Application::Get().GetImGuiLayer()->AddIconFont("assets/fonts/IconsFont.ttf", 20.0f, 0x00A9, 0x00A9); // Copyright Symbol
+		Application::Get().GetImGuiLayer()->AddIconFont("assets/fonts/IconsFont.ttf", 20.0f, 0x00AE, 0x00AE); // Registered Symbol
 		Application::Get().GetImGuiLayer()->AddIconFont("assets/fonts/IconsFont.ttf", 10.0f, 0xF7, 0xF7); // Division Symbol
 		Application::Get().GetImGuiLayer()->AddIconFont("assets/fonts/IconsFont.ttf", 15.0f, 0x03BC, 0x03BC); // Mu Symbol
 		Application::Get().GetImGuiLayer()->AddIconFont("assets/fonts/IconsFont.ttf", 15.0f, 0x3C0, 0x3C0); // PI Symbol
@@ -180,7 +185,7 @@ namespace Dymatic {
 		DY_PROFILE_FUNCTION();
 
 		PluginLoader::OnUpdate(ts);
-		PythonTools::OnUpdate();
+		PythonTools::OnUpdate(ts);
 
 		m_DeltaTime = ts;
 		m_ProgramTime += ts;
@@ -349,7 +354,7 @@ namespace Dymatic {
 			if (ImGui::BeginMenu(CHARACTER_ICON_DYMATIC))
 			{
 				if (ImGui::MenuItem("Splash Screen")) { m_ShowSplash = true; }
-				if (ImGui::MenuItem("About Dymatic")) { Popup::Create("Engine Information", "Dymatic Engine\nVersion 23.1.0 (Development)\n\n\nBranch Publication Date: 11th April 2023\nBranch: Development\n\n\nDymatic Engine is a free, open source engine developed by Dymatic Technologies.\nView source files for licenses from vendor libraries.", { { "Learn More", []() { ShellExecute(0, 0, L"https://www.dymaticengine.com", 0, 0, SW_SHOW); } }, { "Ok", []() {} } }, m_DymaticLogo); }
+				if (ImGui::MenuItem("About Dymatic")) { Popup::Create("Engine Information", "Dymatic Engine\nVersion " DY_VERSION "\n\n\nBranch Publication Date: " __DATE__ "\nBranch: Development\n\n\nDymatic Engine is a free, open source engine developed by Dymatic Technologies.\nView source files for licenses from vendor libraries.", { { "Learn More", []() { ShellExecute(0, 0, L"https://www.dymaticengine.com", 0, 0, SW_SHOW); } }, { "Ok", []() {} } }, m_DymaticLogo); }
 				ImGui::Separator();
 				if (ImGui::MenuItem("Github")) { ShellExecute(0, 0, L"https://github.com/benc25/dymatic", 0, 0 , SW_SHOW ); }
 				if (ImGui::MenuItem("Website")) { ShellExecute(0, 0, L"https://www.dymaticengine.com", 0, 0 , SW_SHOW ); }
@@ -470,6 +475,8 @@ namespace Dymatic {
 
 				ImGui::Separator();
 
+				PythonTools::OnImGuiRender(PythonUIRenderStage::MenuBar_File);
+
 				if (ImGui::MenuItem(CHARACTER_ICON_RESTART " Restart"))
 				{
 					WCHAR filename[MAX_PATH];
@@ -488,6 +495,9 @@ namespace Dymatic {
 					m_PreferencesPannel.GetPreferencesPanelVisible() = true;
 				if (ImGui::MenuItem(CHARACTER_ICON_TEXT_EDIT " Open Solution"))
 					;
+
+				PythonTools::OnImGuiRender(PythonUIRenderStage::MenuBar_Edit);
+
 				ImGui::EndMenu();
 			}
 
@@ -509,6 +519,8 @@ namespace Dymatic {
 				ImGui::MenuItem(CHARACTER_ICON_MATERIAL " Material Editor", "",			&Preferences::GetEditorWindowVisible(Preferences::EditorWindow::MaterialEditor));
 				ImGui::MenuItem(CHARACTER_ICON_CONSOLE " Console", "",					&Preferences::GetEditorWindowVisible(Preferences::EditorWindow::Console));
 				ImGui::MenuItem(CHARACTER_ICON_STATISTICS " Asset Manager", "",			&Preferences::GetEditorWindowVisible(Preferences::EditorWindow::AssetManager));
+
+				PythonTools::OnImGuiRender(PythonUIRenderStage::MenuBar_Window);
 
 				ImGui::Separator();
 
@@ -537,6 +549,8 @@ namespace Dymatic {
 					ImGui::EndMenu();
 				}
 
+				PythonTools::OnImGuiRender(PythonUIRenderStage::MenuBar_View);
+
 				ImGui::EndMenu();
 			}
 
@@ -548,6 +562,8 @@ namespace Dymatic {
 				if (ImGui::MenuItem(CHARACTER_ICON_RESTART " Reload Assembly", Preferences::Keymap::GetBindString(Preferences::Keymap::KeyBindEvent::ReloadAssembly).c_str(), nullptr, m_SceneState == SceneState::Edit))
 					ScriptEngine::ReloadAssembly();
 
+				PythonTools::OnImGuiRender(PythonUIRenderStage::MenuBar_Script);
+
 				ImGui::EndMenu();
 			}
 
@@ -555,8 +571,13 @@ namespace Dymatic {
 			{
 				if (ImGui::MenuItem(CHARACTER_ICON_DOCUMENT " Documentation"))
 					ShellExecute(0, 0, L"https://docs.dymaticengine.com", 0, 0, SW_SHOW);
+
+				PythonTools::OnImGuiRender(PythonUIRenderStage::MenuBar_Help);
+
 				ImGui::EndMenu();
 			}
+
+			PythonTools::OnImGuiRender(PythonUIRenderStage::MenuBar);
 
 			auto drawList = ImGui::GetWindowDrawList();
 			
@@ -761,7 +782,10 @@ namespace Dymatic {
 					if (ImGui::Button("##NextFrameButton", { buttonHeight, buttonHeight }))
 					{
 						if (m_SceneState != SceneState::Edit && m_ActiveScene->IsPaused())
+						{
 							m_ActiveScene->Step(Preferences::GetData().FrameStepCount);
+							m_SoundStep->Play();
+						}
 					}
 					const ImColor color = (m_SceneState != SceneState::Edit && m_ActiveScene->IsPaused()) ? (ImGui::IsItemHovered() ? ImColor(255, 255, 255) : ImColor(192, 192, 192)) : ImColor(117, 117, 117);
 					drawList->AddImage((ImTextureID)(uint64_t)m_IconStep->GetRendererID(), ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), { 0, 1 }, { 1, 0 }, color);
@@ -875,7 +899,7 @@ namespace Dymatic {
 			}
 
 			ImGui::SameLine();
-			std::string text = "23.1.0 (Development)";
+			std::string text = DY_VERSION;
 			ImGui::Dummy(ImVec2{ ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize(text.c_str()).x - 5, 0 });
 			ImGui::SameLine();
 			ImGui::Text(text.c_str());
@@ -898,7 +922,7 @@ namespace Dymatic {
 			}
 		}
 
-		//Scene Hierarchy and properties pannel
+		//Scene Hierarchy and properties panel
 		m_SceneHierarchyPanel.OnImGuiRender();
 
 		// Check for external drag drop sources
@@ -934,7 +958,7 @@ namespace Dymatic {
 
 		PluginLoader::OnUIRender();
 		
-		PythonTools::OnImGuiRender();
+		PythonTools::OnImGuiRender(PythonUIRenderStage::Main);
 		
 		m_ProfilerPanel.OnImGuiRender();
 
@@ -989,10 +1013,6 @@ namespace Dymatic {
 			ImGui::Text("Total Freed: %d", allocStats.TotalFreed);
 			ImGui::Text("Current Usage: %d", allocStats.TotalAllocated - allocStats.TotalFreed);
 
-			ImGui::End();
-
-			ImGui::Begin("Settings");
-			ImGui::Checkbox("Show physics colliders", &m_ShowPhysicsColliders);
 			ImGui::End();
 		}
 
@@ -1180,6 +1200,13 @@ namespace Dymatic {
 							auto& transform = entity.GetComponent<TransformComponent>();
 							transform.Translation = m_EditorCamera.GetPosition();
 							transform.Rotation = glm::vec3(m_EditorCamera.GetPitch() * -1.0f, m_EditorCamera.GetYaw() * -1.0f, 0.0f);
+						}
+
+						bool showColliders = m_ActiveScene->GetShowColliders();
+						if (ImGui::MenuItem("Show Colliders", nullptr, &showColliders))
+						{
+							m_ActiveScene->SetShowColliders(showColliders);
+							m_EditorScene->SetShowColliders(showColliders);
 						}
 
 						ImGui::MenuItem("Game View");
@@ -2045,7 +2072,7 @@ namespace Dymatic {
 			
 			ImGui::Image((ImTextureID)m_DymaticSplash->GetRendererID(), ImVec2(488, 267), { 0, 1 }, { 1, 0 });
 			ImGui::SameLine();
-			const char* versionName = "Version 23.1.0";
+			const char* versionName = "Version " DY_VERSION_STRING;
 			ImGui::SameLine( 488.0f -ImGui::CalcTextSize(versionName).x);
 			ImGui::Text(versionName);
 
@@ -2328,9 +2355,9 @@ namespace Dymatic {
 			Renderer2D::BeginScene(m_EditorCamera);
 		}
 
-		if (m_ShowPhysicsColliders)
+		if (m_ActiveScene->GetShowColliders())
 		{
-			// Box Colliders
+			// Box Colliders 2D
 			{
 				auto view = m_ActiveScene->GetAllEntitiesWith<TransformComponent, BoxCollider2DComponent>();
 				for (auto entity : view)
@@ -2348,7 +2375,7 @@ namespace Dymatic {
 				}
 			}
 
-			// Circle Colliders
+			// Circle Colliders 2D
 			{
 				auto view = m_ActiveScene->GetAllEntitiesWith<TransformComponent, CircleCollider2DComponent>();
 				for (auto entity : view)
@@ -2366,7 +2393,7 @@ namespace Dymatic {
 			}
 		}
 
-		// Draw selected entity outline
+		// Draw selected 2D entity outline
 		auto& selectedEntities = m_SceneHierarchyPanel.GetSelectedEntities();
 		for (auto e : selectedEntities)
 		{
@@ -2396,7 +2423,9 @@ namespace Dymatic {
 			AssetManager::Deserialize();
 			ProjectSettings::Deserialize();
 
-			ScriptEngine::ReloadAssembly(Project::GetScriptModulePath());
+			ScriptEngine::SetCoreAssemblyPath(Project::GetCoreModulePath());
+			ScriptEngine::SetAppAssemblyPath(Project::GetScriptModulePath());
+			ScriptEngine::ReloadAssembly();
 			
 			auto startScenePath = Project::GetAssetFileSystemPath(Project::GetActive()->GetConfig().StartScene);
 			OpenScene(startScenePath);
@@ -2561,15 +2590,9 @@ namespace Dymatic {
 		}
 
 		if (devenvPath.empty())
-		{
 			Popup::Create("Compilation Failure", "Development Environment has not been specified.", { { "Ok", nullptr } }, m_ErrorIcon);
-			Taskbar::FlashIcon();
-		}
 		else if (!std::filesystem::exists(devenvPath))
-		{
 			Popup::Create("Compilation Failure", "Cannot access Development Environment", { { "Ok", nullptr } }, m_ErrorIcon);
-			Taskbar::FlashIcon();
-		}
 		else
 		{
 			std::string compileMessage = System::Execute("\"\"" + devenvPath + "\" \"" + std::filesystem::absolute(Project::GetAssetDirectory() / "Scripts/Sandbox.sln").string() + "\" /build "
@@ -2586,12 +2609,22 @@ namespace Dymatic {
 				Popup::Create("Compilation Failure", compileMessage, { { "Ok", nullptr } }, m_ErrorIcon);
 				Taskbar::FlashIcon();
 			}
+			else
+			{
+				// No errors detected, indicate successful compilation
+				m_SoundCompileSuccess->Play();
+				return;
+			}
 		}
+
+		// We failed to compile, so prompt the user
+		Taskbar::FlashIcon();
+		m_SoundCompileFailure->Play();
 	}
 
 	void EditorLayer::SaveAndExit()
 	{
-		Popup::Create("Unsaved Changes", "Save changes before closing?\nDocument: " + m_EditorScenePath.filename().string() + "\n",
+		Popup::Create("Unsaved Changes", "Save changes before closing?\nActive Scene: " + m_EditorScenePath.stem().string(),
 			{ 
 				{ "Cancel", [](){}}, 
 				{ "Discard", [&]() { CloseProgramWindow(); } }, 

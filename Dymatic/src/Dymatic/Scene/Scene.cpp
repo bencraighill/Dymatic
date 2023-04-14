@@ -7,7 +7,6 @@
 #include "Dymatic/Renderer/Renderer2D.h"
 #include "Dymatic/Renderer/SceneRenderer.h"
 #include "Dymatic/Audio/AudioEngine.h"
-#include "Dymatic/Physics/PhysicsEngine.h"
 
 #include <glm/glm.hpp>
 
@@ -36,10 +35,13 @@ namespace Dymatic {
 	extern physx::PxMaterial* g_DefaultMaterial;
 
 	static bool s_Init = false;
+	static Ref<Model> s_CubeModel = nullptr;
+	static Ref<Model> s_SphereModel = nullptr;
+	static Ref<Model> s_CapsuleModel = nullptr;
 	static Ref<Model> s_ArrowModel = nullptr;
 	static Ref<Model> s_CameraModel = nullptr;
-	static Ref<Texture2D> m_LightIcon = nullptr;
-	static Ref<Texture2D> m_SoundIcon = nullptr;
+	static Ref<Texture2D> s_LightIcon = nullptr;
+	static Ref<Texture2D> s_SoundIcon = nullptr;
 
 	static std::unordered_map<UUID, Scene*> s_ActiveScenes;
 
@@ -62,11 +64,15 @@ namespace Dymatic {
 
 		if (!s_Init)
 		{
-			s_ArrowModel = Model::Create("Resources/Objects/arrow/arrow.fbx");
-			s_CameraModel = Model::Create("Resources/Objects/camera/camera.fbx");
+			s_CubeModel = Model::Create("Resources/Objects/Basic/Cube.fbx");
+			s_SphereModel = Model::Create("Resources/Objects/Basic/Sphere.fbx");
+			s_CapsuleModel = Model::Create("Resources/Objects/Basic/Capsule.fbx");
 
-			m_LightIcon = Texture2D::Create("Resources/Icons/Scene/LightIcon.png");
-			m_SoundIcon = Texture2D::Create("Resources/Icons/Scene/SoundIcon.png");
+			s_ArrowModel = Model::Create("Resources/Objects/Arrow/Arrow.fbx");
+			s_CameraModel = Model::Create("Resources/Objects/Camera/Camera.fbx");
+
+			s_LightIcon = Texture2D::Create("Resources/Icons/Scene/LightIcon.png");
+			s_SoundIcon = Texture2D::Create("Resources/Icons/Scene/SoundIcon.png");
 		}
 	}
 
@@ -119,6 +125,8 @@ namespace Dymatic {
 
 		newScene->m_ViewportWidth = other->m_ViewportWidth;
 		newScene->m_ViewportHeight = other->m_ViewportHeight;
+
+		newScene->m_ShowColliders = other->m_ShowColliders;
 
 		auto& srcSceneRegistry = other->m_Registry;
 		auto& dstSceneRegistry = newScene->m_Registry;
@@ -376,6 +384,87 @@ namespace Dymatic {
 			}
 			
 			SceneRenderer::RenderScene();
+
+			// Draw overlay elements
+			if (m_ShowColliders)
+			{
+				{
+					auto view = m_Registry.view<TransformComponent, BoxColliderComponent>();
+					for (auto entity : view)
+					{
+						BoxColliderComponent& bcc = view.get<BoxColliderComponent>(entity);
+						SceneRenderer::DrawMeshOutlineOverlay(GetWorldTransform({ entity, this }) * glm::scale(glm::mat4(1.0f), bcc.Size), s_CubeModel, glm::vec4(0.0f, 1.0f, 0.0f, 1.0f), (int)entity);
+					}
+				}
+
+				{
+					auto view = m_Registry.view<TransformComponent, SphereColliderComponent>();
+					for (auto entity : view)
+					{
+						SphereColliderComponent& scc = view.get<SphereColliderComponent>(entity);
+						SceneRenderer::DrawMeshOutlineOverlay(GetWorldTransform({ entity, this }) * glm::scale(glm::mat4(1.0f), glm::vec3(scc.Radius)), s_SphereModel, glm::vec4(0.0f, 1.0f, 0.0f, 1.0f), (int)entity);
+					}
+				}
+
+				{
+					auto view = m_Registry.view<TransformComponent, CapsuleColliderComponent>();
+					for (auto entity : view)
+					{
+						CapsuleColliderComponent& ccc = view.get<CapsuleColliderComponent>(entity);
+						SceneRenderer::DrawMeshOutlineOverlay(GetWorldTransform({ entity, this }) * glm::scale(glm::mat4(1.0f), glm::vec3(ccc.Radius, ccc.HalfHeight, ccc.Radius)), s_CapsuleModel, glm::vec4(0.0f, 1.0f, 0.0f, 1.0f), (int)entity);
+					}
+				}
+
+				{
+					auto view = m_Registry.view<TransformComponent, MeshColliderComponent, StaticMeshComponent>();
+					for (auto entity : view)
+					{
+						StaticMeshComponent& smc = view.get<StaticMeshComponent>(entity);
+						SceneRenderer::DrawMeshOutlineOverlay(GetWorldTransform({ entity, this }), smc.m_Model, glm::vec4(0.0f, 1.0f, 0.0f, 1.0f), (int)entity);
+					}
+				}
+			}
+
+			// Render Debug Objects
+			{
+				// Cubes
+				for (uint32_t index = 0; index < m_DebugCubes.size(); index++)
+				{
+					DebugCube& cube = m_DebugCubes[index];
+
+					if (cube.Time != 0.0f)
+					{
+						cube.Time -= ts;
+						if (cube.Time < 0.0f)
+						{
+							m_DebugCubes.erase(m_DebugCubes.begin() + index);
+							index--;
+							continue;
+						}
+					}
+					
+					SceneRenderer::DrawMeshOutlineOverlay(cube.Transform, s_CubeModel, cube.Color);
+				}
+
+				// Spheres
+				for (uint32_t index = 0; index < m_DebugSpheres.size(); index++)
+				{
+					DebugSphere& sphere = m_DebugSpheres[index];
+
+					if (sphere.Time != 0.0f)
+					{
+						sphere.Time -= ts;
+						if (sphere.Time < 0.0f)
+						{
+							m_DebugSpheres.erase(m_DebugSpheres.begin() + index);
+							index--;
+							continue;
+						}
+					}
+
+					SceneRenderer::DrawMeshOutlineOverlay(sphere.Transform, s_SphereModel, sphere.Color);
+				}
+			}
 			
 			SceneRenderer::EndScene();
 
@@ -431,6 +520,25 @@ namespace Dymatic {
 					 
 					Renderer2D::DrawQuad(transform, image.Image);
 				}
+			}
+
+			// Render Debug Lines
+			for (uint32_t index = 0; index < m_DebugLines.size(); index++)
+			{
+				DebugLine& line = m_DebugLines[index];
+
+				if (line.Time != 0.0f)
+				{
+					line.Time -= ts;
+					if (line.Time < 0.0f)
+					{
+						m_DebugLines.erase(m_DebugLines.begin() + index);
+						index--;
+						continue;
+					}
+				}
+				
+				Renderer2D::DrawLine(line.Start, line.End, line.Color);
 			}
 
 			Renderer2D::EndScene();
@@ -621,6 +729,58 @@ namespace Dymatic {
 				matrix = glm::inverse(currentEntity.GetComponent<TransformComponent>().GetTransform()) * matrix;
 		}
 		return matrix;
+	}
+
+	RaycastHit Scene::Raycast(glm::vec3 origin, glm::vec3 direction, float distance)
+	{
+		PxRaycastBuffer hit;
+		m_PhysXScene->raycast(physx::PxVec3(origin.x, origin.y, origin.z), PxVec3(direction.x, direction.y, direction.z), distance, hit);
+
+		if (!hit.hasBlock)
+			return RaycastHit();
+
+		RaycastHit raycastHit;
+
+		if (hit.block.actor && hit.block.actor->userData)
+			raycastHit.EntityID = Entity(*(entt::entity*)hit.block.actor->userData, this).GetUUID();
+
+		raycastHit.Hit = true;
+		raycastHit.Position = glm::vec3(hit.block.position.x, hit.block.position.y, hit.block.position.z);
+		raycastHit.Normal = glm::vec3(hit.block.normal.x, hit.block.normal.y, hit.block.normal.z);
+		raycastHit.Distance = hit.block.distance;
+
+		return raycastHit;
+	}
+
+	RaycastHit Scene::Raycast(glm::vec3 start, glm::vec3 end)
+	{
+		glm::vec3 direction = glm::normalize(end - start);
+		float distance = glm::distance(start, end);
+		return Raycast(start, direction, distance);
+	}
+
+	void Scene::DrawDebugLine(glm::vec3 start, glm::vec3 end, glm::vec4 color, float time)
+	{
+		m_DebugLines.push_back({ start, end, color, time });
+	}
+
+	void Scene::DrawDebugCube(glm::vec3 position, glm::vec3 size, glm::vec4 color, float time)
+	{
+		glm::mat4 transform = glm::scale(glm::translate(glm::mat4(1.0f), position), size);
+		m_DebugCubes.push_back({ transform, color, time });
+	}
+
+	void Scene::DrawDebugSphere(glm::vec3 center, float radius, glm::vec4 color, float time)
+	{
+		glm::mat4 transform = glm::scale(glm::translate(glm::mat4(1.0f), center), glm::vec3(radius));
+		m_DebugSpheres.push_back({ transform, color, time });
+	}
+
+	void Scene::ClearDebugDrawing()
+	{
+		m_DebugLines.clear();
+		m_DebugCubes.clear();
+		m_DebugSpheres.clear();
 	}
 
 	void Scene::OnPhysics2DStart()
@@ -818,6 +978,10 @@ namespace Dymatic {
 						auto& scc = entity.GetComponent<SphereColliderComponent>();
 						float scale = std::max({ transform.Scale.x, transform.Scale.y, transform.Scale.z });
 						auto shape = g_PhysicsEngine->createShape(physx::PxSphereGeometry(scc.Radius * scale), *g_DefaultMaterial);
+
+						shape->setSimulationFilterData(simFilterData);
+						shape->setQueryFilterData(qryFilterData);
+
 						body->attachShape(*shape);
 						shape->release();
 					}
@@ -827,6 +991,10 @@ namespace Dymatic {
 						auto& ccc = entity.GetComponent<CapsuleColliderComponent>();
 						float scale = std::max(transform.Scale.y, transform.Scale.z);
 						auto shape = g_PhysicsEngine->createShape(physx::PxCapsuleGeometry(ccc.Radius * transform.Scale.x, ccc.HalfHeight * scale), *g_DefaultMaterial);
+
+						shape->setSimulationFilterData(simFilterData);
+						shape->setQueryFilterData(qryFilterData);
+
 						body->attachShape(*shape);
 						shape->release();
 					}
@@ -868,7 +1036,11 @@ namespace Dymatic {
 								auto holder = shape->getGeometry();
 								holder.triangleMesh().triangleMesh->acquireReference();
 								holder.triangleMesh().scale.scale = physx::PxVec3(transform.Scale.x, transform.Scale.y, transform.Scale.z);
+
 								shape->setGeometry(holder.any());
+								shape->setSimulationFilterData(simFilterData);
+								shape->setQueryFilterData(qryFilterData);
+
 								holder.triangleMesh().triangleMesh->release();
 
 								body->attachShape(*shape);
@@ -906,7 +1078,11 @@ namespace Dymatic {
 								auto holder = shape->getGeometry();
 								holder.convexMesh().convexMesh->acquireReference();
 								holder.convexMesh().scale.scale = physx::PxVec3(transform.Scale.x, transform.Scale.y, transform.Scale.z);
+
 								shape->setGeometry(holder.any());
+								shape->setSimulationFilterData(simFilterData);
+								shape->setQueryFilterData(qryFilterData);
+
 								holder.convexMesh().convexMesh->release();
 
 								body->attachShape(*shape);
@@ -932,8 +1108,8 @@ namespace Dymatic {
 						delete[] shapes;
 					}
 
+					body->userData = new entt::entity(e);
 					m_PhysXScene->addActor(*body);
-
 					rbc.RuntimeBody = body;
 				}
 			}
@@ -963,6 +1139,7 @@ namespace Dymatic {
 					desc.material = g_DefaultMaterial;
 
 					PxController* controller = m_PhysXControllerManager->createController(desc);
+					controller->getActor()->userData = new entt::entity(e);
 					cmc.CharacterController = controller;
 					cmc.Velocity = glm::vec3(0.0f);
 				}
@@ -1295,10 +1472,29 @@ namespace Dymatic {
 
 	void Scene::OnPhysicsStop()
 	{
-		// Destroy PhysX World
-		m_PhysXScene->release();
-		m_PhysXScene = nullptr;
-
+		// Clean up user data
+		{
+			auto view = m_Registry.view<RigidbodyComponent>();
+			for (auto entity : view)
+			{
+				RigidbodyComponent& rbc = view.get<RigidbodyComponent>(entity);
+				auto& userData = ((physx::PxRigidActor*)rbc.RuntimeBody)->userData;
+				delete userData;
+				userData = nullptr;
+			}
+		}
+		
+		{
+			auto view = m_Registry.view<CharacterMovementComponent>();
+			for (auto entity : view)
+			{
+				CharacterMovementComponent& cmc = view.get<CharacterMovementComponent>(entity);
+				auto& userData = ((physx::PxController*)cmc.CharacterController)->getActor()->userData;
+				delete userData;
+				userData = nullptr;
+			}
+		}
+		
 		// Clean up controllers
 		m_PhysXControllerManager->purgeControllers();
 
@@ -1316,9 +1512,13 @@ namespace Dymatic {
 				delete vmc.VehicleController;
 			}
 		}
+
+		// Destroy PhysX World
+		m_PhysXScene->release();
+		m_PhysXScene = nullptr;
 	}
 
-	static void DrawDebugSphere(glm::vec3 position, float radius, glm::vec4 color = glm::vec4(1.0f))
+	static void Draw2DDebugSphere(glm::vec3 position, float radius, glm::vec4 color = glm::vec4(1.0f))
 	{
 		const size_t ittertions = 30;
 		const float angle = 360.0f / ittertions;
@@ -1412,24 +1612,57 @@ namespace Dymatic {
 			{
 				auto view = m_Registry.view<TransformComponent, CameraComponent>();
 				for (auto entity : view)
-				{
-					auto [transform, camera] = view.get<TransformComponent, CameraComponent>(entity);
-
 					SceneRenderer::SubmitModel(GetWorldTransform({ entity, this }), s_CameraModel, (int)entity, IsEntitySelected(entity));
-				}
 			}
 
 			{
 				auto view = m_Registry.view<TransformComponent, DirectionalLightComponent>();
 				for (auto entity : view)
-				{
-					auto [dlc, camera] = view.get<TransformComponent, DirectionalLightComponent>(entity);
 					SceneRenderer::SubmitModel(GetWorldTransform({ entity, this }), s_ArrowModel, (int)entity, IsEntitySelected(entity));
-				}
 			}
 		}
 
 		SceneRenderer::RenderScene();
+
+		// Draw overlay elements
+		if (m_ShowColliders)
+		{
+			{
+				auto view = m_Registry.view<TransformComponent, BoxColliderComponent>();
+				for (auto entity : view)
+				{
+					BoxColliderComponent& bcc = view.get<BoxColliderComponent>(entity);
+					SceneRenderer::DrawMeshOutlineOverlay(GetWorldTransform({ entity, this }) * glm::scale(glm::mat4(1.0f), bcc.Size), s_CubeModel, glm::vec4(0.0f, 1.0f, 0.0f, 1.0f), (int)entity);
+				}
+			}
+
+			{
+				auto view = m_Registry.view<TransformComponent, SphereColliderComponent>();
+				for (auto entity : view)
+				{
+					SphereColliderComponent& scc = view.get<SphereColliderComponent>(entity);
+					SceneRenderer::DrawMeshOutlineOverlay(GetWorldTransform({ entity, this }) * glm::scale(glm::mat4(1.0f), glm::vec3(scc.Radius)), s_SphereModel, glm::vec4(0.0f, 1.0f, 0.0f, 1.0f), (int)entity);
+				}
+			}
+
+			{
+				auto view = m_Registry.view<TransformComponent, CapsuleColliderComponent>();
+				for (auto entity : view)
+				{
+					CapsuleColliderComponent& ccc = view.get<CapsuleColliderComponent>(entity);
+					SceneRenderer::DrawMeshOutlineOverlay(GetWorldTransform({ entity, this }) * glm::scale(glm::mat4(1.0f), glm::vec3(ccc.Radius, ccc.HalfHeight, ccc.Radius)), s_CapsuleModel, glm::vec4(0.0f, 1.0f, 0.0f, 1.0f), (int)entity);
+				}
+			}
+
+			{
+				auto view = m_Registry.view<TransformComponent, MeshColliderComponent, StaticMeshComponent>();
+				for (auto entity : view)
+				{
+					StaticMeshComponent& smc = view.get<StaticMeshComponent>(entity);
+					SceneRenderer::DrawMeshOutlineOverlay(GetWorldTransform({ entity, this }), smc.m_Model, glm::vec4(0.0f, 1.0f, 0.0f, 1.0f), (int)entity);
+				}
+			}
+		}
 
 		SceneRenderer::EndScene();
 
@@ -1518,8 +1751,8 @@ namespace Dymatic {
 						auto transformation = glm::translate(glm::mat4(1.0f), glm::vec3(GetWorldTransform({ entity, this })[3])) * glm::rotate(glm::mat4(1.0f), camera.GetYaw(), glm::vec3{ 0.0f, -1.0f, 0.0f })
 							* glm::rotate(glm::mat4(1.0f), camera.GetPitch(), glm::vec3{ -1.0f, 0.0f, 0.0f }) * glm::scale(glm::mat4(1.0f), glm::vec3(distance < 5.0f ? distance / 5.0f : 1.0f));
 
-						Renderer2D::DrawQuad(transformation, m_SoundIcon, 1.0f, glm::vec4(1.0f), (int)entity);
-						DrawDebugSphere(transformation[3], ac.AudioSound->GetRadius());
+						Renderer2D::DrawQuad(transformation, s_SoundIcon, 1.0f, glm::vec4(1.0f), (int)entity);
+						Draw2DDebugSphere(transformation[3], ac.AudioSound->GetRadius());
 					}
 				}
 			}
@@ -1536,10 +1769,10 @@ namespace Dymatic {
 				auto transformation = glm::translate(glm::mat4(1.0f), glm::vec3(GetWorldTransform({ entity, this })[3])) * glm::rotate(glm::mat4(1.0f), camera.GetYaw(), glm::vec3{ 0.0f, -1.0f, 0.0f })
 					* glm::rotate(glm::mat4(1.0f), camera.GetPitch(), glm::vec3{ -1.0f, 0.0f, 0.0f }) * glm::scale(glm::mat4(1.0f), glm::vec3(distance < 5.0f ? distance / 5.0f : 1.0f));
 
-				Renderer2D::DrawQuad(transformation, m_LightIcon, 1.0f, glm::vec4(light.Color, 1.0f), (int)entity);
+				Renderer2D::DrawQuad(transformation, s_LightIcon, 1.0f, glm::vec4(light.Color, 1.0f), (int)entity);
 
 				if (IsEntitySelected(entity))
-					DrawDebugSphere(transformation[3], light.Radius, glm::vec4(light.Color, 1.0f));
+					Draw2DDebugSphere(transformation[3], light.Radius, glm::vec4(light.Color, 1.0f));
 			}
 		}
 
@@ -1772,6 +2005,11 @@ namespace Dymatic {
 	
 	template<>
 	void Scene::OnComponentAdded<VehicleMovementComponent>(Entity entity, VehicleMovementComponent& component)
+	{
+	}
+
+	template<>
+	void Scene::OnComponentAdded<SpringArmComponent>(Entity entity, SpringArmComponent& component)
 	{
 	}
 

@@ -20,7 +20,7 @@
 
 namespace Dymatic {
 
-	struct Renderer3DData
+	struct SceneRendererData
 	{
 		static const uint32_t MaxBones = 100;
 		static const uint32_t MaxBoneInfluence = 4;
@@ -72,8 +72,10 @@ namespace Dymatic {
 		Ref<Shader> DeferredGBufferShader;
 		Ref<Shader> DeferredLightingShader;
 
+		// Editor Only Shaders
 		Ref<Shader> BufferVisualizationShader;
 		Ref<Shader> WireframeShader;
+		Ref<Shader> ColorShader;
 
 		// Cluster Culling
 		Ref<Shader> ClusterShader;
@@ -247,7 +249,6 @@ namespace Dymatic {
 		{
 			glm::mat4 Model;
 			glm::mat4 ModelInverse;
-			glm::mat4 FinalBonesMatrices[MaxBones];
 			int EntityID;
 			int Animated;
 			float BUFF[2];
@@ -255,6 +256,13 @@ namespace Dymatic {
 		ObjectData ObjectBuffer;
 		Ref<UniformBuffer> ObjectUniformBuffer;
 
+		struct AnimationData
+		{
+			glm::mat4 FinalBonesMatrices[MaxBones];
+		};
+		AnimationData AnimationBuffer;
+		Ref<UniformBuffer> AnimationUniformBuffer;
+		
 		Ref<UniformBuffer> MaterialUniformBuffer;
 
 		struct Volume
@@ -335,7 +343,7 @@ namespace Dymatic {
 		bool UseFXAA = false;
 	};
 
-	static Renderer3DData s_Data;
+	static SceneRendererData s_Data;
 	
 	static GLuint vao, vbo;
 
@@ -379,22 +387,23 @@ namespace Dymatic {
 		s_Data.CubeVertexArray->SetIndexBuffer(skyboxIB);
 
 		// Setup Buffers
-		s_Data.CameraUniformBuffer = UniformBuffer::Create(sizeof(Renderer3DData::CameraData), 0);
-		s_Data.LightingUniformBuffer = UniformBuffer::Create(sizeof(Renderer3DData::LightingData), 1);
-		s_Data.ObjectUniformBuffer = UniformBuffer::Create(sizeof(Renderer3DData::ObjectData), 2);
-		s_Data.MaterialUniformBuffer = UniformBuffer::Create(sizeof(Material::MaterialData), 3);
-		s_Data.VolumetricUniformBuffer = UniformBuffer::Create(sizeof(Renderer3DData::VolumetricData), 4);
-		s_Data.PostProcessingUniformBuffer = UniformBuffer::Create(sizeof(Renderer3DData::PostProcessingData), 5);
+		s_Data.CameraUniformBuffer = UniformBuffer::Create(sizeof(SceneRendererData::CameraData), 0);
+		s_Data.LightingUniformBuffer = UniformBuffer::Create(sizeof(SceneRendererData::LightingData), 1);
+		s_Data.ObjectUniformBuffer = UniformBuffer::Create(sizeof(SceneRendererData::ObjectData), 2);
+		s_Data.AnimationUniformBuffer = UniformBuffer::Create(sizeof(SceneRendererData::AnimationData), 3);
+		s_Data.MaterialUniformBuffer = UniformBuffer::Create(sizeof(Material::MaterialData), 4);
+		s_Data.VolumetricUniformBuffer = UniformBuffer::Create(sizeof(SceneRendererData::VolumetricData), 5);
+		s_Data.PostProcessingUniformBuffer = UniformBuffer::Create(sizeof(SceneRendererData::PostProcessingData), 6);
 
 		// Lighting SSBOs
-		s_Data.ClusterAABBSSBO = ShaderStorageBuffer::Create(sizeof(glm::vec4) * 2 * s_Data.NumClusters, 6, ShaderStorageBufferUsage::STATIC_COPY);
-		s_Data.PointLightSSBO = ShaderStorageBuffer::Create(sizeof(unsigned int) + s_Data.MaxLights * sizeof(Renderer3DData::PointLight), 7, ShaderStorageBufferUsage::DYNAMIC_DRAW);
-		s_Data.LightIndexSSBO = ShaderStorageBuffer::Create(s_Data.MaxLights * sizeof(unsigned int), 8, ShaderStorageBufferUsage::STATIC_COPY);
-		s_Data.LightGridSSBO = ShaderStorageBuffer::Create(s_Data.NumClusters * 2 * sizeof(unsigned int), 9, ShaderStorageBufferUsage::STATIC_COPY);
-		s_Data.LightCountsSSBO = ShaderStorageBuffer::Create(2 * sizeof(unsigned int), 10, ShaderStorageBufferUsage::STATIC_COPY);
+		s_Data.ClusterAABBSSBO = ShaderStorageBuffer::Create(sizeof(glm::vec4) * 2 * s_Data.NumClusters, 7, ShaderStorageBufferUsage::DYNAMIC_DRAW);
+		s_Data.PointLightSSBO = ShaderStorageBuffer::Create(s_Data.MaxLights * sizeof(SceneRendererData::PointLight), 8, ShaderStorageBufferUsage::DYNAMIC_DRAW);
+		s_Data.LightIndexSSBO = ShaderStorageBuffer::Create(s_Data.MaxLights * sizeof(unsigned int), 9, ShaderStorageBufferUsage::DYNAMIC_DRAW);
+		s_Data.LightGridSSBO = ShaderStorageBuffer::Create(s_Data.NumClusters * 2 * sizeof(unsigned int), 10, ShaderStorageBufferUsage::DYNAMIC_DRAW);
+		s_Data.LightCountsSSBO = ShaderStorageBuffer::Create(2 * sizeof(unsigned int), 11, ShaderStorageBufferUsage::DYNAMIC_DRAW);
 
 		// Bokeh SSBO
-		s_Data.BokehSSBO = ShaderStorageBuffer::Create(sizeof(Renderer3DData::BokehData), 11, ShaderStorageBufferUsage::DYNAMIC_COPY);
+		s_Data.BokehSSBO = ShaderStorageBuffer::Create(sizeof(SceneRendererData::BokehData), 12, ShaderStorageBufferUsage::DYNAMIC_COPY);
 
 		// Setup Specular IBL
 		{
@@ -426,6 +435,7 @@ namespace Dymatic {
 
 				s_Data.BufferVisualizationShader = Shader::Create("assets/shaders/Renderer3D_BufferVisualization.glsl");
 				s_Data.WireframeShader = Shader::Create("assets/shaders/Renderer3D_Wireframe.glsl");
+				s_Data.ColorShader = Shader::Create("assets/shaders/Renderer3D_Color.glsl");
 			}
 		}
 
@@ -588,7 +598,7 @@ namespace Dymatic {
 			s_Data.BloomBlurVerticalShader = Shader::Create("assets/shaders/Renderer3D_BloomBlurVertical.glsl");
 			s_Data.BloomAddShader = Shader::Create("assets/shaders/Renderer3D_BloomAdd.glsl");
 			s_Data.BloomCompositeShader = Shader::Create("assets/shaders/Renderer3D_BloomComposite.glsl");
-			s_Data.BloomDirtTexture = Texture2D::Create("assets/textures/DirtMaskTexture.png");
+			s_Data.BloomDirtTexture = Texture2D::Create("Resources/Textures/DirtMaskTexture.png");
 
 			// Bloom downsample FBOs
 			{
@@ -690,7 +700,7 @@ namespace Dymatic {
 		s_Data.CameraBuffer.Scale = (float)s_Data.GridSizeZ / std::log2f(s_Data.CameraBuffer.ZFar / s_Data.CameraBuffer.ZNear);
 		s_Data.CameraBuffer.Bias = -((float)s_Data.GridSizeZ * std::log2f(s_Data.CameraBuffer.ZNear) / std::log2f(s_Data.CameraBuffer.ZFar / s_Data.CameraBuffer.ZNear));
 
-		s_Data.CameraUniformBuffer->SetData(&s_Data.CameraBuffer, sizeof(Renderer3DData::CameraData));
+		s_Data.CameraUniformBuffer->SetData(&s_Data.CameraBuffer, sizeof(SceneRendererData::CameraData));
 
 		// Reset Lighting Data
 		s_Data.LightingBuffer.UsingDirectionalLight = false;
@@ -723,7 +733,7 @@ namespace Dymatic {
 		s_Data.CameraBuffer.Scale = (float)s_Data.GridSizeZ / std::log2f(s_Data.CameraBuffer.ZFar / s_Data.CameraBuffer.ZNear);
 		s_Data.CameraBuffer.Bias = - ((float)s_Data.GridSizeZ * std::log2f(s_Data.CameraBuffer.ZNear) / std::log2f(s_Data.CameraBuffer.ZFar / s_Data.CameraBuffer.ZNear));
 
-		s_Data.CameraUniformBuffer->SetData(&s_Data.CameraBuffer, sizeof(Renderer3DData::CameraData));
+		s_Data.CameraUniformBuffer->SetData(&s_Data.CameraBuffer, sizeof(SceneRendererData::CameraData));
 
 		// Reset Lighting Data
 		s_Data.LightingBuffer.UsingDirectionalLight = false;
@@ -970,10 +980,11 @@ namespace Dymatic {
 					{
 						auto& matricies = model.Animator->GetFinalBoneMatrices();
 						for (uint32_t i = 0; i < matricies.size(); i++)
-							s_Data.ObjectBuffer.FinalBonesMatrices[i] = matricies[i];
+							s_Data.AnimationBuffer.FinalBonesMatrices[i] = matricies[i];
+						s_Data.AnimationUniformBuffer->SetData(&s_Data.AnimationBuffer, sizeof(SceneRendererData::AnimationBuffer));
 					}
 
-				s_Data.ObjectUniformBuffer->SetData(&s_Data.ObjectBuffer, sizeof(Renderer3DData::ObjectBuffer));
+				s_Data.ObjectUniformBuffer->SetData(&s_Data.ObjectBuffer, sizeof(SceneRendererData::ObjectBuffer));
 
 				(model.Selected ? s_Data.WireframeShader : s_Data.DeferredGBufferShader)->Bind();
 				DrawModel(model.Model, model.Materials);
@@ -983,7 +994,6 @@ namespace Dymatic {
 		}
 		else
 		{
-
 			// Submit all point lights
 			{
 				// Update count so we don't have to memset unused slots.
@@ -991,14 +1001,14 @@ namespace Dymatic {
 				s_Data.LightCountsSSBO->SetData(&count, sizeof(unsigned int), sizeof(unsigned int));
 
 				if (!s_Data.LightList.empty())
-					s_Data.PointLightSSBO->SetData(s_Data.LightList.data(), s_Data.LightList.size() * sizeof(Renderer3DData::PointLight));
+					s_Data.PointLightSSBO->SetData(s_Data.LightList.data(), s_Data.LightList.size() * sizeof(SceneRendererData::PointLight));
 			}
 
 			// Pass in the current volumetric data
-			s_Data.VolumetricUniformBuffer->SetData(&s_Data.VolumetricBuffer, sizeof(Renderer3DData::VolumetricData));
+			s_Data.VolumetricUniformBuffer->SetData(&s_Data.VolumetricBuffer, sizeof(SceneRendererData::VolumetricData));
 
 			// Pass in the current post processing data
-			s_Data.PostProcessingUniformBuffer->SetData(&s_Data.PostProcessingBuffer, sizeof(Renderer3DData::PostProcessingData));
+			s_Data.PostProcessingUniformBuffer->SetData(&s_Data.PostProcessingBuffer, sizeof(SceneRendererData::PostProcessingData));
 
 			// Point Light Shadow Pass
 			glCullFace(GL_FRONT);
@@ -1007,7 +1017,7 @@ namespace Dymatic {
 				static bool init = false;
 
 				static uint32_t lightDepthMaps, lightDepthFBO;
-				const unsigned int ShadowResolution = 1024;
+				static const unsigned int ShadowResolution = 1024;
 
 				if (!init)
 				{
@@ -1069,7 +1079,7 @@ namespace Dymatic {
 					s_Data.LightingBuffer.LightSpaceMatrices[5] = (shadowProj * glm::lookAt(lightPos, lightPos + glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, -1.0f, 0.0f)));
 					s_Data.LightingBuffer.CascadeCount = index;
 					s_Data.LightingBuffer.CascadePlaneDistances[0] = far_plane;
-					s_Data.LightingUniformBuffer->SetData(&s_Data.LightingBuffer, sizeof(Renderer3DData::LightingData));
+					s_Data.LightingUniformBuffer->SetData(&s_Data.LightingBuffer, sizeof(SceneRendererData::LightingData));
 
 					for (auto& model : s_Data.ModelDrawList)
 					{
@@ -1084,10 +1094,11 @@ namespace Dymatic {
 							{
 								auto& matricies = model.Animator->GetFinalBoneMatrices();
 								for (size_t i = 0; i < matricies.size(); i++)
-									s_Data.ObjectBuffer.FinalBonesMatrices[i] = matricies[i];
+									s_Data.AnimationBuffer.FinalBonesMatrices[i] = matricies[i];
+								s_Data.AnimationUniformBuffer->SetData(&s_Data.AnimationBuffer, sizeof(SceneRendererData::AnimationBuffer));
 							}
 
-						s_Data.ObjectUniformBuffer->SetData(&s_Data.ObjectBuffer, sizeof(Renderer3DData::ObjectBuffer));
+						s_Data.ObjectUniformBuffer->SetData(&s_Data.ObjectBuffer, sizeof(SceneRendererData::ObjectBuffer));
 
 						s_Data.ShadowShader->Bind();
 						DrawModel(model.Model, model.Materials);
@@ -1113,7 +1124,7 @@ namespace Dymatic {
 					s_Data.LightingBuffer.LightSpaceMatrices[i] = matricies[i];
 
 				// Submit Lighting Data
-				s_Data.LightingUniformBuffer->SetData(&s_Data.LightingBuffer, sizeof(Renderer3DData::LightingData));
+				s_Data.LightingUniformBuffer->SetData(&s_Data.LightingBuffer, sizeof(SceneRendererData::LightingData));
 			}
 
 			// CSM Shadow Pass
@@ -1177,10 +1188,11 @@ namespace Dymatic {
 						{
 							auto& matricies = model.Animator->GetFinalBoneMatrices();
 							for (size_t i = 0; i < matricies.size(); i++)
-								s_Data.ObjectBuffer.FinalBonesMatrices[i] = matricies[i];
+								s_Data.AnimationBuffer.FinalBonesMatrices[i] = matricies[i];
+							s_Data.AnimationUniformBuffer->SetData(&s_Data.AnimationBuffer, sizeof(SceneRendererData::AnimationBuffer));
 						}
 
-					s_Data.ObjectUniformBuffer->SetData(&s_Data.ObjectBuffer, sizeof(Renderer3DData::ObjectBuffer));
+					s_Data.ObjectUniformBuffer->SetData(&s_Data.ObjectBuffer, sizeof(SceneRendererData::ObjectBuffer));
 
 					s_Data.CSMShadowShader->Bind();
 					DrawModel(model.Model, model.Materials);
@@ -1215,10 +1227,11 @@ namespace Dymatic {
 					{
 						auto& matricies = model.Animator->GetFinalBoneMatrices();
 						for (size_t i = 0; i < matricies.size(); i++)
-							s_Data.ObjectBuffer.FinalBonesMatrices[i] = matricies[i];
+							s_Data.AnimationBuffer.FinalBonesMatrices[i] = matricies[i];
+						s_Data.AnimationUniformBuffer->SetData(&s_Data.AnimationBuffer, sizeof(SceneRendererData::AnimationBuffer));
 					}
 
-				s_Data.ObjectUniformBuffer->SetData(&s_Data.ObjectBuffer, sizeof(Renderer3DData::ObjectData));
+				s_Data.ObjectUniformBuffer->SetData(&s_Data.ObjectBuffer, sizeof(SceneRendererData::ObjectData));
 
 				s_Data.PreDepthShader->Bind();
 				DrawModel(model.Model, model.Materials);
@@ -1245,10 +1258,11 @@ namespace Dymatic {
 					{
 						auto& matricies = model.Animator->GetFinalBoneMatrices();
 						for (size_t i = 0; i < matricies.size(); i++)
-							s_Data.ObjectBuffer.FinalBonesMatrices[i] = matricies[i];
+							s_Data.AnimationBuffer.FinalBonesMatrices[i] = matricies[i];
+						s_Data.AnimationUniformBuffer->SetData(&s_Data.AnimationBuffer, sizeof(SceneRendererData::AnimationBuffer));
 					}
 
-				s_Data.ObjectUniformBuffer->SetData(&s_Data.ObjectBuffer, sizeof(Renderer3DData::ObjectBuffer));
+				s_Data.ObjectUniformBuffer->SetData(&s_Data.ObjectBuffer, sizeof(SceneRendererData::ObjectBuffer));
 
 				if (model.Selected)
 				{
@@ -1399,7 +1413,7 @@ namespace Dymatic {
 					s_Data.MotionBlurShader->Bind();
 
 					s_Data.ObjectBuffer.Model = previousViewProjectionMatrix;
-					s_Data.ObjectUniformBuffer->SetData(&s_Data.ObjectBuffer, sizeof(Renderer3DData::ObjectBuffer));
+					s_Data.ObjectUniformBuffer->SetData(&s_Data.ObjectBuffer, sizeof(SceneRendererData::ObjectBuffer));
 
 					PriorStageFramebuffer->BindColorSampler(0, 0);
 					PriorStageFramebuffer->BindDepthSampler(1);
@@ -1549,6 +1563,30 @@ namespace Dymatic {
 		s_Data.ModelDrawList.clear();
 		s_Data.LightList.clear();
 		s_Data.NextShadowIndex = 0;
+	}
+
+	void SceneRenderer::DrawMeshOutlineOverlay(const glm::mat4& transform, Ref<Model> model, const glm::vec4& color, int entityID)
+	{
+		glDepthFunc(GL_LEQUAL);
+
+		s_Data.ActiveFramebuffer->Bind();
+		
+		s_Data.ColorShader->Bind();
+		s_Data.MaterialUniformBuffer->SetData(&color, sizeof(glm::vec4));
+
+		s_Data.ObjectBuffer.Model = transform;
+		s_Data.ObjectBuffer.ModelInverse = glm::inverse(transform);
+		s_Data.ObjectBuffer.EntityID = entityID;
+		s_Data.ObjectBuffer.Animated = false;
+		s_Data.ObjectUniformBuffer->SetData(&s_Data.ObjectBuffer, sizeof(SceneRendererData::ObjectData));
+		
+		RenderCommand::SetWireframe(true);
+		auto& meshes = model->GetMeshes();
+		for (auto& mesh : meshes)
+			mesh->Draw();
+		RenderCommand::SetWireframe(false);
+
+		glDepthFunc(GL_LESS);
 	}
 
 	void SceneRenderer::SubmitDirectionalLight(const glm::mat4& transform, DirectionalLightComponent& lightComponent)

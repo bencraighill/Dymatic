@@ -19,8 +19,6 @@ project "Dymatic"
 		"vendor/glm/glm/**.hpp",
 		"vendor/glm/glm/**.inl",
 
-		"vendor/CSplash/**.h",
-		"vendor/CSplash/**.cpp",
 		"vendor/ImGuiNode/**.h",
 		"vendor/ImGuiNode/**.cpp",
 
@@ -55,7 +53,6 @@ project "Dymatic"
 		"%{IncludeDir.ImGuiNode}",
 		"%{IncludeDir.glm}",
 		"%{IncludeDir.stb_image}",
-		"%{IncludeDir.CSplash}",
 		"%{IncludeDir.entt}",
 		"%{IncludeDir.mono}",
 		"%{IncludeDir.yaml_cpp}",
@@ -74,6 +71,7 @@ project "Dymatic"
 		"msdf-atlas-gen",
 		"msdfgen",
 		"opengl32.lib",
+		
 		"%{Library.mono}",
 	}
 

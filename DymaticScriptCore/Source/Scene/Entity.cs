@@ -17,6 +17,19 @@ namespace Dymatic
 
         public readonly ulong ID;
 
+        public string Tag
+        {
+            get
+            {
+                InternalCalls.TagComponent_GetTag(ID, out string name);
+                return name;
+            }
+            set
+            {
+                InternalCalls.TagComponent_SetTag(ID, value);
+            }
+        }
+
         public Vector3 Translation
         {
             get

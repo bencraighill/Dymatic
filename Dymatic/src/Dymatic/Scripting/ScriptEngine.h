@@ -181,8 +181,9 @@ namespace Dymatic {
 		static bool LoadAssembly(const std::filesystem::path& filepath);
 		static bool LoadAppAssembly(const std::filesystem::path& filepath);
 
+		static void SetCoreAssemblyPath(const std::filesystem::path& filepath);
+		static void SetAppAssemblyPath(const std::filesystem::path& filepath);
 		static void ReloadAssembly();
-		static void ReloadAssembly(const std::filesystem::path& assemblyPath);
 
 		static void OnRuntimeStart(Scene* scene);
 		static void OnRuntimeStop();

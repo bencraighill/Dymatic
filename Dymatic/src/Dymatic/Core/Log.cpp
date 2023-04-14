@@ -55,8 +55,7 @@ namespace Dymatic {
 
 	void Log::HideConsole()
 	{
-		::SetForegroundWindow(::GetConsoleWindow());
-		::ShowWindow(::GetForegroundWindow(), SW_HIDE);
+		::ShowWindow(::GetConsoleWindow(), SW_HIDE);
 	}
 
 	void Log::ShowConsole()

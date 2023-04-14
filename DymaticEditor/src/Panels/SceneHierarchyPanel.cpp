@@ -499,10 +499,21 @@ namespace Dymatic {
 	{
 		if (ImGui::BeginCombo("##Asset", asset ? AssetManager::GetMetadata(asset->Handle).FilePath.filename().stem().string().c_str() : "Select Asset"))
 		{
-			for (auto& [handle, metadata] : AssetManager::GetMetadataRegistry())
+			auto& metadataRegistry = AssetManager::GetMetadataRegistry();
+
+			bool found = false;
+			for (auto& [handle, metadata] : metadataRegistry)
+			{
 				if (metadata.Type == type)
+				{
+					found = true;
 					if (ImGui::Selectable(metadata.FilePath.filename().stem().string().c_str(), asset ? asset->Handle == handle : false))
 						onSelect(AssetManager::GetAsset<T>(handle));
+				}
+			}
+
+			if (!found)
+				ImGui::TextDisabled("No Assets Available");
 
 			ImGui::EndCombo();
 		}
@@ -633,6 +644,7 @@ namespace Dymatic {
 				{
 					DisplayAddComponentEntry<CharacterMovementComponent>(CHARACTER_ICON_RUNNING " Character Movement");
 					DisplayAddComponentEntry<VehicleMovementComponent>(CHARACTER_ICON_VEHICLE " Vehicle Movement");
+					DisplayAddComponentEntry<SpringArmComponent>(CHARACTER_ICON_SPRING " Spring Arm");
 					ImGui::EndMenu();
 				}
 				if (ImGui::BeginMenu(CHARACTER_ICON_DIRECTIONAL_FORCE " Field"))
@@ -1552,7 +1564,7 @@ namespace Dymatic {
 
 		}, [](auto& component) {});
 
-		DrawComponent<VehicleMovementComponent>(CHARACTER_ICON_VEHICLE " VEHICLE MOVEMENT", entity, [](auto& component)
+		DrawComponent<SpringArmComponent>(CHARACTER_ICON_SPRING " SPRING ARM", entity, [](auto& component)
 		{
 		}, [](auto& component) {});
 

@@ -7,7 +7,7 @@ Dymatic is a basic, open source, C++ game engine.
 Currently, Microsoft Visual Studio 2022 is required to build, and only supports Windows with OpenGL.
 
 <h4>Latest Build:</h4>
-<i>Dymatic Engine version 23.1.0 (Development)</i>
+<i>Dymatic Engine version 23.1.1 (Development)</i>
 
 ![Dymatic_Editor_Screenshot](/Resources/Branding/Screenshots/EditorScreenshot.png)
 

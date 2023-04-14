@@ -9,8 +9,11 @@
 #include "Dymatic/Scene/Scene.h"
 #include "Dymatic/Scene/Entity.h"
 
+#include "Dymatic/Physics/PhysicsEngine.h"
+
 #include "mono/metadata/object.h"
 #include "mono/metadata/reflection.h"
+#include "mono/metadata/appdomain.h"
 
 #include "box2d/b2_body.h"
 
@@ -50,6 +53,26 @@ namespace Dymatic {
 			return 0;
 
 		return entity.GetUUID();
+	}
+
+	static void TagComponent_GetTag(UUID entityID, MonoString** outTag)
+	{
+		Scene* scene = ScriptEngine::GetSceneContext();
+		DY_CORE_ASSERT(scene);
+		Entity entity = scene->GetEntityByUUID(entityID);
+		DY_CORE_ASSERT(entity);
+
+		*outTag = mono_string_new(mono_domain_get(), entity.GetComponent<TagComponent>().Tag.c_str());
+	}
+
+	static void TagComponent_SetTag(UUID entityID, MonoString* tag)
+	{
+		Scene* scene = ScriptEngine::GetSceneContext();
+		DY_CORE_ASSERT(scene);
+		Entity entity = scene->GetEntityByUUID(entityID);
+		DY_CORE_ASSERT(entity);
+
+		entity.GetComponent<TagComponent>().Tag = mono_string_to_utf8(tag);
 	}
 
 	static void TransformComponent_GetTranslation(UUID entityID, glm::vec3* outTranslation)
@@ -126,6 +149,11 @@ namespace Dymatic {
 		return Input::IsGamepadConnected(gamepad);
 	}
 
+	static void Input_GetGamepadName(int gamepad, MonoString** outName)
+	{
+		*outName = mono_string_new(mono_domain_get(), Input::GetGamepadName(gamepad).c_str());
+	}
+
 	static bool Input_IsGamepadButtonPressed(int gamepad, GamepadButtonCode button)
 	{
 		return Input::IsGamepadButtonPressed(gamepad, button);
@@ -151,6 +179,56 @@ namespace Dymatic {
 		return Input::SetGamepadLED(gamepad, *color);
 	}
 	
+	static void Physics_Raycast(glm::vec3* origin, glm::vec3* direction, float distance, uint64_t* outEntityID, RaycastHit* outHit)
+	{
+		Scene* scene = ScriptEngine::GetSceneContext();
+		DY_CORE_ASSERT(scene);
+
+		*outHit = scene->Raycast(*origin, *direction, distance);
+		*outEntityID = outHit->EntityID;
+	}
+
+	static void Physics_RaycastPoints(glm::vec3* start, glm::vec3* end, uint64_t* outEntityID, RaycastHit* outHit)
+	{
+		Scene* scene = ScriptEngine::GetSceneContext();
+		DY_CORE_ASSERT(scene);
+
+		*outHit = scene->Raycast(*start, *end);
+		*outEntityID = outHit->EntityID;
+	}
+	
+	static void Debug_DrawDebugLine(glm::vec3* start, glm::vec3* end, glm::vec3* color, float duration)
+	{
+		Scene* scene = ScriptEngine::GetSceneContext();
+		DY_CORE_ASSERT(scene);
+
+		scene->DrawDebugLine(*start, *end, glm::vec4(*color, 1.0f), duration);
+	}
+
+	static void Debug_DrawDebugCube(glm::vec3* position, glm::vec3* size, glm::vec3* color, float duration)
+	{
+		Scene* scene = ScriptEngine::GetSceneContext();
+		DY_CORE_ASSERT(scene);
+
+		scene->DrawDebugCube(*position, *size, glm::vec4(*color, 1.0f), duration);
+	}
+
+	static void Debug_DrawDebugSphere(glm::vec3* center, float radius, glm::vec3* color, float duration)
+	{
+		Scene* scene = ScriptEngine::GetSceneContext();
+		DY_CORE_ASSERT(scene);
+
+		scene->DrawDebugSphere(*center, radius, glm::vec4(*color, 1.0f), duration);
+	}
+
+	static void Debug_ClearDebugDrawing()
+	{
+		Scene* scene = ScriptEngine::GetSceneContext();
+		DY_CORE_ASSERT(scene);
+
+		scene->ClearDebugDrawing();
+	}
+
 	static void Log_Trace(MonoString* message) 
 	{
 		char* messageCStr = mono_string_to_utf8(message);
@@ -226,6 +304,9 @@ namespace Dymatic {
 		DY_ADD_INTERNAL_CALL(Entity_HasComponent);
 		DY_ADD_INTERNAL_CALL(Entity_FindEntityByName);
 
+		DY_ADD_INTERNAL_CALL(TagComponent_GetTag);
+		DY_ADD_INTERNAL_CALL(TagComponent_SetTag);
+
 		DY_ADD_INTERNAL_CALL(TransformComponent_GetTranslation);
 		DY_ADD_INTERNAL_CALL(TransformComponent_SetTranslation);
 
@@ -238,11 +319,20 @@ namespace Dymatic {
 		DY_ADD_INTERNAL_CALL(Input_GetMouseX);
 		DY_ADD_INTERNAL_CALL(Input_GetMouseY);
 		DY_ADD_INTERNAL_CALL(Input_IsGamepadConnected);
+		DY_ADD_INTERNAL_CALL(Input_GetGamepadName);
 		DY_ADD_INTERNAL_CALL(Input_IsGamepadButtonPressed);
 		DY_ADD_INTERNAL_CALL(Input_GetGamepadAxis);
 		DY_ADD_INTERNAL_CALL(Input_GetGamepadSensor);
 		DY_ADD_INTERNAL_CALL(Input_SetGamepadRumble);
 		DY_ADD_INTERNAL_CALL(Input_SetGamepadLED);
+
+		DY_ADD_INTERNAL_CALL(Physics_Raycast);
+		DY_ADD_INTERNAL_CALL(Physics_RaycastPoints);
+
+		DY_ADD_INTERNAL_CALL(Debug_DrawDebugLine);
+		DY_ADD_INTERNAL_CALL(Debug_DrawDebugCube);
+		DY_ADD_INTERNAL_CALL(Debug_DrawDebugSphere);
+		DY_ADD_INTERNAL_CALL(Debug_ClearDebugDrawing);
 
 		DY_ADD_INTERNAL_CALL(Log_Trace);
 		DY_ADD_INTERNAL_CALL(Log_Info);

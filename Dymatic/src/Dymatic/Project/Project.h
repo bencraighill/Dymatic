@@ -13,6 +13,7 @@ namespace Dymatic {
 		std::filesystem::path StartScene;
 		
 		std::filesystem::path AssetDirectory;
+		std::filesystem::path CoreModulePath;
 		std::filesystem::path ScriptModulePath;
 	};
 
@@ -43,9 +44,23 @@ namespace Dymatic {
 			return s_ActiveProject->GetConfig().AssetDirectory;
 		}
 
+		static std::filesystem::path GetCoreModulePath()
+		{
+			DY_CORE_ASSERT(s_ActiveProject);
+
+			if (s_ActiveProject->GetConfig().CoreModulePath.empty())
+				return "";
+
+			return GetAssetDirectory() / s_ActiveProject->GetConfig().CoreModulePath;
+		}
+
 		static std::filesystem::path GetScriptModulePath()
 		{
 			DY_CORE_ASSERT(s_ActiveProject);
+
+			if (s_ActiveProject->GetConfig().ScriptModulePath.empty())
+				return "";
+
 			return GetAssetDirectory() / s_ActiveProject->GetConfig().ScriptModulePath;
 		}
 

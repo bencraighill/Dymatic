@@ -137,8 +137,6 @@ namespace Dymatic {
 		};
 		GizmoPivotPoint m_GizmoPivotPoint = GizmoPivotPoint::MedianPoint;
 
-		bool m_ShowPhysicsColliders = false;
-
 		//Snap Enabled
 		bool m_TranslationSnap = false;
 		bool m_RotationSnap = false;
@@ -195,7 +193,7 @@ namespace Dymatic {
 
 		// Editor Resources
 		Ref<Texture2D> m_IconPlay, m_IconSimulate, m_IconStop, m_IconPause, m_IconStep;
-		Ref<Audio> m_SoundPlay, m_SoundSimulate, m_SoundStop, m_SoundPause;
+		Ref<Audio> m_SoundPlay, m_SoundSimulate, m_SoundStop, m_SoundPause, m_SoundStep, m_SoundCompileSuccess, m_SoundCompileFailure;
 
 		bool m_ShowSplash;
 

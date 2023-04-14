@@ -120,13 +120,17 @@ layout(std140, binding = 2) uniform Object
 {
 	mat4 u_Model;
 	mat4 u_ModelInverse;
-	mat4 u_FinalBonesMatrices[MAX_BONES];
 	int u_EntityID;
 	int u_Animated;
     float BUFF2[2];
 };
 
-layout(std140, binding = 3) uniform Material
+layout(std140, binding = 3) uniform Animation
+{
+    mat4 u_FinalBonesMatrices[MAX_BONES];
+};
+
+layout(std140, binding = 4) uniform Material
 {
 	vec4 u_Albedo;
     vec4 u_Emissive;
@@ -149,14 +153,14 @@ layout(std140, binding = 3) uniform Material
 	int  u_AlphaBlendMode;
 };
 
-layout(std140, binding = 4) uniform Volumetric
+layout(std140, binding = 5) uniform Volumetric
 {
     Volume u_Volumes[MAX_VOLUMES];
     int u_VolumeCount;
-    float BUFF4[3];
+    float BUFF5[3];
 };
 
-layout(std140, binding = 5) uniform PostProcessing
+layout(std140, binding = 6) uniform PostProcessing
 {
     vec4 u_SSAOSamples[64];
 
@@ -180,36 +184,36 @@ layout(std140, binding = 5) uniform PostProcessing
     float u_BokehThreshold;
     float u_BokehSize;
 
-    float BUFF5[1];
+    float BUFF6[1];
 };
 
-layout (std430, binding = 6) buffer ClusterAABB
+layout (std430, binding = 7) buffer ClusterAABB
 {
     VolumeTileAABB u_Cluster[];
 };
 
-layout (std430, binding = 7) buffer PointLightSSBO
+layout (std430, binding = 8) buffer PointLightSSBO
 {
     PointLight u_PointLights[];
 };
 
-layout (std430, binding = 8) buffer LightIndexSSBO
+layout (std430, binding = 9) buffer LightIndexSSBO
 {
     uint u_GlobalLightIndexList[];
 };
 
-layout (std430, binding = 9) buffer LightGridSSBO
+layout (std430, binding = 10) buffer LightGridSSBO
 {
     LightGrid u_LightGrid[];
 };
 
-layout (std430, binding = 10) buffer LightCountSSBO
+layout (std430, binding = 11) buffer LightCountSSBO
 {
     uint u_GlobalIndexCount;
     uint u_PointLightCount;
 };
 
-layout (std140, binding = 11) buffer BokehSSBO
+layout (std140, binding = 12) buffer BokehSSBO
 {
     uint u_GlobalBokehIndex;
     BokehPoint u_BokehList[MAX_BOKEH];

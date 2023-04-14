@@ -39,6 +39,7 @@ namespace Dymatic {
 		static void SubmitModel(const glm::mat4& transform, Ref<Model> model, const std::vector<Ref<Material>>& materials, Ref<Animator> animator, int entityID = -1, bool selected = false);
 		static void SubmitStaticMesh(const glm::mat4& transform, const StaticMeshComponent& mesh, int entityID = -1, bool selected = false);
 		static void RenderScene();
+		static void DrawMeshOutlineOverlay(const glm::mat4& transform, Ref<Model> model, const glm::vec4& color, int entityID = -1);
 
 		static void SubmitDirectionalLight(const glm::mat4& transform, DirectionalLightComponent& lightComponent);
 		static void SubmitPointLight(const glm::mat4& transform, PointLightComponent& lightComponent);

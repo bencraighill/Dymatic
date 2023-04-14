@@ -18,10 +18,7 @@
 #define DY_DEBUGBREAK()
 #endif
 
-#define DY_EXPAND_MACRO(x) x
-#define DY_STRINGIFY_MACRO(x) #x
-
-#define BIT(x) (1 << x)
+#include "Dymatic/Core/PreprocessorUtils.h"
 
 #define DY_BIND_EVENT_FN(fn) [this](auto&&... args) -> decltype(auto) { return this->fn(std::forward<decltype(args)>(args)...); }
 
@@ -70,5 +67,6 @@ namespace Dymatic {
 	}
 }
 
+#include "Dymatic/Core/Version.h"
 #include "Dymatic/Core/Log.h"
 #include "Dymatic/Core/Assert.h"

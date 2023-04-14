@@ -24,6 +24,7 @@ namespace Dymatic {
 				out << YAML::Key << "Name" << YAML::Value << config.Name;
 				out << YAML::Key << "StartScene" << YAML::Value << config.StartScene.string();
 				out << YAML::Key << "AssetDirectory" << YAML::Value << config.AssetDirectory.string();
+				out << YAML::Key << "CoreModulePath" << YAML::Value << config.CoreModulePath.string();
 				out << YAML::Key << "ScriptModulePath" << YAML::Value << config.ScriptModulePath.string();
 				out << YAML::EndMap; // Project
 			}
@@ -59,12 +60,29 @@ namespace Dymatic {
 		if (!projectNode)
 			return false;
 
-		config.Name = projectNode["Name"].as<std::string>();
-		config.StartScene = projectNode["StartScene"].as<std::string>();
-		config.AssetDirectory = projectNode["AssetDirectory"].as<std::string>();
-		config.ScriptModulePath = projectNode["ScriptModulePath"].as<std::string>();
+		auto nameNode = projectNode["Name"];
+		if (!nameNode)
+			return false;
+		config.Name = nameNode.as<std::string>();
+
+		auto startSceneNode = projectNode["StartScene"];
+		if (startSceneNode)
+			config.StartScene = startSceneNode.as<std::string>();
+
+		auto assetDirectoryNode = projectNode["AssetDirectory"];
+		if (!assetDirectoryNode)
+			return false;
+		config.AssetDirectory = assetDirectoryNode.as<std::string>();
+
+		auto coreModulePathNode = projectNode["CoreModulePath"];
+		if (coreModulePathNode)
+			config.CoreModulePath = coreModulePathNode.as<std::string>();
+
+		auto scriptModulePathNode = projectNode["ScriptModulePath"];
+		if (scriptModulePathNode)
+			config.ScriptModulePath = scriptModulePathNode.as<std::string>();
 
 		return true;
 	}
-
+	
 }

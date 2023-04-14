@@ -94,10 +94,8 @@ namespace Dymatic {
 				}
 
 				ImGui::Dummy(ImVec2{ 0, ImGui::GetContentRegionAvail().y - 25 });
-				if (ImGui::ImageButton(reinterpret_cast<void*>(m_IconMoreOptions->GetRendererID()), ImVec2{ 15, 15 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 }))
-				{
+				if (ImGui::Button(CHARACTER_ICON_HAMBURGER))
 					ImGui::OpenPopup("##PreferencesOptionsPopup");
-				}
 
 				if (ImGui::BeginPopup("##PreferencesOptionsPopup", ImGuiWindowFlags_NoMove))
 				{

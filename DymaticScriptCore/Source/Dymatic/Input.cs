@@ -40,6 +40,13 @@
         }
 
         [IsEditorCallable]
+        public static string GetGamepadName([ParameterName("Gamepad Index")] int gamepadIndex)
+        {
+            InternalCalls.Input_GetGamepadName(gamepadIndex, out string name);
+            return name;
+        }
+
+        [IsEditorCallable]
         public static bool IsGamepadButtonPressed([ParameterName("Gamepad Index")] int gamepadIndex, [ParameterName("Gamepad Button Code")] GamepadButtonCode gamepadButton)
         {
             return InternalCalls.Input_IsGamepadButtonPressed(gamepadIndex, gamepadButton);
@@ -54,7 +61,8 @@
         [IsEditorCallable]
         public static Vector3 GetGamepadSensor([ParameterName("Gamepad Index")] int gamepadIndex, [ParameterName("Gamepad Sensor Code")] GamepadSensorCode gamepadSensor)
         {
-            return InternalCalls.Input_GetGamepadSensor(gamepadIndex, gamepadSensor);
+            InternalCalls.Input_GetGamepadSensor(gamepadIndex, gamepadSensor, out Vector3 sensor);
+            return sensor;
         }
 
         [IsEditorCallable]
@@ -66,7 +74,7 @@
         [IsEditorCallable]
         public static bool SetGamepadLED([ParameterName("Gamepad Index")] int gamepadIndex, [ParameterName("Color")] Vector3 color)
         {
-            return InternalCalls.Input_SetGamepadLED(gamepadIndex, color);
+            return InternalCalls.Input_SetGamepadLED(gamepadIndex, ref color);
         }
     }
 }

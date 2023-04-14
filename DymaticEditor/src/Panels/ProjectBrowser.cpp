@@ -17,19 +17,15 @@
 
 namespace Dymatic {
 
-	static std::filesystem::path s_RecentProjectsFilepath = "saved/RecentProjects.txt";
+	static const std::filesystem::path s_RecentProjectsFilepath = "saved/RecentProjects.txt";
 
 	void ProjectLauncher::OnImGuiRender(std::filesystem::path* openPath)
 	{		
 		if (!m_Open)
 			return;
 
-		static bool firstFrame = true;
-		if (firstFrame)
-		{
-			firstFrame = false;
+		if (ImGui::GetFrameCount() == 1)
 			return;
-		}
 
 		auto& style = ImGui::GetStyle();
 		auto& io = ImGui::GetIO();
@@ -43,17 +39,20 @@ namespace Dymatic {
 		if (!Project::GetActive())
 			io.ConfigViewportsNoAutoMerge = true;
 
-		if (ImGui::BeginPopupModal(name, nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoTitleBar))
+		if (ImGui::BeginPopupModal(name, nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoSavedSettings))
 		{
 			const float optionsHeight = 75.0f;
-
+			const ImVec2 size(800.0f, 600.0f);
+			
 			if (ImGui::IsWindowAppearing())
-			{
-				const ImVec2 size(800.0f, 600.0f);
+			{				
 				if (Project::GetActive())
 					ImGui::SetWindowPos(ImGui::GetMainViewport()->Pos + ((ImGui::GetMainViewport()->Size - size) * 0.5f));
 				else
-					ImGui::SetWindowPos((io.DisplaySize - size) * 0.5f);
+				{
+					glm::vec4 monitorRect = Monitor::GetMonitorWorkArea();
+					ImGui::SetWindowPos((ImVec2(monitorRect.z, monitorRect.w) - size) * 0.5f);
+				}
 				ImGui::SetWindowSize(size);
 			}
 
@@ -67,9 +66,13 @@ namespace Dymatic {
 
 				ImGui::Dummy(ImVec2(0.0f, 10.0f));
 
-				if (Project::GetActive())
-					if (ImGui::CloseButton(ImGui::GetID("##ProjectBrowserCloseButton"), ImVec2(ImGui::GetWindowPos().x + ImGui::GetWindowContentRegionMax().x - style.WindowPadding.x - 10.0f, ImGui::GetWindowPos().y + ImGui::GetWindowContentRegionMin().y)))
+				if (ImGui::CloseButton(ImGui::GetID("##ProjectBrowserCloseButton"), ImVec2(ImGui::GetWindowPos().x + ImGui::GetWindowContentRegionMax().x - style.WindowPadding.x - 10.0f, ImGui::GetWindowPos().y + ImGui::GetWindowContentRegionMin().y)))
+				{
+					if (Project::GetActive())
 						m_Open = false;
+					else
+						Application::Get().Close();
+				}
 			}
 
 			{
@@ -196,7 +199,7 @@ namespace Dymatic {
 			}
 
 			ImGui::PushFont(io.Fonts->Fonts[1]);
-			ImGui::TextDisabled("Dymatic Project Launcher - 23.1.0 (Development)");
+			ImGui::TextDisabled("Dymatic Project Launcher - " DY_VERSION);
 			ImGui::PopFont();
 
 			ImGui::SameLine();

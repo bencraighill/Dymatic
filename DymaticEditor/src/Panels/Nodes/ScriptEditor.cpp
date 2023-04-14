@@ -1446,7 +1446,7 @@ void ScriptEditorInternal::CompileNodes()
 	// Set Window Focus
 	ImGui::SetWindowFocus("Compiler Results");
 
-	m_CompilerResults.push_back({ CompilerResultType::Info, "Build started [C#] - Dymatic Script Nodes Version 23.1.0 (" + NodeScriptName + ")" });
+	m_CompilerResults.push_back({ CompilerResultType::Info, "Build started [C#] - Dymatic Script Nodes Version " DY_VERSION_STRING " (" + NodeScriptName + ")" });
 
 	// Pre Compile Checks //
 
@@ -1514,7 +1514,7 @@ void ScriptEditorInternal::CompileNodes()
     // Rebuild nodes after alterations have been made by the precompiler
     BuildNodes();
 
-	source.WriteLine("//Dymatic C# Node Script - Version 23.1.0");
+	source.WriteLine("//Dymatic C# Node Script - Version " DY_VERSION_STRING);
     source.NewLine();
 	source.WriteLine("using System;");
     source.WriteLine("using Dymatic;");
@@ -2055,10 +2055,10 @@ void ScriptEditorInternal::CompileNodes()
 	if (errorCount == 0)
 	{
 		source.OutputToFile(filepath.string() + ".cs");
-		m_CompilerResults.push_back({ CompilerResultType::Info, "Compile of " + NodeScriptName + " completed [C#] - Dymatic Nodes Version 23.1.0 (" + filepath.string() + ")" });
+		m_CompilerResults.push_back({ CompilerResultType::Info, "Compile of " + NodeScriptName + " completed [C#] - Dymatic Nodes Version " DY_VERSION_STRING " (" + filepath.string() + ")" });
 	}
 	else
-		m_CompilerResults.push_back({ CompilerResultType::Info, "Compile of " + NodeScriptName + " failed [C#] - " + std::to_string(errorCount) + " Error(s) " + std::to_string(warningCount) + " Warnings(s) - Dymatic Nodes Version 23.1.0 (" + filepath.string() + ")" });
+		m_CompilerResults.push_back({ CompilerResultType::Info, "Compile of " + NodeScriptName + " failed [C#] - " + std::to_string(errorCount) + " Error(s) " + std::to_string(warningCount) + " Warnings(s) - Dymatic Nodes Version " DY_VERSION_STRING " (" + filepath.string() + ")" });
 }
 
 void ScriptEditorInternal::RecursivePinWrite(Pin& pin, NodeCompiler& source, NodeCompiler& ubergraphHeader, NodeCompiler& ubergraphBody, std::string& line, std::vector<ed::NodeId>& node_errors, std::vector<ed::NodeId>& pureNodeList, std::vector<ed::NodeId>& localNodeList)

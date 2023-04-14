@@ -1263,8 +1263,8 @@ namespace Dymatic {
 
 	void ContentBrowserPanel::ImportExternalFiles()
 	{
-		std::string file = FileDialogs::OpenFile("");
-		if (!file.empty())
+		std::vector<std::string> files = FileDialogs::OpenFileMultiple("");
+		for (auto& file : files)
 			CopyFileToDirectory(file, m_CurrentDirectory);
 	}
 

@@ -1,7 +1,9 @@
-#include "dypch.h"
+﻿#include "dypch.h"
 #include "Dymatic/Core/Application.h"
 
 #include "Dymatic/Core/Log.h"
+
+#include "Dymatic/Core/Version.h"
 
 #include "Dymatic/Renderer/Renderer.h"
 #include "Dymatic/Scripting/ScriptEngine.h"
@@ -18,6 +20,7 @@
 #include <GLFW/glfw3native.h>
 
 #include <cmath>
+#include <iostream>
 
 extern const char* g_ImGuiWindowIconPath;
 
@@ -29,7 +32,11 @@ namespace Dymatic {
 		: m_Specification(specification)
 	{
 		DY_PROFILE_FUNCTION();
-
+		
+		std::cout << "Dymatic Engine " DY_VERSION << std::endl;
+		std::cout << DY_VERSION_COPYRIGHT_SAFE << std::endl;
+		std::cout << std::endl;
+		
 		if (m_Specification.ConsoleVisible)
 			Log::ShowConsole();
 		else
@@ -78,6 +85,8 @@ namespace Dymatic {
 	Application::~Application()
 	{
 		DY_PROFILE_FUNCTION();
+
+		m_LayerStack.DetachAll();
 
 		Renderer::Shutdown();
 		ScriptEngine::Shutdown();

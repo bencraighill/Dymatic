@@ -16,5 +16,5 @@ Intermediates/
 
 # Directories
 Dymatic/vendor/VulkanSDK
-DymaticEditor/assets/cache
+*/assets/cache
 */__pycache__

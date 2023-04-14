@@ -65,9 +65,6 @@ namespace Dymatic {
 
 		PreferencesCategory m_CurrentCategory = Input;
 
-		//Icons
-		Ref<Texture2D> m_IconMoreOptions = Texture2D::Create("assets/icons/SystemIcons/MoreOptionsIcon.png");
-
 		std::vector<std::string> m_SelectableThemeNames;
 		std::vector<std::string> m_SelectableThemePaths;
 

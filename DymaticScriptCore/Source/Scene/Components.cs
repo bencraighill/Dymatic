@@ -5,6 +5,22 @@
         public Entity Entity { get; internal set; }
     }
 
+    public class TagComponent : Component
+    {
+        public string Tag
+        {
+            get
+            {
+                InternalCalls.TagComponent_GetTag(Entity.ID, out string tag);
+                return tag;
+            }
+            set
+            {
+                InternalCalls.TagComponent_SetTag(Entity.ID, value);
+            }
+        }
+    }
+
     public class TransformComponent : Component
     {
         public Vector3 Translation

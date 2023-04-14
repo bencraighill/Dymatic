@@ -2,10 +2,12 @@
 #include "winres.h"
 #undef APSTUDIO_READONLY_SYMBOLS
 
+#include "Dymatic/Core/Version.h"
+
 MAINICON ICON "../Resources/Branding/Logo/DymaticLogo.ico"
 
 VS_VERSION_INFO VERSIONINFO
-FILEVERSION 23, 1, 0, 0
+FILEVERSION DY_VERSION_MAJOR, DY_VERSION_MINOR, DY_VERSION_PATCH, 0
 FILEFLAGSMASK 0x3FL
 FILEFLAGS 0x0L
 FILEOS 0x4L
@@ -18,11 +20,11 @@ BLOCK "040904E4"
 BEGIN
 VALUE "CompanyName", "Dymatic Technologies"
 VALUE "FileDescription", "Dymatic Engine Crash Manager"
-VALUE "LegalCopyright", "© 2023 Dymatic Technologies"
+VALUE "LegalCopyright", DY_VERSION_COPYRIGHT
 VALUE "ProductName", "Dymatic Crash Manager"
-VALUE "ProductVersion", "DymaticCrashManager-23.1.0-Development"
-VALUE "FileVersion", "23, 1, 0, 0"
-VALUE "LegalTrademarks1", "Dymatic Engine®, All Rights Reserved"
+VALUE "ProductVersion", "DymaticCrashManager-" DY_VERSION_STRING "-" DY_VERSION_SUFFIX
+VALUE "FileVersion", DY_TO_STRING(DY_VERSION_MAJOR) ", " DY_TO_STRING(DY_VERSION_MINOR) ", " DY_TO_STRING(DY_VERSION_PATCH) ", 0"
+VALUE "LegalTrademarks1", DY_VERSION_TRADEMARK
 VALUE "OriginalFilename", "DymaticEditor.exe"
 VALUE "fileos", "Microsoft Windows 11"
 END

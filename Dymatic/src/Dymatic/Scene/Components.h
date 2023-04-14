@@ -588,6 +588,14 @@ namespace Dymatic {
 		void* VehicleController = nullptr;
 	};
 
+	struct SpringArmComponent
+	{
+		SpringArmComponent() = default;
+		SpringArmComponent(const SpringArmComponent&) = default;
+		
+		float TargetLength = 3.0f;
+	};
+
 	struct DirectionalFieldComponent
 	{
 		DirectionalFieldComponent() = default;
@@ -729,7 +737,7 @@ namespace Dymatic {
 			StaticMeshComponent, DirectionalLightComponent, PointLightComponent, 
 			SpotLightComponent, SkyLightComponent, VolumeComponent,
 			AudioComponent,
-			RigidbodyComponent, CharacterMovementComponent, VehicleMovementComponent, 
+			RigidbodyComponent, CharacterMovementComponent, VehicleMovementComponent, SpringArmComponent,
 			BouyancyFieldComponent, DirectionalFieldComponent, RadialFieldComponent,
 			BoxColliderComponent, SphereColliderComponent, CapsuleColliderComponent, MeshColliderComponent,
 			UICanvasComponent, UIImageComponent, UIButtonComponent

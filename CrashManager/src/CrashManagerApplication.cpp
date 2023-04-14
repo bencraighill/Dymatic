@@ -380,7 +380,7 @@ namespace Dymatic {
 		ImGui::PopStyleColor();
 
 		{
-			const char* text = "Dymatic Crash Manager 23.1.0 (Development)";
+			const char* text = "Dymatic Crash Manager " DY_VERSION;
 			ImGui::GetForegroundDrawList()->AddText(ImGui::GetWindowPos() + ImGui::GetWindowSize() - ImGui::CalcTextSize(text) - ImGui::GetStyle().WindowPadding, ImGui::GetColorU32(ImGuiCol_TextDisabled), text);
 		}
 		ImGui::End();

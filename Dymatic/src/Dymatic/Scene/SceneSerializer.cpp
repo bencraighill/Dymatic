@@ -509,6 +509,9 @@ namespace Dymatic {
 
 	bool SceneSerializer::Deserialize(const std::string& filepath)
 	{
+		if (!std::filesystem::exists(filepath))
+			return false;
+
 		YAML::Node data;
 		try
 		{

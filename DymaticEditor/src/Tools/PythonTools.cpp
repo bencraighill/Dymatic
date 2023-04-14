@@ -1,14 +1,15 @@
 #include "PythonTools.h"
+
 #include "Dymatic/Core/Base.h"
+#include "Dymatic/Utils/PlatformUtils.h"
+
+#include "../EditorLayer.h"
+#include "TextSymbols.h"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/embed.h>
 
 #include <fstream>
-
-#include "../EditorLayer.h"
-
-#include "Dymatic/Utils/PlatformUtils.h"
 
 #include <glm/glm.hpp>
 
@@ -20,72 +21,22 @@ namespace Dymatic {
 
 	static Dymatic::EditorLayer* s_EditorContext = nullptr;
 
-	// Utility function to handle variadic functions received from python (limited to predefined types)
-	static char* GetArgsAsBuffer(pybind11::args args, uint32_t start = 0)
-	{
-		size_t size = 0;
-		for (size_t i = start; i < args.size(); i++)
-		{
-			pybind11::object arg = args[i];
-			if (arg.is_none())
-				continue;
-			if (pybind11::isinstance<pybind11::int_>(arg))
-				size += sizeof(int);
-			else if (pybind11::isinstance<pybind11::float_>(arg))
-				size += sizeof(float);
-			else if (pybind11::isinstance<pybind11::bool_>(arg))
-				size += sizeof(bool);
-			else if (pybind11::isinstance<pybind11::str>(arg))
-				size += arg.cast<std::string>().length();
-		}
-
-		char* buffer = new char[size];
-		
-		size_t offset = 0;
-		for (size_t i = start; i < args.size(); i++) 
-		{
-			pybind11::object arg = args[i];
-			if (arg.is_none())
-				continue;
-			if (pybind11::isinstance<pybind11::int_>(arg)) 
-			{
-				int cpp_int = arg.cast<int>();
-				memcpy(buffer + offset, &cpp_int, sizeof(int));
-				offset += sizeof(int);
-			}
-			else if (pybind11::isinstance<pybind11::float_>(arg)) 
-			{
-				float cpp_float = arg.cast<float>();
-				memcpy(buffer + offset, &cpp_float, sizeof(float));
-				offset += sizeof(float);
-			}
-			else if (pybind11::isinstance<pybind11::str>(arg)) 
-			{
-				std::string cpp_string = arg.cast<std::string>();
-				size_t len = cpp_string.length();
-				memcpy(buffer + offset, cpp_string.c_str(), len);
-				offset += len;
-			}
-			else {
-				DY_CORE_ERROR("Unknown data type for argument in variadic function");
-			}
-		}
-		buffer[offset] = 0; // null-terminate the buffer
-
-		return buffer;
-	}
-
-	static int GetVersionMajor() { return 23; }
-	static int GetVersionMinor() { return 1; }
-	static int GetVersionPatch() { return 0; }
-	static const char* GetVersionString() { return "23.1.0"; }
+	static int GetVersionMajor() { return DY_VERSION_MAJOR; }
+	static int GetVersionMinor() { return DY_VERSION_MINOR; }
+	static int GetVersionPatch() { return DY_VERSION_PATCH; }
+	static const char* GetVersionString() { return DY_VERSION_STRING; }
 
 	class EditorPythonInterface
 	{
 	public:
 		EditorPythonInterface() = delete;
 
+		static void NewScene() { s_EditorContext->NewScene(); }
+		static void OpenScene() { s_EditorContext->OpenScene(); }
 		static void SaveScene() { s_EditorContext->SaveScene(); }
+		static void SaveSceneAs() { s_EditorContext->SaveSceneAs(); }
+		
+		static void Compile() { s_EditorContext->Compile(); }
 	};
 }
 
@@ -193,15 +144,32 @@ PYBIND11_EMBEDDED_MODULE(Dymatic, module)
 	pybind11::class_<Dymatic::PlatformUtils>(module, "Platform")
 		.def_static("OpenFileDialogue", &Dymatic::FileDialogs::OpenFile)
 		.def_static("SaveFileDialogue", &Dymatic::FileDialogs::SaveFile)
-		.def_static("SelectFolderDialogue", &Dymatic::FileDialogs::SelectFolder);
+		.def_static("SelectFolderDialogue", &Dymatic::FileDialogs::SelectFolder)
+		;
 	
 	// Editor Commands
 	pybind11::class_<Dymatic::EditorPythonInterface>(module, "Editor")
-		.def_static("SaveScene", &Dymatic::EditorPythonInterface::SaveScene);
+		.def_static("NewScene", &Dymatic::EditorPythonInterface::NewScene)
+		.def_static("OpenScene", &Dymatic::EditorPythonInterface::OpenScene)
+		.def_static("SaveScene", &Dymatic::EditorPythonInterface::SaveScene)
+		.def_static("SaveSceneAs", &Dymatic::EditorPythonInterface::SaveSceneAs)
+		.def_static("Compile", &Dymatic::EditorPythonInterface::Compile)
+		;
 
 	//========================================================================================================//
 	//                                              USER INTERFACE										      //
 	//========================================================================================================//
+
+	pybind11::enum_<Dymatic::PythonUIRenderStage>(module, "UIRenderStage")
+		.value("Main", Dymatic::PythonUIRenderStage::Main)
+		.value("MenuBar", Dymatic::PythonUIRenderStage::MenuBar)
+		.value("MenuBar_File", Dymatic::PythonUIRenderStage::MenuBar_File)
+		.value("MenuBar_Edit", Dymatic::PythonUIRenderStage::MenuBar_Edit)
+		.value("MenuBar_Window", Dymatic::PythonUIRenderStage::MenuBar_Window)
+		.value("MenuBar_View", Dymatic::PythonUIRenderStage::MenuBar_View)
+		.value("MenuBar_Script", Dymatic::PythonUIRenderStage::MenuBar_Script)
+		.value("MenuBar_Help", Dymatic::PythonUIRenderStage::MenuBar_Help)
+		.export_values();
 
 	pybind11::enum_<::ImGuiTreeNodeFlags_>(module, "TreeFlags")
 		.value("NoFlags", ImGuiTreeNodeFlags_None)
@@ -282,7 +250,7 @@ PYBIND11_EMBEDDED_MODULE(Dymatic, module)
 		.def("BeginWindow", [](const char* name, bool closeable, ImGuiWindowFlags flags) 
 		{
 			bool open = true;
-			bool visible = ImGui::Begin(name, closeable ? &open : nullptr, flags);
+			bool visible = ImGui::Begin(fmt::format(CHARACTER_ICON_PLUGIN " {}", name).c_str(), closeable ? &open : nullptr, flags);
 			return std::make_tuple(visible, open);
 		}, pybind11::arg("name"), pybind11::arg("closeable") = true, pybind11::arg("flags") = 0)
 		
@@ -294,6 +262,8 @@ PYBIND11_EMBEDDED_MODULE(Dymatic, module)
 
 		.def("Text", &ImGui::TextUnformatted, pybind11::arg("text"), pybind11::arg("text_end") = nullptr)
 		.def("TextDisabled", &ImGui::TextDisabledUnformatted, pybind11::arg("text"), pybind11::arg("text_end") = nullptr)
+
+		.def("Separator", &ImGui::Separator)
 
 		.def("Button", [](const char* label, glm::vec2 size, ImGuiButtonFlags flags) { return ImGui::ButtonEx(label, ImVec2(size.x, size.y), flags); }, pybind11::arg("label"), pybind11::arg("size") = glm::vec2(0.0f), pybind11::arg("flags") = ImGuiButtonFlags_None)
 
@@ -308,12 +278,29 @@ PYBIND11_EMBEDDED_MODULE(Dymatic, module)
 			bool modified = ImGui::DragInt(label, &v, v_speed, v_min, v_max, format, flags);
 			return pybind11::make_tuple(modified , v);
 		}, pybind11::arg("label"), pybind11::arg("v"), pybind11::arg("v_speed") = 1.0f, pybind11::arg("v_min") = 0, pybind11::arg("v_max") = 0, pybind11::arg("format") = "%d", pybind11::arg("flags") = 0)
+
+		.def("BeginMenu", &ImGui::BeginMenu, pybind11::arg("label"), pybind11::arg("enabled") = true)
+		.def("EndMenu", &ImGui::EndMenu)
+		.def("MenuItem", [](const char* label, const char* shortcut, bool selected, bool enabled)
+		{
+			return ImGui::MenuItem(label, shortcut, selected, enabled);
+		}, pybind11::arg("label"), pybind11::arg("shortcut") = nullptr, pybind11::arg("selected") = false, pybind11::arg("enabled") = true)
 		;
 }
 
 namespace Dymatic {
 
+	class PythonPlugin;
+	static std::vector<Ref<PythonPlugin>> s_Plugins;
 
+	static pybind11::module s_InspectModule;
+	static pybind11::module s_SystemModule;
+
+	static uint32_t GetPythonArgumentCount(const pybind11::function& function)
+	{
+		pybind11::object result = s_InspectModule.attr("signature")(function).attr("parameters");
+		return pybind11::len(result);
+	}
 
 	class PythonPlugin
 	{
@@ -321,20 +308,18 @@ namespace Dymatic {
 
 		inline const std::filesystem::path& GetPath() const { return m_Path; }
 
-		void CallFunction(const char* name)
+		pybind11::function GetFunction(const char* name)
 		{
 			try
 			{
 				if (pybind11::hasattr(m_Module, name))
-				{
-					auto function = pybind11::getattr(m_Module, name);
-					function();
-				}
+					return pybind11::getattr(m_Module, name);
 			}
 			catch (pybind11::error_already_set& e)
 			{
 				DY_CORE_ERROR(e.what());
 			}
+			return pybind11::none();
 		}
 
 		PythonPlugin(const std::filesystem::path& path)
@@ -356,52 +341,93 @@ namespace Dymatic {
 
 			try
 			{
-				pybind11::module_ sys = pybind11::module_::import("sys");
-				sys.attr("path").attr("append")(m_Path.parent_path().string().c_str());
+				s_SystemModule.attr("path").attr("append")(m_Path.parent_path().string().c_str());
 				m_Module = pybind11::module_::import(m_Path.filename().stem().string().c_str());
-				m_Module.reload(); // Ensure we get the latest module version (in case we are reloading)
+
+				// Ensure we get the latest module version (in case we are reloading)
+				m_Module.reload(); 
 			}
 			catch (pybind11::error_already_set& e)
 			{
 				DY_CORE_ERROR(e.what());
 			}
 
-			CallFunction("DymaticOnLoad");
+			if (m_OnUpdate = GetFunction("DymaticOnUpdate"))
+				m_OnUpdateArgumentCount = GetPythonArgumentCount(m_OnUpdate);
+
+			if (m_OnUIRender = GetFunction("DymaticOnUIRender"))
+				m_OnUIRenderArgumentCount = GetPythonArgumentCount(m_OnUIRender);
+
+			if (pybind11::function onLoad = GetFunction("DymaticOnLoad"))
+				if (GetPythonArgumentCount(onLoad) == 0)
+					onLoad();
+			
 		}
 
 		~PythonPlugin()
 		{
-			CallFunction("DymaticOnUnload");
+			if (pybind11::function onUnload = GetFunction("DymaticOnUnload"))
+				if (GetPythonArgumentCount(onUnload) == 0)
+					onUnload();
+			
+			
 			m_Module.release();
 		}
 
-		void Update()
+		void OnUpdate(Timestep ts)
 		{
-			CallFunction("DymaticOnUpdate");
+			if (!m_OnUpdate.is_none())
+			{
+				if (m_OnUpdateArgumentCount == 0)
+					m_OnUpdate();
+				else if (m_OnUpdateArgumentCount == 1)
+					m_OnUpdate((float)ts);
+			}
 		}
 
-		void OnUIRender()
+		void OnUIRender(PythonUIRenderStage stage)
 		{
-			CallFunction("DymaticOnUIRender");
+			if (m_OnUIRender.is_none())
+				return;
+
+			if (m_OnUIRenderArgumentCount == 0)
+			{
+				if (stage == PythonUIRenderStage::Main)
+					m_OnUIRender();
+			}
+			else if (m_OnUIRenderArgumentCount == 1)
+				m_OnUIRender(stage);
 		}
 
 	private:
 		std::filesystem::path m_Path;
 		pybind11::module_ m_Module;
+		
+		pybind11::function m_OnUpdate;
+		int m_OnUpdateArgumentCount;
+		
+		pybind11::function m_OnUIRender;
+		int m_OnUIRenderArgumentCount;
 	};
-
-	static std::vector<Ref<PythonPlugin>> s_Plugins;
 
 	void PythonTools::Init(EditorLayer* context)
 	{
 		s_EditorContext = context;
 		pybind11::initialize_interpreter();
+
+		s_SystemModule = pybind11::module::import("sys");
+		s_InspectModule = pybind11::module::import("inspect");
 	}
 
 	void PythonTools::Shutdown()
 	{
 		s_Plugins.clear();
+
+		s_SystemModule.release();
+		s_InspectModule.release();
+
 		pybind11::finalize_interpreter();
+
 	}
 
 	void PythonTools::RunScript(const std::filesystem::path& path)
@@ -454,25 +480,25 @@ namespace Dymatic {
 		}
 	}
 
-	void PythonTools::ReloadPlugin(std::filesystem::path path)
+	void PythonTools::ReloadPlugin(const std::filesystem::path& path)
 	{
 		UnloadPlugin(path);
 		LoadPlugin(path);
 	}
 
-	void PythonTools::OnUpdate()
+	void PythonTools::OnUpdate(Timestep ts)
 	{
 		for (auto& plugin : s_Plugins)
 		{
-			plugin->Update();
+			plugin->OnUpdate(ts);
 		}
 	}
 
-	void PythonTools::OnImGuiRender()
+	void PythonTools::OnImGuiRender(PythonUIRenderStage stage)
 	{
 		for (auto& plugin : s_Plugins)
 		{
-			plugin->OnUIRender();
+			plugin->OnUIRender(stage);
 		}
 	}
 
