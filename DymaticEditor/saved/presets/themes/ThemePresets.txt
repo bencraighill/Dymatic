@@ -1,9 +1,0 @@
-Add custom presets here:
-You may use relative or full paths, in the format "Preset_Name - Preset_Path"
-
-//Default Presets:
-<Dark> {saved/presets/themes/DymaticDark.dytheme}
-<Light> {saved/presets/themes/DymaticLight.dytheme}
-<Vintage> {saved/presets/themes/Vintage.dytheme}
-<Unreal> {saved/presets/themes/Unreal.dytheme}
-

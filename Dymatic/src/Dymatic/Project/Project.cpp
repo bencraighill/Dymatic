@@ -18,12 +18,19 @@ namespace Dymatic {
 		ProjectSerializer serializer(project);
 		if (serializer.Deserialize(path))
 		{
+			project->m_ProjectFilepath = path;
 			project->m_ProjectDirectory = path.parent_path();
 			s_ActiveProject = project;
 			return s_ActiveProject;
 		}
 
 		return nullptr;
+	}
+
+	bool Project::Save()
+	{
+		DY_CORE_ASSERT(s_ActiveProject);
+		return Save(s_ActiveProject->m_ProjectFilepath);
 	}
 
 	bool Project::Save(const std::filesystem::path& path)

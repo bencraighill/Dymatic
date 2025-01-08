@@ -39,8 +39,6 @@ namespace Dymatic {
 
 		// Memory Monitor
 		std::vector<float> m_MemoryUsageSteps;
-		float m_MemoryUsageMin = 0.0f;
-		float m_MemoryUsageMax = 200.0f;
 		
 		// Core Monitor
 		float** cores;

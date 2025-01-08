@@ -1,0 +1,15 @@
+// Uniform Buffer Shader Header for Dymatic Image Editor
+
+#pragma once
+#include Include/Constants.glslh
+
+layout (std140, binding = EDITOR_BUFFER_BINDING) uniform Editor
+{
+    vec4 u_BrushColor;
+    vec2 u_MousePosition;
+    vec2 u_PreviousMousePosition;
+    vec2 u_PreviousDrawPosition;
+    uvec2 u_CanvasSize;
+    float u_BrushRadius;
+    float u_Zoom;
+};

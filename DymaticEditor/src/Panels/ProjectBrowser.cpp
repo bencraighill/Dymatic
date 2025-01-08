@@ -1,19 +1,66 @@
 #include "ProjectBrowser.h"
-#include "Dymatic/Project/Project.h"
 
+#include "EditorResources.h"
+
+#include "Dymatic/Project/Project.h"
 #include "Dymatic/Core/Application.h"
 #include "Dymatic/Utils/PlatformUtils.h"
 
-#include "Dymatic/UI/UI.h"
-
-#include "../TextSymbols.h"
+#include "Fonts.h"
+#include "TextSymbols.h"
 
 #define IMGUI_DEFINE_MATH_OPERATORS
+#include "Dymatic/UI/UI.h"
+
 #include <imgui/imgui.h>
 #include <imgui/imgui_internal.h>
 
 #include <fstream>
 #include <string>
+
+// Modified version of ImGui::CloseButton for minimizing as well!
+// We only modify the way the lines are drawn at the end
+namespace ImGui {
+
+	static bool MinimizeButton(ImGuiID id, const ImVec2& pos)
+	{
+		ImGuiContext& g = *GImGui;
+		ImGuiWindow* window = g.CurrentWindow;
+
+		// Tweak 1: Shrink hit-testing area if button covers an abnormally large proportion of the visible region. That's in order to facilitate moving the window away. (#3825)
+		// This may better be applied as a general hit-rect reduction mechanism for all widgets to ensure the area to move window is always accessible?
+		const ImRect bb(pos, pos + ImVec2(g.FontSize, g.FontSize));
+		ImRect bb_interact = bb;
+		const float area_to_visible_ratio = window->OuterRectClipped.GetArea() / bb.GetArea();
+		if (area_to_visible_ratio < 1.5f)
+			bb_interact.Expand(ImTrunc(bb_interact.GetSize() * -0.25f));
+
+		// Tweak 2: We intentionally allow interaction when clipped so that a mechanical Alt,Right,Activate sequence can always close a window.
+		// (this isn't the common behavior of buttons, but it doesn't affect the user because navigation tends to keep items visible in scrolling layer).
+		bool is_clipped = !ItemAdd(bb_interact, id);
+
+		bool hovered, held;
+		bool pressed = ButtonBehavior(bb_interact, id, &hovered, &held);
+		if (is_clipped)
+			return pressed;
+
+		// Render
+		// FIXME: Clarify this mess
+		ImU32 col = GetColorU32(held ? ImGuiCol_ButtonActive : ImGuiCol_ButtonHovered);
+		ImVec2 center = bb.GetCenter();
+		if (hovered)
+			window->DrawList->AddCircleFilled(center, ImMax(2.0f, g.FontSize * 0.5f + 1.0f), col);
+
+		float cross_extent = g.FontSize * 0.5f * 0.7071f - 1.0f;
+		ImU32 cross_col = GetColorU32(ImGuiCol_Text);
+		center -= ImVec2(0.5f, 0.5f);
+
+		// ONLY modification is the line below where we draw only one line horizontally
+		window->DrawList->AddLine(center + ImVec2(+cross_extent, 0.0f), center + ImVec2(-cross_extent, 0.0f), cross_col, 1.0f);
+
+		return pressed;
+	}
+}
 
 namespace Dymatic {
 
@@ -57,22 +104,30 @@ namespace Dymatic {
 			}
 
 			{
-				ImGui::PushFont(io.Fonts->Fonts[0]);
+				UI::PushFont(FontType::Bold);
 				const char* text = "Dymatic Project Browser";
 				ImGui::Dummy(ImVec2((ImGui::GetWindowContentRegionWidth() - ImGui::CalcTextSize(text).x) * 0.5f, 0.0f));
 				ImGui::SameLine();
 				ImGui::TextDisabled(text);
-				ImGui::PopFont();
+				UI::PopFont();
 
 				ImGui::Dummy(ImVec2(0.0f, 10.0f));
 
-				if (ImGui::CloseButton(ImGui::GetID("##ProjectBrowserCloseButton"), ImVec2(ImGui::GetWindowPos().x + ImGui::GetWindowContentRegionMax().x - style.WindowPadding.x - 10.0f, ImGui::GetWindowPos().y + ImGui::GetWindowContentRegionMin().y)))
+				const ImVec2 closePosition = ImVec2(ImGui::GetWindowPos().x + ImGui::GetWindowContentRegionMax().x - style.WindowPadding.x - 10.0f, ImGui::GetWindowPos().y + ImGui::GetWindowContentRegionMin().y);
+				const bool isProjectActive = (bool)Project::GetActive();
+
+
+				if (ImGui::CloseButton(ImGui::GetID("##ProjectBrowserCloseButton"), closePosition))
 				{
-					if (Project::GetActive())
+					if (isProjectActive)
 						m_Open = false;
 					else
 						Application::Get().Close();
 				}
+
+				if (!isProjectActive)
+					if (ImGui::MinimizeButton(ImGui::GetID("##ProjectBrowserMinimizeButton"), closePosition - ImVec2(20.0f, 0.0f)))
+						ImGui::GetPlatformIO().Platform_SetWindowMinimized(ImGui::GetCurrentWindow()->Viewport);
 			}
 
 			{
@@ -81,7 +136,7 @@ namespace Dymatic {
 				ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::GetStyleColorVec4(ImGuiCol_WindowBg) * ImVec4(1.25f, 1.25f, 1.25f, 1.0f));
 				ImGui::BeginChild("##RecentProjects", ImVec2(0.0f, ImGui::GetContentRegionAvail().y - optionsHeight), false, ImGuiWindowFlags_AlwaysUseWindowPadding);
 
-				ImGui::Text("Recent Projects");
+				ImGui::Text(CHARACTER_ICON_RECENT " Recent Projects");
 				ImGui::Separator();
 
 				// Grid
@@ -123,8 +178,18 @@ namespace Dymatic {
 						// Draw background
 						drawList->AddRectFilled(min, min + ImVec2(width, width), ImGui::GetColorU32(ImGuiCol_Button));
 
-						drawList->AddImage((ImTextureID)(m_ShowThumbnails ? project.Icon : m_DymaticProjectIcon)->GetRendererID(), min, min + ImVec2(width, width), { 0, 1 }, { 1, 0 });
+						drawList->AddImage((ImTextureID)(m_ShowThumbnails ? project.Icon : EditorResources::DymaticLogo)->GetRendererID(), min, min + ImVec2(width, width), { 0, 1 }, { 1, 0 });
 						drawList->AddText(min + ImVec2(style.FramePadding.x, width + style.FramePadding.y), ImGui::GetColorU32(ImGuiCol_Text), project.Path.filename().stem().string().c_str());
+
+						// Render Engine Version
+						if (project.Version != DY_VERSION_STRING)
+						{
+							UI::PushFont(FontType::Bold);
+							const ImVec2 textSize = ImGui::CalcTextSize(project.Version.c_str());
+							drawList->AddRectFilled(ImVec2(min.x, max.y - textSize.y), max, ImColor(65, 65, 65), style.FrameRounding * 3.0f, ImDrawFlags_RoundCornersBottom);
+							drawList->AddText(max - textSize - style.FramePadding, ImGui::GetColorU32(ImGuiCol_Text), project.Version.c_str());
+							UI::PopFont();
+						}
 
 						// Render Item Outline
 						auto selected = project.Path == m_SelectedProject;
@@ -148,7 +213,7 @@ namespace Dymatic {
 				const float width = ImGui::GetContentRegionAvailWidth();
 				ImGui::Dummy(ImVec2(width * 0.25f, 0.0f));
 				ImGui::SameLine();
-				if (ImGui::Button(m_CreateState ? "Open Recent Project" : "Create New Project", ImVec2(width * 0.5f, newButtonHeight)))
+				if (ImGui::Button(m_CreateState ? CHARACTER_ICON_OPEN_PROJECT " Open Recent Project" : CHARACTER_ICON_ADD " Create New Project", ImVec2(width * 0.5f, newButtonHeight)))
 				{
 					m_CreateState = !m_CreateState;
 					m_SelectedProject.clear();
@@ -161,7 +226,7 @@ namespace Dymatic {
 			{
 				UI::ScopedStyleColor  textColor(ImGuiCol_Text, ImGui::GetColorU32(ImGuiCol_TextDisabled), !m_CreateState);
 
-				ImGui::Text("Project Location");
+				ImGui::Text(FA_FOLDER " Project Location");
 				ImGui::SameLine();
 				{
 					char buffer[256];
@@ -186,7 +251,7 @@ namespace Dymatic {
 
 				ImGui::SameLine();
 
-				ImGui::Text("Project Name");
+				ImGui::Text(FA_TAG " Project Name");
 				ImGui::SameLine();
 				{
 					char buffer[256];
@@ -198,14 +263,14 @@ namespace Dymatic {
 				}
 			}
 
-			ImGui::PushFont(io.Fonts->Fonts[1]);
+			UI::PushFont(FontType::Small);
 			ImGui::TextDisabled("Dymatic Project Launcher - " DY_VERSION);
-			ImGui::PopFont();
+			UI::PopFont();
 
 			ImGui::SameLine();
 
 			{
-				ImGui::Text("Show Thumbnails");
+				ImGui::Text(FA_IMAGE_POLAROID " Show Thumbnails");
 				ImGui::SameLine();
 				ImGui::Checkbox("##ShowThumbnailsCheckbox", &m_ShowThumbnails);
 				ImGui::SameLine();
@@ -217,7 +282,7 @@ namespace Dymatic {
 					ImGui::SameLine();
 
 					ImGui::BeginDisabled(!std::filesystem::exists(m_ProjectLocationBuffer) || m_ProjectNameBuffer.empty());
-					if (ImGui::Button("Create", size))
+					if (ImGui::Button(CHARACTER_ICON_NEW_PROJECT " Create", size))
 					{
 						CreateProject(std::filesystem::path(m_ProjectLocationBuffer), m_ProjectNameBuffer);
 						m_Open = false;
@@ -231,7 +296,7 @@ namespace Dymatic {
 					ImGui::Dummy(ImVec2(ImGui::GetContentRegionAvailWidth() - 300.0f - 6.0f * style.FramePadding.x, 0.0f));
 					ImGui::SameLine();
 
-					if (ImGui::Button("Browse...", size))
+					if (ImGui::Button(FA_FOLDER_OPEN " Browse...", size))
 					{
 						std::string filepath = FileDialogs::OpenFile("Dymatic Project (*.dyproject)\0*.dyproject\0");
 						if (!filepath.empty())
@@ -239,7 +304,7 @@ namespace Dymatic {
 					}
 					ImGui::SameLine();
 					ImGui::BeginDisabled(m_SelectedProject.empty());
-					if (ImGui::Button("Open", size))
+					if (ImGui::Button(CHARACTER_ICON_OPEN_PROJECT " Open", size))
 					{
 						m_Open = false;
 						*openPath = m_SelectedProject;
@@ -247,7 +312,7 @@ namespace Dymatic {
 					ImGui::EndDisabled();
 				}
 				ImGui::SameLine();
-				if (ImGui::Button("Cancel", size))
+				if (ImGui::Button(FA_CIRCLE_XMARK " Cancel", size))
 				{
 					m_Open = false;
 					if (!Project::GetActive())
@@ -283,7 +348,7 @@ namespace Dymatic {
 			m_RecentProjects.erase(index);
 
 		// Insert at beginning
-		m_RecentProjects.insert(m_RecentProjects.begin(), { path, GetProjectIcon(path) });
+		m_RecentProjects.insert(m_RecentProjects.begin(), { path, GetProjectVersion(path), GetProjectIcon(path) });
 		SaveRecentProjcets();
 	}
 
@@ -321,6 +386,12 @@ namespace Dymatic {
 		
 		RenameAllInFile(path / name / "Assets/Scripts/premakeTemplate.lua", path / name / "Assets/Scripts/premake5.lua", "{projectName}", name);
 		std::filesystem::remove(path / name / "Assets/Scripts/premakeTemplate.lua");
+
+		std::filesystem::path versionPath = path / name / "Config/Editor/version";
+		if (!std::filesystem::exists(versionPath.parent_path()))
+			std::filesystem::create_directories(versionPath.parent_path());
+		std::ofstream fout(versionPath);
+		fout << DY_VERSION_STRING;
 	}
 
 	void ProjectLauncher::LoadRecentProjects()
@@ -348,7 +419,7 @@ namespace Dymatic {
 				}
 
 				if (!found && std::filesystem::exists(line))
-					m_RecentProjects.push_back({ std::filesystem::path(line).make_preferred(), GetProjectIcon(line) });
+					m_RecentProjects.push_back({ std::filesystem::path(line).make_preferred(), GetProjectVersion(line), GetProjectIcon(line) });
 			}
 		}
 
@@ -368,7 +439,23 @@ namespace Dymatic {
 		std::filesystem::path iconPath = path.parent_path() / "Saved" / "DefaultScreenshot.png";
 		if (std::filesystem::exists(iconPath))
 			return Texture2D::Create(iconPath.string());
-		return m_DymaticProjectIcon;
+		return EditorResources::DymaticLogo;
+	}
+
+	std::string ProjectLauncher::GetProjectVersion(const std::filesystem::path& path)
+	{
+		std::filesystem::path versionPath = path.parent_path() / "Config" / "Editor" / "version";
+		if (std::filesystem::exists(versionPath))
+		{
+			std::ifstream file(versionPath);
+			if (file.is_open())
+			{
+				std::string line;
+				if (getline(file, line))
+					return line;
+			}
+		}
+		return "Unknown";
 	}
 
 }

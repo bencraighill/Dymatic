@@ -9,6 +9,7 @@
 #include "mono/metadata/tabledefs.h"
 #include "mono/metadata/mono-debug.h"
 #include "mono/metadata/threads.h"
+#include <mono/metadata/threads.h>
 
 #include "FileWatch.h"
 
@@ -38,22 +39,35 @@ namespace Dymatic {
 		{ "Dymatic.Vector4", ScriptFieldType::Vector4 },
 
 		{ "Dymatic.Entity", ScriptFieldType::Entity },
+
+		{ "Dymatic.Asset", ScriptFieldType::Asset },
+		{ "Dymatic.Scene", ScriptFieldType::Scene },
+		{ "Dymatic.Texture", ScriptFieldType::Texture },
+		{ "Dymatic.VirtualTexture", ScriptFieldType::VirtualTexture },
+		{ "Dymatic.Mesh", ScriptFieldType::Mesh },
+		{ "Dymatic.Animation", ScriptFieldType::Animation },
+		{ "Dymatic.Material", ScriptFieldType::Material },
+		{ "Dymatic.Audio", ScriptFieldType::Audio },
+		{ "Dymatic.VideoPlayer", ScriptFieldType::VideoPlayer }
 	};
 
 	namespace Utils {
 
 		static MonoAssembly* LoadMonoAssembly(const std::filesystem::path& assemblyPath, bool loadPDB = false)
 		{
-			ScopedBuffer fileData = FileSystem::ReadFileBinary(assemblyPath);
+			ScopedBuffer fileData = FileSystem::ReadBytes(assemblyPath);
 
 			// NOTE: We can't use this image for anything other than loading the assembly because this image doesn't have a reference to the assembly
 			MonoImageOpenStatus status;
-			MonoImage* image = mono_image_open_from_data_full(fileData.As<char>(), fileData.Size(), 1, &status, 0);
+			MonoImage* image = mono_image_open_from_data_full(fileData.As<char>(), fileData.Size, 1, &status, 0);
 
 			if (status != MONO_IMAGE_OK)
 			{
 				const char* errorMessage = mono_image_strerror(status);
+
 				// Log some error message using the errorMessage data
+				DY_CORE_ERROR("Failed to load C# mono image: {}", errorMessage);
+				
 				return nullptr;
 			}
 
@@ -64,8 +78,8 @@ namespace Dymatic {
 
 				if (std::filesystem::exists(pdbPath))
 				{
-					ScopedBuffer pdbFileData = FileSystem::ReadFileBinary(pdbPath);
-					mono_debug_open_image_from_memory(image, pdbFileData.As<const mono_byte>(), pdbFileData.Size());
+					ScopedBuffer pdbFileData = FileSystem::ReadBytes(pdbPath);
+					mono_debug_open_image_from_memory(image, pdbFileData.As<const mono_byte>(), pdbFileData.Size);
 					DY_CORE_INFO("Loaded PDB {}", pdbPath);
 				}
 			}
@@ -141,6 +155,7 @@ namespace Dymatic {
 		// Editor only
 		std::unordered_map<std::string, MethodDeclaration> StaticMethods;
 		std::unordered_map<std::string, std::vector<MethodDeclaration>> EntityClassOverridableMethods;
+		std::function<void()> AssemblyReloadCallback;
 		
 		MonoClass* IsEditorCallableAttributeClass;
 		MonoClass* ParameterNameAttributeClass;
@@ -163,10 +178,11 @@ namespace Dymatic {
 			s_Data->AssemblyReloadPending = true;
 
 			Application::Get().SubmitToMainThread([]()
-				{
-					s_Data->AppAssemblyFileWatcher.reset();
-			ScriptEngine::ReloadAssembly();
-				});
+			{
+				s_Data->AssemblyReloadCallback();
+				s_Data->AppAssemblyFileWatcher.reset();
+				ScriptEngine::ReloadAssembly();
+			});
 		}
 	}
 
@@ -176,26 +192,6 @@ namespace Dymatic {
 
 		InitMono();
 		ScriptGlue::RegisterFunctions();
-		
-		if (!LoadAssembly("Resources/Scripts/DymaticScriptCore.dll"))
-		{
-			DY_CORE_ERROR("[ScriptEngine] Could not load DymaticScriptCore assembly.");
-			return;
-		}
-		if (!LoadAppAssembly("SandboxProject/Assets/Scripts/Binaries/Sandbox.dll"))
-		{
-			DY_CORE_ERROR("[ScriptEngine] Could not load app assembly.");
-			return;
-		}
-
-		LoadAssemblyClasses();
-
-		GenerateScriptMetadata();
-
-		ScriptGlue::RegisterComponents();
-
-		// Retrieve and instantiate class
-		s_Data->EntityClass = ScriptClass("Dymatic", "Entity", true);
 	}
 
 	void ScriptEngine::Shutdown()
@@ -212,7 +208,7 @@ namespace Dymatic {
 		if (s_Data->EnableDebugging)
 		{
 			const char* argv[2] = {
-				"--debugger-agent=transport=dt_socket,address=127.0.0.1:2550,server=y,suspend=n,loglevel=3,logfile=MonoDebugger.log",
+				"--debugger-agent=transport=dt_socket,address=127.0.0.1:2550,server=y,suspend=n,loglevel=3,logfile=logs/MonoDebugger.log",
 				"--soft-breakpoints"
 			};
 
@@ -239,11 +235,17 @@ namespace Dymatic {
 	{
 		mono_domain_set(mono_get_root_domain(), false);
 
-		mono_domain_unload(s_Data->AppDomain);
-		s_Data->AppDomain = nullptr;
+		if (s_Data->AppDomain)
+		{
+			mono_domain_unload(s_Data->AppDomain);
+			s_Data->AppDomain = nullptr;
+		}
 
-		mono_jit_cleanup(s_Data->RootDomain);
-		s_Data->RootDomain = nullptr;
+		if (s_Data->RootDomain)
+		{
+			mono_jit_cleanup(s_Data->RootDomain);
+			s_Data->RootDomain = nullptr;
+		}
 	}
 
 	bool ScriptEngine::LoadAssembly(const std::filesystem::path& filepath)
@@ -283,14 +285,12 @@ namespace Dymatic {
 
 	void ScriptEngine::SetCoreAssemblyPath(const std::filesystem::path& filepath)
 	{
-		if (!filepath.empty())
-			s_Data->CoreAssemblyFilepath = filepath;
+		s_Data->CoreAssemblyFilepath = filepath;
 	}
 
 	void ScriptEngine::SetAppAssemblyPath(const std::filesystem::path& filepath)
 	{
-		if (!filepath.empty())
-			s_Data->AppAssemblyFilepath = filepath;
+		s_Data->AppAssemblyFilepath = filepath;
 	}
 
 	void ScriptEngine::ReloadAssembly()
@@ -298,9 +298,13 @@ namespace Dymatic {
 		DY_CORE_INFO("Reloading Script Assembly...");
 
 		mono_domain_set(mono_get_root_domain(), false);
-		mono_domain_unload(s_Data->AppDomain);
+
+		if (s_Data->AppDomain)
+			mono_domain_unload(s_Data->AppDomain);
 
 		DY_CORE_INFO("Loading Core Assembly '{}'", s_Data->CoreAssemblyFilepath);
+		s_Data->CoreAssembly = nullptr;
+		s_Data->CoreAssemblyImage = nullptr;
 		LoadAssembly(s_Data->CoreAssemblyFilepath);
 
 		DY_CORE_INFO("Loading App Assembly '{}'", s_Data->AppAssemblyFilepath);
@@ -315,12 +319,8 @@ namespace Dymatic {
 		ScriptGlue::RegisterComponents();
 
 		// Retrieve and instantiate class
-		s_Data->EntityClass = ScriptClass("Dymatic", "Entity", true);
-	}
-
-	void ScriptEngine::OnRuntimeStart(Scene* scene)
-	{
-		s_Data->SceneContext = scene;
+		if (s_Data->CoreAssemblyImage)
+			s_Data->EntityClass = ScriptClass("Dymatic", "Entity", true);
 	}
 
 	bool ScriptEngine::EntityClassExists(const std::string& fullClassName)
@@ -330,6 +330,9 @@ namespace Dymatic {
 
 	void ScriptEngine::OnCreateEntity(Entity entity)
 	{
+		if (!s_Data->SceneContext)
+			return;
+
 		const auto& sc = entity.GetComponent<ScriptComponent>();
 		if (ScriptEngine::EntityClassExists(sc.ClassName))
 		{
@@ -353,29 +356,62 @@ namespace Dymatic {
 	void ScriptEngine::OnUpdateEntity(Entity entity, Timestep ts)
 	{
 		UUID entityUUID = entity.GetUUID();
-		if (s_Data->EntityInstances.find(entityUUID) != s_Data->EntityInstances.end())
-		{
-			Ref<ScriptInstance> instance = s_Data->EntityInstances[entityUUID];
-			instance->InvokeOnUpdate((float)ts);
-		}
-		else
+
+		if (s_Data->EntityInstances.find(entityUUID) == s_Data->EntityInstances.end())
 		{
 			DY_CORE_ERROR("Could not find ScriptInstance for entity {}", entityUUID);
+			return;
 		}
+
+		Ref<ScriptInstance> instance = s_Data->EntityInstances.at(entityUUID);
+		instance->InvokeOnUpdate((float)ts);
+	}
+
+	void ScriptEngine::OnPrePhysicsUpdateEntity(Entity entity, Timestep ts)
+	{
+		EntityHandle entityUUID = entity.GetUUID();
+
+		if (s_Data->EntityInstances.find(entityUUID) == s_Data->EntityInstances.end())
+		{
+			DY_CORE_ERROR("Could not find ScriptInstance for entity {}", entityUUID);
+			return;
+		}
+
+		Ref<ScriptInstance> instance = s_Data->EntityInstances.at(entityUUID);
+		instance->InvokeOnPrePhysicsUpdate((float)ts);
 	}
 
 	void ScriptEngine::OnDestroyEntity(Entity entity)
 	{
+		if (!s_Data->SceneContext)
+			return;
+
 		UUID entityUUID = entity.GetUUID();
 		if (s_Data->EntityInstances.find(entityUUID) != s_Data->EntityInstances.end())
 		{
-			Ref<ScriptInstance> instance = s_Data->EntityInstances[entityUUID];
+			Ref<ScriptInstance> instance = s_Data->EntityInstances.at(entityUUID);
 			instance->InvokeOnDestroy();
 		}
 		else
-		{
 			DY_CORE_ERROR("Could not find ScriptInstance for entity {}", entityUUID);
-		}
+	}
+
+	void ScriptEngine::OnContactEntity(Entity entity, Entity other, const glm::vec3& hitPosition, const glm::vec3& normal)
+	{
+		if (Ref<ScriptInstance> instance = GetEntityScriptInstance(entity.GetUUID()))
+			instance->InvokeOnContact(other, hitPosition, normal);
+	}
+
+	void ScriptEngine::OnContactPersistedEntity(Entity entity, Entity other, const glm::vec3& hitPosition, const glm::vec3& normal)
+	{
+		if (Ref<ScriptInstance> instance = GetEntityScriptInstance(entity.GetUUID()))
+			instance->InvokeOnContactPersisted(other, hitPosition, normal);
+	}
+
+	void ScriptEngine::OnContactRemovedEntity(Entity entity, Entity other)
+	{
+		if (Ref<ScriptInstance> instance = GetEntityScriptInstance(entity.GetUUID()))
+			instance->InvokeOnContactRemoved(other);
 	}
 
 	Scene* ScriptEngine::GetSceneContext()
@@ -401,11 +437,19 @@ namespace Dymatic {
 		return s_Data->EntityClasses.at(name);
 	}
 
+	void ScriptEngine::OnRuntimeStart(Scene* scene)
+	{
+		s_Data->SceneContext = scene;
+		
+		ScriptGlue::OnRuntimeStart();
+	}
+
 	void ScriptEngine::OnRuntimeStop()
 	{
 		s_Data->SceneContext = nullptr;
-
 		s_Data->EntityInstances.clear();
+
+		ScriptGlue::OnRuntimeStop();
 	}
 
 	const std::unordered_map<std::string, Ref<ScriptClass>>& ScriptEngine::GetEntityClasses()
@@ -481,7 +525,7 @@ namespace Dymatic {
 	{
 		s_Data->EntityClasses.clear();
 
-		if (!s_Data->AppAssemblyImage)
+		if (!s_Data->CoreAssemblyImage || !s_Data->AppAssemblyImage)
 			return;
 
 		const MonoTableInfo* typeDefinitionsTable = mono_image_get_table_info(s_Data->AppAssemblyImage, MONO_TABLE_TYPEDEF);
@@ -502,6 +546,9 @@ namespace Dymatic {
 				fullName = className;
 
 			MonoClass* monoClass = mono_class_from_name(s_Data->AppAssemblyImage, nameSpace, className);
+
+			if (!monoClass)
+				continue;
 
 			if (monoClass == entityClass)
 				continue;
@@ -653,7 +700,7 @@ namespace Dymatic {
 		s_Data->StaticMethods.clear();
 		s_Data->EntityClassOverridableMethods.clear();
 
-		if (!s_Data->AppAssembly)
+		if (!s_Data->CoreAssemblyImage || !s_Data->AppAssemblyImage)
 			return;
 
 		// Get the internal attribute classes used to provide method metadata
@@ -687,6 +734,9 @@ namespace Dymatic {
 					fullClassName = className;
 
 				MonoClass* monoClass = mono_class_from_name(image, nameSpace, className);
+
+				if (!monoClass)
+					continue;
 
 				// Retrieve all the methods this class contains
 				void* iter = nullptr;
@@ -733,16 +783,77 @@ namespace Dymatic {
 		}
 	}
 
+	void* ScriptEngine::RegisterThread()
+	{
+		if (s_Data->RootDomain)
+			return mono_thread_attach(s_Data->RootDomain);
+
+		return nullptr;
+	}
+
+	void ScriptEngine::UnregisterThread(void* context)
+	{
+		if (context)
+			mono_thread_detach((MonoThread*)context);
+	}
+
 	MonoImage* ScriptEngine::GetCoreAssemblyImage()
 	{
 		return s_Data->CoreAssemblyImage;
 	}
 
 
+	MonoDomain* ScriptEngine::GetRootDomain()
+	{
+		return s_Data->RootDomain;
+	}
+
+	MonoDomain* ScriptEngine::GetApplicationDomain()
+	{
+		return s_Data->AppDomain;
+	}
+
 	MonoObject* ScriptEngine::GetManagedInstance(UUID uuid)
 	{
-		DY_CORE_ASSERT(s_Data->EntityInstances.find(uuid) != s_Data->EntityInstances.end());
-		return s_Data->EntityInstances.at(uuid)->GetManagedObject();
+		if (s_Data->EntityInstances.find(uuid) != s_Data->EntityInstances.end())
+			return s_Data->EntityInstances.at(uuid)->GetManagedObject();
+		return nullptr;
+	}
+
+	MonoObject* ScriptEngine::GetManagedInstanceOrDefaultEntity(UUID uuid)
+	{
+		// Get the existing instance if this entity has a script
+		MonoObject* instance = ScriptEngine::GetManagedInstance(uuid);
+
+		if (!instance)
+		{
+			if (uuid == 0 || !s_Data->SceneContext->DoesEntityExist(uuid))
+				return nullptr;
+
+			// Create a new entity instance if it does not exist (we don't need to have access to any class specific fields/functions for a non-script entity)
+			instance = s_Data->EntityClass.Instantiate();
+
+			// Call constructor for new entity
+			MonoMethod* constructor = s_Data->EntityClass.GetMethod(".ctor", 1);
+			void* param = &uuid;
+			ScriptEngine::InvokeMethod(instance, constructor, &param);
+		}
+
+		return instance;
+	}
+
+	void ScriptEngine::ExecuteEntityMethod(UUID entityID, const std::string& methodName, const Buffer& parameterData)
+	{
+		if (s_Data->EntityInstances.find(entityID) == s_Data->EntityInstances.end())
+			return;
+
+		Ref<ScriptInstance> instance = s_Data->EntityInstances.at(entityID);
+		MonoMethod* method = instance->GetScriptClass()->GetMethod(methodName, 0);
+		
+		if (!method)
+			return;
+
+		InvokeMethod(instance->GetManagedObject(), method);
 	}
 
 	bool ScriptEngine::IsDebuggerAttached()
@@ -754,11 +865,46 @@ namespace Dymatic {
 #endif
 	}
 
+	void ScriptEngine::SetAssemblyReloadCallback(const std::function<void()> callback)
+	{
+		s_Data->AssemblyReloadCallback = callback;
+	}
+
 	MonoObject* ScriptEngine::InstantiateClass(MonoClass* monoClass)
 	{
 		MonoObject* instance = mono_object_new(s_Data->AppDomain, monoClass);
 		mono_runtime_object_init(instance);
 		return instance;
+	}
+
+	MonoObject* ScriptEngine::InvokeMethod(MonoObject* instance, MonoMethod* method, void** params)
+	{
+		try
+		{
+			// Crash Note: If your debugger breaks here that is because a C# exception was thrown.
+			// Forcing your debugger to continue should be fine. To avoid this, do not attach a debugger
+			// or configure your IDE to not break when exceptions (e.g. null reference) are thrown.
+			MonoObject* exception = nullptr;
+			MonoObject* result = mono_runtime_invoke(method, instance, params, &exception);
+		
+			if (exception)
+			{
+				MonoString* message = mono_object_to_string((MonoObject*)exception, nullptr);
+				const char* message_cstr = mono_string_to_utf8(message);
+				DY_CRITICAL(message_cstr);
+				mono_free((void*)message_cstr);
+		
+				return nullptr;
+			}
+		
+			return result;
+		}
+		catch (const std::exception& e)
+		{
+			DY_CRITICAL(e.what());
+		}
+
+		return nullptr;
 	}
 
 	ScriptClass::ScriptClass(const std::string& classNamespace, const std::string& className, bool isCore)
@@ -777,12 +923,6 @@ namespace Dymatic {
 		return mono_class_get_method_from_name(m_MonoClass, name.c_str(), parameterCount);
 	}
 
-	MonoObject* ScriptClass::InvokeMethod(MonoObject* instance, MonoMethod* method, void** params)
-	{
-		MonoObject* exception = nullptr;
-		return mono_runtime_invoke(method, instance, params, &exception);
-	}
-
 	ScriptInstance::ScriptInstance(Ref<ScriptClass> scriptClass, Entity entity)
 		: m_ScriptClass(scriptClass)
 	{
@@ -791,20 +931,24 @@ namespace Dymatic {
 		m_Constructor = s_Data->EntityClass.GetMethod(".ctor", 1);
 		m_OnCreateMethod = scriptClass->GetMethod("OnCreate", 0);
 		m_OnUpdateMethod = scriptClass->GetMethod("OnUpdate", 1);
+		m_OnPrePhysicsUpdateMethod = scriptClass->GetMethod("OnPrePhysicsUpdate", 1);
 		m_OnDestroyMethod = scriptClass->GetMethod("OnDestroy", 0);
+		m_OnContactMethod = scriptClass->GetMethod("OnContact", 3);
+		m_OnContactPersistedMethod = scriptClass->GetMethod("OnContactPersisted", 3);
+		m_OnContactRemovedMethod = scriptClass->GetMethod("OnContactRemoved", 1);
 
 		// Call Entity constructor
 		{
 			UUID entityID = entity.GetUUID();
 			void* param = &entityID;
-			m_ScriptClass->InvokeMethod(m_Instance, m_Constructor, &param);
+			ScriptEngine::InvokeMethod(m_Instance, m_Constructor, &param);
 		}
 	}
 
 	void ScriptInstance::InvokeOnCreate()
 	{
 		if (m_OnCreateMethod)
-			m_ScriptClass->InvokeMethod(m_Instance, m_OnCreateMethod);
+			ScriptEngine::InvokeMethod(m_Instance, m_OnCreateMethod);
 	}
 
 	void ScriptInstance::InvokeOnUpdate(float ts)
@@ -812,15 +956,52 @@ namespace Dymatic {
 		if (m_OnUpdateMethod)
 		{
 			void* param = &ts;
-			m_ScriptClass->InvokeMethod(m_Instance, m_OnUpdateMethod, &param);
+			ScriptEngine::InvokeMethod(m_Instance, m_OnUpdateMethod, &param);
 		}
 	}
 
+	void ScriptInstance::InvokeOnPrePhysicsUpdate(float ts)
+	{
+		if (m_OnPrePhysicsUpdateMethod)
+		{
+			void* param = &ts;
+			ScriptEngine::InvokeMethod(m_Instance, m_OnPrePhysicsUpdateMethod, &param);
+		}
+	}
 
 	void ScriptInstance::InvokeOnDestroy()
 	{
 		if (m_OnDestroyMethod)
-			m_ScriptClass->InvokeMethod(m_Instance, m_OnDestroyMethod);
+			ScriptEngine::InvokeMethod(m_Instance, m_OnDestroyMethod);
+	}
+
+	void ScriptInstance::InvokeOnContact(Entity other, const glm::vec3& hitPosition, const glm::vec3& normal)
+	{
+		if (m_OnContactMethod)
+		{
+			MonoObject* instance = ScriptEngine::GetManagedInstanceOrDefaultEntity(other.GetUUID());
+			void* params[] = { instance, (void*)&hitPosition, (void*)&normal};
+			ScriptEngine::InvokeMethod(m_Instance, m_OnContactMethod, params);
+		}
+	}
+
+	void ScriptInstance::InvokeOnContactPersisted(Entity other, const glm::vec3& hitPosition, const glm::vec3& normal)
+	{
+		if (m_OnContactPersistedMethod)
+		{
+			MonoObject* instance = ScriptEngine::GetManagedInstanceOrDefaultEntity(other.GetUUID());
+			void* params[] = { instance, (void*)&hitPosition, (void*)&normal };
+			ScriptEngine::InvokeMethod(m_Instance, m_OnContactPersistedMethod, params);
+		}
+	}
+
+	void ScriptInstance::InvokeOnContactRemoved(Entity other)
+	{
+		if (m_OnContactRemovedMethod)
+		{
+			MonoObject* instance = ScriptEngine::GetManagedInstanceOrDefaultEntity(other.GetUUID());
+			ScriptEngine::InvokeMethod(m_Instance, m_OnContactRemovedMethod, (void**)&instance);
+		}
 	}
 
 	bool ScriptInstance::GetFieldValueInternal(const std::string& name, void* buffer)
@@ -843,7 +1024,28 @@ namespace Dymatic {
 			return false;
 
 		const ScriptField& field = it->second;
-		mono_field_set_value(m_Instance, field.ClassField, (void*)value);
+		
+		MonoType* fieldType = mono_field_get_type(field.ClassField);
+		if (mono_type_is_reference(fieldType))
+		{
+			// If the field is a class then we assume it is some form of asset or entity that takes in a handle/id as a constructor
+			if (*(uint64_t*)value == 0)
+				mono_field_set_value(m_Instance, field.ClassField, nullptr);
+			else
+			{
+				MonoClass* fieldClass = mono_type_get_class(fieldType);
+				MonoObject* instance = mono_object_new(s_Data->AppDomain, fieldClass);
+
+				MonoMethod* constructor = mono_class_get_method_from_name(fieldClass, ".ctor", 1);
+				void* param = (void*)value;
+				ScriptEngine::InvokeMethod(instance, constructor, &param);
+
+				mono_field_set_value(m_Instance, field.ClassField, (void*)instance);
+			}
+		}
+		else
+			mono_field_set_value(m_Instance, field.ClassField, (void*)value);
+		
 		return true;
 	}
 

@@ -54,6 +54,12 @@ namespace Dymatic {
 		glBufferSubData(GL_ARRAY_BUFFER, 0, size, data);
 	}
 
+	void OpenGLVertexBuffer::BindAsBuffer(const uint32_t slot) const
+	{
+		DY_PROFILE_FUNCTION();
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, slot, m_RendererID);
+	}
+
 	/////////////////////////////////////////////////////////////////////////////
 	// IndexBuffer //////////////////////////////////////////////////////////////
 	/////////////////////////////////////////////////////////////////////////////
@@ -90,6 +96,12 @@ namespace Dymatic {
 		DY_PROFILE_FUNCTION();
 
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+	}
+
+	void OpenGLIndexBuffer::BindAsBuffer(const uint32_t slot) const
+	{
+		DY_PROFILE_FUNCTION();
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, slot, m_RendererID);
 	}
 
 }

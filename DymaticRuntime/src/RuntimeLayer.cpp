@@ -1,7 +1,7 @@
 #include "RuntimeLayer.h"
 #include "Dymatic/Asset/AssetManager.h"
-#include "Dymatic/Scene/SceneSerializer.h"
 #include "Dymatic/Scripting/ScriptEngine.h"
+#include "Dymatic/Scripting/ScriptGlue.h"
 
 #include "Dymatic/Renderer/SceneRenderer.h"
 
@@ -16,7 +16,8 @@
 
 namespace Dymatic {
 
-	static const char* s_ProjectPath = "C:/dev/Dymatic/DymaticEditor/SandboxProject/Sandbox.dyproject";
+	// Client should modify this at compile time
+	static const char* s_ProjectPath = "Packaging.dyproject";
 
 	RuntimeLayer::RuntimeLayer()
 		: Layer("RuntimeLayer")
@@ -27,38 +28,38 @@ namespace Dymatic {
 	{
 		DY_PROFILE_FUNCTION();
 
-		// Setup the framebuffer and renderer
-		FramebufferSpecification fbSpec;
-		fbSpec.Attachments = { 
-			TextureFormat::RGBA16F,			// Color
-			TextureFormat::RED_INTEGER,		// EntityID
-			TextureFormat::Depth,			// Depth
-			TextureFormat::RGBA16F,			// Normal
-			TextureFormat::RGBA16F,			// Emissive
-			TextureFormat::RGBA8			// Roughness + Metallic + Specular + AO
-		};
-		fbSpec.Width = 1600;
-		fbSpec.Height = 900;
-		fbSpec.Samples = 1;
-		m_Framebuffer = Framebuffer::Create(fbSpec);
-		SceneRenderer::SetActiveFramebuffer(m_Framebuffer);
+#ifndef DY_DIST
+		Log::SetCallback([&](const Log::Message& message)
+		{
+			m_DebugMessages.push_back({ message.FormattedText, message.Level });
+		});
+#endif
+
+		const glm::vec2 defaultViewportSize = glm::vec2(1600, 900);
+		m_SceneRendererContext = SceneRendererContext::Create(defaultViewportSize);
+		SceneRenderer::SetActiveContext(m_SceneRendererContext);
 
 		Renderer2D::SetLineWidth(4.0f);
 
 		// Load the project
 		Project::Load(s_ProjectPath);
-		AssetManager::Deserialize();
 		
 		Log::ShowConsole();
 		ScriptEngine::SetCoreAssemblyPath(Project::GetCoreModulePath());
 		ScriptEngine::SetAppAssemblyPath(Project::GetScriptModulePath());
 		ScriptEngine::ReloadAssembly();
 
+		ScriptGlue::SetOpenSceneCallback([&](UUID handle)
+		{
+			m_PostUpdateQueue.push_back(handle);
+		});
+
 		// Open the start scene
-		m_Scene = CreateRef<Scene>();
-		SceneSerializer serializer(m_Scene);
-		serializer.Deserialize(Project::GetAssetFileSystemPath(Project::GetActive()->GetConfig().StartScene).string());
+		m_Scene = AssetManager::GetAsset<Scene>(Project::GetActive()->GetConfig().StartScene);
 		
+		// Startup Logo
+		m_StartupLogo = Texture2D::Create("Resources/Icons/Branding/DymaticIconCircular.png");
+
 		// Start the scene runtime
 		m_Scene->OnRuntimeStart();
 
@@ -66,15 +67,17 @@ namespace Dymatic {
 		if (Application::Get().GetSpecification().WindowStartHidden)
 			Application::Get().GetWindow().ShowWindow();
 
+#ifndef DY_DIST
 		// Setup ImGui debug overlay
 		{
 			// Prevent ini settings dumping
 			ImGui::GetIO().IniFilename = nullptr;
 
 			ImGuiLayer* imguiLayer = Application::Get().GetImGuiLayer();
-			imguiLayer->AddIconFont("assets/fonts/IconsFont.ttf", 20.0f, 0x00A9, 0x00A9); // Copyright Symbol
-			imguiLayer->AddIconFont("assets/fonts/IconsFont.ttf", 20.0f, 0x00AE, 0x00AE); // Registered Symbol
+			imguiLayer->AddIconFont("Resources/Fonts/OpenSans-Regular.ttf", 20.0f, 0x00A9, 0x00A9); // Copyright Symbol
+			imguiLayer->AddIconFont("Resources/Fonts/OpenSans-Regular.ttf", 20.0f, 0x00AE, 0x00AE); // Registered Symbol
 		}
+#endif
 	}
 
 	void RuntimeLayer::OnDetach()
@@ -88,7 +91,14 @@ namespace Dymatic {
 	{
 		DY_PROFILE_FUNCTION();
 
+		static constexpr float fadeInStart = 3.0f;
+		static constexpr float fadeInEnd = 5.0f;
+		static constexpr float fadeOutStart = 8.0f;
+		static constexpr float fadeOutEnd = 10.0f;
+
+#ifndef DY_DIST
 		m_DeltaTime = ts;
+#endif
 		
 		const uint32_t width = Application::Get().GetWindow().GetWidth();
 		const uint32_t height = Application::Get().GetWindow().GetHeight();
@@ -96,36 +106,83 @@ namespace Dymatic {
 		m_Scene->OnViewportResize(width, height);
 
 		// Resize
-		if (FramebufferSpecification spec = m_Framebuffer->GetSpecification();
+		if (FramebufferSpecification spec = m_SceneRendererContext->ActiveFramebuffer->GetSpecification();
 			width > 0.0f && height > 0.0f && // zero sized framebuffer is invalid
 			(spec.Width != width || spec.Height != height))
 		{
-			m_Framebuffer->Resize(width, height);
-			SceneRenderer::Resize();
+			m_SceneRendererContext->Resize(width, height);
 		}
 
 		// Render
 		Renderer2D::ResetStats();
 		SceneRenderer::ResetStats();
-		m_Framebuffer->Bind();
+		m_SceneRendererContext->ActiveFramebuffer->Bind();
 		
 		RenderCommand::SetClearColor(glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
 		RenderCommand::Clear();
 
 		//Clear entity ID attachment to -1
-		int value = -1;
-		m_Framebuffer->ClearAttachment(1, &value);
+		const int value = -1;
+		m_SceneRendererContext->ActiveFramebuffer->ClearAttachment(1, &value);
 
-		m_Scene->OnUpdateRuntime(ts);
+		// Manage Startup Logo
+		if (m_StartupLogo)
+		{
+			m_StartupDisplayTime += ts;
+
+			if (m_StartupDisplayTime >= fadeInStart)
+			{
+				// Animate alpha with cubic
+				const float alpha =
+					m_StartupDisplayTime <= fadeInEnd ? std::pow((m_StartupDisplayTime - fadeInStart) / (fadeInEnd - fadeInStart), 3.0f) :
+					m_StartupDisplayTime >= fadeOutStart ? 1.0f - std::pow((m_StartupDisplayTime - fadeOutStart) / (fadeOutEnd - fadeOutStart), 3.0f) :
+					1.0f;
+
+				SceneCamera camera;
+				camera.SetProjectionType(SceneCamera::ProjectionType::Orthographic);
+				camera.SetOrthographicSize(2.0f);
+				camera.SetViewportSize(m_SceneRendererContext->ActiveWidth, m_SceneRendererContext->ActiveHeight);
+
+				Renderer2D::BeginScene(camera, glm::mat4(1.0f));
+				Renderer2D::DrawQuad(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.2f, 0.0f)), m_StartupLogo, 1.0f, glm::vec4(alpha));
+				Renderer2D::DrawText(glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -0.65f, 0.0f)), glm::vec3(0.2f)), "Dymatic Engine", TextAlignment::Center, nullptr, glm::vec4(alpha));
+				Renderer2D::DrawText(glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -0.80f, 0.0f)), glm::vec3(0.035f)), "Copyright Dymatic Technologies 2024", TextAlignment::Center, nullptr, glm::vec4(alpha));
+				Renderer2D::EndScene();
+
+				if (m_StartupDisplayTime >= fadeOutEnd)
+					m_StartupLogo = nullptr;
+			}
+		}
+		else
+		{
+			// Render Scene
+			m_Scene->OnUpdateRuntime(ts);
+		}
 
 		// Draw framebuffer to main framebuffer
-		m_Framebuffer->Copy(0);
+		m_SceneRendererContext->ActiveFramebuffer->CopyColor(0);
 
-		m_Framebuffer->Unbind();
+		m_SceneRendererContext->ActiveFramebuffer->Unbind();
+
+		// Iterate through the post update command list
+		// (Which at the moment is just a list of scenes to potentially switch)
+		if (!m_PostUpdateQueue.empty())
+		{
+			for (auto& command : m_PostUpdateQueue)
+			{
+				// Instruct the current scene to terminate then request the new scene from the asset manager.
+				m_Scene->OnRuntimeStop();
+				m_Scene = Scene::Copy(AssetManager::GetAsset<Scene>(command));
+				m_Scene->OnRuntimeStart();
+			}
+			
+			m_PostUpdateQueue.clear();
+		}
 	}
 
 	void RuntimeLayer::OnImGuiRender()
 	{
+#ifndef DY_DIST
 		static bool s_DebugOpen = false;
 		static bool s_PressedLastFrame = false;
 		
@@ -147,17 +204,19 @@ namespace Dymatic {
 
 			// Draw debug log overlay
 			{
-				const float spacing = ImGui::GetTextLineHeight() + style.FramePadding.y * 2.0f;
-
-				ImVec2 drawPos = ImVec2(windowPos.x + style.FramePadding.x, windowPos.y + windowSize.y - spacing);
-				auto& messages = Log::GetMessages();
-				for (uint32_t index = messages.size() - 1; index > 0; index--)
+				ImVec2 drawPos = ImVec2(windowPos.x + style.FramePadding.x, windowPos.y + windowSize.y);
+				for (auto it = std::rbegin(m_DebugMessages); it != std::rend(m_DebugMessages); ++it)
 				{
-					auto& message = messages[index];
+					auto& message = *it;
+
+					if (drawPos.y > windowPos.y)
+						drawPos.y -= ImGui::CalcTextSize(message.Text.c_str()).y + style.FramePadding.y * 2.0f;
+					else
+						break;
 
 					if (message.Level == 5 /*Critical*/)
 					{
-						const ImVec2 size = ImGui::CalcTextSize(message.Text.c_str());
+						ImVec2 size = ImGui::CalcTextSize(message.Text.c_str());
 						drawList->AddRectFilled(
 							ImVec2(drawPos.x - style.FramePadding.x, drawPos.y - style.FramePadding.y),
 							ImVec2(drawPos.x + size.x + style.FramePadding.x, drawPos.y + size.y + style.FramePadding.y),
@@ -178,11 +237,6 @@ namespace Dymatic {
 						// Access log message text
 						message.Text.c_str()
 					);
-
-					if (drawPos.y > windowPos.y)
-						drawPos.y -= spacing;
-					else
-						break;
 				}
 			}
 
@@ -198,7 +252,7 @@ namespace Dymatic {
 
 				memset(buff, 0, 256);
 
-				sprintf(buff, "%.2f ms", m_DeltaTime);
+				sprintf(buff, "%.2f ms", m_DeltaTime * 100.0f);
 				drawList->AddText(ImVec2(windowPos.x + windowSize.x - style.FramePadding.x - ImGui::CalcTextSize(buff).x, windowPos.y + style.FramePadding.y * 3.0f + ImGui::GetTextLineHeight()), color, buff);
 			}
 
@@ -217,6 +271,7 @@ namespace Dymatic {
 					drawList->AddText(windowPos + windowSize - ImVec2(style.FramePadding.x + ImGui::CalcTextSize(text[index]).x, style.FramePadding.y + ImGui::GetTextLineHeightWithSpacing() * ((count) - index)), ImGui::GetColorU32(ImGuiCol_TextDisabled), text[index]);
 			}
 		}
+#endif
 	}
 
 	void RuntimeLayer::OnEvent(Event& e)

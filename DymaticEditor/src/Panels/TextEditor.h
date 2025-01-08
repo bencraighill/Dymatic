@@ -9,6 +9,7 @@
 #include <map>
 #include <regex>
 
+#define IMGUI_DEFINE_MATH_OPERATORS
 #include <imgui/imgui.h>
 #include "Dymatic.h"
 
@@ -17,31 +18,6 @@ namespace TextEditorInternal {
 	class TextEditor
 	{
 	public:
-		//enum class PaletteIndex
-		//{
-		//	Default,
-		//	Keyword,
-		//	Number,
-		//	String,
-		//	CharLiteral,
-		//	Punctuation,
-		//	Preprocessor,
-		//	Identifier,
-		//	KnownIdentifier,
-		//	PreprocIdentifier,
-		//	Comment,
-		//	MultiLineComment,
-		//	Background,
-		//	Cursor,
-		//	Selection,
-		//	ErrorMarker,
-		//	Breakpoint,
-		//	LineNumber,
-		//	CurrentLineFill,
-		//	CurrentLineFillInactive,
-		//	CurrentLineEdge,
-		//	Max
-		//};
 
 		enum class SelectionMode
 		{
@@ -415,10 +391,10 @@ namespace Dymatic {
 		bool IsDirty() { return textEditor.GetUndoIndex() != SavedUndoIndex; }
 	};
 
-	class TextEditorPannel
+	class TextEditorPanel
 	{
 	public:
-		TextEditorPannel();
+		TextEditorPanel();
 		void OnImGuiRender();
 
 		void OnEvent(Event& e);

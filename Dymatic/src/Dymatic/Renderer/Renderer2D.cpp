@@ -1,10 +1,15 @@
 #include "dypch.h"
 #include "Dymatic/Renderer/Renderer2D.h"
 
+#include "Dymatic/Renderer/Renderer.h"
+#include "Dymatic/Renderer/RendererConstants.h"
+
 #include "Dymatic/Renderer/VertexArray.h"
 #include "Dymatic/Renderer/Shader.h"
 #include "Dymatic/Renderer/UniformBuffer.h"
 #include "Dymatic/Renderer/RenderCommand.h"
+
+#include "Dymatic/Asset/EngineAsset.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -57,12 +62,6 @@ namespace Dymatic {
 
 	struct Renderer2DData
 	{
-		static const uint32_t MaxQuads = 20000;
-		static const uint32_t MaxVertices = MaxQuads * 4;
-		static const uint32_t MaxIndices = MaxQuads * 6;
-		static const uint32_t MaxTextureSlots = 32; // TODO: RenderCaps
-		static const uint32_t MaxFontSlots = 32;
-
 		Ref<VertexArray> QuadVertexArray;
 		Ref<VertexBuffer> QuadVertexBuffer;
 		Ref<Shader> QuadShader;
@@ -92,30 +91,30 @@ namespace Dymatic {
 		LineVertex* LineVertexBufferBase = nullptr;
 		LineVertex* LineVertexBufferPtr = nullptr;
 
+		uint32_t PointVertexCount = 0;
+		LineVertex* PointVertexBufferBase = nullptr;
+		LineVertex* PointVertexBufferPtr = nullptr;
+
 		uint32_t TextIndexCount = 0;
 		TextVertex* TextVertexBufferBase = nullptr;
 		TextVertex* TextVertexBufferPtr = nullptr;
 
 		float LineWidth = 2.0f;
 
-		std::array<Ref<Texture2D>, MaxTextureSlots> TextureSlots;
+		std::array<Ref<Texture2D>, RendererConstants::MaxTextureSlots> TextureSlots;
 		uint32_t TextureSlotIndex = 1; // 0 = white texture
 
-		std::array<Ref<Texture2D>, MaxFontSlots> FontSlots;
+		std::array<Ref<Texture2D>, RendererConstants::MaxFontSlots> FontSlots;
 		uint32_t FontSlotIndex = 0;
 
 		glm::vec4 QuadVertexPositions[4];
 		glm::vec4 CubeVertexPositions[8];
 
-		Renderer2D::Statistics Stats;
+		Ref<Font> DefaultFont = nullptr;
 
-		struct CameraData
-		{
-			glm::mat4 ViewProjection;
-			glm::vec3 ViewPosition;
-		};
-		CameraData CameraBuffer;
-		Ref<UniformBuffer> CameraUniformBuffer;
+		Renderer2D::Statistics Stats;
+		
+		RendererSharedData::CameraData CameraBuffer;
 	};
 
 	static Renderer2DData s_Data;
@@ -126,7 +125,7 @@ namespace Dymatic {
 
 		s_Data.QuadVertexArray = VertexArray::Create();
 
-		s_Data.QuadVertexBuffer = VertexBuffer::Create(s_Data.MaxVertices * sizeof(QuadVertex));
+		s_Data.QuadVertexBuffer = VertexBuffer::Create(RendererConstants::MaxVertices * sizeof(QuadVertex));
 		s_Data.QuadVertexBuffer->SetLayout({
 			{ ShaderDataType::Float3, "a_Position"     },
 			{ ShaderDataType::Float4, "a_Color"        },
@@ -137,12 +136,12 @@ namespace Dymatic {
 			});
 		s_Data.QuadVertexArray->AddVertexBuffer(s_Data.QuadVertexBuffer);
 
-		s_Data.QuadVertexBufferBase = new QuadVertex[s_Data.MaxVertices];
+		s_Data.QuadVertexBufferBase = new QuadVertex[RendererConstants::MaxVertices];
 
-		uint32_t* quadIndices = new uint32_t[s_Data.MaxIndices];
+		uint32_t* quadIndices = new uint32_t[RendererConstants::MaxIndices];
 
 		uint32_t offset = 0;
-		for (uint32_t i = 0; i < s_Data.MaxIndices; i += 6)
+		for (uint32_t i = 0; i < RendererConstants::MaxIndices; i += 6)
 		{
 			quadIndices[i + 0] = offset + 0;
 			quadIndices[i + 1] = offset + 1;
@@ -155,14 +154,14 @@ namespace Dymatic {
 			offset += 4;
 		}
 
-		Ref<IndexBuffer> quadIB = IndexBuffer::Create(quadIndices, s_Data.MaxIndices);
+		Ref<IndexBuffer> quadIB = IndexBuffer::Create(quadIndices, RendererConstants::MaxIndices);
 		s_Data.QuadVertexArray->SetIndexBuffer(quadIB);
 		delete[] quadIndices;
 
 		// Circles
 		s_Data.CircleVertexArray = VertexArray::Create();
 
-		s_Data.CircleVertexBuffer = VertexBuffer::Create(s_Data.MaxVertices * sizeof(CircleVertex));
+		s_Data.CircleVertexBuffer = VertexBuffer::Create(RendererConstants::MaxVertices * sizeof(CircleVertex));
 		s_Data.CircleVertexBuffer->SetLayout({
 			{ ShaderDataType::Float3, "a_WorldPosition" },
 			{ ShaderDataType::Float3, "a_LocalPosition" },
@@ -173,24 +172,27 @@ namespace Dymatic {
 			});
 		s_Data.CircleVertexArray->AddVertexBuffer(s_Data.CircleVertexBuffer);
 		s_Data.CircleVertexArray->SetIndexBuffer(quadIB); // Use quad IB
-		s_Data.CircleVertexBufferBase = new CircleVertex[s_Data.MaxVertices];
+		s_Data.CircleVertexBufferBase = new CircleVertex[RendererConstants::MaxVertices];
 
 		// Lines
 		s_Data.LineVertexArray = VertexArray::Create();
 
-		s_Data.LineVertexBuffer = VertexBuffer::Create(s_Data.MaxVertices * sizeof(LineVertex));
+		s_Data.LineVertexBuffer = VertexBuffer::Create(RendererConstants::MaxLineVertices * sizeof(LineVertex));
 		s_Data.LineVertexBuffer->SetLayout({
 			{ ShaderDataType::Float3, "a_Position" },
 			{ ShaderDataType::Float4, "a_Color"    },
 			{ ShaderDataType::Int,    "a_EntityID" }
 			});
 		s_Data.LineVertexArray->AddVertexBuffer(s_Data.LineVertexBuffer);
-		s_Data.LineVertexBufferBase = new LineVertex[s_Data.MaxVertices];
+		s_Data.LineVertexBufferBase = new LineVertex[RendererConstants::MaxLineVertices];
+
+		// Points (shared with Lines)
+		s_Data.PointVertexBufferBase = new LineVertex[RendererConstants::MaxPoints];
 
 		// Text
 		s_Data.TextVertexArray = VertexArray::Create();
 
-		s_Data.TextVertexBuffer = VertexBuffer::Create(s_Data.MaxVertices * sizeof(TextVertex));
+		s_Data.TextVertexBuffer = VertexBuffer::Create(RendererConstants::MaxVertices * sizeof(TextVertex));
 		s_Data.TextVertexBuffer->SetLayout({
 			{ ShaderDataType::Float3, "a_Position" },
 			{ ShaderDataType::Float4, "a_Color"    },
@@ -200,17 +202,21 @@ namespace Dymatic {
 			});
 		s_Data.TextVertexArray->AddVertexBuffer(s_Data.TextVertexBuffer);
 		s_Data.TextVertexArray->SetIndexBuffer(quadIB); // Use quad IB
-		s_Data.TextVertexBufferBase = new TextVertex[s_Data.MaxVertices];
+		s_Data.TextVertexBufferBase = new TextVertex[RendererConstants::MaxVertices];
 
 		// Setup base white texture
-		s_Data.WhiteTexture = Texture2D::Create(1, 1);
+		TextureSpecification whiteTextureSpecifcation;
+		whiteTextureSpecifcation.Width = 1;
+		whiteTextureSpecifcation.Height = 1;
+		s_Data.WhiteTexture = Texture2D::Create(whiteTextureSpecifcation);
+		
 		uint32_t whiteTextureData = 0xffffffff;
 		s_Data.WhiteTexture->SetData(&whiteTextureData, sizeof(uint32_t));
 
-		s_Data.QuadShader = Shader::Create("assets/shaders/Renderer2D_Quad.glsl");
-		s_Data.CircleShader = Shader::Create("assets/shaders/Renderer2D_Circle.glsl");
-		s_Data.LineShader = Shader::Create("assets/shaders/Renderer2D_Line.glsl");
-		s_Data.TextShader = Shader::Create("assets/shaders/Renderer2D_Text.glsl");
+		s_Data.QuadShader = Renderer::GetShaderLibrary()->Get("Renderer2D_Quad");
+		s_Data.CircleShader = Renderer::GetShaderLibrary()->Get("Renderer2D_Circle");
+		s_Data.LineShader = Renderer::GetShaderLibrary()->Get("Renderer2D_Line");
+		s_Data.TextShader = Renderer::GetShaderLibrary()->Get("Renderer2D_Text");
 
 		// Set first texture slot to 0
 		s_Data.TextureSlots[0] = s_Data.WhiteTexture;
@@ -229,7 +235,9 @@ namespace Dymatic {
 		s_Data.CubeVertexPositions[6] = { 0.5f,  0.5f,  0.5f, 1.0f };
 		s_Data.CubeVertexPositions[7] = { -0.5f,  0.5f,  0.5f, 1.0f };
 
-		s_Data.CameraUniformBuffer = UniformBuffer::Create(sizeof(Renderer2DData::CameraData), 0);
+		s_Data.DefaultFont = AssetManager::GetAsset<Font>((AssetHandle)EngineAsset::DefaultFont);
+
+		// Note: RendererSharedData now handles the camera uniform buffer.
 	}
 
 	void Renderer2D::Shutdown()
@@ -245,7 +253,8 @@ namespace Dymatic {
 		
 		s_Data.CameraBuffer.ViewProjection = camera.GetProjection() * glm::inverse(transform);
 		s_Data.CameraBuffer.ViewPosition = transform[3];
-		s_Data.CameraUniformBuffer->SetData(&s_Data.CameraBuffer, sizeof(Renderer2DData::CameraData));
+		
+		UpdateCamera();
 
 		StartBatch();
 	}
@@ -255,8 +264,9 @@ namespace Dymatic {
 		DY_PROFILE_FUNCTION();
 		
 		s_Data.CameraBuffer.ViewProjection = camera.GetViewProjection();
-		s_Data.CameraBuffer.ViewPosition = camera.GetPosition();
-		s_Data.CameraUniformBuffer->SetData(&s_Data.CameraBuffer, sizeof(Renderer2DData::CameraData));
+		s_Data.CameraBuffer.ViewPosition = glm::vec4(camera.GetPosition(), 1.0f);
+
+		UpdateCamera();
 
 		StartBatch();
 	}
@@ -266,84 +276,152 @@ namespace Dymatic {
 		DY_PROFILE_FUNCTION();
 
 		Flush();
+
+		// Clear all texture and font slots (excluding white texture) to allow asset references to die if unused
+		std::fill(s_Data.TextureSlots.begin() + 1, s_Data.TextureSlots.begin() + s_Data.TextureSlotIndex, nullptr);
+		std::fill(s_Data.FontSlots.begin(), s_Data.FontSlots.begin() + s_Data.FontSlotIndex, nullptr);
 	}
 
 	void Renderer2D::StartBatch()
 	{
-		s_Data.QuadIndexCount = 0;
-		s_Data.QuadVertexBufferPtr = s_Data.QuadVertexBufferBase;
-		s_Data.TextureSlotIndex = 1;
-
-		s_Data.CircleIndexCount = 0;
-		s_Data.CircleVertexBufferPtr = s_Data.CircleVertexBufferBase;
-
-		s_Data.LineVertexCount = 0;
-		s_Data.LineVertexBufferPtr = s_Data.LineVertexBufferBase;
-
+		StartQuadBatch();
+		StartCircleBatch();
+		StartLineBatch();
+		StartPointBatch();
 		StartTextBatch();
 	}
 
 	void Renderer2D::Flush()
 	{
-		if (s_Data.QuadIndexCount)
-		{
-			uint32_t dataSize = (uint32_t)((uint8_t*)s_Data.QuadVertexBufferPtr - (uint8_t*)s_Data.QuadVertexBufferBase);
-			s_Data.QuadVertexBuffer->SetData(s_Data.QuadVertexBufferBase, dataSize);
-
-			// Bind textures
-			for (uint32_t i = 0; i < s_Data.TextureSlotIndex; i++)
-				s_Data.TextureSlots[i]->Bind(i);
-
-			s_Data.QuadShader->Bind();
-			RenderCommand::DrawIndexed(s_Data.QuadVertexArray, s_Data.QuadIndexCount);
-			s_Data.Stats.DrawCalls++;
-		}
-
-		if (s_Data.CircleIndexCount)
-		{
-			uint32_t dataSize = (uint32_t)((uint8_t*)s_Data.CircleVertexBufferPtr - (uint8_t*)s_Data.CircleVertexBufferBase);
-			s_Data.CircleVertexBuffer->SetData(s_Data.CircleVertexBufferBase, dataSize);
-
-			s_Data.CircleShader->Bind();
-			RenderCommand::DrawIndexed(s_Data.CircleVertexArray, s_Data.CircleIndexCount);
-			s_Data.Stats.DrawCalls++;
-		}
-
-		if (s_Data.LineVertexCount)
-		{
-			uint32_t dataSize = (uint32_t)((uint8_t*)s_Data.LineVertexBufferPtr - (uint8_t*)s_Data.LineVertexBufferBase);
-			s_Data.LineVertexBuffer->SetData(s_Data.LineVertexBufferBase, dataSize);
-
-			s_Data.LineShader->Bind();
-			RenderCommand::SetLineWidth(s_Data.LineWidth);
-			RenderCommand::DrawLines(s_Data.LineVertexArray, s_Data.LineVertexCount);
-			s_Data.Stats.DrawCalls++;
-		}
-
+		FlushQuads();
+		FlushCircles();
+		FlushLines();
+		FlushPoints();
 		FlushText();
 	}
 
-	void Renderer2D::NextBatch()
+	void Renderer2D::FlushQuads()
 	{
-		Flush();
-		StartBatch();
+		if (!s_Data.QuadIndexCount)
+			return;
+
+		uint32_t dataSize = (uint32_t)((uint8_t*)s_Data.QuadVertexBufferPtr - (uint8_t*)s_Data.QuadVertexBufferBase);
+		s_Data.QuadVertexBuffer->SetData(s_Data.QuadVertexBufferBase, dataSize);
+
+		// Bind textures
+		for (uint32_t i = 0; i < s_Data.TextureSlotIndex; i++)
+			s_Data.TextureSlots[i]->Bind(i);
+
+		s_Data.QuadShader->Bind();
+		RenderCommand::DrawIndexed(s_Data.QuadVertexArray, s_Data.QuadIndexCount);
+		s_Data.Stats.DrawCalls++;
+	}
+
+	void Renderer2D::StartQuadBatch()
+	{
+		s_Data.QuadIndexCount = 0;
+		s_Data.QuadVertexBufferPtr = s_Data.QuadVertexBufferBase;
+		s_Data.TextureSlotIndex = 1;
+	}
+
+	void Renderer2D::NextQuadBatch()
+	{
+		FlushQuads();
+		StartQuadBatch();
+	}
+
+	void Renderer2D::FlushCircles()
+	{
+		if (!s_Data.CircleIndexCount)
+			return;
+
+		uint32_t dataSize = (uint32_t)((uint8_t*)s_Data.CircleVertexBufferPtr - (uint8_t*)s_Data.CircleVertexBufferBase);
+		s_Data.CircleVertexBuffer->SetData(s_Data.CircleVertexBufferBase, dataSize);
+
+		s_Data.CircleShader->Bind();
+		RenderCommand::DrawIndexed(s_Data.CircleVertexArray, s_Data.CircleIndexCount);
+		s_Data.Stats.DrawCalls++;
+	}
+
+	void Renderer2D::StartCircleBatch()
+	{
+		s_Data.CircleIndexCount = 0;
+		s_Data.CircleVertexBufferPtr = s_Data.CircleVertexBufferBase;
+	}
+
+	void Renderer2D::NextCircleBatch()
+	{
+		FlushCircles();
+		StartCircleBatch();
+	}
+
+	void Renderer2D::FlushLines()
+	{
+		if (!s_Data.LineVertexCount)
+			return;
+
+		uint32_t dataSize = (uint32_t)((uint8_t*)s_Data.LineVertexBufferPtr - (uint8_t*)s_Data.LineVertexBufferBase);
+		s_Data.LineVertexBuffer->SetData(s_Data.LineVertexBufferBase, dataSize);
+
+		s_Data.LineShader->Bind();
+		RenderCommand::SetLineWidth(s_Data.LineWidth);
+		RenderCommand::DrawLines(s_Data.LineVertexArray, s_Data.LineVertexCount);
+		s_Data.Stats.DrawCalls++;
+	}
+
+	void Renderer2D::StartLineBatch()
+	{
+		s_Data.LineVertexCount = 0;
+		s_Data.LineVertexBufferPtr = s_Data.LineVertexBufferBase;
+	}
+
+	void Renderer2D::NextLineBatch()
+	{
+		FlushLines();
+		StartLineBatch();
+	}
+
+	void Renderer2D::FlushPoints()
+	{
+		if (!s_Data.PointVertexCount)
+			return;
+
+		uint32_t dataSize = (uint32_t)((uint8_t*)s_Data.PointVertexBufferPtr - (uint8_t*)s_Data.PointVertexBufferBase);
+		s_Data.LineVertexBuffer->SetData(s_Data.PointVertexBufferBase, dataSize);
+
+		s_Data.LineShader->Bind();
+		RenderCommand::SetPointSize(10.0f);
+		RenderCommand::DrawPoints(s_Data.LineVertexArray, s_Data.PointVertexCount);
+		s_Data.Stats.DrawCalls++;
+	}
+
+	void Renderer2D::StartPointBatch()
+	{
+		s_Data.PointVertexCount = 0;
+		s_Data.PointVertexBufferPtr = s_Data.PointVertexBufferBase;
+	}
+
+	void Renderer2D::NextPointBatch()
+	{
+		FlushPoints();
+		StartPointBatch();
 	}
 
 	void Renderer2D::FlushText()
 	{
-		if (s_Data.TextIndexCount)
-		{
-			uint32_t dataSize = (uint32_t)((uint8_t*)s_Data.TextVertexBufferPtr - (uint8_t*)s_Data.TextVertexBufferBase);
-			s_Data.TextVertexBuffer->SetData(s_Data.TextVertexBufferBase, dataSize);
+		if (!s_Data.TextIndexCount)
+			return;
 
-			// Bind textures
-			for (uint32_t i = 0; i < s_Data.FontSlotIndex; i++)
-				s_Data.FontSlots[i]->Bind(i);
+		uint32_t dataSize = (uint32_t)((uint8_t*)s_Data.TextVertexBufferPtr - (uint8_t*)s_Data.TextVertexBufferBase);
+		s_Data.TextVertexBuffer->SetData(s_Data.TextVertexBufferBase, dataSize);
 
-			s_Data.TextShader->Bind();
-			RenderCommand::DrawIndexed(s_Data.TextVertexArray, s_Data.TextIndexCount);
-			s_Data.Stats.DrawCalls++;
-		}
+		// Bind textures
+		for (uint32_t i = 0; i < s_Data.FontSlotIndex; i++)
+			s_Data.FontSlots[i]->Bind(i);
+
+		s_Data.TextShader->Bind();
+		RenderCommand::DrawIndexed(s_Data.TextVertexArray, s_Data.TextIndexCount);
+		s_Data.Stats.DrawCalls++;
 	}
 
 	void Renderer2D::StartTextBatch()
@@ -351,6 +429,19 @@ namespace Dymatic {
 		s_Data.TextIndexCount = 0;
 		s_Data.TextVertexBufferPtr = s_Data.TextVertexBufferBase;
 		s_Data.FontSlotIndex = 0;
+	}
+
+	void Renderer2D::NextTextBatch()
+	{
+		FlushText();
+		StartTextBatch();
+	}
+
+	void Renderer2D::UpdateCamera()
+	{
+		// The Renderer2D only actually sets the first two uniforms in the buffer so we specify the size here.
+		const size_t bufferUploadSize = sizeof(glm::mat4) + sizeof(glm::vec4);
+		Renderer::SetCameraData(s_Data.CameraBuffer, bufferUploadSize);
 	}
 
 	void Renderer2D::DrawQuad(const glm::vec2& position, const glm::vec2& size, const glm::vec4& color)
@@ -392,8 +483,8 @@ namespace Dymatic {
 		constexpr glm::vec2 textureCoords[] = { { 0.0f, 0.0f }, { 1.0f, 0.0f }, { 1.0f, 1.0f }, { 0.0f, 1.0f } };
 		const float tilingFactor = 1.0f;
 
-		if (s_Data.QuadIndexCount >= Renderer2DData::MaxIndices)
-			NextBatch();
+		if (s_Data.QuadIndexCount >= RendererConstants::MaxIndices)
+			NextQuadBatch();
 
 		for (size_t i = 0; i < quadVertexCount; i++)
 		{
@@ -419,8 +510,8 @@ namespace Dymatic {
 		constexpr size_t quadVertexCount = 4;
 		constexpr glm::vec2 textureCoords[] = { { 0.0f, 0.0f }, { 1.0f, 0.0f }, { 1.0f, 1.0f }, { 0.0f, 1.0f } };
 
-		if (s_Data.QuadIndexCount >= Renderer2DData::MaxIndices)
-			NextBatch();
+		if (s_Data.QuadIndexCount >= RendererConstants::MaxIndices)
+			NextQuadBatch();
 
 		float textureIndex = 0.0f;
 		for (uint32_t i = 1; i < s_Data.TextureSlotIndex; i++)
@@ -434,8 +525,8 @@ namespace Dymatic {
 
 		if (textureIndex == 0.0f)
 		{
-			if (s_Data.TextureSlotIndex >= Renderer2DData::MaxTextureSlots)
-				NextBatch();
+			if (s_Data.TextureSlotIndex >= RendererConstants::MaxTextureSlots)
+				NextQuadBatch();
 
 			textureIndex = (float)s_Data.TextureSlotIndex;
 			s_Data.TextureSlots[s_Data.TextureSlotIndex] = texture;
@@ -495,9 +586,8 @@ namespace Dymatic {
 	{
 		DY_PROFILE_FUNCTION();
 
-		// TODO: implement for circles
-		// if (s_Data.QuadIndexCount >= Renderer2DData::MaxIndices)
-		// 	NextBatch();
+		if (s_Data.CircleIndexCount >= RendererConstants::MaxIndices)
+			NextCircleBatch();
 
 		for (size_t i = 0; i < 4; i++)
 		{
@@ -515,7 +605,7 @@ namespace Dymatic {
 		s_Data.Stats.QuadCount++;
 	}
 
-	void Renderer2D::DrawLine(const glm::vec3& p0, glm::vec3& p1, const glm::vec4& color, int entityID)
+	void Renderer2D::DrawLine(const glm::vec3& p0, const glm::vec3& p1, const glm::vec4& color, int entityID)
 	{
 		s_Data.LineVertexBufferPtr->Position = p0;
 		s_Data.LineVertexBufferPtr->Color = color;
@@ -530,30 +620,133 @@ namespace Dymatic {
 		s_Data.LineVertexCount += 2;
 	}
 
-	void Renderer2D::DrawTextComponent(const glm::mat4& transform, TextComponent& tc, int entityID)
+	void Renderer2D::DrawLineDashed(const glm::vec3& p0, const glm::vec3& p1, const glm::vec4& color, float dashRatio, float scale, int entityID)
+	{
+		// Calculate line/pattern lengths
+		const float lineLength = glm::distance(p0, p1);
+		const float dashLength = dashRatio * scale;
+		const float spaceLength = (1.0f - dashRatio) * scale;
+		const float patternLength = dashLength + spaceLength;
+
+		// Calculate the number of full patterns that fit
+		const uint32_t fullPatternCount = lineLength / patternLength;
+		const glm::vec3 lineDirection = glm::normalize(p1 - p0);
+
+		glm::vec3 currentPoint = p0;
+
+		// Draw all full line segments
+		for (uint32_t i = 0; i < fullPatternCount; i++)
+		{
+			const glm::vec3 dashEndPoint = currentPoint + lineDirection * dashLength;
+			DrawLine(currentPoint, dashEndPoint, color, entityID);
+			currentPoint = dashEndPoint + lineDirection * spaceLength;
+		}
+
+		// Draw the remaining partial segment
+		const float remainingLength = glm::length(p1 - currentPoint);
+		if (remainingLength > 0.0f)
+		{
+			if (remainingLength > dashLength)
+				DrawLine(currentPoint, currentPoint + lineDirection * dashLength, color, entityID);
+			else
+				DrawLine(currentPoint, p1, color, entityID);
+		}
+	}
+
+	void Renderer2D::DrawPoint(const glm::vec3& point, const glm::vec4& color, int entityID)
+	{
+		if (s_Data.PointVertexCount >= RendererConstants::MaxPoints)
+			NextPointBatch();
+
+		s_Data.PointVertexBufferPtr->Position = point;
+		s_Data.PointVertexBufferPtr->Color = color;
+		s_Data.PointVertexBufferPtr->EntityID = entityID;
+		s_Data.PointVertexBufferPtr++;
+
+		s_Data.PointVertexCount++;
+	}
+
+	void Renderer2D::DrawText(const glm::mat4& transform, const std::string& text, const TextAlignment alignment, Ref<Font> font, const glm::vec4& color, float kerning, float lineSpacing, float maxWidth, int entityID)
 	{
 		DY_PROFILE_FUNCTION();
 
-		if (!tc.Font)
+		if (!font || !font->IsLoaded())
+			font = s_Data.DefaultFont;
+
+		if (!font)
 			return;
 
 		constexpr size_t quadVertexCount = 4;
-		
+
 		const float scale_x = glm::length(glm::vec3(transform[0][0], transform[1][0], transform[2][0]));
-		const float maxWidth = tc.MaxWidth / scale_x;
+		const float scaledMaxWidth = maxWidth / scale_x;
 
 		glm::vec2 cursor = glm::vec2(0.0f);
+		float lineLength;
+		int lineMaxIndex;
+		int spaceCount;
 
-		for (auto& character : tc.TextString)
+		const size_t textLength = text.size();
+		for (uint32_t index = 0; index < textLength; index++)
 		{
+			const char character = text[index];
+
+			// If we hit a new line, reset the cursor and move on to the next character.
 			if (character == '\n')
 			{
 				cursor.x = 0.0f;
-				cursor.y -= tc.Font->GetLineHeight() + tc.LineSpacing;
+				cursor.y -= font->GetLineHeight() + lineSpacing;
 				continue;
 			}
 
-			const Font::Glyph* glyph = tc.Font->GetGlyph(character);
+			// When the cursor is situated at the beginning of a new line, we can calculate the length of the line.
+			if (cursor.x == 0.0f)
+			{
+				lineLength = 0;
+				spaceCount = 0;
+				float previousLength = 0.0f;
+				float currentLength = 0.0f;
+				for (uint32_t i = index; i < textLength; i++)
+				{
+					const char c = text[i];
+
+					previousLength = currentLength;
+
+					const Font::Glyph* glyph = font->GetGlyph(c);
+					if (glyph)
+					{
+						currentLength += glyph->Advance + kerning;
+					}
+
+					if (currentLength > maxWidth && maxWidth != 0.0f && lineLength != 0)
+						break;
+
+					if (c == '\n')
+					{
+						lineLength = previousLength;
+						lineMaxIndex = i;
+						break;
+					}
+
+					if (i == textLength - 1)
+					{
+						lineLength = currentLength;
+						lineMaxIndex = i;
+						break;
+					}
+
+					if (c == ' ')
+					{
+						lineLength = previousLength;
+						lineMaxIndex = i;
+
+						if (alignment == TextAlignment::Justify)
+							spaceCount++;
+					}
+				}
+			}
+
+			const Font::Glyph* glyph = font->GetGlyph(character);
 			if (!glyph)
 				continue;
 
@@ -562,16 +755,13 @@ namespace Dymatic {
 
 				const glm::vec2 textureCoords[] = { glyph->Min, { glyph->Max.x, glyph->Min.y }, glyph->Max, { glyph->Min.x, glyph->Max.y } };
 
-				if (s_Data.TextIndexCount >= Renderer2DData::MaxIndices)
-				{
-					FlushText();
-					StartTextBatch();
-				}
+				if (s_Data.TextIndexCount >= RendererConstants::MaxIndices)
+					NextTextBatch();
 
 				int fontIndex = 0;
 				for (uint32_t i = 1; i < s_Data.FontSlotIndex; i++)
 				{
-					if (*s_Data.FontSlots[i] == *tc.Font->GetAtlas())
+					if (*s_Data.FontSlots[i] == *font->GetAtlas())
 					{
 						fontIndex = i;
 						break;
@@ -580,18 +770,28 @@ namespace Dymatic {
 
 				if (fontIndex == 0)
 				{
-					if (s_Data.FontSlotIndex >= Renderer2DData::MaxFontSlots)
-						NextBatch();
+					if (s_Data.FontSlotIndex >= RendererConstants::MaxFontSlots)
+						NextTextBatch();
 
 					fontIndex = s_Data.FontSlotIndex;
-					s_Data.FontSlots[s_Data.FontSlotIndex] = tc.Font->GetAtlas();
+					s_Data.FontSlots[s_Data.FontSlotIndex] = font->GetAtlas();
 					s_Data.FontSlotIndex++;
+				}
+
+				float offset;
+
+				switch (alignment)
+				{
+				case TextAlignment::Left:		offset = 0.0f; break;
+				case TextAlignment::Center:		offset = lineLength * 0.5f; break;
+				case TextAlignment::Right:		offset = lineLength; break;
+				case TextAlignment::Justify:	offset = 0.0f; break;
 				}
 
 				for (size_t i = 0; i < quadVertexCount; i++)
 				{
-					s_Data.TextVertexBufferPtr->Position = transform * glm::vec4(glyph->Size * glm::vec2(s_Data.QuadVertexPositions[i]) + cursor + glm::vec2(glyph->Left + (glyph->Size.x * 0.5f), glyph->Bottom + (glyph->Size.y * 0.5f)), 0.0f, 1.0f);
-					s_Data.TextVertexBufferPtr->Color = tc.Color;
+					s_Data.TextVertexBufferPtr->Position = transform * glm::vec4(glyph->Size * glm::vec2(s_Data.QuadVertexPositions[i]) + cursor + glm::vec2(glyph->Left + (glyph->Size.x * 0.5f), glyph->Bottom + (glyph->Size.y * 0.5f)) - glm::vec2(offset, 0.0f), 0.0f, 1.0f);
+					s_Data.TextVertexBufferPtr->Color = color;
 					s_Data.TextVertexBufferPtr->TexCoord = textureCoords[i];
 					s_Data.TextVertexBufferPtr->TexIndex = fontIndex;
 					s_Data.TextVertexBufferPtr->EntityID = entityID;
@@ -604,15 +804,28 @@ namespace Dymatic {
 				s_Data.Stats.QuadCount++;
 			}
 
-			cursor.x +=  glyph->Advance + tc.Kerning;
+			// Move the cursor along by the space required by the glyph and any additional kerning,
+			// only if the character is not a space at the end of the line.
+			if (character != ' ' || index != lineMaxIndex)
+				cursor.x += glyph->Advance + kerning;
 
-			if (cursor.x > maxWidth && maxWidth != 0.0f && character == ' ')
+			if (alignment == TextAlignment::Justify && character == ' ')
+				cursor.x += std::fmax(maxWidth - lineLength, 0.0f) / (float)spaceCount;
+
+			if (index >= lineMaxIndex)
 			{
 				cursor.x = 0.0f;
-				cursor.y -= tc.Font->GetLineHeight() + tc.LineSpacing;
+				cursor.y -= font->GetLineHeight() + lineSpacing;
 				continue;
 			}
 		}
+	}
+
+	void Renderer2D::DrawTextComponent(const glm::mat4& transform, TextComponent& tc, int entityID)
+	{
+		DY_PROFILE_FUNCTION();
+
+		DrawText(transform, tc.TextString, tc.Alignment, tc.Font, tc.Color, tc.Kerning, tc.LineSpacing, tc.MaxWidth, entityID);
 	}
 
 	void Renderer2D::DrawRect(const glm::vec3& position, const glm::vec2& size, const glm::vec4& color, int entityID)
@@ -667,7 +880,7 @@ namespace Dymatic {
 		DrawLine(p3, p7, color, entityID);
 	}
 
-	void Renderer2D::DrawCube(const glm::mat4& transform, const glm::vec4& color, int entityID /*= -1*/)
+	void Renderer2D::DrawCube(const glm::mat4& transform, const glm::vec4& color, int entityID)
 	{
 		glm::vec3 lineVertices[8];
 		for (size_t i = 0; i < 8; i++)

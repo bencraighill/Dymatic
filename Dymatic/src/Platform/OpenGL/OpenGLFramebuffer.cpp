@@ -101,6 +101,13 @@ namespace Dymatic {
 
 			glFramebufferTexture2D(GL_FRAMEBUFFER, attachmentType, target, id, 0);
 		}
+
+		static uint64_t MakeTextureBindless(uint32_t id)
+		{
+			uint64_t textureHandle = glGetTextureHandleARB(id);
+			glMakeTextureHandleResidentARB(textureHandle);
+			return textureHandle;
+		}
 	}
 
 	OpenGLFramebuffer::OpenGLFramebuffer(const FramebufferSpecification& spec)
@@ -134,6 +141,9 @@ namespace Dymatic {
 
 			m_ColorAttachments.clear();
 			m_DepthAttachment = 0;
+
+			m_ColorHandles.clear();
+			m_DepthHandle = 0;
 		}
 
 		glCreateFramebuffers(1, &m_RendererID);
@@ -151,6 +161,9 @@ namespace Dymatic {
 			{
 				Utils::BindTexture(multisample, m_Specification.Target, m_ColorAttachments[i]);
 				Utils::AttachColorTexture(m_ColorAttachments[i], m_Specification, m_ColorAttachmentSpecifications[i], i);
+
+				if (m_Specification.BindlessAttachments)
+					m_ColorHandles.push_back(Utils::MakeTextureBindless(m_ColorAttachments[i]));
 			}
 		}
 
@@ -158,12 +171,16 @@ namespace Dymatic {
 		{
 			Utils::CreateTextures(multisample, m_Specification.Target, &m_DepthAttachment, 1);
 			Utils::BindTexture(multisample, m_Specification.Target, m_DepthAttachment);
+
 			switch (m_DepthAttachmentSpecification.TextureFormat)
 			{
 				case TextureFormat::DEPTH24STENCIL8:
 					Utils::AttachDepthTexture(m_DepthAttachment, GL_DEPTH_STENCIL_ATTACHMENT, m_Specification, m_DepthAttachmentSpecification);
 					break;
 			}
+			
+			if (m_Specification.BindlessAttachments)
+				m_DepthHandle = Utils::MakeTextureBindless(m_DepthAttachment);
 		}
 
 		if (m_ColorAttachments.size() > 1)
@@ -234,7 +251,30 @@ namespace Dymatic {
 		return pixelData;
 	}
 
-	void OpenGLFramebuffer::Copy(uint32_t target)
+	Buffer OpenGLFramebuffer::CopyColorBuffer(uint32_t attachmentIndex)
+	{
+		DY_CORE_ASSERT(attachmentIndex < m_ColorAttachments.size());
+
+		auto& spec = m_ColorAttachmentSpecifications[attachmentIndex];
+		uint32_t size = m_Specification.Width * m_Specification.Height * Utils::GetDymaticTextureFormatBPP(spec.TextureFormat);
+		Buffer buffer(size);
+		ReadPixels(attachmentIndex, 0, 0, m_Specification.Width, m_Specification.Height, buffer.Data);
+		return buffer;
+	}
+
+	void OpenGLFramebuffer::Copy(Ref<Framebuffer> target)
+	{
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, m_RendererID);
+
+		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, target->GetRendererID());
+
+		glBlitFramebuffer(0, 0, m_Specification.Width, m_Specification.Height, 0, 0, m_Specification.Width, m_Specification.Height, GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+	}
+
+	void OpenGLFramebuffer::CopyColor(uint32_t target)
 	{
 		glBindFramebuffer(GL_READ_FRAMEBUFFER, m_RendererID);
 		
@@ -246,9 +286,34 @@ namespace Dymatic {
 		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 	}
 
-	void OpenGLFramebuffer::Copy(Ref<Framebuffer> target)
+	void OpenGLFramebuffer::CopyColor(Ref<Framebuffer> target)
 	{
-		Copy(target->GetRendererID());
+		CopyColor(target->GetRendererID());
+	}
+
+	void OpenGLFramebuffer::CopyColor(Ref<Texture2D> target)
+	{
+		// Setup temporary framebuffer with target as color attachment
+		GLuint framebuffer;
+		glCreateFramebuffers(1, &framebuffer);
+		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, target->GetRendererID(), 0);
+
+		// Execute normal copy command and release temporary
+		CopyColor(framebuffer);
+		glDeleteFramebuffers(1, &framebuffer);
+	}
+
+	void OpenGLFramebuffer::CopyDepth(Ref<Framebuffer> target)
+	{
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, m_RendererID);
+
+		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, target->GetRendererID());
+
+		glBlitFramebuffer(0, 0, m_Specification.Width, m_Specification.Height, 0, 0, m_Specification.Width, m_Specification.Height, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 	}
 
 	void OpenGLFramebuffer::ClearAttachment(uint32_t attachmentIndex, const void* value)
@@ -278,6 +343,18 @@ namespace Dymatic {
 	void OpenGLFramebuffer::BindDepthTexture(uint32_t slot) const
 	{
 		glBindImageTexture(slot, GetDepthAttachmentRendererID(), 0, GL_FALSE, 0, GL_READ_WRITE, Utils::DymaticTextureFormatToGLInternalFormat(m_DepthAttachmentSpecification.TextureFormat));
+	}
+
+	uint64_t OpenGLFramebuffer::GetColorHandle(uint32_t index) const
+	{
+		DY_CORE_ASSERT(m_Specification.BindlessAttachments, "Cannot get handle of non-bindless attachment!");
+		return m_ColorHandles[index];
+	}
+
+	uint64_t OpenGLFramebuffer::GetDepthHandle() const
+	{
+		DY_CORE_ASSERT(m_Specification.BindlessAttachments, "Cannot get handle of non-bindless attachment!");
+		return m_DepthHandle;
 	}
 
 	void OpenGLFramebuffer::SetAttachmentTarget(uint32_t index, FramebufferTextureTarget target, uint32_t mip)

@@ -1,6 +1,7 @@
 #include "ProjectSettings.h"
 
 #include "Dymatic/Project/Project.h"
+#include "Dymatic/Physics/PhysicsEngine.h"
 
 #include <fstream>
 #include <yaml-cpp/yaml.h>
@@ -56,6 +57,8 @@ namespace Dymatic {
 					out << YAML::EndSeq; // ColoredFolderPaths
 				}
 
+				out << YAML::Key << "Physics Logging" << YAML::Value << s_ProjectSettingsData.EnablePhysicsLogging;
+
 				out << YAML::EndMap; // ProjectSettings
 			}
 			out << YAML::EndMap; // Root
@@ -109,6 +112,9 @@ namespace Dymatic {
 			}
 		}
 
+		if (auto& physicsLoggingNode = projectSettingsNode["Physics Logging"])
+			SetEnablePhysicsLogging(physicsLoggingNode.as<bool>());
+
 		return true;
 	}
 
@@ -116,7 +122,7 @@ namespace Dymatic {
 	{
 		auto& paths = s_ProjectSettingsData.RecentScenePaths;
 		for (uint32_t i = 0; i < paths.size(); i++)
-			if (paths[i].lexically_normal() == path.lexically_normal())
+			if (paths[i].lexically_normal() == path.lexically_normal() || !std::filesystem::exists(paths[i]))
 				paths.erase(paths.begin() + i);
 		paths.insert(paths.begin(), path.lexically_normal());
 
@@ -134,8 +140,27 @@ namespace Dymatic {
 		Serialize();
 	}
 
+	void ProjectSettings::ClearFolderColor(const std::filesystem::path& path)
+	{
+		SetFolderColor(path, glm::vec3(1.0f));
+	}
+
+	bool ProjectSettings::GetEnablePhysicsLogging()
+	{
+		return s_ProjectSettingsData.EnablePhysicsLogging;
+	}
+
+	void ProjectSettings::SetEnablePhysicsLogging(const bool enabled)
+	{
+		s_ProjectSettingsData.EnablePhysicsLogging = enabled;
+		PhysicsEngine::SetDebugLogsEnabled(enabled);
+	}
+
 	glm::vec3 ProjectSettings::GetFolderColor(const std::filesystem::path& path)
 	{
+		if (!HasFolderColor(path))
+			return glm::vec3(1.0f);
+
 		return s_ProjectSettingsData.ColoredFolders[path];
 	}
 

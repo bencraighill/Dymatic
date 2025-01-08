@@ -2,8 +2,9 @@
 
 #include "Dymatic/Debug/Instrumentor.h"
 
-#include "Settings/Preferences.h"
+#include "Fonts.h"
 #include "TextSymbols.h"
+#include "Settings/Preferences.h"
 
 #include <stdio.h>
 #include <stdint.h>
@@ -121,6 +122,8 @@ namespace Dymatic {
 	
 	void ProfilerPanel::DrawProfileTimers()
 	{	
+		static const double minimumDelta = 0.01;
+
 		auto drawList = ImGui::GetWindowDrawList();
 		auto& io = ImGui::GetIO();
 		auto& style = ImGui::GetStyle();
@@ -134,8 +137,14 @@ namespace Dymatic {
 		if (isHovered && io.MouseWheel != 0.0f)
 		{
 			auto offset = (m_TimerViewEnd - m_TimerViewStart) * (double)io.MouseWheel * 0.1;
-			m_TimerViewStart += offset;
-			m_TimerViewEnd -= offset;
+
+			// Ensure the delta does not reach zero
+			const double newDelta = (m_TimerViewEnd - offset) - (m_TimerViewStart + offset);
+			if (std::abs(newDelta) >= minimumDelta)
+			{
+				m_TimerViewStart += offset;
+				m_TimerViewEnd -= offset;
+			}
 		}
 
 		if (isHovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
@@ -271,9 +280,9 @@ namespace Dymatic {
 			}
 
 			// Main loading text
-			ImGui::PushFont(io.Fonts->Fonts[0]);
+			UI::PushFont(FontType::Bold);
 			drawList->AddText(ImVec2(windowPos.x + (windowSize.x - textSize.x) * 0.5f, windowPos.y + windowSize.y - style.WindowPadding.y - 10.0f - textSize.y - style.FramePadding.y), ImGui::GetColorU32(ImGuiCol_Text), text);
-			ImGui::PopFont();
+			UI::PopFont();
 		}
 	}
 
@@ -627,7 +636,6 @@ namespace Dymatic {
 			}
 		}
 		IM_ASSERT(clipper.Step() == false);
-		clipper.End();
 		ImGui::PopStyleVar(2);
 		ImGui::EndChild();
 

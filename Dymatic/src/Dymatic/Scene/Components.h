@@ -3,6 +3,7 @@
 #include "SceneCamera.h"
 #include "Dymatic/Core/UUID.h"
 #include "Dymatic/Renderer/Texture.h"
+#include "Dymatic/Renderer/EnvironmentMap.h"
 #include "Dymatic/Renderer/Font.h"
 
 #include <glm/glm.hpp>
@@ -11,21 +12,28 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/quaternion.hpp>
 
-//----Particles------//
-#include <glm/gtc/constants.hpp>
-#define GLM_ENABLE_EXPERIMENTAL
-#include <glm/gtx/compatibility.hpp>
-
-#include <random>
-//-------------------//
+#include "Dymatic/Scene/Transform.h"
 
 #include "Dymatic/Renderer/Model.h"
-#include "Dymatic/Renderer/Animator.h"
+#include "Dymatic/Animation/AnimationGraphPlayer.h"
+#include "Dymatic/Renderer/ParticleSystemPlayer.h"
 #include "Dymatic/Audio/Audio.h"
+#include "Dymatic/Renderer/SceneRendererContext.h"
 
 #include "Dymatic/Asset/AssetManager.h"
+#include "Dymatic/Physics/Axis.h"
+#include "Dymatic/Math/Fraction.h"
 
 namespace Dymatic {
+
+	typedef uint64_t EntityHandle;
+	typedef uint64_t PhysicsLayerID;
+
+	// For internal use
+	struct SceneComponent
+	{
+		UUID SceneID;
+	};
 
 	struct IDComponent
 	{
@@ -45,24 +53,53 @@ namespace Dymatic {
 			: Tag(tag) {}
 	};
 
+	struct RelationshipComponent
+	{
+		RelationshipComponent() = default;
+		RelationshipComponent(const RelationshipComponent&) = default;
+
+		EntityHandle ParentHandle = 0;
+		std::vector<EntityHandle> Children;
+	};
+
+	struct AttachmentComponent
+	{
+		AttachmentComponent() = default;
+		AttachmentComponent(const AttachmentComponent&) = default;
+
+		std::string BoneName;
+	};
+
+	struct PrefabComponent
+	{
+		PrefabComponent() = default;
+		PrefabComponent(const AssetHandle prefabID) : PrefabID(prefabID) {}
+		PrefabComponent(const PrefabComponent&) = default;
+
+		AssetHandle PrefabID = 0;
+	};
+
+	struct FolderComponent
+	{
+		glm::vec4 Color = { 1.0f, 1.0f, 1.0f, 1.0f };
+	};
+
 	struct TransformComponent
 	{
-		glm::vec3 Translation = { 0.0f, 0.0f, 0.0f };
-		glm::vec3 Rotation = { 0.0f, 0.0f, 0.0f };
-		glm::vec3 Scale = { 1.0f, 1.0f, 1.0f };
+		// Note: Only internal systems should directly modify these. Editor and script systems should use Scene SetEntity Transform methods.
+		Transform Transform;
 
 		TransformComponent() = default;
 		TransformComponent(const TransformComponent&) = default;
-		TransformComponent(const glm::vec3& translation)
-			: Translation(translation) {}
 
-		glm::mat4 GetTransform() const
+		bool operator==(const TransformComponent& other) const
 		{
-			glm::mat4 rotation = glm::toMat4(glm::quat(Rotation));
+			return Transform == other.Transform;
+		}
 
-			return glm::translate(glm::mat4(1.0f), Translation)
-				* rotation
-				* glm::scale(glm::mat4(1.0f), Scale);
+		bool operator!=(const TransformComponent& other) const
+		{
+			return Transform != other.Transform;
 		}
 	};
 
@@ -82,155 +119,14 @@ namespace Dymatic {
 
 	struct ParticleSystemComponent
 	{
-	public:
-		ParticleSystemComponent(uint32_t maxParticles = 100000)
-			: m_PoolIndex(maxParticles - 1)
-		{
-			m_ParticlePool.resize(maxParticles);
-		}
+		ParticleSystemComponent() = default;
+		ParticleSystemComponent(const ParticleSystemComponent& other);
 
-		struct ColorPoint
-		{
-			unsigned int id = 0;
-			float point = 1.0f;
-			glm::vec4 color = glm::vec4(1.0f);
+		void SetParticleSystem(const Ref<ParticleSystem> particleSystem, const Ref<MaterialAsset> material = nullptr);
+		Ref<ParticleSystem> GetParticleSystem() const { return Player ? Player->GetParticleSystem() : nullptr; }
 
-			unsigned int GetId() { return id; }
-
-			ColorPoint(unsigned int id)
-				: id(id)
-			{
-			}
-
-			ColorPoint(unsigned int id, float point, glm::vec4 color)
-				: id(id), point(point), color(color)
-			{
-			}
-		};
-
-		struct Particle
-		{
-			glm::vec3 Position;
-			glm::vec3 Velocity;
-			glm::vec4 ColorBegin, ColorEnd, ColorConstant;
-			float Rotation = 0.0f;
-			float SizeBegin, SizeEnd;
-
-			std::vector<ColorPoint> ColorPoints;
-
-			float LifeTime = 1.0f;
-			float LifeRemaining = 0.0f;
-
-			bool Active = false;
-		};
-
-		void OnUpdate(Timestep ts)
-		{
-			for (auto& particle : m_ParticlePool)
-			{
-				if (!particle.Active)
-					continue;
-
-				if (particle.LifeRemaining <= 0.0f)
-				{
-					particle.Active = false;
-					continue;
-				}
-
-				particle.LifeRemaining -= ts;
-
-				particle.Velocity += Gravity * (float)ts;
-
-				particle.Position += particle.Velocity * (float)ts;
-				particle.Rotation += 0.01f * ts;
-			}
-		}
-
-		void Emit()
-		{
-			if (Active)
-			{
-				for (int i = 0; i < EmissionNumber; i++)
-				{
-					Particle& particle = m_ParticlePool[m_PoolIndex];
-					particle.Active = true;
-					particle.Position = Position;
-					particle.Rotation = RandomFloat(0, 1) * 2.0f * glm::pi<float>();
-
-					// Velocity
-					particle.Velocity = Velocity;
-					particle.Velocity.x += VelocityVariation.x * (RandomFloat(0, 1) - 0.5f);
-					particle.Velocity.y += VelocityVariation.y * (RandomFloat(0, 1) - 0.5f);
-					particle.Velocity.z += VelocityVariation.z * (RandomFloat(0, 1) - 0.5f);
-
-					// Color
-					particle.ColorBegin = ColorBegin;
-					particle.ColorEnd = ColorEnd;
-
-					particle.ColorConstant = ColorConstant;
-
-					particle.ColorPoints = ColorPoints;
-
-					particle.LifeTime = LifeTime;
-					particle.LifeRemaining = LifeTime;
-					particle.SizeBegin = SizeBegin + SizeVariation * (RandomFloat(0, 1) - 0.5f);
-					particle.SizeEnd = SizeEnd;
-
-					m_PoolIndex = --m_PoolIndex % m_ParticlePool.size();
-				}
-			}
-		}
-
-		void DuplicateColorPoint(int index) { ColorPoints.insert(ColorPoints.begin() + index, ColorPoints[index]); ColorPoints[index].id = GetNextColorPointId(); }
-
-		struct ColorPointOrderKey
-		{
-			inline bool operator() (const ColorPoint& colorPoint1, const ColorPoint& colorPoint2)
-			{
-				return (colorPoint1.point < colorPoint2.point);
-			}
-		};
-
-		void RecalculateColorPointOrder()
-		{
-			std::sort(ColorPoints.begin(), ColorPoints.end(), ColorPointOrderKey());
-		}
-
-		glm::vec3 Offset = glm::vec3(0.0f, 0.0f, 0.0f);
-		glm::vec3 Position = glm::vec3(0.0f, 0.0f, 0.0f);
-		glm::vec3 Velocity = glm::vec3(0.0f, 0.0f, 0.0f);
-		glm::vec3 VelocityVariation = glm::vec3(0.0f, 0.0f, 0.0f);
-		glm::vec3 Gravity = glm::vec3(0.0f, -9.8f, 0.0f);
-		glm::vec4 ColorBegin = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-		glm::vec4 ColorEnd = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-		glm::vec4 ColorConstant = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-		float SizeBegin = 1.0f;
-		float SizeEnd = 1.0f;
-		float SizeVariation = 0.0f;
-		float LifeTime = 1.0f;
-		int EmissionNumber = 10;
-		bool Active = true;
-		bool FaceCamera = true;
-
-		int ColorMethod = 0;
-		unsigned int nextColorPointId = 1;
-		unsigned int GetNextColorPointId() { nextColorPointId++; return nextColorPointId; }
-		std::vector<ColorPoint> ColorPoints;
-
-		std::vector<Particle>& GetParticlePool() { return m_ParticlePool; }
-		void ClearParticlePool() { std::fill(m_ParticlePool.begin(), m_ParticlePool.end(), Particle()); }
-
-	private:
-
-		float RandomFloat(float a, float b) {
-			float random = ((float)rand()) / (float)RAND_MAX;
-			float diff = b - a;
-			float r = random * diff;
-			return a + r;
-		}
-
-		std::vector<Particle> m_ParticlePool;
-		uint32_t m_PoolIndex;
+		Ref<ParticleSystemPlayer> Player = nullptr;
+		Ref<MaterialAsset> Material = nullptr;
 	};
 
 	struct CircleRendererComponent
@@ -246,6 +142,7 @@ namespace Dymatic {
 	struct TextComponent
 	{
 		std::string TextString;
+		TextAlignment Alignment = TextAlignment::Left;
 		glm::vec4 Color{ 1.0f, 1.0f, 1.0f, 1.0f };
 		Ref<Font> Font;
 		float Kerning = 0.0f;
@@ -266,12 +163,30 @@ namespace Dymatic {
 		CameraComponent(const CameraComponent&) = default;
 	};
 
+	struct CaptureComponent
+	{
+		Ref<Texture2D> Target = nullptr;
+		SceneRendererContext::RendererVisualizationMode Type = SceneRendererContext::RendererVisualizationMode::Rendered;
+		SceneRendererContext::RenderMaskType MaskType = SceneRendererContext::RenderMaskType::None;
+		bool Capture = true;
+		bool Cumulative = false;
+
+		// Runtime Only
+		Ref<SceneRendererContext> RuntimeRendererContext = nullptr;
+
+		CaptureComponent() = default;
+		CaptureComponent(const CaptureComponent&) = default;
+	};
+
 	struct ScriptComponent
 	{
 		std::string ClassName;
 
 		ScriptComponent() = default;
 		ScriptComponent(const ScriptComponent&) = default;
+
+		ScriptComponent(const std::string& className)
+			: ClassName(className) {}
 	};
 
 	// Forward declaration
@@ -282,6 +197,7 @@ namespace Dymatic {
 		ScriptableEntity* Instance = nullptr;
 		ScriptableEntity* (*InstantiateScript)();
 		void (*DestroyScript)(NativeScriptComponent*);
+
 		template<typename T>
 		void Bind()
 		{
@@ -291,7 +207,7 @@ namespace Dymatic {
 	};
 
 	// Physics
-	struct Rigidbody2DComponent
+	struct RigidBody2DComponent
 	{
 		enum class BodyType { Static = 0, Dynamic, Kinematic };
 		BodyType Type;
@@ -300,8 +216,8 @@ namespace Dymatic {
 		// Storage for runtime
 		void* RuntimeBody = nullptr;
 
-		Rigidbody2DComponent() = default;
-		Rigidbody2DComponent(const Rigidbody2DComponent& other) = default;
+		RigidBody2DComponent() = default;
+		RigidBody2DComponent(const RigidBody2DComponent& other) = default;
 	};
 
 	struct BoxCollider2DComponent
@@ -338,68 +254,29 @@ namespace Dymatic {
 		CircleCollider2DComponent(const CircleCollider2DComponent& other) = default;
 	};
 
-	// For internal use
-	struct SceneComponent
-	{
-		UUID SceneID;
-	};
-
-	// For internal use
-	struct FolderComponent
-	{
-		glm::vec4 Color = { 1.0f, 1.0f, 1.0f, 1.0f };
-	};
-
 	struct StaticMeshComponent
 	{
 		Ref<Model> m_Model = nullptr;
-		std::vector<Ref<Material>> m_Materials;
-		Ref<Animator> m_Animator;
+		std::vector<Ref<MaterialAsset>> m_Materials;
+		Ref<AnimationGraphPlayer> m_AnimationGraphPlayer = nullptr;
 
-		StaticMeshComponent() 
-		{ 
-			m_Animator = Animator::Create();
-		}
-		
-		StaticMeshComponent(Ref<Model> model) 
+		StaticMeshComponent() {}
+
+		StaticMeshComponent(Ref<Model> model)
 		{
-			m_Animator = Animator::Create(); 
 			SetModel(model);
 		}
-		
-		StaticMeshComponent(const StaticMeshComponent& other) = default;
 
-		inline Ref<Model> GetModel() { return m_Model; }
-		inline Ref<Animator> GetAnimator() { return m_Animator; }
+		StaticMeshComponent(const StaticMeshComponent& other);
 
-		void SetModel(Ref<Model> model)
-		{
-			m_Model = model;
-			m_Materials.clear();
+		inline Ref<Model> GetModel() const { return m_Model; }
+		inline Ref<AnimationGraphPlayer> GetAnimationPlayer() const { return m_AnimationGraphPlayer; }
+		Ref<Skeleton> GetSkeleton() const { return m_Model ? m_Model->GetSkeleton() : nullptr; }
 
-			if (model && model->IsLoaded())
-				m_Materials.resize(m_Model->GetMeshes().size());
-		}
+		void SetModel(Ref<Model> model);
+		void SetAnimationGraph(Ref<AnimationGraph> animationGraph);
 
-		void LoadAnimation(const std::string& path)
-		{
-			if (m_Model)
-			{
-				Ref<Animation> animation = Animation::Create(path, m_Model);
-				if (animation->IsLoaded())
-					m_Animator->SetAnimation(animation);
-				else
-					DY_CORE_WARN("Could not load model {0}", path);
-			}
-			else
-				DY_CORE_WARN("Model must be loaded before animation");
-		}
-
-		void Update(Timestep ts)
-		{
-			if (m_Animator)
-				m_Animator->UpdateAnimation(ts.GetSeconds());
-		}
+		void Update(Timestep ts);
 	};
 
 	struct DirectionalLightComponent
@@ -439,26 +316,15 @@ namespace Dymatic {
 
 	struct SkyLightComponent
 	{
-		Ref<Texture2D> SkyboxHDRI;
-		Ref<Texture2D> SkyboxFlowMap;
-		std::string Filepath;
-		float Intensity;
-		int Type = 0;
+		enum class SkyType { EnvironmentMap, DynamicSky };
 
 		SkyLightComponent() = default;
 		SkyLightComponent(const SkyLightComponent&) = default;
 
-		void Load(const std::string& filepath)
-		{
-			Ref<Texture2D> hdri = Texture2D::Create(filepath);
-			if (hdri->IsLoaded())
-			{
-				SkyboxHDRI = hdri;
-				Filepath = filepath;
-			}
-			else
-				DY_CORE_WARN("Could not load HDRI '{0}'", filepath);
-		}
+		Ref<EnvironmentMap> EnvironmentMap = nullptr;
+		Ref<Texture2D> FlowMap = nullptr;
+		float Intensity = 1.0f;
+		SkyType Type = SkyType::EnvironmentMap;
 	};
 
 	struct VolumeComponent
@@ -472,9 +338,29 @@ namespace Dymatic {
 		};
 
 		BlendType Blend = BlendType::Set;
+
+		glm::vec3 Color = glm::vec3(1.0f);
 		float ScatteringDistribution = 0.5;
 		float ScatteringIntensity = 1.0;
 		float ExtinctionScale = 0.5;
+	};
+
+	struct DecalComponent
+	{
+		DecalComponent() = default;
+
+		Ref<Texture2D> Texture;
+		bool ConstrainAngle = false;
+	};
+
+	struct PostProcessVolumeComponent
+	{
+		PostProcessVolumeComponent() = default;
+		PostProcessVolumeComponent(const PostProcessVolumeComponent& ppvc) = default;
+
+		bool Enabled = true;
+		bool Bounded = true;
+		Ref<MaterialAsset> Material = nullptr;
 	};
 
 	struct AudioComponent
@@ -486,34 +372,90 @@ namespace Dymatic {
 
 		AudioComponent() = default;
 		AudioComponent(const AudioComponent& ac) = default;
-		AudioComponent(const std::string& path)
-		{
-			Load(path);
-		}
 
-		void Load(const std::string& path)
-		{
-			Ref<Audio> audio = AssetManager::GetAsset<Audio>(path);
-			if (audio)
-				AudioSound = audio;
-		}
+		void SetStartPosition(const uint32_t startPosition);
 	};
 
-	struct RigidbodyComponent
+	struct SplineComponent
 	{
-		enum class BodyType { Static = 0, Dynamic };
+		enum class SplineType { Curve, Linear, Constant };
+
+		struct SplinePoint
+		{
+			SplineType Type;
+			glm::vec3 Position;
+			glm::vec3 Tangent;
+
+			SplinePoint(const glm::vec3& position = glm::vec3(0.0f), const glm::vec3& tangent = glm::vec3(0.0f), SplineType type = SplineType::Curve)
+				: Position(position), Tangent(tangent), Type(type) {}
+		};
+
+		std::vector<SplinePoint> Points;
+
+		SplineComponent();
+		SplineComponent(const SplineComponent& sc) = default;
+
+		glm::vec3 Sample(float t) const;
+		glm::vec3 SampleDistance(float distance) const;
+
+		void AddPoint();
+		void RemovePoint(uint32_t index);
+		void DuplicatePoint(uint32_t index);
+		void SetPoints(const std::vector<SplinePoint>& points);
+
+	private:
+		void Invalidate();
+		glm::vec3 SampleSegment(const SplinePoint& startPoint, const SplinePoint& endPoint, float localT) const;
+
+		// Cached world space values
+		std::vector<float> SegmentLengths;
+		float TotalLength;
+	};
+
+	struct RigidBodyComponent
+	{
+		enum class BodyType { Static = 0, Dynamic, Kinematic };
+		enum class MassMode { Density, Mass };
 
 		BodyType Type;
-		float Density = 1.0f;
-		float StaticFriction = 0.5f;
-		float DynamicFriction = 0.5f;
+		MassMode Mode;
+		PhysicsLayerID Layer = 0;
+		bool Sensor = false;
+
+		union
+		{
+			float Density = 1.0f;
+			float Mass;
+		};
+
+		float Friction = 0.2f;
 		float Restitution = 0.1f;
 
 		// Storage for runtime
 		void* RuntimeBody = nullptr;
 
-		RigidbodyComponent() = default;
-		RigidbodyComponent(const RigidbodyComponent&) = default;
+		RigidBodyComponent() = default;
+		RigidBodyComponent(const RigidBodyComponent&) = default;
+	};
+
+	struct SoftBodyComponent
+	{
+		PhysicsLayerID Layer = 0;
+
+		float Friction = 0.2f;
+		float Restitution = 0.1f;
+		float Pressure = 0.0f;
+
+		float VertexMass = 40.0f;
+		float VertexRadius = 0.0f;
+		bool UseVertexColorAsWeight = false;
+
+		// Storage for runtime
+		void* RuntimeBody = nullptr;
+		Ref<Model> RuntimeModel = nullptr;
+
+		SoftBodyComponent() = default;
+		SoftBodyComponent(const SoftBodyComponent&) = default;
 	};
 
 	struct BoxColliderComponent
@@ -544,10 +486,376 @@ namespace Dymatic {
 	struct MeshColliderComponent
 	{
 		enum class MeshType { Triangle = 0, Convex };
-		MeshType Type;
+		MeshType Type = MeshType::Convex;
 
 		MeshColliderComponent() = default;
 		MeshColliderComponent(const MeshColliderComponent&) = default;
+	};
+
+	enum class ConstraintSpace
+	{
+		LocalSpace,
+		WorldSpace,
+		Automatic
+	};
+
+	enum class ConstraintSwingType
+	{
+		Cone,
+		Pyramid
+	};
+
+	struct MotorComponent
+	{
+		enum class MotorStateType
+		{
+			Off,
+			Velocity,
+			Position
+		};
+
+		MotorStateType MotorState;
+		float MaxMotorAcceleration = 20.0f;
+
+		// TOOD: Just use spring component part
+		float Frequency = 2.0f;
+		float Damping = 1.0f;
+	};
+
+	struct ConstraintComponentBase
+	{
+		EntityHandle Target;
+		bool Enabled = true;
+
+		// Runtime Only
+		void* RuntimeConstraint;
+
+		ConstraintComponentBase() = default;
+		ConstraintComponentBase(EntityHandle target, bool enabled = true)
+			: Target(target), Enabled(enabled) {}
+	};
+
+	struct PointConstraintComponent : ConstraintComponentBase
+	{
+		ConstraintSpace Space = ConstraintSpace::LocalSpace;
+		glm::vec3 LocalPoint = glm::vec3(0.0f);
+		glm::vec3 TargetPoint = glm::vec3(0.0f);
+
+		PointConstraintComponent() = default;
+		PointConstraintComponent(EntityHandle target)
+			: ConstraintComponentBase(target) {}
+	};
+
+	struct ConeConstraintComponent : ConstraintComponentBase
+	{
+		ConstraintSpace Space = ConstraintSpace::LocalSpace;
+
+		struct ReferenceFrame
+		{
+			glm::vec3 Offset = glm::vec3(0.0f);
+			glm::vec3 TwistAxis = c_AxisX;
+		};
+
+		ReferenceFrame LocalReferenceFrame;
+		ReferenceFrame TargetReferenceFrame;
+		
+		float HalfConeAngle = 0.0f;
+
+		ConeConstraintComponent() = default;
+		ConeConstraintComponent(const ConeConstraintComponent& other) = default;
+
+		ConeConstraintComponent(EntityHandle target)
+			: ConstraintComponentBase(target) {}
+	};
+
+	struct DistanceConstraintComponent : ConstraintComponentBase
+	{
+		enum class DistanceType { Default, Fixed, Range };
+		DistanceType Type = DistanceType::Default;
+
+		union
+		{
+			// Fixed Only
+			float Distance;
+
+			// Range Only
+			struct
+			{
+				float MinDistance;
+				float MaxDistance;
+			};
+		};
+
+		DistanceConstraintComponent() = default;
+
+		void UpdateType();
+
+		DistanceConstraintComponent(EntityHandle target)
+			: ConstraintComponentBase(target), Type(DistanceType::Default) {}
+
+		DistanceConstraintComponent(EntityHandle target, float distance)
+			: ConstraintComponentBase(target), Type(DistanceType::Fixed), Distance(distance) {}
+
+		DistanceConstraintComponent(EntityHandle target, float minDistance, float maxDistance)
+			: ConstraintComponentBase(target), Type(DistanceType::Fixed), MinDistance(minDistance), MaxDistance(maxDistance) {}
+	};
+
+	struct SpringConstraintComponent
+	{
+		enum class SpringType { FrequencyAndDamping, StiffnessAndDamping };
+		SpringType Type = SpringType::FrequencyAndDamping;
+
+		union
+		{
+			float Frequency = 0.0f;
+			float Stiffness;
+		};
+
+		float Damping = 0.0f;
+	};
+
+	struct HingeConstraintComponent : ConstraintComponentBase
+	{
+		struct ReferenceFrame
+		{
+			glm::vec3 Point = glm::vec3(0.0f);
+			glm::vec3 HingeAxis = c_AxisY;
+			glm::vec3 NormalAxis = c_AxisX;
+		};
+
+		ConstraintSpace Space = ConstraintSpace::LocalSpace;
+		ReferenceFrame LocalReferenceFrame;
+		ReferenceFrame TargetReferenceFrame;
+
+		float MinRotation = -180.0f;
+		float MaxRotation = 180.0f;
+
+		float MaxFrictionTorque = 0.0f;
+	};
+
+	struct FixedConstraintComponent : ConstraintComponentBase
+	{
+		struct ReferenceFrame
+		{
+			glm::vec3 Point = glm::vec3(0.0f);
+			glm::vec3 AxisX = c_AxisX;
+			glm::vec3 AxisY = c_AxisY;
+		};
+
+		ConstraintSpace Type = ConstraintSpace::Automatic;
+
+		// Manual World/Local Space specification only
+		ReferenceFrame LocalReferenceFrame;
+		ReferenceFrame TargetReferenceFrame;
+
+		FixedConstraintComponent() = default;
+		FixedConstraintComponent(EntityHandle target)
+			: ConstraintComponentBase(target) {}
+	};
+
+	struct GearConstraintComponent : ConstraintComponentBase
+	{
+		ConstraintSpace Space = ConstraintSpace::LocalSpace;
+		glm::vec3 LocalHingeAxis = c_AxisX;
+		glm::vec3 TargetHingeAxis = c_AxisX;
+		Fraction Ratio;
+
+		GearConstraintComponent() = default;
+		GearConstraintComponent(EntityHandle target)
+			: ConstraintComponentBase(target) {}
+	};
+
+	struct PulleyConstraintComponent : ConstraintComponentBase
+	{
+		static constexpr float AutomaticLengthCalculationFlag = -1.0f;
+
+		struct ReferenceFrame
+		{
+			glm::vec3 BodyPoint = glm::vec3(0.0f);
+			glm::vec3 FixedPoint = glm::vec3(0.0f);
+		};
+
+		ConstraintSpace Space = ConstraintSpace::LocalSpace;
+		ReferenceFrame LocalReferenceFrame;
+		ReferenceFrame TargetReferenceFrame;
+
+		Fraction Ratio;
+		float MinLength = 0.0f;
+		float MaxLength = AutomaticLengthCalculationFlag;
+
+		PulleyConstraintComponent() = default;
+		PulleyConstraintComponent(EntityHandle target)
+			: ConstraintComponentBase(target) {}
+	};
+
+	struct RackAndPinionConstraintComponent : ConstraintComponentBase
+	{
+		enum class RatioMode { Properties, Ratio };
+
+		ConstraintSpace Space = ConstraintSpace::LocalSpace;
+		RatioMode Mode = RatioMode::Properties;
+
+		glm::vec3 HingeAxis = c_AxisX;
+		glm::vec3 SliderAxis = c_AxisX;
+
+		union
+		{
+			struct
+			{
+				uint32_t RackTeethCount;
+				uint32_t PinionTeethCount;
+				float RackLength;
+			};
+
+			float Ratio;
+		};
+
+		void UpdateMode();
+
+		RackAndPinionConstraintComponent();
+		RackAndPinionConstraintComponent(EntityHandle target)
+			: ConstraintComponentBase(target) {}
+	};
+
+	struct SwingTwistConstraintComponent : ConstraintComponentBase
+	{
+		struct ReferenceFrame
+		{
+			glm::vec3 Position = glm::vec3(0.0f);
+			glm::vec3 TwistAxis = c_AxisX;
+			glm::vec3 PlaneAxis = c_AxisY;
+		};
+
+		ConstraintSpace Space = ConstraintSpace::LocalSpace;
+		ConstraintSwingType SwingType = ConstraintSwingType::Cone;
+		ReferenceFrame LocalReferenceFrame;
+		ReferenceFrame TargetReferenceFrame;
+
+		float NormalHalfConeAngle = 0.0f;
+		float PlaneHalfConeAngle = 0.0f;
+		float TwistMinAngle = 0.0f;
+		float TwistMaxAngle = 0.0f;
+		float MaxFrictionTorque = 0.0f;
+
+		SwingTwistConstraintComponent() = default;
+		SwingTwistConstraintComponent(EntityHandle target)
+			: ConstraintComponentBase(target) {}
+	};
+
+	struct SliderConstraintComponent : ConstraintComponentBase
+	{
+		static constexpr float SliderMaxBound = FLT_MAX;
+
+		struct ReferenceFrame
+		{
+			glm::vec3 Point = glm::vec3(0.0f);
+			glm::vec3 SliderAxis = c_AxisX;
+			glm::vec3 NormalAxis = c_AxisY;
+		};
+
+		ConstraintSpace Space = ConstraintSpace::LocalSpace;
+		ReferenceFrame LocalReferenceFrame;
+		ReferenceFrame TargetReferenceFrame;
+
+		float SliderMin = -SliderMaxBound;
+		float SliderMax = SliderMaxBound;
+		float MaxFrictionForce = 0.0f;
+
+		SliderConstraintComponent() = default;
+		SliderConstraintComponent(EntityHandle target)
+			: ConstraintComponentBase(target) {}
+	};
+
+	struct SixDOFConstraintComponent : ConstraintComponentBase
+	{
+		enum Axis
+		{
+			TranslationX,
+			TranslationY,
+			TranslationZ,
+
+			RotationX,
+			RotationY,
+			RotationZ,
+
+			AxisCount
+		};
+
+		enum class AxisStatus
+		{
+			Free,
+			Locked,
+			Custom
+		};
+
+		struct ReferenceFrame
+		{
+			glm::vec3 Position = glm::vec3(0.0f);
+			glm::vec3 AxisX = c_AxisX;
+			glm::vec3 AxisY = c_AxisY;
+		};
+
+		ConstraintSpace Space = ConstraintSpace::LocalSpace;
+		ReferenceFrame LocalReferenceFrame;
+		ReferenceFrame TargetReferenceFrame;
+		ConstraintSwingType SwingType = ConstraintSwingType::Cone;
+
+		std::array<float, Axis::AxisCount> MaxFriction = { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
+		std::array<float, Axis::AxisCount> LimitMin = { -FLT_MAX, -FLT_MAX, -FLT_MAX, -FLT_MAX, -FLT_MAX, -FLT_MAX };
+		std::array<float, Axis::AxisCount> LimitMax = {  FLT_MAX,  FLT_MAX,  FLT_MAX,  FLT_MAX,  FLT_MAX,  FLT_MAX };
+
+		SixDOFConstraintComponent() = default;
+		SixDOFConstraintComponent(EntityHandle target)
+			: ConstraintComponentBase(target) {}
+
+		AxisStatus GetAxisStatus(const Axis axis) const;
+		void SetAxisStatus(const Axis axis, const AxisStatus status);
+	};
+
+	struct FollowConstraintComponent : ConstraintComponentBase
+	{
+		enum class RotationConstraintType
+		{
+			Free,
+			AroundTangent,
+			AroundNormal,
+			AroundBinormal,
+			ToPath,
+			Constrained,
+		};
+
+		bool Looping = true;
+		glm::vec3 Normal = c_AxisY;
+
+		float StartFraction = 0.0f;
+		float MaxFrictionForce = 0.0f;
+
+		RotationConstraintType RotationConstraint = RotationConstraintType::Free;
+
+		EntityHandle BaseTarget = 0;
+		void* BaseRuntimeBody = nullptr;
+
+		// Motor
+		MotorComponent Motor;
+		float TargetVelocity = 0.0f;
+		float TargetPathFraction = 0.0f;
+		float MaxFrictionAcceleration = 0.0f;
+
+		FollowConstraintComponent() = default;
+		FollowConstraintComponent(EntityHandle target)
+			: ConstraintComponentBase(target) {}
+	};
+
+	struct RagdollComponent
+	{
+		RagdollComponent() = default;
+		RagdollComponent(const RagdollComponent&) = default;
+
+		PhysicsLayerID Layer = 0;
+
+		// Runtime Only
+		void* RuntimeBody = nullptr;
+		Ref<BoneMatrixList> RuntimePose = nullptr;
 	};
 
 	struct CharacterMovementComponent
@@ -555,22 +863,38 @@ namespace Dymatic {
 		CharacterMovementComponent() = default;
 		CharacterMovementComponent(const CharacterMovementComponent&) = default;
 
-		float Density = 75.0f;
+		PhysicsLayerID Layer;
+
+		float Mass = 70.0f;
 		float CapsuleRadius = 0.42f;
 		float CapsuleHeight = 1.92f;
-		
-		float GravityScale = 1.0f;
-		float StepOffset = 0.45f;
-		float MaxWalkableSlope = 0.45f;
+		float InnerShapeFraction = 0.9f;
+
 		float MaxWalkSpeed = 6.0f;
-		float MaxAcceleration = 20.48f;
-		float BrakingDeceleration = 20.48f;
-		float GroundFriction = 8.0f;
+		float JumpSpeed = 4.0f;
+		float GravityScale = 1.0f;
+		float MaxSlopeAngle = 45.0f;
 		float AirControl = 0.2f;
+		float VelocityBlendWeight = 0.25f;
+
+		bool RotateToMotion = true;
+		float RotationRate = 540.0f;
+
+		float MaxStrength = 100.0f;
+		float Friction = 0.5f;
+		
+		float MaxStepHeight = 0.45f;
+		float MinStepForward = 0.02f;
+		bool StickToFloor = true;
 		
 		// Runtime storage
-		glm::vec3 Velocity = glm::vec3(0.0f);
-		void* CharacterController = nullptr;
+		glm::vec3 RuntimeMovementDirection;
+		glm::vec3 PreviousMovementDirection;
+		glm::vec3 RuntimeLinearVelocity;
+		glm::vec3 RuntimeGroundVelocity;
+		bool RuntimeJump;
+		bool IsFalling;
+		void* RuntimeController = nullptr;
 	};
 	
 	struct VehicleMovementComponent
@@ -578,50 +902,112 @@ namespace Dymatic {
 		VehicleMovementComponent() = default;
 		VehicleMovementComponent(const VehicleMovementComponent&) = default;
 
-		UUID Chasis;
-		UUID Wheels[4];
+		struct Wheel
+		{
 
-		float Mass;
+		};
+
+		std::vector<Wheel> Wheels;
 
 		// Runtime storage
-		uint32_t RuntimeVehicleID = 0;
 		void* VehicleController = nullptr;
 	};
 
 	struct SpringArmComponent
 	{
-		SpringArmComponent() = default;
-		SpringArmComponent(const SpringArmComponent&) = default;
+		SpringArmComponent()
+		{
+			ExclusionMask = CreateRef<std::unordered_set<EntityHandle>>();
+		}
+		
+		SpringArmComponent(const SpringArmComponent& other)
+		{
+			ExclusionMask = CreateRef<std::unordered_set<EntityHandle>>(*other.ExclusionMask);
+		}
 		
 		float TargetLength = 3.0f;
+		float ProbeRadius = 0.12f;
+		glm::vec3 TargetOffset = glm::vec3(0.0f);
+		glm::vec3 SocketOffset = glm::vec3(0.0f);
+
+		// Runtime Storage
+		float CurrentLength = -1.0f;
+		Ref<std::unordered_set<EntityHandle>> ExclusionMask;
 	};
 
-	struct DirectionalFieldComponent
+	struct FieldComponent
 	{
-		DirectionalFieldComponent() = default;
-		DirectionalFieldComponent(const DirectionalFieldComponent&) = default;
+		enum class FieldType { Directional, Radial, Buoyancy };
+		FieldType Type;
 
-		glm::vec3 Force;
+		PhysicsLayerID Layer = 0;
+
+		union
+		{
+			// Directional
+			glm::vec3 Force;
+
+			// Radial
+			struct
+			{
+				float Magnitude;
+				float Radius;
+				float Falloff;
+			};
+
+			// Bouyancy
+			struct
+			{
+				float Buoyancy;
+				float LinearDrag;
+				float AngularDrag;
+				glm::vec3 FluidVelocity;
+			};
+		};
+
+		FieldComponent()
+		{
+			SetType(FieldType::Directional);
+		}
+
+		FieldComponent(const FieldComponent&) = default;
+		void SetType(FieldType type);
 	};
 
-	struct RadialFieldComponent
+	struct LandscapeComponent
 	{
-		RadialFieldComponent() = default;
-		RadialFieldComponent(const RadialFieldComponent&) = default;
+		LandscapeComponent();
+		LandscapeComponent(const LandscapeComponent&) = default;
 
-		float Magnitude = 1.0f;
-		float Radius = 1.0f;
-		float Falloff = 0.0f;
+		void Allocate();
+		void Build();
+
+		glm::uvec2 Resolution = glm::uvec2(32);
+		Ref<ScopedBuffer> Data;
+
+		Ref<Model> LandscapeMesh;
+		Ref<MaterialAsset> Material = nullptr;
+
+		bool Physics = true;
+		PhysicsLayerID Layer;
+		void* RuntimeBody = nullptr;
+
+		// TODO: Foliage Assets (mesh, size variation, distribution etc)
 	};
 
-	struct BouyancyFieldComponent
+	struct NavigationMeshComponent
 	{
-		BouyancyFieldComponent() = default;
-		BouyancyFieldComponent(const BouyancyFieldComponent&) = default;
+		Ref<Model> DebugMesh;
+	};
 
-		float FluidDensity = 1.0f;
-		float LinearDamping = 2.5f;
-		float AngularDamping = 0.5f;
+	struct NavigationModifierComponent
+	{
+		float Weight;
+	};
+
+	struct NavigationLinkComponent
+	{
+		EntityHandle TargetLink;
 	};
 
 	// UI Components
@@ -728,18 +1114,24 @@ namespace Dymatic {
 	{
 	};
 
+	// Note: The order these are listed is important for registration (e.g. A collider must be registered before the rigid body that uses it)
 	using AllComponents =
 		ComponentGroup<
-			FolderComponent, TransformComponent,
+			PrefabComponent, AttachmentComponent, FolderComponent, TransformComponent,
 			SpriteRendererComponent, CircleRendererComponent, TextComponent,
-			CameraComponent, ScriptComponent, NativeScriptComponent,
-			Rigidbody2DComponent, BoxCollider2DComponent, CircleCollider2DComponent,
+			CameraComponent, CaptureComponent, ScriptComponent, NativeScriptComponent,
+			RigidBody2DComponent, BoxCollider2DComponent, CircleCollider2DComponent,
 			StaticMeshComponent, DirectionalLightComponent, PointLightComponent, 
-			SpotLightComponent, SkyLightComponent, VolumeComponent,
-			AudioComponent,
-			RigidbodyComponent, CharacterMovementComponent, VehicleMovementComponent, SpringArmComponent,
-			BouyancyFieldComponent, DirectionalFieldComponent, RadialFieldComponent,
+			SpotLightComponent, SkyLightComponent, VolumeComponent, PostProcessVolumeComponent,
+			AudioComponent, SplineComponent,
+			ParticleSystemComponent, DecalComponent,
 			BoxColliderComponent, SphereColliderComponent, CapsuleColliderComponent, MeshColliderComponent,
+			RigidBodyComponent, SoftBodyComponent,
+			PointConstraintComponent, ConeConstraintComponent, DistanceConstraintComponent, SpringConstraintComponent, HingeConstraintComponent,
+			FixedConstraintComponent, GearConstraintComponent, PulleyConstraintComponent, RackAndPinionConstraintComponent,
+			SwingTwistConstraintComponent, SliderConstraintComponent, SixDOFConstraintComponent, FollowConstraintComponent,
+			RagdollComponent, CharacterMovementComponent, VehicleMovementComponent, SpringArmComponent, FieldComponent,
+			LandscapeComponent, NavigationMeshComponent, NavigationModifierComponent, NavigationLinkComponent,
 			UICanvasComponent, UIImageComponent, UIButtonComponent
 		>;
 

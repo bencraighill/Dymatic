@@ -116,6 +116,20 @@
   Ctrl: false
   Alt: false
   Shift: false
+- Bind: Undo
+  Enabled: true
+  Key: Z
+  Repeats: false
+  Ctrl: true
+  Alt: false
+  Shift: false
+- Bind: Redo
+  Enabled: true
+  Key: Z
+  Repeats: false
+  Ctrl: true
+  Alt: false
+  Shift: true
 - Bind: Visualization Rendered
   Enabled: true
   Key: F1

@@ -15,6 +15,8 @@ namespace Dymatic {
 	EditorCamera::EditorCamera(float fov, float aspectRatio, float nearClip, float farClip)
 		: m_FOV(fov), m_AspectRatio(aspectRatio), m_NearClip(nearClip), m_FarClip(farClip), Camera(glm::perspective(glm::radians(fov), aspectRatio, nearClip, farClip))
 	{
+		m_CameraTransform.Position = CalculatePosition();
+		m_TargetPosition = m_CameraTransform.Position;
 		UpdateView();
 	}
 
@@ -27,7 +29,7 @@ namespace Dymatic {
 		}
 		else if (m_ProjectionType == 1)
 		{
-			float m_OrthographicSize = m_Distance * 0.5f;
+			float m_OrthographicSize = m_CameraTransform.Distance * 0.5f;
 
 			float orthoLeft = -m_OrthographicSize * m_AspectRatio * 0.5f;
 			float orthoRight = m_OrthographicSize * m_AspectRatio * 0.5f;
@@ -44,13 +46,13 @@ namespace Dymatic {
 		//m_Yaw = m_Pitch = 0.0f; //Lock the camera's rotation
 		{
 			glm::quat orientation = GetOrientation();
-			m_ViewMatrix = glm::translate(glm::mat4(1.0f), m_Position) * glm::toMat4(orientation);
+			m_ViewMatrix = glm::translate(glm::mat4(1.0f), m_CameraTransform.Position) * glm::toMat4(orientation);
 			m_ViewMatrix = glm::inverse(m_ViewMatrix);
 		}
 		if (m_ProjectionType == 1)
 		{
 
-			float m_OrthographicSize = m_Distance * 0.5f;
+			float m_OrthographicSize = m_CameraTransform.Distance * 0.5f;
 
 			float orthoLeft = -m_OrthographicSize * m_AspectRatio * 0.5f;
 			float orthoRight = m_OrthographicSize * m_AspectRatio * 0.5f;
@@ -80,7 +82,7 @@ namespace Dymatic {
 
 	float EditorCamera::ZoomSpeed() const
 	{
-		float distance = m_Distance * 0.2f;
+		float distance = m_CameraTransform.Distance * 0.2f;
 		distance = std::max(distance, 0.0f);
 		float speed = distance * distance;
 		speed = std::min(speed, 100.0f); // max speed = 100
@@ -93,9 +95,8 @@ namespace Dymatic {
 		glm::vec2 delta = (mouse - m_InitialMousePosition) * 0.003f;
 		m_InitialMousePosition = mouse;
 
-		if ((!m_BlockEvents && m_OrbitalEnabled && Input::IsKeyPressed(Key::LeftAlt)) || m_FreePan)
+		if ((!m_BlockEvents && m_OrbitalEnabled && (!m_OrbitRequireAlt || Input::IsKeyPressed(Key::LeftAlt))) || m_FreePan)
 		{
-
 			if (Input::IsMouseButtonPressed(Mouse::ButtonMiddle))
 				MousePan(delta);
 			else if (Input::IsMouseButtonPressed(Mouse::ButtonLeft))
@@ -103,8 +104,8 @@ namespace Dymatic {
 			else if (Input::IsMouseButtonPressed(Mouse::ButtonRight))
 				MouseZoom(delta.y);
 
-			m_Position = CalculatePosition();
-			m_TargetPosition = m_Position;
+			m_CameraTransform.Position = CalculatePosition();
+			m_TargetPosition = m_CameraTransform.Position;
 			UpdateView();
 		}
 		else if (m_FirstPersonEnabled)
@@ -136,7 +137,7 @@ namespace Dymatic {
 				static const float deadZone = 0.25f;
 				const float mult = Input::IsGamepadButtonPressed(0, Gamepad::LeftThumb) ? 2.0f : 1.0f;
 
-				glm::vec2 rotation = { Input::GetGamepadAxis(0, Gamepad::RightX), Input::GetGamepadAxis(0, Gamepad::RightY) };
+				glm::vec2 rotation = { Input::GetGamepadAxis(0, Gamepad::RightXAxis), Input::GetGamepadAxis(0, Gamepad::RightYAxis) };
 				if (std::abs(rotation.x) < deadZone) rotation.x = 0.0f;
 				if (std::abs(rotation.y) < deadZone) rotation.y = 0.0f;
 
@@ -144,10 +145,10 @@ namespace Dymatic {
 
 				MouseRotate(rotation);
 
-				if (std::abs(Input::GetGamepadAxis(0, Gamepad::LeftX)) >= deadZone)
-					MoveInDirection(ts, GetRightDirection() * Input::GetGamepadAxis(0, Gamepad::LeftX));
-				if (std::abs(Input::GetGamepadAxis(0, Gamepad::LeftY)) >= deadZone)
-					MoveInDirection(ts, GetForwardDirection() * -Input::GetGamepadAxis(0, Gamepad::LeftY));
+				if (std::abs(Input::GetGamepadAxis(0, Gamepad::LeftXAxis)) >= deadZone)
+					MoveInDirection(ts, GetRightDirection() * Input::GetGamepadAxis(0, Gamepad::LeftXAxis));
+				if (std::abs(Input::GetGamepadAxis(0, Gamepad::LeftYAxis)) >= deadZone)
+					MoveInDirection(ts, GetForwardDirection() * -Input::GetGamepadAxis(0, Gamepad::LeftYAxis));
 				if (Input::GetGamepadAxis(0, Gamepad::LeftTrigger != -1.0f))
 					MoveInDirection(ts, glm::vec3(0.0f, -1.0f * (Input::GetGamepadAxis(0, Gamepad::LeftTrigger) * 0.5f + 0.5f), 0.0f));
 				if (Input::GetGamepadAxis(0, Gamepad::RightTrigger) != -1.0f)
@@ -166,8 +167,8 @@ namespace Dymatic {
 				m_CurrentTargetTime = 0.0f;
 			
 			float interpolation = (m_CurrentTargetTime / m_SmoothingTime);
-			m_Position = m_TargetPosition + (m_TargetStart - m_TargetPosition) * (interpolation * interpolation);
-			m_FocalPoint = m_Position + GetForwardDirection() * m_Distance;
+			m_CameraTransform.Position = m_TargetPosition + (m_TargetStart - m_TargetPosition) * (interpolation * interpolation);
+			m_CameraTransform.FocalPoint = m_CameraTransform.Position + GetForwardDirection() * m_CameraTransform.Distance;
 			
 			UpdateView();
 		}
@@ -178,11 +179,11 @@ namespace Dymatic {
 		const float mult = Input::IsKeyPressed(Key::LeftShift) || Input::IsKeyPressed(Key::RightShift) ? 2.0f : 1.0f;
 		
 		if (m_SmoothingTime == 0.0f)
-			m_Position += direction * mult * GetMoveSpeed() * ts.GetSeconds();
+			m_CameraTransform.Position += direction * mult * GetMoveSpeed() * ts.GetSeconds();
 		else
 		{
 			m_TargetPosition += direction * mult * GetMoveSpeed() * ts.GetSeconds();
-			m_TargetStart = m_Position;
+			m_TargetStart = m_CameraTransform.Position;
 			m_CurrentTargetTime = m_SmoothingTime;
 		}
 	}
@@ -207,24 +208,24 @@ namespace Dymatic {
 	void EditorCamera::MousePan(const glm::vec2& delta)
 	{
 		auto [xSpeed, ySpeed] = PanSpeed();
-		m_FocalPoint += -GetRightDirection() * delta.x * xSpeed * m_Distance;
-		m_FocalPoint += GetUpDirection() * delta.y * ySpeed * m_Distance;
+		m_CameraTransform.FocalPoint += -GetRightDirection() * delta.x * xSpeed * m_CameraTransform.Distance;
+		m_CameraTransform.FocalPoint += GetUpDirection() * delta.y * ySpeed * m_CameraTransform.Distance;
 	}
 
 	void EditorCamera::MouseRotate(const glm::vec2& delta)
 	{
 		float yawSign = GetUpDirection().y < 0 ? -1.0f : 1.0f;
-		m_Yaw += yawSign * delta.x * RotationSpeed();
-		m_Pitch += delta.y * RotationSpeed();
+		m_CameraTransform.Yaw += yawSign * delta.x * RotationSpeed();
+		m_CameraTransform.Pitch += delta.y * RotationSpeed();
 	}
 
 	void EditorCamera::MouseZoom(float delta)
 	{
-		m_Distance -= delta * ZoomSpeed();
-		if (m_Distance < 1.0f)
+		m_CameraTransform.Distance -= delta * ZoomSpeed();
+		if (m_CameraTransform.Distance < 1.0f)
 		{
-			m_FocalPoint += GetForwardDirection();
-			m_Distance = 1.0f;
+			m_CameraTransform.FocalPoint += GetForwardDirection();
+			m_CameraTransform.Distance = 1.0f;
 		}
 	}
 
@@ -243,14 +244,37 @@ namespace Dymatic {
 		return glm::rotate(GetOrientation(), glm::vec3(0.0f, 0.0f, -1.0f));
 	}
 
+	void EditorCamera::SetTransform(const EditorCameraTransform& transform)
+	{
+		m_CameraTransform = transform;
+		
+		// Update translation variables
+		m_CameraTransform.Position = CalculatePosition();
+		m_TargetPosition = m_CameraTransform.Position;
+
+		// Reset the smooth movement variables
+		m_TargetStart = transform.Position;
+		m_CurrentTargetTime = 0.0f;
+	}
+
+	void EditorCamera::SmoothTransform(const EditorCameraTransform& transform)
+	{
+		m_TargetStart = m_CameraTransform.Position;
+		m_CameraTransform = transform;
+
+		// Move smoothly
+		m_TargetPosition = CalculatePosition();
+		m_CurrentTargetTime = m_SmoothingTime;
+	}
+
 	glm::vec3 EditorCamera::CalculatePosition() const
 	{
-		return m_FocalPoint - GetForwardDirection() * m_Distance;
+		return m_CameraTransform.FocalPoint - GetForwardDirection() * m_CameraTransform.Distance;
 	}
 
 	glm::quat EditorCamera::GetOrientation() const
 	{
-		return glm::quat(glm::vec3(-m_Pitch, -m_Yaw, 0.0f));
+		return glm::quat(glm::vec3(-m_CameraTransform.Pitch, -m_CameraTransform.Yaw, 0.0f));
 	}
 
 }

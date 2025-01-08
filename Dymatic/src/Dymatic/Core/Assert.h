@@ -4,11 +4,20 @@
 #include "Dymatic/Core/Log.h"
 #include <filesystem>
 
+// Asserts
 #ifdef DY_ENABLE_ASSERTS
+
+	// Message box implementation for Windows platforms
+	#ifdef DY_PLATFORM_WINDOWS
+		#include <Windows.h>
+		#define DY_INTERNAL_ASSERT_ERROR_BOX(msg, ...) { MessageBoxA(nullptr, fmt::format(msg, __VA_ARGS__).c_str(), "Dymatic assertion failed!", MB_OK | MB_ICONERROR); }
+	#else
+		#define DY_INTERNAL_ASSERT_ERROR_BOX(msg, ...)
+	#endif
 
 	// Alteratively we could use the same "default" message for both "WITH_MSG" and "NO_MSG" and
 	// provide support for custom formatting by concatenating the formatting string instead of having the format inside the default message
-	#define DY_INTERNAL_ASSERT_IMPL(type, check, msg, ...) { if(!(check)) { DY##type##ERROR(msg, __VA_ARGS__); DY_DEBUGBREAK(); } }
+	#define DY_INTERNAL_ASSERT_IMPL(type, check, msg, ...) { if(!(check)) { DY##type##ERROR(msg, __VA_ARGS__); DY_INTERNAL_ASSERT_ERROR_BOX(msg, __VA_ARGS__); DY_DEBUGBREAK(); } }
 	#define DY_INTERNAL_ASSERT_WITH_MSG(type, check, ...) DY_INTERNAL_ASSERT_IMPL(type, check, "Assertion failed: {0}", __VA_ARGS__)
 	#define DY_INTERNAL_ASSERT_NO_MSG(type, check) DY_INTERNAL_ASSERT_IMPL(type, check, "Assertion '{0}' failed at {1}:{2}", DY_STRINGIFY_MACRO(check), std::filesystem::path(__FILE__).filename().string(), __LINE__)
 
@@ -21,4 +30,29 @@
 #else
 	#define DY_ASSERT(...)
 	#define DY_CORE_ASSERT(...)
+#endif
+
+// Verify
+#ifdef DY_ENABLE_VERIFY
+	
+	// Message box implementation for Windows platforms
+	#ifdef DY_PLATFORM_WINDOWS
+		#include <Windows.h>
+		#define DY_INTERNAL_VERIFY_ERROR_BOX(msg, ...) { MessageBoxA(nullptr, fmt::format(msg, __VA_ARGS__).c_str(), "Dymatic verify failed!", MB_OK | MB_ICONERROR); }
+	#else
+		#define DY_INTERNAL_VERIFY_ERROR_BOX(msg, ...)
+	#endif
+
+	#define DY_INTERNAL_VERIFY_IMPL(type, check, msg, ...) { if(!(check)) { DY##type##ERROR(msg, __VA_ARGS__); DY_INTERNAL_VERIFY_ERROR_BOX(msg, __VA_ARGS__); DY_DEBUGBREAK(); } }
+	#define DY_INTERNAL_VERIFY_WITH_MSG(type, check, ...) DY_INTERNAL_VERIFY_IMPL(type, check, "Verify failed: {0}", __VA_ARGS__)
+	#define DY_INTERNAL_VERIFY_NO_MSG(type, check) DY_INTERNAL_VERIFY_IMPL(type, check, "Verify '{0}' failed at {1}:{2}", DY_STRINGIFY_MACRO(check), std::filesystem::path(__FILE__).filename().string(), __LINE__)
+	
+	#define DY_INTERNAL_VERIFY_GET_MACRO_NAME(arg1, arg2, macro, ...) macro
+	#define DY_INTERNAL_VERIFY_GET_MACRO(...) DY_EXPAND_MACRO( DY_INTERNAL_VERIFY_GET_MACRO_NAME(__VA_ARGS__, DY_INTERNAL_VERIFY_WITH_MSG, DY_INTERNAL_VERIFY_NO_MSG) )
+
+	#define DY_VERIFY(...) DY_EXPAND_MACRO( DY_INTERNAL_VERIFY_GET_MACRO(__VA_ARGS__)(_, __VA_ARGS__) )
+	#define DY_CORE_VERIFY(...) DY_EXPAND_MACRO( DY_INTERNAL_VERIFY_GET_MACRO(__VA_ARGS__)(_CORE_, __VA_ARGS__) )
+#else
+	#define DY_VERIFY(...)
+	#define DY_CORE_VERIFY(...)
 #endif

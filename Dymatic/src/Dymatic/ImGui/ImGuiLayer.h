@@ -25,6 +25,7 @@ namespace Dymatic {
 		void BlockEvents(bool block) { m_BlockEvents = block; }
 
 		void AddIconFont(const char* path, float size, int min_range, int max_range);
+		void AddFontRanges(const char* path, float size, int min_range, int max_range);
 	private:
 		bool m_BlockEvents = true;
 	};

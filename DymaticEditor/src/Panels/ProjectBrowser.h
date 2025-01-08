@@ -20,15 +20,15 @@ namespace Dymatic {
 		void SaveRecentProjcets();
 
 		Ref<Texture2D> GetProjectIcon(const std::filesystem::path& path);
+		std::string GetProjectVersion(const std::filesystem::path& path);
 
 	private:
 		bool m_Open = false;
 		
-		Ref<Texture2D> m_DymaticProjectIcon = Texture2D::Create("Resources/Icons/Branding/DymaticLogo.png");
-		
 		struct RecentProject
 		{
 			std::filesystem::path Path;
+			std::string Version;
 			Ref<Texture2D> Icon;
 
 			bool operator==(const std::filesystem::path& path) { return Path == path; }

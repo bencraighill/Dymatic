@@ -4,11 +4,13 @@
 
 namespace Dymatic::String {
 
+	int ToInteger(const std::string& string);
+
 	std::string FloatToString(float Float);
 	int FindNthOf(const std::string& str, const std::string& find, int nth);
 	int FindNthOf(const std::string& str, char find, int nth);
 	void ReplaceAll(std::string& str, const std::string& from, const std::string& to);
-	void ReplaceAll(std::string& str, const char& from, const char& to);
+	void ReplaceAll(std::string& str, const char from, const char to);
 	std::string GetNextNameWithIndex(std::vector<std::string>& vector, std::string prefix);
 	void EraseAllOfCharacter(std::string& string, char character);
 	void SplitStringByDelimiter(const std::string& string, std::vector<std::string>& seglist, char delimiter);
@@ -16,4 +18,6 @@ namespace Dymatic::String {
 	std::string ToLower(std::string string);
 	std::wstring StringToWideString(const std::string&);
 	std::string WideStringToString(const std::wstring&);
+	std::string FormatBytes(size_t bytes);
+	bool TryGetHandleFromString(const char* string, const std::function<void(uint64_t)>& callback);
 }

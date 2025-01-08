@@ -1,13 +1,35 @@
 #pragma once
-
 #include "Dymatic/Renderer/Camera.h"
+
+#include "Dymatic/Renderer/Texture.h"
 
 namespace Dymatic {
 
 	class SceneCamera : public Camera
 	{
 	public:
-		enum class ProjectionType { Perspective = 0, Orthographic = 1 };
+		enum class ProjectionType
+		{
+			Perspective = 0,
+			Orthographic = 1
+		};
+
+		struct CameraSettings
+		{
+			// DOF
+			float DOFStrength = 0.0f;
+			float DOFTarget = 0.0f;
+			float DOFFocusRange = 1.0f;
+			float DOFFocusFalloff = 0.0f;
+
+			// Bloom
+			Ref<Texture2D> BloomDirtTexture = nullptr;
+			float BloomThreshold = 2.0f;
+
+			// LUT
+			Ref<Texture2D> LUT = nullptr;
+		};
+
 	public:
 		SceneCamera();
 		virtual ~SceneCamera() = default;
@@ -16,6 +38,10 @@ namespace Dymatic {
 		void SetOrthographic(float size, float nearClip, float farClip);
 
 		void SetViewportSize(uint32_t width, uint32_t height);
+
+		virtual float GetNearClip() const override { return GetPerspectiveNearClip(); }
+		virtual float GetFarClip() const override { return GetPerspectiveFarClip(); }
+		virtual float GetFOV() const override { return m_PerspectiveFOV; }
 
 		float GetPerspectiveVerticalFOV() const { return m_PerspectiveFOV; }
 		void SetPerspectiveVerticalFOV(float verticalFov) { m_PerspectiveFOV = verticalFov; RecalculateProjection(); }
@@ -35,6 +61,9 @@ namespace Dymatic {
 		void SetProjectionType(ProjectionType type) { m_ProjectionType = type; RecalculateProjection(); }
 
 		float GetAspectRatio() { return m_AspectRatio; }
+
+		CameraSettings& GetCameraSettings() { return m_Settings; }
+		const CameraSettings& GetCameraSettings() const { return m_Settings; }
 	private: 
 		void RecalculateProjection();
 	private:
@@ -47,6 +76,8 @@ namespace Dymatic {
 		float m_OrthographicNear = -1.0f, m_OrthographicFar = 1.0f;
 
 		float m_AspectRatio = 0.0f;
+
+		CameraSettings m_Settings;
 	};
 
 }

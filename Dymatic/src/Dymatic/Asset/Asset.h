@@ -1,5 +1,6 @@
 #pragma once
 #include "Dymatic/Core/UUID.h"
+#include "Dymatic/Asset/AssetHandle.h"
 
 namespace Dymatic {
 
@@ -7,17 +8,30 @@ namespace Dymatic {
 	{
 		None = 0,
 		Scene = 1,
-		Mesh = 2,
-		Material = 3,
-		Texture = 4,
-		Font = 5,
-		Audio = 6
+		Prefab = 2,
+		MeshSource = 3,
+		Mesh = 4,
+		Material = 5,
+		Texture = 6,
+		EnvironmentMap = 7,
+		VirtualTexture = 8,
+		Font = 9,
+		Audio = 10,
+		ParticleSystem = 11,
+		Skeleton = 12,
+		Animation = 13,
+		AnimationGraph = 14,
+		PhysicsMaterial = 15,
+		Video = 16,
+		Subtitle = 17,
+		VideoPlayer = 18,
+		ASSET_TYPE_SIZE
 	};
 
 	class Asset
 	{
 	public:
-		UUID Handle;
+		AssetHandle Handle;
 		virtual AssetType GetAssetType() const = 0;
 	};
 	

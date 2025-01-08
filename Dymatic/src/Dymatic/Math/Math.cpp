@@ -8,6 +8,7 @@
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/matrix_decompose.hpp>
+#include <glm/gtx/quaternion.hpp>
 
 namespace Dymatic::Math {
 
@@ -81,6 +82,13 @@ namespace Dymatic::Math {
 
 
 		return true;
+	}
+
+	void ComposeTransform(glm::mat4& transform, const glm::vec3& translation, const glm::vec3& rotation, const glm::vec3& scale)
+	{
+		transform = glm::translate(glm::mat4(1.0f), translation) *
+					glm::toMat4(glm::quat(rotation)) *
+					glm::scale(glm::mat4(1.0f), scale);
 	}
 
 	unsigned int GetRandomInRange(int min, int max)
@@ -167,4 +175,5 @@ namespace Dymatic::Math {
 			InterpEaseIn(0.f, 1.f, Alpha * 2.f, Exp) * 0.5f :
 			InterpEaseOut(0.f, 1.f, Alpha * 2.f - 1.f, Exp) * 0.5f + 0.5f);
 	}
+
 }

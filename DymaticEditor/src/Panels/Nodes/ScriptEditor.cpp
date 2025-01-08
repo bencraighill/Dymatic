@@ -1,13 +1,16 @@
 #include "ScriptEditor.h"
 
+#include "EditorResources.h"
+
 #include "Settings/Preferences.h"
 #include "TextSymbols.h"
 
+#include "Panels/UI.h"
 #include <imgui/imgui.h>
-#include "NodeUtilities/builders.h"
-#include "NodeUtilities/widgets.h"
+#include "Utilities/Builders.h"
+#include "Utilities/Widgets.h"
+#include "Utilities/Graph.h"
 #include <ImGuiNode/imgui_node_editor.h>
-#define IMGUI_DEFINE_MATH_OPERATORS
 #include <imgui/imgui_internal.h>
 
 #include <glm/gtc/type_ptr.hpp>
@@ -225,7 +228,7 @@ enum class CompilerResultType
     Error
 };
 
-struct CompilerResult
+struct CompilerResultMessage
 {
     CompilerResultType Type;
     std::string Message;
@@ -486,15 +489,6 @@ private:
 
     bool m_HideUnconnected = false;
 
-    Ref<Texture2D> m_HeaderBackground;
-	Ref<Texture2D> m_SaveIcon;
-	Ref<Texture2D> m_RestoreIcon;
-	Ref<Texture2D> m_CommentIcon;
-	Ref<Texture2D> m_PinIcon;
-	Ref<Texture2D> m_PinnedIcon;
-
-	Ref<Texture2D> m_RemoveIcon;
-
 	Ref<Texture2D> m_GraphIcon;
 	Ref<Texture2D> m_MacroIcon;
 
@@ -518,7 +512,7 @@ private:
 	std::string m_PreviousSearchBuffer;
 
     // Compiler and Results
-    std::vector<CompilerResult> m_CompilerResults;
+    std::vector<CompilerResultMessage> m_CompilerResults;
     std::string m_FindResultsSearchBar = "";
     std::vector<FindResultsData> m_FindResultsData;
 
@@ -1162,15 +1156,15 @@ void ScriptEditorInternal::ShowStyleEditor(bool* show)
 
     ImGui::Separator();
 
-    static ImGuiColorEditFlags edit_mode = ImGuiColorEditFlags_RGB;
+    static ImGuiColorEditFlags edit_mode = ImGuiColorEditFlags_DisplayRGB;
     ImGui::BeginHorizontal("Color Mode", ImVec2(paneWidth, 0), 1.0f);
     ImGui::TextUnformatted("Filter Colors");
     ImGui::Spring();
-    ImGui::RadioButton("RGB", &edit_mode, ImGuiColorEditFlags_RGB);
+    ImGui::RadioButton("RGB", &edit_mode, ImGuiColorEditFlags_DisplayRGB);
     ImGui::Spring(0);
-    ImGui::RadioButton("HSV", &edit_mode, ImGuiColorEditFlags_HSV);
+    ImGui::RadioButton("HSV", &edit_mode, ImGuiColorEditFlags_DisplayHSV);
     ImGui::Spring(0);
-    ImGui::RadioButton("HEX", &edit_mode, ImGuiColorEditFlags_HEX);
+    ImGui::RadioButton("HEX", &edit_mode, ImGuiColorEditFlags_DisplayHex);
     ImGui::EndHorizontal();
 
     static ImGuiTextFilter filter;
@@ -1190,172 +1184,6 @@ void ScriptEditorInternal::ShowStyleEditor(bool* show)
     ImGui::PopItemWidth();
 
     ImGui::End();
-}
-
-void ScriptEditorInternal::ShowLeftPane(float paneWidth)
-{
-    if (ed::GetCurrentEditor() != nullptr)
-    {
-        auto& io = ImGui::GetIO();
-
-        ImGui::BeginChild("Selection", ImVec2(paneWidth, 0));
-
-        paneWidth = ImGui::GetContentRegionAvailWidth();
-
-        static bool showStyleEditor = false;
-        ImGui::BeginHorizontal("Style Editor", ImVec2(paneWidth, 0));
-        ImGui::Spring();
-        if (ImGui::Button("Edit Style"))
-            showStyleEditor = true;
-        ImGui::EndHorizontal();
-
-        if (showStyleEditor)
-            ShowStyleEditor(&showStyleEditor);
-
-        std::vector<ed::NodeId> selectedNodes;
-        std::vector<ed::LinkId> selectedLinks;
-        selectedNodes.resize(ed::GetSelectedObjectCount());
-        selectedLinks.resize(ed::GetSelectedObjectCount());
-
-        int nodeCount = ed::GetSelectedNodes(selectedNodes.data(), static_cast<int>(selectedNodes.size()));
-        int linkCount = ed::GetSelectedLinks(selectedLinks.data(), static_cast<int>(selectedLinks.size()));
-
-        selectedNodes.resize(nodeCount);
-        selectedLinks.resize(linkCount);
-
-        int saveIconWidth = m_SaveIcon->GetWidth();
-        int saveIconHeight = m_SaveIcon->GetHeight();
-        int restoreIconWidth = m_RestoreIcon->GetWidth();
-        int restoreIconHeight = m_RestoreIcon->GetHeight();
-
-        ImGui::GetWindowDrawList()->AddRectFilled(
-            ImGui::GetCursorScreenPos(),
-            ImGui::GetCursorScreenPos() + ImVec2(paneWidth, ImGui::GetTextLineHeight()),
-            ImColor(ImGui::GetStyle().Colors[ImGuiCol_HeaderActive]), ImGui::GetTextLineHeight() * 0.25f);
-        ImGui::Spacing(); ImGui::SameLine();
-        ImGui::TextUnformatted("NODES");
-        ImGui::Indent();
-        for (auto& graph : m_Graphs)
-        {
-            for (auto& node : graph.Nodes)
-            {
-                ImGui::PushID(node.ID.AsPointer());
-                auto start = ImGui::GetCursorScreenPos();
-
-                if (const auto progress = GetTouchProgress(node.ID))
-                {
-                    ImGui::GetWindowDrawList()->AddLine(
-                        start + ImVec2(-8, 0),
-                        start + ImVec2(-8, ImGui::GetTextLineHeight()),
-                        IM_COL32(255, 0, 0, 255 - (int)(255 * progress)), 4.0f);
-                }
-
-                bool isSelected = std::find(selectedNodes.begin(), selectedNodes.end(), node.ID) != selectedNodes.end();
-                if (ImGui::Selectable((node.Name + "##" + std::to_string(reinterpret_cast<uintptr_t>(node.ID.AsPointer()))).c_str(), &isSelected))
-                {
-                    if (io.KeyCtrl)
-                    {
-                        if (isSelected)
-                            ed::SelectNode(node.ID, true);
-                        else
-                            ed::DeselectNode(node.ID);
-                    }
-                    else
-                        ed::SelectNode(node.ID, false);
-
-                    ed::NavigateToSelection();
-                }
-                if (ImGui::IsItemHovered() && !node.State.empty())
-                    ImGui::SetTooltip("State: %s", node.State.c_str());
-
-                auto id = std::string("(") + std::to_string(reinterpret_cast<uintptr_t>(node.ID.AsPointer())) + ")";
-                auto textSize = ImGui::CalcTextSize(id.c_str(), nullptr);
-                auto iconPanelPos = start + ImVec2(
-                    paneWidth - ImGui::GetStyle().FramePadding.x - ImGui::GetStyle().IndentSpacing - saveIconWidth - restoreIconWidth - ImGui::GetStyle().ItemInnerSpacing.x * 1,
-                    (ImGui::GetTextLineHeight() - saveIconHeight) / 2);
-                ImGui::GetWindowDrawList()->AddText(
-                    ImVec2(iconPanelPos.x - textSize.x - ImGui::GetStyle().ItemInnerSpacing.x, start.y),
-                    IM_COL32(255, 255, 255, 255), id.c_str(), nullptr);
-
-                auto drawList = ImGui::GetWindowDrawList();
-                ImGui::SetCursorScreenPos(iconPanelPos);
-                ImGui::SetItemAllowOverlap();
-                if (node.SavedState.empty())
-                {
-                    if (ImGui::InvisibleButton("save", ImVec2((float)saveIconWidth, (float)saveIconHeight)))
-                        node.SavedState = node.State;
-
-                    if (ImGui::IsItemActive())
-                        drawList->AddImage(reinterpret_cast<void*>(m_SaveIcon->GetRendererID()), ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0, 1), ImVec2(1, 0), IM_COL32(255, 255, 255, 96));
-                    else if (ImGui::IsItemHovered())
-                        drawList->AddImage(reinterpret_cast<void*>(m_SaveIcon->GetRendererID()), ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0, 1), ImVec2(1, 0), IM_COL32(255, 255, 255, 255));
-                    else
-                        drawList->AddImage(reinterpret_cast<void*>(m_SaveIcon->GetRendererID()), ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0, 1), ImVec2(1, 0), IM_COL32(255, 255, 255, 160));
-                }
-                else
-                {
-                    ImGui::Dummy(ImVec2((float)saveIconWidth, (float)saveIconHeight));
-                    drawList->AddImage(reinterpret_cast<void*>(m_SaveIcon->GetRendererID()), ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0, 1), ImVec2(1, 0), IM_COL32(255, 255, 255, 32));
-                }
-
-                ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
-                ImGui::SetItemAllowOverlap();
-                if (!node.SavedState.empty())
-                {
-                    if (ImGui::InvisibleButton("restore", ImVec2((float)restoreIconWidth, (float)restoreIconHeight)))
-                    {
-                        node.State = node.SavedState;
-                        ed::RestoreNodeState(node.ID);
-                        node.SavedState.clear();
-                    }
-
-                    if (ImGui::IsItemActive())
-                        drawList->AddImage(reinterpret_cast<void*>(m_RestoreIcon->GetRendererID()), ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0, 1), ImVec2(1, 0), IM_COL32(255, 255, 255, 96));
-                    else if (ImGui::IsItemHovered())
-                        drawList->AddImage(reinterpret_cast<void*>(m_RestoreIcon->GetRendererID()), ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0, 1), ImVec2(1, 0), IM_COL32(255, 255, 255, 255));
-                    else
-                        drawList->AddImage(reinterpret_cast<void*>(m_RestoreIcon->GetRendererID()), ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0, 1), ImVec2(1, 0), IM_COL32(255, 255, 255, 160));
-                }
-                else
-                {
-                    ImGui::Dummy(ImVec2((float)restoreIconWidth, (float)restoreIconHeight));
-                    drawList->AddImage(reinterpret_cast<void*>(m_RestoreIcon->GetRendererID()), ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImVec2(0, 1), ImVec2(1, 0), IM_COL32(255, 255, 255, 32));
-                }
-
-                ImGui::SameLine(0, 0);
-                ImGui::SetItemAllowOverlap();
-                ImGui::Dummy(ImVec2(0, (float)restoreIconHeight));
-
-                ImGui::PopID();
-            }
-        }
-        ImGui::Unindent();
-
-        static int changeCount = 0;
-
-        ImGui::GetWindowDrawList()->AddRectFilled(
-            ImGui::GetCursorScreenPos(),
-            ImGui::GetCursorScreenPos() + ImVec2(paneWidth, ImGui::GetTextLineHeight()),
-            ImColor(ImGui::GetStyle().Colors[ImGuiCol_HeaderActive]), ImGui::GetTextLineHeight() * 0.25f);
-        ImGui::Spacing(); ImGui::SameLine();
-        ImGui::TextUnformatted("Selection");
-
-        ImGui::BeginHorizontal("Selection Stats", ImVec2(paneWidth, 0));
-        ImGui::Text("Changed %d time%s", changeCount, changeCount > 1 ? "s" : "");
-        ImGui::Spring();
-        if (ImGui::Button("Deselect All"))
-            ClearSelection();
-        ImGui::EndHorizontal();
-        ImGui::Indent();
-        for (int i = 0; i < nodeCount; ++i) ImGui::Text("Node (%p)", selectedNodes[i].AsPointer());
-        for (int i = 0; i < linkCount; ++i) ImGui::Text("Link (%p)", selectedLinks[i].AsPointer());
-        ImGui::Unindent();
-
-        if (ed::HasSelectionChanged())
-            ++changeCount;
-
-        ImGui::EndChild();
-    }
 }
 
 void ScriptEditorInternal::OnEvent(Dymatic::Event& e)
@@ -2476,6 +2304,8 @@ void ScriptEditorInternal::PasteNodes()
 
 void ScriptEditorInternal::DuplicateNodes()
 {
+    return;
+
     for (auto& graph : m_Graphs)
     {
         std::vector<ed::NodeId> selectedNodes;
@@ -2823,7 +2653,7 @@ void ScriptEditorInternal::DrawGraphOption(NodeGraph& graph)
 		memset(buffer, 0, sizeof(buffer));
 		std::strncpy(buffer, graph.Name.c_str(), sizeof(buffer));
 
-		bool input, clicked = ImGui::SelectableInput("##GraphTree", ImGui::GetContentRegionAvail().x, false, ImGuiSelectableFlags_None, buffer, sizeof(buffer), input);
+		ImGui::SelectableInput("##GraphTree", ImGui::GetContentRegionAvail().x, false, ImGuiSelectableFlags_None, buffer, sizeof(buffer));
         
         if ((GImGui->TempInputId != 0 && GImGui->TempInputId == GImGui->ActiveIdPreviousFrame && GImGui->TempInputId != GImGui->ActiveId))
         {
@@ -2853,7 +2683,7 @@ Node* ScriptEditorInternal::DisplaySearchData(SearchData& searchData, bool origi
 
 	if (!searchData.IsConfirmed)
 	{
-		ImGui::SetNextTreeNodeOpen(searchData.IsOpen);
+		ImGui::SetNextItemOpen(searchData.IsOpen);
 		searchData.IsConfirmed = true;
 	}
 	bool searchEmpty = !m_SearchBuffer.empty();
@@ -3081,15 +2911,6 @@ void ScriptEditorInternal::Init()
 	ed::Config config;
     config.SettingsFile = "";
 
-	m_HeaderBackground = Dymatic::Texture2D::Create("Resources/Icons/NodeEditor/BlueprintBackground.png");
-	m_SaveIcon = Dymatic::Texture2D::Create("Resources/Icons/NodeEditor/ic_save_white_24dp.png");
-	m_RestoreIcon = Dymatic::Texture2D::Create("Resources/Icons/NodeEditor/ic_restore_white_24dp.png");
-	m_CommentIcon = Dymatic::Texture2D::Create("Resources/Icons/NodeEditor/ic_comment_white_24dp.png");
-	m_PinIcon = Dymatic::Texture2D::Create("Resources/Icons/NodeEditor/ic_pin_white_24dp.png");
-	m_PinnedIcon = Dymatic::Texture2D::Create("Resources/Icons/NodeEditor/ic_pinned_white_24dp.png");
-
-    m_RemoveIcon = Dymatic::Texture2D::Create("Resources/Icons/SceneHierarchy/ClearIcon.png");
-
     m_GraphIcon = Dymatic::Texture2D::Create("Resources/Icons/NodeEditor/GraphIcon.png");
     m_MacroIcon = Dymatic::Texture2D::Create("Resources/Icons/NodeEditor/MacroIcon.png");
 
@@ -3244,7 +3065,7 @@ void ScriptEditorInternal::OnImGuiRender()
                     {
                         auto cursorTopLeft = ImGui::GetCursorScreenPos();
                     
-                        util::BlueprintNodeBuilder builder(reinterpret_cast<void*>(m_HeaderBackground->GetRendererID()), m_HeaderBackground->GetWidth(), m_HeaderBackground->GetHeight());
+                        util::BlueprintNodeBuilder builder((ImTextureID)EditorResources::HeaderBackground->GetRendererID(), EditorResources::HeaderBackground->GetWidth(), EditorResources::HeaderBackground->GetHeight());
 
                         // Drag Drop Target
                         const ImGuiID id = ImGui::GetID("##AddVariablePopup");
@@ -3376,7 +3197,7 @@ void ScriptEditorInternal::OnImGuiRender()
 											char buffer[256];
 											memset(buffer, 0, sizeof(buffer));
 											std::strncpy(buffer, node.DisplayName.c_str(), sizeof(buffer));
-											bool input, clicked = ImGui::SelectableInput("##CustomEventName", node.DisplayName.empty() ? 1.0f : ImGui::CalcTextSize(buffer).x, false, NULL, buffer, sizeof(buffer), input, ImGuiInputTextFlags_NoHorizontalScroll);
+											bool input, clicked = ImGui::SelectableInput("##CustomEventName", node.DisplayName.empty() ? 1.0f : ImGui::CalcTextSize(buffer).x, false, 0, buffer, sizeof(buffer), &input, ImGuiInputTextFlags_NoHorizontalScroll);
                                             if (input)
                                                 node.DisplayName = buffer;
                                             
@@ -3601,7 +3422,7 @@ void ScriptEditorInternal::OnImGuiRender()
 		            		auto drawList = ImGui::GetWindowDrawList();
 
 		            		const int vert_start_idx = drawList->VtxBuffer.Size;
-		            		drawList->AddRect(pos, pos + size, ImColor(0, 0, 0, 75), ed::GetStyle().NodeRounding + 5.0f, 15, 20.0f);
+		            		drawList->AddRect(pos, pos + size, ImColor(0, 0, 0, 75), ed::GetStyle().NodeRounding + 5.0f, ImDrawFlags_None, 20.0f);
 		            		const int vert_end_idx = drawList->VtxBuffer.Size;
 		            		ImDrawVert* vert_start = drawList->VtxBuffer.Data + vert_start_idx;
 		            		ImDrawVert* vert_end = drawList->VtxBuffer.Data + vert_end_idx;
@@ -3626,12 +3447,11 @@ void ScriptEditorInternal::OnImGuiRender()
 
 		            			ImGui::SetCursorScreenPos(min - ImVec2(-8, ImGui::GetTextLineHeightWithSpacing() + 4));
 		            			ImGui::BeginGroup();
-		            			//ImGui::TextUnformatted(node.Comment.c_str());
 
 		            			char buffer[256];
 		            			memset(buffer, 0, sizeof(buffer));
 		            			std::strncpy(buffer, node.Comment.c_str(), sizeof(buffer));
-                                bool input, clicked = ImGui::SelectableInput("##NodeComment", node.Comment.empty() ? 1.0f : ImGui::CalcTextSize(buffer).x, false, NULL, buffer, sizeof(buffer), input, ImGuiInputTextFlags_NoHorizontalScroll);
+                                bool input, clicked = ImGui::SelectableInput("##NodeComment", node.Comment.empty() ? 1.0f : ImGui::CalcTextSize(buffer).x, false, NULL, buffer, sizeof(buffer), &input, ImGuiInputTextFlags_NoHorizontalScroll);
                                 if (input) node.Comment = std::string(buffer);
 
                                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4());
@@ -3640,9 +3460,9 @@ void ScriptEditorInternal::OnImGuiRender()
 		            			ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 5.0f * zoom);
 
                                 ImGui::SameLine();
-                                if (ImGui::ImageButton((ImTextureID)(node.CommentPinned ? m_PinnedIcon : m_PinIcon)->GetRendererID(), ImVec2(15.0f, 15.0f) * zoom, { 0, 1 }, {1, 0}, 2 * zoom)) node.CommentPinned = !node.CommentPinned;
+                                if (ImGui::ImageButton((ImTextureID)(node.CommentPinned ? EditorResources::PinnedIcon : EditorResources::PinIcon)->GetRendererID(), ImVec2(15.0f, 15.0f) * zoom, { 0, 1 }, {1, 0}, 2 * zoom)) node.CommentPinned = !node.CommentPinned;
                                 ImGui::SameLine();
-                                if (ImGui::ImageButton((ImTextureID)m_CommentIcon->GetRendererID(), ImVec2(15.0f, 15.0f) * zoom, { 0, 1 }, { 1, 0 }, 2 * zoom)) node.CommentEnabled = false;
+                                if (ImGui::ImageButton((ImTextureID)EditorResources::CommentIcon->GetRendererID(), ImVec2(15.0f, 15.0f) * zoom, { 0, 1 }, { 1, 0 }, 2 * zoom)) node.CommentEnabled = false;
 
                                 ImGui::PopStyleVar();
                                 ImGui::PopStyleColor(3);
@@ -3665,7 +3485,7 @@ void ScriptEditorInternal::OnImGuiRender()
 		            			drawList->AddRect(
 		            				hintFrameBounds.GetTL() - padding * zoom,
 		            				hintFrameBounds.GetBR() + padding * zoom,//hintFrameBounds.GetTL() + (hintFrameBounds.GetSize() * ed::GetCurrentZoom()),
-		            				IM_COL32(255, 255, 255, 128 * bgAlpha / 255), 4.0f * zoom, ImDrawCornerFlags_All, zoom);
+		            				IM_COL32(255, 255, 255, 128 * bgAlpha / 255), 4.0f * zoom, ImDrawFlags_RoundCornersAll, zoom);
 		            		}
                             else if (ImGui::IsItemHovered() || (window.CommentOpacity > -1.0f && window.HoveredCommentID == node.ID))
                             {
@@ -3681,7 +3501,7 @@ void ScriptEditorInternal::OnImGuiRender()
 
                                 ImGui::SetCursorScreenPos(min - ImVec2(-8, ImGui::GetTextLineHeightWithSpacing() + 4));
                                 ImGui::PushStyleVar(ImGuiStyleVar_Alpha, window.CommentOpacity);
-                                if (ImGui::ImageButton((ImTextureID)m_CommentIcon->GetRendererID(), ImVec2(15.0f, 15.0f) * zoom, { 0, 1 }, { 1, 0 }, 2 * zoom)) { window.CommentOpacity = -2.5f; node.CommentEnabled = true; }
+                                if (ImGui::ImageButton((ImTextureID)EditorResources::CommentIcon->GetRendererID(), ImVec2(15.0f, 15.0f) * zoom, { 0, 1 }, { 1, 0 }, 2 * zoom)) { window.CommentOpacity = -2.5f; node.CommentEnabled = true; }
                                 ImGui::PopStyleVar();
 
 		            			if (ImGui::IsItemHovered() || nodeHovered)
@@ -3903,9 +3723,9 @@ void ScriptEditorInternal::OnImGuiRender()
                     
                                     auto drawList = ImGui::GetWindowDrawList();
                                     drawList->AddRectFilled(inputsRect.GetTL(), inputsRect.GetBR(),
-                                        IM_COL32((int)(255 * pinBackground.x), (int)(255 * pinBackground.y), (int)(255 * pinBackground.z), inputAlpha), 4.0f, 15);
+                                        IM_COL32((int)(255 * pinBackground.x), (int)(255 * pinBackground.y), (int)(255 * pinBackground.z), inputAlpha), 4.0f);
                                     drawList->AddRect(inputsRect.GetTL(), inputsRect.GetBR(),
-                                        IM_COL32((int)(255 * pinBackground.x), (int)(255 * pinBackground.y), (int)(255 * pinBackground.z), inputAlpha), 4.0f, 15);
+                                        IM_COL32((int)(255 * pinBackground.x), (int)(255 * pinBackground.y), (int)(255 * pinBackground.z), inputAlpha), 4.0f);
                     
                                     if (m_NewLinkPin && !CanCreateLink(m_NewLinkPin, &pin) && &pin != m_NewLinkPin)
                                         inputAlpha = (int)(255 * ImGui::GetStyle().Alpha * (48.0f / 255.0f));
@@ -3955,9 +3775,9 @@ void ScriptEditorInternal::OnImGuiRender()
                     
                                     auto drawList = ImGui::GetWindowDrawList();
                                     drawList->AddRectFilled(outputsRect.GetTL(), outputsRect.GetBR(),
-                                        IM_COL32((int)(255 * pinBackground.x), (int)(255 * pinBackground.y), (int)(255 * pinBackground.z), outputAlpha), 4.0f, 15);
+                                        IM_COL32((int)(255 * pinBackground.x), (int)(255 * pinBackground.y), (int)(255 * pinBackground.z), outputAlpha), 4.0f);
                                     drawList->AddRect(outputsRect.GetTL(), outputsRect.GetBR(),
-                                        IM_COL32((int)(255 * pinBackground.x), (int)(255 * pinBackground.y), (int)(255 * pinBackground.z), outputAlpha), 4.0f, 15);
+                                        IM_COL32((int)(255 * pinBackground.x), (int)(255 * pinBackground.y), (int)(255 * pinBackground.z), outputAlpha), 4.0f);
                     
                     
                                     if (m_NewLinkPin && !CanCreateLink(m_NewLinkPin, &pin) && &pin != m_NewLinkPin)
@@ -3999,7 +3819,7 @@ void ScriptEditorInternal::OnImGuiRender()
 		            		std::strncpy(buffer, node.Name.c_str(), sizeof(buffer));
                             ImGui::SetNextItemWidth(ImGui::GetItemRectSize().x);
                             //bool tree, ret = ImGui::TreeNodeInput("##CommentName", ImGuiTreeNodeFlags_Leaf, buffer, sizeof(buffer), tree, input);
-                            bool input, clicked = ImGui::SelectableInput("##CommentName", node.Name.empty() ? 1.0f : ImGui::CalcTextSize(buffer).x, false, NULL, buffer, sizeof(buffer), input, ImGuiInputTextFlags_NoHorizontalScroll);
+                            bool input, clicked = ImGui::SelectableInput("##CommentName", node.Name.empty() ? 1.0f : ImGui::CalcTextSize(buffer).x, false, NULL, buffer, sizeof(buffer), &input, ImGuiInputTextFlags_NoHorizontalScroll);
                             //if (tree) ImGui::TreePop();
 		            		if (input) node.Name = std::string(buffer);
 
@@ -4052,7 +3872,7 @@ void ScriptEditorInternal::OnImGuiRender()
 		            		auto drawList = ImGui::GetWindowDrawList();
 
 		            		const int vert_start_idx = drawList->VtxBuffer.Size;
-		            		drawList->AddRect(pos, pos + shadowSize, ImColor(0, 0, 0, 75), ed::GetStyle().NodeRounding + 5.0f, 15, 20.0f);
+		            		drawList->AddRect(pos, pos + shadowSize, ImColor(0, 0, 0, 75), ed::GetStyle().NodeRounding + 5.0f);
 		            		const int vert_end_idx = drawList->VtxBuffer.Size;
 		            		ImDrawVert* vert_start = drawList->VtxBuffer.Data + vert_start_idx;
 		            		ImDrawVert* vert_end = drawList->VtxBuffer.Data + vert_end_idx;
@@ -4581,20 +4401,7 @@ void ScriptEditorInternal::OnImGuiRender()
 
                     ed::End();
 
-                    ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[2]);
-                    ImGui::GetWindowDrawList()->AddText(ImGui::GetWindowPos() + ImGui::GetWindowSize() - ImGui::CalcTextSize("SCRIPTING") - ImVec2(20.0f, 20.0f), IM_COL32(255, 255, 255, 50), "SCRIPTING");
-                    ImGui::PopFont();
-
-		            // Shadows
-		            auto drawList = ImGui::GetWindowDrawList();
-		            const ImVec4& borderCol = ImGui::GetStyleColorVec4(ImGuiCol_BorderShadow);
-		            const ImU32& minColor = ImGui::ColorConvertFloat4ToU32({ borderCol.x, borderCol.y, borderCol.z, 0.0f });
-		            const ImU32& maxColor = ImGui::ColorConvertFloat4ToU32({ borderCol.x, borderCol.y, borderCol.z, 0.25f });
-                    const float size = 75.0f;
-		            drawList->AddRectFilledMultiColor(ImGui::GetWindowPos(), ImGui::GetWindowPos() + ImVec2(size, ImGui::GetWindowSize().y), maxColor, minColor, minColor, maxColor);
-		            drawList->AddRectFilledMultiColor(ImGui::GetWindowPos(), ImGui::GetWindowPos() + ImVec2(ImGui::GetWindowSize().x, size), maxColor, maxColor, minColor, minColor);
-		            drawList->AddRectFilledMultiColor(ImGui::GetWindowPos() + ImGui::GetWindowSize(), ImGui::GetWindowPos() + ImGui::GetWindowSize() - ImVec2(size, ImGui::GetWindowSize().y), maxColor, minColor, minColor, maxColor);
-		            drawList->AddRectFilledMultiColor(ImGui::GetWindowPos() + ImGui::GetWindowSize(), ImGui::GetWindowPos() + ImGui::GetWindowSize() - ImVec2(ImGui::GetWindowSize().x, size), maxColor, maxColor, minColor, minColor);
+                    UI::DrawGraphOverlay("SCRIPTING");
                 }
 
                 ImGui::End();
@@ -4604,11 +4411,6 @@ void ScriptEditorInternal::OnImGuiRender()
                     m_Windows.erase(m_Windows.begin() + i);
             }
         }
-    
-    	ImGui::SetNextWindowClass(&windowClass);
-    	ImGui::Begin("Nodes", NULL, ImGuiWindowFlags_NoNavFocus);
-    	ShowLeftPane(ImGui::GetWindowSize().x);
-    	ImGui::End();
 
         const ImGuiTreeNodeFlags treeNodeFlags = ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_AllowItemOverlap | ImGuiTreeNodeFlags_FramePadding;
 
@@ -4644,7 +4446,7 @@ void ScriptEditorInternal::OnImGuiRender()
                         memset(buffer, 0, sizeof(buffer));
                         std::strncpy(buffer, variable.second.Name.c_str(), sizeof(buffer));
                         bool input;
-                        bool clicked = ImGui::SelectableInput("##VariableTree", ImGui::GetContentRegionAvail().x, m_SelectedVariable == variable.second.ID, ImGuiSelectableFlags_None, buffer, sizeof(buffer), input);
+                        bool clicked = ImGui::SelectableInput("##VariableTree", ImGui::GetContentRegionAvail().x, m_SelectedVariable == variable.second.ID, ImGuiSelectableFlags_None, buffer, sizeof(buffer), &input);
 
                         if (ImGui::IsItemHovered() && !variable.second.Tooltip.empty())
                             ImGui::SetTooltip(variable.second.Tooltip.c_str());
@@ -4837,7 +4639,7 @@ void ScriptEditorInternal::OnImGuiRender()
                             memset(buffer, 0, sizeof(buffer));
                             std::strncpy(buffer, variable.Name.c_str(), sizeof(buffer));
                             ImGui::InputText("##VariableName", buffer, sizeof(buffer));
-                            if ((ImGui::IsItemActivePreviousFrame() && !ImGui::IsItemActive()) || (ImGui::IsItemActive() && ImGui::IsKeyPressed(io.KeyMap[ImGuiKey_Enter])))
+                            if ((ImGui::IsItemActivePreviousFrame() && !ImGui::IsItemActive()) || (ImGui::IsItemActive() && ImGui::IsKeyPressed(ImGuiKey_Enter)))
                                 SetVariableName(&variable, buffer);
 
                             ImGui::Columns(1);
@@ -5088,7 +4890,7 @@ void ScriptEditorInternal::OnImGuiRender()
 
                                         ImGui::SameLine();
 
-                                        if (ImGui::ImageButton((ImTextureID)m_RemoveIcon->GetRendererID(), ImVec2(lineHeight * 0.5f, lineHeight * 0.5f), { 0, 1 }, { 1, 0 }))
+                                        if (ImGui::ImageButton((ImTextureID)EditorResources::ClearIcon->GetRendererID(), ImVec2(lineHeight * 0.5f, lineHeight * 0.5f), { 0, 1 }, { 1, 0 }))
                                             RemoveMacroPin(macro->ID, &output);
 
                                         if (open)
@@ -5161,7 +4963,7 @@ void ScriptEditorInternal::OnImGuiRender()
             std::strncpy(buffer, m_FindResultsSearchBar.c_str(), sizeof(buffer));
             ImGui::SetNextItemWidth(-1);
             ImGui::InputTextWithHint("##FindResultsSearchBar", "Enter function or event name to find references...", buffer, sizeof(buffer));
-            if ((ImGui::IsItemActivePreviousFrame() && !ImGui::IsItemActive()) || (ImGui::IsItemActive() && ImGui::IsKeyPressed(io.KeyMap[ImGuiKey_Enter])))
+            if ((ImGui::IsItemActivePreviousFrame() && !ImGui::IsItemActive()) || (ImGui::IsItemActive() && ImGui::IsKeyPressed(ImGuiKey_Enter)))
                 FindResultsSearch(buffer);
 
             if (m_FindResultsData.empty())
@@ -5515,47 +5317,47 @@ void ScriptEditorInternal::FindResultsSearch(const std::string& search)
     }
 }
 
-ScriptEditorPannel::ScriptEditorPannel()
+ScriptEditorPanel::ScriptEditorPanel()
 {
 	m_InternalEditor = new ScriptEditorInternal();
 }
 
-ScriptEditorPannel::~ScriptEditorPannel()
+ScriptEditorPanel::~ScriptEditorPanel()
 {
 	delete m_InternalEditor;
 }
 
-void ScriptEditorPannel::OnEvent(Event& e)
+void ScriptEditorPanel::OnEvent(Event& e)
 {
 	m_InternalEditor->OnEvent(e);
 }
 
-void ScriptEditorPannel::CompileNodes()
+void ScriptEditorPanel::CompileNodes()
 {
 	m_InternalEditor->CompileNodes();
 }
 
-void ScriptEditorPannel::CopyNodes()
+void ScriptEditorPanel::CopyNodes()
 {
 	m_InternalEditor->CopyNodes();
 }
 
-void ScriptEditorPannel::PasteNodes()
+void ScriptEditorPanel::PasteNodes()
 {
 	m_InternalEditor->PasteNodes();
 }
 
-void ScriptEditorPannel::DuplicateNodes()
+void ScriptEditorPanel::DuplicateNodes()
 {
 	m_InternalEditor->DuplicateNodes();
 }
 
-void ScriptEditorPannel::DeleteNodes()
+void ScriptEditorPanel::DeleteNodes()
 {
 	m_InternalEditor->DeleteNodes();
 }
 
-void ScriptEditorPannel::OnImGuiRender()
+void ScriptEditorPanel::OnImGuiRender()
 {
 	m_InternalEditor->OnImGuiRender();
 }

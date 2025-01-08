@@ -8,11 +8,13 @@
 
 namespace Dymatic {
 
+	typedef uint64_t EntityHandle;
+
 	class Entity
 	{
 	public:
 		Entity() = default;
-		Entity(entt::entity handle, Scene* scene);
+		Entity(entt::entity handle, EntityRegistry* scene);
 		Entity(const Entity& other) = default;
 
 		template<typename T, typename... Args>
@@ -33,6 +35,13 @@ namespace Dymatic {
 		}
 
 		template<typename T>
+		const T& GetComponent() const
+		{
+			DY_CORE_ASSERT(HasComponent<T>(), "Entity does not have component!");
+			return m_Scene->m_Registry.get<T>(m_EntityHandle);
+		}
+
+		template<typename T>
 		T& GetComponent()
 		{
 			DY_CORE_ASSERT(HasComponent<T>(), "Entity does not have component!");
@@ -40,7 +49,7 @@ namespace Dymatic {
 		}
 
 		template<typename T>
-		bool HasComponent()
+		bool HasComponent() const
 		{
 			return m_Scene->m_Registry.has<T>(m_EntityHandle);
 		}
@@ -49,6 +58,7 @@ namespace Dymatic {
 		void RemoveComponent()
 		{
 			DY_CORE_ASSERT(HasComponent<T>(), "Entity does not have component!");
+			m_Scene->OnComponentRemoved<T>(*this, GetComponent<T>());
 			m_Scene->m_Registry.remove<T>(m_EntityHandle);
 		}
 
@@ -56,10 +66,50 @@ namespace Dymatic {
 		operator entt::entity() const { return m_EntityHandle; }
 		operator uint32_t() const { return (uint32_t)m_EntityHandle; }
 
-		UUID GetUUID() { return GetComponent<IDComponent>().ID; }
+		UUID GetUUID() const { return GetComponent<IDComponent>().ID; }
 		const std::string& GetName() { return GetComponent<TagComponent>().Tag; }
 
-		inline Scene* GetScene() const { return m_Scene; }
+		EntityHandle GetParentHandle() const { return GetComponent<RelationshipComponent>().ParentHandle; };
+		const bool HasParent() const { return GetComponent<RelationshipComponent>().ParentHandle != 0; }
+
+		const std::vector<EntityHandle>& GetChildrenUUIDs() const { return GetComponent<RelationshipComponent>().Children; }
+		const size_t GetChildCount() const { return GetComponent<RelationshipComponent>().Children.size(); }
+		const bool HasChildren() const { return GetChildCount() != 0; }
+
+		Entity GetParent() const
+		{
+			UUID parentUUID = GetComponent<RelationshipComponent>().ParentHandle;
+
+			if (parentUUID == 0)
+				return Entity();
+			
+			return m_Scene->GetEntityByUUID(GetComponent<RelationshipComponent>().ParentHandle); 
+		}
+
+		std::vector<Entity> GetChildren() const
+		{
+			std::vector<Entity> children;
+			auto& childrenUUIDs = GetComponent<RelationshipComponent>().Children;
+			children.reserve(childrenUUIDs.size());
+			
+			for (UUID childUUID : childrenUUIDs)
+				children.push_back(m_Scene->GetEntityByUUID(childUUID));
+			
+			return children;
+		}
+
+		Transform GetWorldTransform()
+		{
+			return m_Scene->GetWorldTransform(*this);
+		}
+
+		Transform GetLocalTransform(const Transform& worldTransform)
+		{
+			return m_Scene->GetLocalTransform(*this, worldTransform);
+		}
+
+		inline Scene* GetScene() const { return (Scene*)m_Scene; }
+		inline EntityRegistry* GetEntityRegistry() const { return m_Scene; }
 
 		bool operator==(const Entity& other) const
 		{
@@ -73,7 +123,7 @@ namespace Dymatic {
 
 	private:
 		entt::entity m_EntityHandle{ entt::null };
-		Scene* m_Scene = nullptr;
+		EntityRegistry* m_Scene = nullptr;
 	};
 
 }

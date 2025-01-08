@@ -5,6 +5,8 @@
 #include "Dymatic/Core/Base.h"
 #include "Dymatic/Events/Event.h"
 
+#include "Dymatic/Renderer/RendererContext.h"
+
 namespace Dymatic {
 
 	struct WindowProps
@@ -14,14 +16,14 @@ namespace Dymatic {
 		uint32_t Height;
 		bool Decorated;
 		bool StartHidden;
-		std::string Icon;
+		std::filesystem::path Icon;
 
 		WindowProps(const std::string& title = "Dymatic Engine",
 			uint32_t width = 1600,
 			uint32_t height = 900,
 			bool decorated = true,
 			bool startHidden = false,
-			std::string icon = "")
+			const std::filesystem::path& icon = "")
 			: Title(title), Width(width), Height(height), Decorated(decorated), StartHidden(startHidden), Icon(icon)
 		{
 		}
@@ -73,8 +75,15 @@ namespace Dymatic {
 		virtual bool IsVSync() const = 0;
 
 		virtual void* GetNativeWindow() const = 0;
+		virtual Ref<RendererContext>& GetRendererContext() = 0;
 
 		static Scope<Window> Create(const WindowProps& props = WindowProps());
 	};
+
+	namespace Utils {
+
+		void SetWindowCursorLocked(void* window, const bool locked);
+	
+	}
 
 }

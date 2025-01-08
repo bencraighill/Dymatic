@@ -1,0 +1,6 @@
+# Add any additional keymap presets that should be options in the editor below.
+
+# Default Presets:
+Manifest:
+  Default: DymaticDefault.keymap
+  Blender: Blender.keymap

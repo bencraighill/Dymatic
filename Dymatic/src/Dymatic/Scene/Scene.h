@@ -4,35 +4,44 @@
 #include "Dymatic/Core/UUID.h"
 #include "Dymatic/Renderer/EditorCamera.h"
 
-#include "Dymatic/Renderer/Texture.h"
+#include "Dymatic/Scene/EntityRegistry.h"
+#include "Dymatic/Scene/Prefab.h"
 
+#include "Dymatic/Renderer/Texture.h"
 #include "Dymatic/Physics/PhysicsEngine.h"
 
 #include "entt.hpp"
 
 class b2World;
-namespace physx
-{
-	class PxScene;
-	class PxControllerManager;
-	class VehicleManager;
-}
 
 namespace Dymatic {
 
 	class Entity;
+	class SceneCamera;
 
-	class Scene
+	class Scene : public EntityRegistry
 	{
 	public:
-		Scene();
+		static Ref<Scene> Create() { return CreateRef<Scene>(); }
+		static Ref<Scene> Create(Ref<Scene> other) { return CreateRef<Scene>(other); }
+
+		static AssetType GetStaticType() { return AssetType::Scene; }
+		virtual AssetType GetAssetType() const override { return GetStaticType(); }
+
+		// Editor Only
+		static void InitEditorResources();
+		
+	public:
+		Scene() = default;
+		Scene(Ref<Scene> other);
 		~Scene();
 
 		static Ref<Scene> Copy(Ref<Scene> other);
+		static void Copy(Ref<Scene> source, Ref<Scene> target);
 
-		Entity CreateEntity(const std::string& name = std::string());
-		Entity CreateEntityWithUUID(UUID uuid, std::string name = std::string());
-		void DestroyEntity(Entity entity);
+		Entity Instantiate(Ref<Prefab> prefab);
+		void CopyToPrefab(Entity entity, Ref<Prefab> prefab);
+		void RevertPrefab(Entity entity);
 
 		void OnRuntimeStart();
 		void OnRuntimeStop();
@@ -45,10 +54,8 @@ namespace Dymatic {
 		void OnUpdateEditor(Timestep ts, EditorCamera& camera);
 		void OnViewportResize(uint32_t width, uint32_t height);
 
-		Entity DuplicateEntity(Entity entity);
-
-		Entity FindEntityByName(std::string_view name);
-		Entity GetEntityByUUID(UUID uuid);
+		void RenderSceneRuntime(Timestep ts, SceneCamera* mainCamera, const glm::mat4& cameraTransform);
+		void RenderSceneEditor(Timestep ts, EditorCamera& camera);
 
 		Entity GetPrimaryCameraEntity();
 
@@ -59,28 +66,25 @@ namespace Dymatic {
 
 		void Step(int frames = 1);
 
-		template<typename... Components>
-		auto GetAllEntitiesWith()
-		{
-			return m_Registry.view<Components...>();
-		}
+		// Entity Component Methods
+		void SetEntityTransform(Entity entity, const Transform& transform);
 
-		bool IsEntityParented(Entity entity);
-		bool DoesEntityHaveChildren(Entity entity);
+		void SetEntityTranslation(Entity entity, const glm::vec3& translation);
+		void SetEntityRotation(Entity entity, const glm::quat& rotation);
+		void SetEntityRotation(Entity entity, const glm::vec3& rotation);
+		void SetEntityScale(Entity entity, const glm::vec3& scale);
 
-		Entity GetEntityParent(Entity entity);
-		std::vector<Entity> GetEntityChildren(Entity entity);
+		// Note: Call the following if you modified transform directly and need to trigger an update
+		void UpdateEntityTranslation(Entity entity);
+		void UpdateEntityRotation(Entity entity);
+		void UpdateEntityScale(Entity entity);
 
-		void SetEntityParent(Entity entity, Entity parent);
-		void RemoveEntityParent(Entity entity);
-
-		// Helper methods
-		glm::mat4 GetWorldTransform(Entity entity);
-		glm::mat4 WorldToLocalTransform(Entity entity, glm::mat4 matrix);
+		void UpdateEntityScriptName(Entity entity);
 
 		// Physics methods
-		RaycastHit Raycast(glm::vec3 origin, glm::vec3 direction, float distance);
-		RaycastHit Raycast(glm::vec3 start, glm::vec3 end);
+		Ref<PhysicsScene> GetPhysicsScene() const { return m_PhysicsScene; }
+		RaycastHit Raycast(const glm::vec3& origin, const glm::vec3& direction, float distance);
+		RaycastHit Raycast(const glm::vec3& start, const glm::vec3& end);
 
 		// Editor methods
 		inline const bool GetShowColliders() const { return m_ShowColliders; }
@@ -91,8 +95,10 @@ namespace Dymatic {
 		void ClearDebugDrawing();
 		
 	private:
-		template<typename T>
-		void OnComponentAdded(Entity entity, T& component);
+		virtual void OnComponentAdded(Entity entity, const std::type_info& type) override;
+		virtual void OnComponentRemoved(Entity entity, const std::type_info& type) override;
+
+		static void Copy(Scene* source, Scene* target);
 
 		void OnPhysics2DStart();
 		void OnPhysics2DUpdate(Timestep ts);
@@ -102,8 +108,6 @@ namespace Dymatic {
 		void OnPhysicsUpdate(Timestep ts);
 		void OnPhysicsStop();
 
-		void RenderSceneEditor(Timestep ts, EditorCamera& camera);
-
 		bool IsEntitySelected(entt::entity entity);
 		inline std::unordered_set<entt::entity>& GetSelectedEntities() { return m_SelectedEntities; }
 		void ClearSelectedEntities();
@@ -112,15 +116,8 @@ namespace Dymatic {
 		void RemoveSelectedEntity(entt::entity entity);
 		
 	private:
-
-		UUID m_SceneID;
-		entt::registry m_Registry;
 		uint32_t m_ViewportWidth = 0, m_ViewportHeight = 0;
 		bool m_IsRunning = false;
-
-		std::map<entt::entity, entt::entity> m_Relations;
-
-		entt::entity m_SceneEntity;
 
 		bool m_IsPaused = false;
 		int m_StepFrames = 0;
@@ -128,11 +125,10 @@ namespace Dymatic {
 		std::unordered_set<entt::entity> m_SelectedEntities;
 
 		b2World* m_Box2DWorld = nullptr;
-		physx::PxScene* m_PhysXScene = nullptr;
-		physx::PxControllerManager* m_PhysXControllerManager = nullptr;
-		physx::VehicleManager* m_PhysXVehicleManager = nullptr;
+		Ref<PhysicsScene> m_PhysicsScene = nullptr;
 
-		std::unordered_map<UUID, entt::entity> m_EntityMap;
+		// Scene Settings
+		glm::vec3 m_Gravity = glm::vec3(0.0f, -9.81f, 0.0f);
 
 		// Editor Data
 		bool m_ShowColliders = false;
@@ -161,7 +157,9 @@ namespace Dymatic {
 		
 		friend class Entity;
 		friend class SceneSerializer;
+		friend class EntityRegistrySerializer;
 		friend class SceneHierarchyPanel;
+		friend class PhysicsScene;
 	};
 
 }

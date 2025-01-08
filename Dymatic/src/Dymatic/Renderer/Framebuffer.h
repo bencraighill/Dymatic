@@ -3,6 +3,9 @@
 #include "Dymatic/Core/Base.h"
 #include "Dymatic/Renderer/TextureFormat.h"
 
+#include "Dymatic/Core/Buffer.h"
+#include "Dymatic/Renderer/Texture.h"
+
 namespace Dymatic {
 
 	enum class TextureTarget
@@ -58,6 +61,7 @@ namespace Dymatic {
 		TextureTarget Target = TextureTarget::TEXTURE_2D;
 
 		bool SwapChainTarget = false;
+		bool BindlessAttachments = false;
 	};
 
 	class Framebuffer
@@ -70,13 +74,24 @@ namespace Dymatic {
 
 		virtual uint32_t GetRendererID() const = 0;
 
+		virtual uint32_t GetWidth() const = 0;
+		virtual uint32_t GetHeight() const = 0;
+		virtual glm::uvec2 GetSize() const = 0;
+
 		virtual void Resize(uint32_t width, uint32_t height) = 0;
+		inline void Resize(const glm::uvec2 size) { Resize(size.x, size.y); }
+
 		virtual void ReadPixel(uint32_t attachmentIndex, int x, int y, void* pixelData) = 0;
 		virtual void ReadPixels(uint32_t attachmentIndex, int x, int y, int width, int height, void* pixelData) = 0;
 		virtual float ReadDepthPixel(int x, int y) = 0;
 
-		virtual void Copy(uint32_t target) = 0;
+		virtual Buffer CopyColorBuffer(uint32_t attachmentIndex) = 0;
+
 		virtual void Copy(Ref<Framebuffer> target) = 0;
+		virtual void CopyColor(uint32_t target) = 0;
+		virtual void CopyColor(Ref<Framebuffer> target) = 0;
+		virtual void CopyColor(Ref<Texture2D> target) = 0;
+		virtual void CopyDepth(Ref<Framebuffer> target) = 0;
 
 		virtual void ClearAttachment(uint32_t attachmentIndex, const void* value) = 0;
 
@@ -88,6 +103,9 @@ namespace Dymatic {
 
 		virtual void BindColorTexture(uint32_t slot, uint32_t index = 0) const = 0;
 		virtual void BindDepthTexture(uint32_t slot) const = 0;
+
+		virtual uint64_t GetColorHandle(uint32_t index = 0) const = 0;
+		virtual uint64_t GetDepthHandle() const = 0;
 
 		virtual void SetTarget(TextureTarget target) = 0;
 		virtual void SetAttachmentTarget(uint32_t index, FramebufferTextureTarget target, uint32_t mip = 0) = 0;

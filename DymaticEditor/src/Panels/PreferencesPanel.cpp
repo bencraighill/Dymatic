@@ -9,19 +9,27 @@
 
 #include "Settings/Preferences.h"
 #include "Tools/PythonTools.h"
+#include "PopupsAndNotifications.h"
 
-#include "../TextSymbols.h"
+#include "Fonts.h"
+#include "TextSymbols.h"
+
 #include "Dymatic/Math/Math.h"
 #include "Dymatic/Utils/PlatformUtils.h"
 #include "Dymatic/Math/StringUtils.h"
+#include "Dymatic/UI/UI.h"
 
 
 namespace Dymatic {
 
-	PreferencesPannel::PreferencesPannel()
+	static std::vector<System::ApplicationInstallDetails> s_ApplicationInstallDetails;
+
+	PreferencesPanel::PreferencesPanel()
 	{
-		LoadPresetLayout();
+		LoadAvailablePresets();
 		RefreshPlugins();
+
+		s_ApplicationInstallDetails = System::GetInstalledApplications();
 	}
 
 	static void EditThemeColor(ImGuiCol color, const char* tooltip = nullptr)
@@ -37,22 +45,25 @@ namespace Dymatic {
 			if (ImGui::IsItemHovered())
 			{
 				ImGui::BeginTooltip();
-				ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[1]);
+				UI::PushFont(FontType::Small);
 				ImGui::Text(tooltip);
-				ImGui::PopFont();
+				UI::PopFont();
 				ImGui::EndTooltip();
 			}
 		}
 		ImGui::PopID();
 	}
 
-	void PreferencesPannel::OnImGuiRender()
+	void PreferencesPanel::OnImGuiRender()
 	{
+		auto& style = ImGui::GetStyle();
+		auto& io = ImGui::GetIO();
+
 		static bool previousPreferencesShowWindow = m_PreferencesPanelVisible;
 
 		if ((previousPreferencesShowWindow && !m_PreferencesPanelVisible) && Preferences::GetData().AutosavePreferences)
 		{
-			Preferences::SavePreferences("saved/SavedPreferences.prefs");
+			Preferences::SavePreferences();
 		}
 
 		previousPreferencesShowWindow = m_PreferencesPanelVisible;
@@ -65,10 +76,10 @@ namespace Dymatic {
 			{
 				ImGui::TableNextColumn();
 
-				const char* categoriesA[4] = { "Interface", "Themes", "Viewport", "Editing" };
-				const char* categoriesB[3] = { "Input", "Navigation", "Keymap" };
-				const char* categoriesC[1] = { "Plugins" };
-				const char* categoriesD[3] = { "System", "Save & Load", "File Paths" };
+				const char* categoriesA[4] = { FA_WINDOW_FLIP " Interface", FA_PALETTE " Themes", CHARACTER_ICON_VIEWPORT " Viewport", CHARACTER_ICON_TRANSFORM " Editing" };
+				const char* categoriesB[3] = { FA_GAMEPAD_MODERN " Input", FA_MAP " Navigation", FA_KEYBOARD " Keymap" };
+				const char* categoriesC[1] = { FA_PLUG " Plugins" };
+				const char* categoriesD[3] = { FA_DESKTOP " System", FA_FLOPPY_DISK " Save & Load", FA_LINK " File Paths" };
 				int currentValueA = (int)(m_CurrentCategory)-0;
 				int currentValueB = (int)(m_CurrentCategory)-4;
 				int currentValueC = (int)(m_CurrentCategory)-7;
@@ -99,14 +110,14 @@ namespace Dymatic {
 
 				if (ImGui::BeginPopup("##PreferencesOptionsPopup", ImGuiWindowFlags_NoMove))
 				{
-					if (ImGui::MenuItem("Load Factory Defaults")) { Preferences::LoadPreferences("saved/presets/DefaultPreferences.prefs"); }
-					if (ImGui::MenuItem("Restore Saved Preferences ")) { Preferences::LoadPreferences("saved/SavedPreferences.prefs"); }
-					if (ImGui::MenuItem("Import Preferences ")) { ImportPreferences(); }
-					if (ImGui::MenuItem("Export Preferences ")) { ExportPreferences(); }
-					if (ImGui::MenuItem("Save Preferences ")) { Preferences::SavePreferences("saved/SavedPreferences.prefs"); }
+					if (ImGui::MenuItem(FA_INDUSTRY " Load Factory Defaults")) { Preferences::LoadPreferences("saved/presets/DefaultPreferences.prefs"); }
+					if (ImGui::MenuItem(CHARACTER_ICON_RESTART " Restore Saved Preferences ")) { Preferences::LoadPreferences(); }
+					if (ImGui::MenuItem(CHARACTER_ICON_IMPORT " Import Preferences ")) { ImportPreferences(); }
+					if (ImGui::MenuItem(CHARACTER_ICON_IMPORT " Export Preferences ")) { ExportPreferences(); }
+					if (ImGui::MenuItem(CHARACTER_ICON_SAVE " Save Preferences ")) { Preferences::SavePreferences(); }
 					ImGui::Checkbox("##PreferencesAutosaveCheckbox", &Preferences::GetData().AutosavePreferences);
 					ImGui::SameLine();
-					ImGui::Text("Auto-Save Preferences");
+					ImGui::Text(FA_CLOCK " Auto-Save Preferences");
 					ImGui::EndPopup();
 				}
 
@@ -116,7 +127,7 @@ namespace Dymatic {
 				const ImGuiTreeNodeFlags treeNodeFlags = ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_AllowItemOverlap | ImGuiTreeNodeFlags_FramePadding;
 				if (m_CurrentCategory == Interface)
 				{
-					if (ImGui::TreeNodeEx("Display", treeNodeFlags | ImGuiTreeNodeFlags_DefaultOpen))
+					if (ImGui::TreeNodeEx(FA_DESKTOP " Display", treeNodeFlags | ImGuiTreeNodeFlags_DefaultOpen))
 					{
 						ImGui::Checkbox("Show Splash", &Preferences::GetData().ShowSplashStartup);
 						ImGui::TreePop();
@@ -129,34 +140,33 @@ namespace Dymatic {
 					static int selectedIndex = 0;
 
 					ImGui::SetNextItemWidth(widthAvalOver / 7 * 2.5f);
-					if (ImGui::BeginCombo("##ThemeSelectCombo", m_SelectableThemeNames.empty() ? "Unknown Value" : m_SelectableThemeNames[selectedIndex].c_str()))
+					if (ImGui::BeginCombo("##ThemePresetSelectCombo", m_ThemePresets.empty() ? "No Available Preset" : m_ThemePresets[selectedIndex].Name.c_str()))
 					{
-						if (selectedIndex > m_SelectableThemeNames.size() - 1)
+						if (selectedIndex > m_ThemePresets.size() - 1)
 						{
 							selectedIndex = 0;
 						}
-						if (!m_SelectableThemeNames.empty())
+
+						for (uint32_t i = 0; i < m_ThemePresets.size(); i++)
 						{
-							for (int i = 0; i < m_SelectableThemeNames.size(); i++)
+							if (ImGui::Selectable(m_ThemePresets[i].Name.c_str()))
 							{
-								if (ImGui::Selectable(m_SelectableThemeNames[i].c_str()))
-								{
-									selectedIndex = i;
-									Preferences::LoadTheme(m_SelectableThemePaths[i]);
-								}
+								selectedIndex = i;
+								Preferences::LoadTheme(m_ThemePresets[i].Path);
 							}
 						}
+
 						ImGui::EndCombo();
 					}
 
 					ImGui::SameLine();
-					if (ImGui::Button("Import", ImVec2{ widthAvalOver / 7, 23 })) { ImportTheme(); }
+					if (ImGui::Button(CHARACTER_ICON_IMPORT " Import", ImVec2{ widthAvalOver / 7, 23 })) { ImportTheme(); }
 					ImGui::SameLine();
-					if (ImGui::Button("Export", ImVec2{ widthAvalOver / 7, 23 })) { ExportTheme(); }
+					if (ImGui::Button(CHARACTER_ICON_EXPORT " Export", ImVec2{ widthAvalOver / 7, 23 })) { ExportTheme(); }
 					ImGui::SameLine();
-					if (ImGui::Button("Restore Theme", ImVec2{ widthAvalOver / 7 * 1.5f, 23 })) { Preferences::LoadTheme("saved/SavedTheme.dytheme"); }
+					if (ImGui::Button(CHARACTER_ICON_REFRESH " Restore Theme", ImVec2{ widthAvalOver / 7 * 1.5f, 23 })) { Preferences::LoadTheme("saved/SavedTheme.dytheme"); }
 					ImGui::SameLine();
-					if (ImGui::Button("Save Theme", ImVec2{ widthAvalOver / 7, 23 })) { Preferences::SaveTheme("saved/SavedTheme.dytheme"); }
+					if (ImGui::Button(CHARACTER_ICON_SAVE " Save Theme", ImVec2{ widthAvalOver / 7, 23 })) { Preferences::SaveTheme("saved/SavedTheme.dytheme"); }
 
 					ImGui::BeginChild("##ThemePrefsChild");
 
@@ -291,7 +301,7 @@ namespace Dymatic {
 						ImGui::TreePop();
 					}
 
-					if (ImGui::TreeNodeEx("Console", treeNodeFlags))
+					if (ImGui::TreeNodeEx("Log", treeNodeFlags))
 					{
 						EditThemeColor(ImGuiCol_LogTrace);
 						EditThemeColor(ImGuiCol_LogInfo);
@@ -356,18 +366,56 @@ namespace Dymatic {
 				}
 				else if (m_CurrentCategory == Viewport)
 				{
-
+					ImGui::Text(FA_LOCK " Lock Viewport Mouse");
+					ImGui::SameLine();
+					ImGui::Checkbox("##LockViewportMouseCheckbox", &Preferences::GetData().LockViewportMouse);
 				}
 				else if (m_CurrentCategory == Editing)
 				{
+					ImGui::SetNextItemWidth(-1);
+					ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2{ 4, 4 });
+					bool open = ImGui::TreeNodeEx(FA_PENCIL " Edit Modes", treeNodeFlags | ImGuiTreeNodeFlags_DefaultOpen);
+					ImGui::PopStyleVar();
+					if (open)
+					{
+						auto& advancedEditMode = Preferences::GetData().AdvancedEditMode;
 
+						const char* editModeMessage = "Warning! Advanced Edit Mode has been enabled.\nThis allows for direct overriding of the asset registry as well as all entity and prefab UUIDs.\nProceed with caution!";
+
+						ImGui::Text(FA_SCREWDRIVER_WRENCH " Advanced Edit Mode");
+						ImGui::SameLine();
+						if (ImGui::Checkbox("##AdvancedEditModeCheckbox", &advancedEditMode))
+						{
+							if (advancedEditMode)
+								Popup::Create(FA_TRIANGLE_EXCLAMATION " Advanced Edit Mode Enabled!", editModeMessage, { ButtonData("Ok") });
+						}
+
+						if (advancedEditMode)
+						{
+							ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetColorU32(ImGuiCol_TextDisabled));
+							ImGui::PushTextWrapPos(ImGui::GetWindowContentRegionMax().y);
+							ImGui::Text(FA_TRIANGLE_EXCLAMATION);
+							ImGui::SameLine();
+							ImGui::TextWrapped(editModeMessage);
+							ImGui::PopTextWrapPos();
+							ImGui::PopStyleColor();
+						}
+
+						const char* editModeOptions[] = { CHARACTER_ICON_SCENE_HIERARCHY " Hierarchy", FA_LIST_DROPDOWN " Component" };
+						ImGui::TextUnformatted(FA_BONE " Bone Attachment Edit Mode");
+						ImGui::SameLine();
+						ImGui::SetNextItemWidth(ImGui::GetContentRegionAvailWidth());
+						ImGui::Combo("##BoneAttachmentDropdown", (int*)&Preferences::GetData().BoneAttachmentEditMode, editModeOptions, IM_ARRAYSIZE(editModeOptions));
+
+						ImGui::TreePop();
+					}
 				}
 				else if (m_CurrentCategory == Plugins)
 				{
 					// DLL based plugins
 					ImGui::SetNextItemWidth(-1);
 					ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2{ 4, 4 });
-					bool open = ImGui::TreeNodeEx("DLL Plugins", treeNodeFlags | ImGuiTreeNodeFlags_DefaultOpen);
+					bool open = ImGui::TreeNodeEx(FA_GEARS " DLL Plugins", treeNodeFlags | ImGuiTreeNodeFlags_DefaultOpen);
 					ImGui::PopStyleVar();
 					if (open)
 					{
@@ -506,59 +554,185 @@ namespace Dymatic {
 					{
 						ImGui::SetNextItemWidth(-1);
 						ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2{ 4, 4 });
-						bool open = ImGui::TreeNodeEx("Python Script Plugins", treeNodeFlags | ImGuiTreeNodeFlags_DefaultOpen);
+						bool open = ImGui::TreeNodeEx(CHARACTER_ICON_PYTHON " Python Script Plugins", treeNodeFlags | ImGuiTreeNodeFlags_DefaultOpen);
 						ImGui::PopStyleVar();
 						if (open)
 						{
 							const float width = ImGui::GetContentRegionAvailWidth();
 
-							auto& pluginPaths = Preferences::GetData().PythonPluginPaths;
-							for (uint32_t index = 0; index < pluginPaths.size(); index++)
+							if (ImGui::Button("Browse", ImVec2(-1, 30.0f)))
 							{
-								auto& plugin = pluginPaths[index];
+								std::string path = FileDialogs::OpenFile("Python Script (*.py)\0*.py\0");
+								if (!path.empty())
+								{
+									std::filesystem::path filepath = path;
+									filepath.make_preferred();
+									Preferences::GetData().PythonPlugins.push_back(Preferences::PythonPluginInformation(filepath));
+									PythonTools::LoadPlugin(filepath);
+								}
+							}
+
+							ImGui::Dummy(ImVec2(0.0f, 5.0f));
+
+							auto& plugins = Preferences::GetData().PythonPlugins;
+							for (uint32_t index = 0; index < plugins.size(); index++)
+							{
+								auto& plugin = plugins[index];
 
 								ImGui::PushID(index);
-								ImGui::SetNextItemWidth(width * 0.35f);
-								ImGui::InputText("##PythonScriptName", &plugin.filename().string(), ImGuiInputTextFlags_ReadOnly);
 
-								ImGui::SameLine();
+								ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2{ 4, 4 });
+								std::string name = plugin.Metadata.Name.empty() ? plugin.PluginPath.filename().string() : plugin.Metadata.Name;
+								bool open = ImGui::TreeNodeEx(("        " + name).c_str(), treeNodeFlags);
+								ImGui::PopStyleVar();
 
-								ImGui::SetNextItemWidth(ImGui::GetContentRegionAvailWidth() - 60.0f - ImGui::GetStyle().FramePadding.x * 6.0f);
-								ImGui::InputText("##PythonScriptPath", &plugin.parent_path().string(), ImGuiInputTextFlags_ReadOnly);
+								ImGui::BeginDisabled(!plugin.Enabled);
 
-								ImGui::SameLine();
+								if (plugin.Metadata.Icon)
+								{
+									const ImVec2 min = ImGui::GetItemRectMin() + style.FramePadding + ImVec2(20.0f, 0.0f);
+									const float size = ImGui::GetItemRectSize().y - style.FramePadding.y * 2.0f;
+									const ImVec2 max = min + ImVec2(size, size);
+									ImGui::GetWindowDrawList()->AddImage((ImTextureID)plugin.Metadata.Icon->GetRendererID(), min, max, { 0, 1 }, { 1, 0 });
+								}
+
+								ImGui::SameLine(width - 90.0f - ImGui::GetStyle().FramePadding.x * 8.0f);
 
 								if (ImGui::Button(CHARACTER_ICON_RESTART, ImVec2(30.0f, ImGui::GetTextLineHeight() + ImGui::GetStyle().FramePadding.y * 2.0f)))
 								{
-									PythonTools::ReloadPlugin(plugin);
+									PythonTools::ReloadPlugin(plugin.PluginPath);
+								}
+
+								ImGui::EndDisabled();
+
+								ImGui::SameLine();
+
+								if (ImGui::Button(plugin.Enabled ? FA_LINK_SLASH : FA_LINK, ImVec2(30.0f, ImGui::GetTextLineHeight() + ImGui::GetStyle().FramePadding.y * 2.0f)))
+								{
+									plugin.Enabled = !plugin.Enabled;
+
+									if (plugin.Enabled)
+										PythonTools::LoadPlugin(plugin.PluginPath);
+									else
+										PythonTools::UnloadPlugin(plugin.PluginPath);
 								}
 
 								ImGui::SameLine();
 								
 								if (ImGui::Button(CHARACTER_ICON_CROSS, ImVec2(30.0f, ImGui::GetTextLineHeight() + ImGui::GetStyle().FramePadding.y * 2.0f)))
 								{
-									PythonTools::UnloadPlugin(plugin);
-									pluginPaths.erase(pluginPaths.begin() + index);
+									if (plugin.Enabled)
+										PythonTools::UnloadPlugin(plugin.PluginPath);
+
+									plugins.erase(plugins.begin() + index);
 									index--;
+								}
+
+								if (open)
+								{
+									// Plugin Preferences
+									if (plugin.Enabled)
+									{
+										if (ImGui::TreeNodeEx("Preferences", treeNodeFlags))
+										{
+											PythonTools::OnImGuiRender(plugin.PluginPath, PythonUIRenderStage::PluginPreferences);
+											ImGui::TreePop();
+										}
+									}
+
+									// Details
+									ImGui::SetNextItemWidth(width * 0.35f);
+									ImGui::InputText("##PythonScriptName", &plugin.PluginPath.filename().string(), ImGuiInputTextFlags_ReadOnly);
+
+									ImGui::SameLine();
+
+									ImGui::SetNextItemWidth(ImGui::GetContentRegionAvailWidth());
+									ImGui::InputText("##PythonScriptPath", &plugin.PluginPath.parent_path().string(), ImGuiInputTextFlags_ReadOnly);
+
+									if (!plugin.Metadata.Name.empty())
+									{
+										ImGui::Text("Name:");
+										ImGui::SameLine();
+										ImGui::TextDisabled(plugin.Metadata.Name.c_str());
+									}
+
+									if (!plugin.Metadata.Version.empty())
+									{
+										ImGui::Text("Version:");
+										ImGui::SameLine();
+										ImGui::TextDisabled(plugin.Metadata.Version.c_str());
+									}
+
+									if (!plugin.Metadata.Description.empty())
+									{
+										ImGui::Text("Description:");
+										ImGui::SameLine();
+										ImGui::TextDisabled(plugin.Metadata.Description.c_str());
+									}
+
+									ImGui::Separator();
+
+									if (!plugin.Metadata.Author.empty())
+									{
+										ImGui::Text("Author:");
+										ImGui::SameLine();
+										ImGui::TextDisabled(plugin.Metadata.Author.c_str());
+									}
+
+									if (!plugin.Metadata.CompanyName.empty())
+									{
+										ImGui::Text("Company Name:");
+										ImGui::SameLine();
+										ImGui::TextDisabled(plugin.Metadata.CompanyName.c_str());
+									}
+
+									if (!plugin.Metadata.EngineVersionRequirements.empty())
+									{
+										ImGui::Text("Engine Version Requirements:");
+										ImGui::SameLine();
+										ImGui::TextDisabled(plugin.Metadata.EngineVersionRequirements.c_str());
+									}
+
+									if (!plugin.Metadata.Dependencies.empty())
+									{
+										ImGui::Text("Dependencies:");
+										ImGui::SameLine();
+										ImGui::TextDisabled(plugin.Metadata.Dependencies.c_str());
+									}
+
+									if (!plugin.Metadata.BuildDate.empty())
+									{
+										ImGui::Text("Build Date:");
+										ImGui::SameLine();
+										ImGui::TextDisabled(plugin.Metadata.BuildDate.c_str());
+									}
+
+									ImGui::Separator();
+
+									if (!plugin.Metadata.LegalCopyright.empty())
+									{
+										ImGui::Text("Legal Copyright:");
+										ImGui::SameLine();
+										ImGui::TextDisabled(plugin.Metadata.LegalCopyright.c_str());
+									}
+
+									if (!plugin.Metadata.LegalTrademarks.empty())
+									{
+										ImGui::Text("Legal Trademarks:");
+										ImGui::SameLine();
+										ImGui::TextDisabled(plugin.Metadata.LegalTrademarks.c_str());
+									}
+
+									if (!plugin.Metadata.License.empty())
+									{
+										ImGui::Text("License:");
+										ImGui::InputTextMultiline("##PythonScriptLicense", &plugin.Metadata.License, ImVec2(ImGui::GetContentRegionAvailWidth(), 200.0f), ImGuiInputTextFlags_ReadOnly);
+									}
+
+									ImGui::TreePop();
 								}
 								
 								ImGui::PopID();
-							}
-
-							ImGui::Dummy(ImVec2(0.0f, 5.0f));
-
-							{
-								if (ImGui::Button("Browse", ImVec2(-1, 30.0f)))
-								{
-									std::string path = FileDialogs::OpenFile("Python Script (*.py)\0*.py\0");
-									if (!path.empty())
-									{
-										std::filesystem::path filepath = path;
-										filepath.make_preferred();
-										Preferences::GetData().PythonPluginPaths.push_back(filepath);
-										PythonTools::LoadPlugin(filepath);
-									}
-								}
 							}
 
 							ImGui::TreePop();
@@ -567,23 +741,144 @@ namespace Dymatic {
 				}
 				else if (m_CurrentCategory == Input)
 				{
-					if (ImGui::TreeNodeEx("Keyboard", treeNodeFlags | ImGuiTreeNodeFlags_DefaultOpen))
+					ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2());
+					ImGui::BeginChild("##InputPreferencesWindow");
+					ImGui::PopStyleVar();
+
+					ImDrawList* drawList = ImGui::GetWindowDrawList();
+
+					// Refresh device data if appearing
+					if (ImGui::IsWindowAppearing())
 					{
+						m_MonitorInfo = Monitor::GetMonitorInfo();
+						m_NetworkInfo = Network::GetNetworkInfo();
+					}
+
+					if (ImGui::TreeNodeEx(FA_KEYBOARD " Keyboard", treeNodeFlags | ImGuiTreeNodeFlags_DefaultOpen))
+					{
+						ImGui::TextDisabled("Information");
+						ImGui::Text(Input::GetKeyboardName().c_str());
+
+						ImGui::TextDisabled("Settings");
 						ImGui::Text("Emulate Numpad");
 						ImGui::SameLine();
 						ImGui::Checkbox("##KeyboardEmulateNumpadCheckbox", &Preferences::GetData().EmulateNumpad);
+
 						ImGui::TreePop();
 					}
-					if (ImGui::TreeNodeEx("Mouse", treeNodeFlags | ImGuiTreeNodeFlags_DefaultOpen))
+					
+					if (ImGui::TreeNodeEx(FA_COMPUTER_MOUSE " Mouse", treeNodeFlags | ImGuiTreeNodeFlags_DefaultOpen))
 					{
+						ImGui::TextDisabled("Information");
+						ImGui::Text(Input::GetMouseName().c_str());
+
+						ImGui::TextDisabled("Settings");
 						ImGui::Text("Double Click Speed");
 						ImGui::SameLine();
 						if (ImGui::SliderInt("##MouseDoubleClickSpeedSlider", &Preferences::GetData().DoubleClickSpeed, 1, 1000))
-						{
 							ImGui::GetIO().MouseDoubleClickTime = Preferences::GetData().DoubleClickSpeed / 1000.0f;
-						}
+
+						ImGui::Text("Tooltip Hover Delay");
+						ImGui::SameLine();
+						ImGui::SliderInt("##TooltipHoverDelaySlider", &Preferences::GetData().TooltipHoverDelay, 0, 2000);
+
 						ImGui::TreePop();
 					}
+
+					const char* networkIcon;
+					if (m_NetworkInfo.Strength > 75)
+						networkIcon = FA_WIFI;
+					else if (m_NetworkInfo.Strength > 35)
+						networkIcon = FA_WIFI_FAIR;
+					else if (m_NetworkInfo.Strength > 0)
+						networkIcon = FA_WIFI_WEAK;
+					else
+						networkIcon = FA_WIFI_SLASH;
+
+					if (ImGui::TreeNodeEx(fmt::format("{} Network", networkIcon).c_str(), treeNodeFlags | ImGuiTreeNodeFlags_DefaultOpen))
+					{
+						ImGui::Text("Name: %s", m_NetworkInfo.Name.c_str());
+						ImGui::Text("Signal Strength: %d", m_NetworkInfo.Strength);
+
+						ImGui::TreePop();
+					}
+					
+					if (ImGui::TreeNodeEx(FA_GAMEPAD_MODERN " Controllers", treeNodeFlags | ImGuiTreeNodeFlags_DefaultOpen))
+					{
+						for (uint32_t i = 0; i < Input::GetGamepadCount(); i++)
+						{
+							const char* powerIcon;
+							const Input::PowerLevel powerLevel = Input::GetGamepadPowerLevel(i);
+
+							switch (powerLevel)
+							{
+							case Input::PowerLevel::Unknown: powerIcon = FA_BATTERY_SLASH; break;
+							case Input::PowerLevel::Empty: powerIcon = FA_BATTERY_EMPTY; break;
+							case Input::PowerLevel::Low: powerIcon = FA_BATTERY_QUARTER; break;
+							case Input::PowerLevel::Medium: powerIcon = FA_BATTERY_HALF; break;
+							case Input::PowerLevel::Full: powerIcon = FA_BATTERY_FULL; break;
+							case Input::PowerLevel::Wired: powerIcon = FA_BATTERY_BOLT; break;
+							case Input::PowerLevel::Max: powerIcon = FA_BATTERY_FULL; break;
+							}
+
+							ImGui::Selectable(fmt::format("{} {}", powerLevel == Input::PowerLevel::Wired ? FA_USB : FA_BLUETOOTH_B, Input::GetGamepadName(i)).c_str(), ImGuiSelectableFlags_SpanAvailWidth);
+							drawList->AddText(ImGui::GetItemRectMax() - ImGui::CalcTextSize(powerIcon) - style.FramePadding, ImGui::GetColorU32(ImGuiCol_Text), powerIcon);
+						}
+
+						ImGui::TreePop();
+					}
+					
+					if (ImGui::TreeNodeEx(FA_DESKTOP " Displays", treeNodeFlags | ImGuiTreeNodeFlags_DefaultOpen))
+					{
+						const ImGuiTableFlags flags = ImGuiTableFlags_PadOuterX | ImGuiTableFlags_NoBordersInBody | ImGuiTableFlags_NoPadInnerX | ImGuiTableFlags_ScrollY | ImGuiTableFlags_ScrollX;
+						if (ImGui::BeginTable("##PreferencesDisplayTable", 4, flags, ImGui::GetContentRegionAvail()))
+						{
+							const float width = ImGui::GetContentRegionAvailWidth() / 4.0f;
+							ImGui::TableSetupColumn(FA_DESKTOP " Name", ImGuiTableColumnFlags_WidthFixed, width);
+							ImGui::TableSetupColumn(FA_CLOCK " Display Frequency", ImGuiTableColumnFlags_WidthFixed, width);
+							ImGui::TableSetupColumn(FA_UP_DOWN_LEFT_RIGHT " Orientation", ImGuiTableColumnFlags_WidthStretch, width);
+							ImGui::TableSetupColumn(FA_EXPAND " Size", ImGuiTableColumnFlags_WidthStretch, width);
+							ImGui::TableSetupScrollFreeze(4, 1);
+							ImGui::TableHeadersRow();
+
+							ImDrawList* drawList = ImGui::GetWindowDrawList();
+
+							ImGuiListClipper clipper;
+							clipper.Begin(m_MonitorInfo.size());
+							while (clipper.Step())
+							{
+								for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; i++)
+								{
+									auto& monitorInfo = m_MonitorInfo[i];
+
+									ImGui::PushID(i);
+
+									ImGui::TableNextRow();
+									ImGui::TableNextColumn();
+
+									// Draw selectable
+									bool even = i % 2 == 0;
+									UI::ScopedStyleColor headerStyleColor(ImGuiCol_HeaderActive, ImGui::GetStyleColorVec4(ImGuiCol_HeaderActive) * ImVec4(0.95f, 0.95f, 0.95f, 1.0f), even);
+									ImGui::Selectable(monitorInfo.Name.c_str(), even, ImGuiSelectableFlags_SpanAllColumns);
+
+									ImGui::TableNextColumn();
+									ImGui::Text("%d Hz", monitorInfo.DisplayFrequency);
+									ImGui::TableNextColumn();
+									ImGui::Text(monitorInfo.GetOrientationString());
+									ImGui::TableNextColumn();
+									ImGui::Text("%d, %d", monitorInfo.Size.x, monitorInfo.Size.y);
+
+									ImGui::PopID();
+								}
+							}
+
+							ImGui::EndTable();
+						}
+
+						ImGui::TreePop();
+					}
+
+					ImGui::EndChild();
 				}
 				else if (m_CurrentCategory == Navigation)
 				{
@@ -598,35 +893,34 @@ namespace Dymatic {
 					static int selectedIndex = 0;
 
 					ImGui::SetNextItemWidth(widthAvalOver / 7 * 2.5f);
-					if (ImGui::BeginCombo("##KeybindSelectCombo", m_SelectableKeybindNames.empty() ? "Unknown Value" : m_SelectableKeybindNames[selectedIndex].c_str()))
+					if (ImGui::BeginCombo("##KeymapPresetSelectCombo", m_KeymapPresets.empty() ? "No Available Preset" : m_KeymapPresets[selectedIndex].Name.c_str()))
 					{
-						if (selectedIndex > m_SelectableKeybindNames.size() - 1)
+						if (selectedIndex > m_KeymapPresets.size() - 1)
 						{
 							selectedIndex = 0;
 						}
-						if (!m_SelectableKeybindNames.empty())
+
+						for (uint32_t i = 0; i < m_KeymapPresets.size(); i++)
 						{
-							for (int i = 0; i < m_SelectableKeybindNames.size(); i++)
+							if (ImGui::Selectable(m_KeymapPresets[i].Name.c_str()))
 							{
-								if (ImGui::Selectable(m_SelectableKeybindNames[i].c_str()))
-								{
-									selectedIndex = i;
-									Preferences::LoadKeymap(m_SelectableKeybindPaths[i]);
-								}
+								selectedIndex = i;
+								Preferences::LoadKeymap(m_KeymapPresets[i].Path);
 							}
 						}
+
 						ImGui::EndCombo();
 					}
 
 					ImGui::SameLine();
 
-					if (ImGui::Button("Import", ImVec2{ widthAvalOver / 7, 23 })) { ImportKeymap(); }
+					if (ImGui::Button(CHARACTER_ICON_IMPORT " Import", ImVec2{ widthAvalOver / 7, 23 })) { ImportKeymap(); }
 					ImGui::SameLine();
-					if (ImGui::Button("Export", ImVec2{ widthAvalOver / 7, 23 })) { ExportKeymap(); }
+					if (ImGui::Button(CHARACTER_ICON_EXPORT " Export", ImVec2{ widthAvalOver / 7, 23 })) { ExportKeymap(); }
 					ImGui::SameLine();
-					if (ImGui::Button("Restore Binds", ImVec2{ widthAvalOver / 7 * 1.5f, 23 })) { Preferences::LoadKeymap("saved/SavedKeymap.keymap"); }
+					if (ImGui::Button(CHARACTER_ICON_RESTART " Restore Binds", ImVec2{ widthAvalOver / 7 * 1.5f, 23 })) { Preferences::LoadKeymap("saved/SavedKeymap.keymap"); }
 					ImGui::SameLine();
-					if (ImGui::Button("Save Binds", ImVec2{ widthAvalOver / 7, 23 })) { Preferences::SaveKeymap("saved/SavedKeymap.keymap"); }
+					if (ImGui::Button(CHARACTER_ICON_SAVE "Save Binds", ImVec2{ widthAvalOver / 7, 23 })) { Preferences::SaveKeymap("saved/SavedKeymap.keymap"); }
 
 					static int currentKeyBindSearchItem = 0;
 					const char* SearchTypes[2] = { "Name", "Key Binding" };
@@ -679,9 +973,9 @@ namespace Dymatic {
 						static bool vis = true;
 						if (m_KeyBindSearchBar == "")
 						{
-							open = ImGui::TreeNodeEx("Window", treeNodeFlags); vis = false;
+							open = ImGui::TreeNodeEx("File", treeNodeFlags); vis = false;
 						}
-						else if (vis) ImGui::Text("Window");
+						else if (vis) ImGui::Text("File");
 						if (open)
 						{
 							bool visible = false;
@@ -691,6 +985,24 @@ namespace Dymatic {
 							if (KeyBindInputButton(Preferences::Keymap::SaveSceneAsBind)) visible = true;
 							if (KeyBindInputButton(Preferences::Keymap::QuitBind)) visible = true;
 							if (KeyBindInputButton(Preferences::Keymap::RenameBind)) visible = true;
+							vis = visible;
+							if (m_KeyBindSearchBar == "") ImGui::TreePop();
+						}
+					}
+
+					{
+						bool open = true;
+						static bool vis = true;
+						if (m_KeyBindSearchBar == "")
+						{
+							open = ImGui::TreeNodeEx("Edit", treeNodeFlags); vis = false;
+						}
+						else if (vis) ImGui::Text("Edit");
+						if (open)
+						{
+							bool visible = false;
+							if (KeyBindInputButton(Preferences::Keymap::UndoBind)) visible = true;
+							if (KeyBindInputButton(Preferences::Keymap::RedoBind)) visible = true;
 							vis = visible;
 							if (m_KeyBindSearchBar == "") ImGui::TreePop();
 						}
@@ -711,6 +1023,7 @@ namespace Dymatic {
 							if (KeyBindInputButton(Preferences::Keymap::SceneStartBind)) visible = true;
 							if (KeyBindInputButton(Preferences::Keymap::SceneSimulateBind)) visible = true;
 							if (KeyBindInputButton(Preferences::Keymap::SceneStopBind)) visible = true;
+							if (KeyBindInputButton(Preferences::Keymap::FocusBind)) visible = true;
 							if (KeyBindInputButton(Preferences::Keymap::ReloadAssembly)) visible = true;
 							if (KeyBindInputButton(Preferences::Keymap::GizmoNoneBind)) visible = true;
 							if (KeyBindInputButton(Preferences::Keymap::GizmoTranslateBind)) visible = true;
@@ -781,8 +1094,8 @@ namespace Dymatic {
 				}
 				else if (m_CurrentCategory == SaveLoad)
 				{
-					ImGui::SliderInt("Recent Files", &Preferences::GetData().RecentFileCount, 0, 30);
-					bool autosave = ImGui::TreeNodeEx("Auto Save", treeNodeFlags);
+					ImGui::SliderInt(CHARACTER_ICON_RECENT " Recent Files", &Preferences::GetData().RecentFileCount, 0, 30);
+					bool autosave = ImGui::TreeNodeEx(FA_ALARM_CLOCK " Auto Save", treeNodeFlags);
 					ImGui::SameLine();
 					ImGui::Checkbox("##AutosavePrefCheckbox", &Preferences::GetData().AutosaveEnabled);
 					if (autosave)
@@ -793,7 +1106,7 @@ namespace Dymatic {
 				}
 				else if (m_CurrentCategory == FilePaths)
 				{
-					if (ImGui::TreeNodeEx("Development Environment", treeNodeFlags | ImGuiTreeNodeFlags_DefaultOpen))
+					if (ImGui::TreeNodeEx(CHARACTER_ICON_VISUAL_STUDIO " Development Environment", treeNodeFlags | ImGuiTreeNodeFlags_DefaultOpen))
 					{
 						ImGui::Text("Devenv Path Detection");
 
@@ -815,7 +1128,7 @@ namespace Dymatic {
 						ImGui::TreePop();
 					}
 
-					if (ImGui::TreeNodeEx("Source Control", treeNodeFlags | ImGuiTreeNodeFlags_DefaultOpen))
+					if (ImGui::TreeNodeEx(FA_CODE_BRANCH " Source Control", treeNodeFlags | ImGuiTreeNodeFlags_DefaultOpen))
 					{
 						char buffer[256];
 						memset(buffer, 0, sizeof(buffer));
@@ -824,6 +1137,115 @@ namespace Dymatic {
 							Preferences::GetData().GitExecutablePath = std::string(buffer);
 						ImGui::SameLine();
 						ImGui::Text("Git Executable Path");
+						ImGui::TreePop();
+					}
+
+					if (ImGui::TreeNodeEx(FA_WINDOW_FLIP " Default Applications", treeNodeFlags | ImGuiTreeNodeFlags_DefaultOpen))
+					{
+						auto& defaultApplications = Preferences::GetData().DefaultApplications;
+
+						ImGui::Text("Extension ");
+						ImGui::SameLine();
+						
+						char buffer[256];
+						memset(buffer, 0, sizeof(buffer));
+						ImGui::SetNextItemWidth(-1);
+						ImGui::InputText("##DefaultApplicationsExtensionInput", buffer, sizeof(buffer));
+						
+						if ((ImGui::IsItemActivePreviousFrame() && !ImGui::IsItemActive()) || (ImGui::IsItemActive() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Enter))))
+							if (!std::string(buffer).empty()) 
+								defaultApplications[buffer] = "";
+
+						ImGui::Separator();
+
+						const float lineHeight = ImGui::GetTextLineHeightWithSpacing();
+
+						for (auto& [extension, application] : defaultApplications)
+						{
+							ImGui::PushID(extension.c_str());
+
+							ImGui::Text(extension.c_str());
+							ImGui::SameLine();
+
+							std::string applicationName = application.string();
+							for (auto& details : s_ApplicationInstallDetails)
+							{
+								if (details.Path.lexically_normal() == application.lexically_normal())
+								{
+									ImGui::Image((ImTextureID)details.Icon->GetRendererID(), ImVec2(lineHeight, lineHeight));
+									ImGui::SameLine();
+
+									applicationName = details.Name;
+									break;
+								}
+							}
+							
+							char buffer[256];
+							memset(buffer, 0, sizeof(buffer));
+							std::strncpy(buffer, applicationName.c_str(), sizeof(buffer));
+							ImGui::SetNextItemWidth(-40.0f - style.FramePadding.x * 3.0f);
+							ImGui::InputText("##DefaultApplicationInput", buffer, sizeof(buffer));
+							
+							if ((ImGui::IsItemActivePreviousFrame() && !ImGui::IsItemActive()) || (ImGui::IsItemActive() && ImGui::IsKeyPressed(ImGuiKey_Enter)))
+							{
+								bool found = false;
+								for (auto& details : s_ApplicationInstallDetails)
+								{
+									if (String::ToLower(details.Name) == String::ToLower(std::string(buffer)))
+									{
+										application = details.Path;
+										found = true;
+										break;
+									}
+								}
+
+								if (!found)
+									application = std::string(buffer);
+							}
+
+							ImVec2 inputPosition = ImVec2(ImGui::GetItemRectMin().x, ImGui::GetItemRectMax().y);
+							if (ImGui::IsItemActive() || ImGui::IsPopupOpen("##DefaultApplicationSearchPopup"))
+							{
+								ImGui::OpenPopup("##DefaultApplicationSearchPopup");
+								ImGui::SetNextWindowSizeConstraints(ImVec2(0.0f, 0.0f), ImVec2(FLT_MAX, 200.0f));
+								if (ImGui::BeginPopup("##DefaultApplicationSearchPopup", ImGuiWindowFlags_NoFocusOnAppearing))
+								{
+									ImGui::SetWindowPos(inputPosition);
+
+									bool found = false;
+									for (auto& installedApplication : s_ApplicationInstallDetails)
+									{
+										if (installedApplication.Path.lexically_normal() == application.lexically_normal())
+											continue;
+
+										if (String::ToLower(installedApplication.Name).find(String::ToLower(std::string(buffer))) != std::string::npos)
+										{
+											found = true;
+											ImGui::Image((ImTextureID)installedApplication.Icon->GetRendererID(), ImVec2(lineHeight, lineHeight));
+											ImGui::SameLine();
+											if (ImGui::MenuItem(installedApplication.Name.c_str()))
+												application = installedApplication.Path;
+										}
+									}
+
+									if (!found)
+										ImGui::TextDisabled("No Installed Applications Found");
+
+									ImGui::EndPopup();
+
+									if (ImGui::IsWindowFocused())
+										ImGui::CloseCurrentPopup();
+								}
+							}
+
+							ImGui::SameLine();
+							
+							if (ImGui::Button(FA_TRASH, ImVec2(40.0f, 0)))
+								defaultApplications.erase(extension);
+
+							ImGui::PopID();
+						}
+
 						ImGui::TreePop();
 					}
 				}
@@ -837,7 +1259,7 @@ namespace Dymatic {
 		}
 	}
 
-	bool PreferencesPannel::KeyBindInputButton(Preferences::Keymap::KeyBindEvent event)
+	bool PreferencesPanel::KeyBindInputButton(Preferences::Keymap::KeyBindEvent event)
 	{
 		auto& style = ImGui::GetStyle();
 		auto& keybind = Preferences::Keymap::GetKeymap()[event];
@@ -931,15 +1353,15 @@ namespace Dymatic {
 		return visible;
 	}
 
-	void PreferencesPannel::OnEvent(Event& e)
+	void PreferencesPanel::OnEvent(Event& e)
 	{
 		EventDispatcher dispatcher(e);
 
-		dispatcher.Dispatch<KeyPressedEvent>(DY_BIND_EVENT_FN(PreferencesPannel::OnKeyPressed));
-		dispatcher.Dispatch<MouseButtonPressedEvent>(DY_BIND_EVENT_FN(PreferencesPannel::OnMouseButtonPressed));
+		dispatcher.Dispatch<KeyPressedEvent>(DY_BIND_EVENT_FN(PreferencesPanel::OnKeyPressed));
+		dispatcher.Dispatch<MouseButtonPressedEvent>(DY_BIND_EVENT_FN(PreferencesPanel::OnMouseButtonPressed));
 	}
 
-	bool PreferencesPannel::OnKeyPressed(KeyPressedEvent& e)
+	bool PreferencesPanel::OnKeyPressed(KeyPressedEvent& e)
 	{
 		if (m_ButtonActive != Preferences::Keymap::INVALID_BIND)
 		{
@@ -958,7 +1380,7 @@ namespace Dymatic {
 		return false;
 	}
 
-	bool PreferencesPannel::OnMouseButtonPressed(MouseButtonPressedEvent& e)
+	bool PreferencesPanel::OnMouseButtonPressed(MouseButtonPressedEvent& e)
 	{
 		if (m_ButtonActive != Preferences::Keymap::INVALID_BIND)
 		{
@@ -973,154 +1395,85 @@ namespace Dymatic {
 		return false;
 	}
 
-	void PreferencesPannel::ImportTheme()
+	void PreferencesPanel::ImportTheme()
 	{
 		std::string filepath = FileDialogs::OpenFile("Dymatic Theme (*.dytheme)\0*.dytheme\0");
 		if (!filepath.empty())
 			Preferences::LoadTheme(filepath);
 	}
 
-	void PreferencesPannel::ExportTheme()
+	void PreferencesPanel::ExportTheme()
 	{
 		std::string filepath = FileDialogs::SaveFile("Dymatic Theme (*.dytheme)\0*.dytheme\0");
 		if (!filepath.empty())
 			Preferences::SaveTheme(filepath);
 	}
 
-	void PreferencesPannel::ImportKeymap()
+	void PreferencesPanel::ImportKeymap()
 	{
 		std::string filepath = FileDialogs::OpenFile("Keymap (*.keymap)\0*.keymap\0");
 		if (!filepath.empty())
 			Preferences::LoadKeymap(filepath);
 	}
 
-	void PreferencesPannel::ExportKeymap()
+	void PreferencesPanel::ExportKeymap()
 	{
 		std::string filepath = FileDialogs::SaveFile("Keymap (*.keymap)\0*.keymap\0");
 		if (!filepath.empty())
 			Preferences::SaveKeymap(filepath);
 	}
 
-	void PreferencesPannel::ImportPreferences()
+	void PreferencesPanel::ImportPreferences()
 	{
 		std::string filepath = FileDialogs::OpenFile("Preferences (*.prefs)\0*.prefs\0");
 		if (!filepath.empty())
 			Preferences::LoadPreferences(filepath);
 	}
 
-	void PreferencesPannel::ExportPreferences()
+	void PreferencesPanel::ExportPreferences()
 	{
 		std::string filepath = FileDialogs::SaveFile("Preferences (*.prefs)\0*.prefs\0");
 		if (!filepath.empty())
 			Preferences::SavePreferences(filepath);
 	}
 
-	void PreferencesPannel::LoadPresetLayout()
+	static void PopulatePresets(const std::filesystem::path& manifestPath, std::vector<PreferencesPanel::PreferencesPreset>& presets)
 	{
-		// Load Themes
+		YAML::Node data;
+		try
 		{
-			std::string result;
-			std::ifstream in("saved/presets/themes/ThemePresets.txt", std::ios::in | std::ios::binary); // ifstream closes itself due to RAII
-
-			if (in)
-			{
-				in.seekg(0, std::ios::end);
-				size_t size = in.tellg();
-				if (size != -1)
-				{
-					result.resize(size);
-					in.seekg(0, std::ios::beg);
-					in.read(&result[0], size);
-				}
-			}
-
-			while (result.find_first_of("\n") != -1)
-			{
-				result = result.erase(result.find_first_of("\n"), 1);
-			}
-
-			while (result.find_first_of("\r") != -1)
-			{
-				result = result.erase(result.find_first_of("\r"), 1);
-			}
-
-			bool openValueName = false;
-			bool openValue = false;
-			std::string CurrentValueName = "";
-			std::string CurrentValue = "";
-			for (int i = 0; i < result.length(); i++)
-			{
-				std::string character = result.substr(i, 1);
-
-				if (character == ">") { openValueName = false; }
-				if (openValueName) { CurrentValueName = CurrentValueName + character; }
-				if (character == "<") { openValueName = true; CurrentValueName = ""; }
-
-				if (character == "}") { openValue = false; }
-				if (openValue) { CurrentValue = CurrentValue + character; }
-				if (character == "{") { openValue = true; CurrentValue = ""; }
-
-				if (character == "}" && CurrentValue != "")
-				{
-					m_SelectableThemeNames.push_back(CurrentValueName);
-					m_SelectableThemePaths.push_back(CurrentValue);
-				}
-			}
+			data = YAML::LoadFile(manifestPath.string());
+		}
+		catch (YAML::ParserException e)
+		{
+			DY_CORE_ERROR("Failed to load preset manifest file '{}'\n     {}", manifestPath.string(), e.what());
+			return;
 		}
 
-		// Load Keymaps
+		auto manifest = data["Manifest"];
+
+		if (!manifest)
+			return;
+
+		for (auto item : manifest)
 		{
-			std::string result;
-			std::ifstream in("saved/presets/keymaps/KeymapPresets.txt", std::ios::in | std::ios::binary); // ifstream closes itself due to RAII
-
-			if (in)
-			{
-				in.seekg(0, std::ios::end);
-				size_t size = in.tellg();
-				if (size != -1)
-				{
-					result.resize(size);
-					in.seekg(0, std::ios::beg);
-					in.read(&result[0], size);
-				}
-			}
-
-			while (result.find_first_of("\n") != -1)
-			{
-				result = result.erase(result.find_first_of("\n"), 1);
-			}
-
-			while (result.find_first_of("\r") != -1)
-			{
-				result = result.erase(result.find_first_of("\r"), 1);
-			}
-
-			bool openValueName = false;
-			bool openValue = false;
-			std::string CurrentValueName = "";
-			std::string CurrentValue = "";
-			for (int i = 0; i < result.length(); i++)
-			{
-				std::string character = result.substr(i, 1);
-
-				if (character == ">") { openValueName = false; }
-				if (openValueName) { CurrentValueName = CurrentValueName + character; }
-				if (character == "<") { openValueName = true; CurrentValueName = ""; }
-
-				if (character == "}") { openValue = false; }
-				if (openValue) { CurrentValue = CurrentValue + character; }
-				if (character == "{") { openValue = true; CurrentValue = ""; }
-
-				if (character == "}" && CurrentValue != "")
-				{
-					m_SelectableKeybindNames.push_back(CurrentValueName);
-					m_SelectableKeybindPaths.push_back(CurrentValue);
-				}
-			}
+			PreferencesPanel::PreferencesPreset preset;
+			preset.Name = item.first.as<std::string>();
+			preset.Path = manifestPath.parent_path() / item.second.as<std::string>();
+			presets.push_back(preset);
 		}
 	}
 
-	void PreferencesPannel::RefreshPlugins()
+	void PreferencesPanel::LoadAvailablePresets()
+	{
+		m_ThemePresets.clear();
+		m_KeymapPresets.clear();
+		
+		PopulatePresets("saved/presets/themes/Themes.manifest", m_ThemePresets);
+		PopulatePresets("saved/presets/keymaps/Keymaps.manifest", m_KeymapPresets);
+	}
+
+	void PreferencesPanel::RefreshPlugins()
 	{
 		m_PluginInfo.clear();
 		for (auto& file : std::filesystem::directory_iterator("Resources/Plugins"))
@@ -1145,7 +1498,7 @@ namespace Dymatic {
 		LoadPluginManifest();
 	}
 
-	void PreferencesPannel::LoadPluginManifest()
+	void PreferencesPanel::LoadPluginManifest()
 	{
 		if (std::filesystem::exists("Resources/Plugins/PluginsManifest"))
 		{
@@ -1211,7 +1564,7 @@ namespace Dymatic {
 		}
 	}
 
-	void PreferencesPannel::WritePluginManifest()
+	void PreferencesPanel::WritePluginManifest()
 	{
 		std::ofstream manifest;
 		manifest.open("Resources/Plugins/PluginsManifest");

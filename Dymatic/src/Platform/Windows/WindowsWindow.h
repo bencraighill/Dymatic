@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Dymatic/Core/Window.h"
-#include "Dymatic/Renderer/GraphicsContext.h"
+#include "Dymatic/Renderer/RendererContext.h"
 
 #include <GLFW/glfw3.h>
 
@@ -50,13 +50,14 @@ namespace Dymatic {
 		void SetVSync(bool enabled) override;
 		bool IsVSync() const override;
 
-		virtual void* GetNativeWindow() const { return m_Window; }
+		inline virtual void* GetNativeWindow() const { return m_Window; }
+		inline virtual Ref<RendererContext>& GetRendererContext() override { return m_Context; }
 	private:
 		virtual void Init(const WindowProps& props);
 		virtual void Shutdown();
 	private:
 		GLFWwindow* m_Window;
-		Scope<GraphicsContext> m_Context;
+		Ref<RendererContext> m_Context;
 
 		struct WindowData
 		{

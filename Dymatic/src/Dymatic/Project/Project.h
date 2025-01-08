@@ -1,6 +1,9 @@
 #pragma once
 #include "Dymatic/Core/Base.h"
 
+#include "Dymatic/Asset/AssetHandle.h"
+#include "Dymatic/Physics/PhysicsSettings.h"
+
 #include <string>
 #include <filesystem>
 
@@ -10,16 +13,25 @@ namespace Dymatic {
 	{
 		std::string Name = "Untitled";
 
-		std::filesystem::path StartScene;
+		AssetHandle StartScene;
 		
 		std::filesystem::path AssetDirectory;
 		std::filesystem::path CoreModulePath;
 		std::filesystem::path ScriptModulePath;
+		std::filesystem::path CacheDirectory;
+
+		PhysicsSettings PhysicsSettings;
 	};
 
 	class Project
 	{
 	public:
+		static const std::filesystem::path& GetProjectFilepath()
+		{
+			DY_CORE_ASSERT(s_ActiveProject);
+			return s_ActiveProject->m_ProjectFilepath;
+		}
+
 		static const std::filesystem::path& GetProjectDirectory()
 		{
 			DY_CORE_ASSERT(s_ActiveProject);
@@ -64,11 +76,24 @@ namespace Dymatic {
 			return GetAssetDirectory() / s_ActiveProject->GetConfig().ScriptModulePath;
 		}
 
+		static std::filesystem::path GetCacheDirectory()
+		{
+			DY_CORE_ASSERT(s_ActiveProject);
+			const auto& cacheDirectory = s_ActiveProject->GetConfig().CacheDirectory;
+			return GetProjectDirectory() / (cacheDirectory.empty() ? "Cache" : cacheDirectory);
+		}
+
 		// Should be inside an asset manager
 		static std::filesystem::path GetAssetFileSystemPath(const std::filesystem::path& path)
 		{
 			DY_CORE_ASSERT(s_ActiveProject);
 			return GetAssetDirectory() / path;
+		}
+
+		static ProjectConfig& GetActiveConfig()
+		{
+			DY_CORE_ASSERT(s_ActiveProject);
+			return s_ActiveProject->GetConfig();
 		}
 
 		ProjectConfig& GetConfig() { return m_Config; }
@@ -77,11 +102,13 @@ namespace Dymatic {
 
 		static Ref<Project> New();
 		static Ref<Project> Load(const std::filesystem::path& path);
+		static bool Save();
 		static bool Save(const std::filesystem::path& path);
 
 	private:
 		ProjectConfig m_Config;
 		std::filesystem::path m_ProjectDirectory;
+		std::filesystem::path m_ProjectFilepath;
 
 		inline static Ref<Project> s_ActiveProject = nullptr;
 	};

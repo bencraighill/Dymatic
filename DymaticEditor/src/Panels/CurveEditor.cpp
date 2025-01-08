@@ -139,7 +139,8 @@ namespace Dymatic {
 			ImGui::BeginChild("##MainGraph", ImVec2(panelB, 0));
 			ImGui::PopStyleColor();
 
-			if (ImGui::BeginPopupContextWindow(0, 1, false))
+			
+			if (ImGui::BeginPopupContextWindow(0, ImGuiPopupFlags_MouseButtonRight))
 			{
 				if (ImGui::MenuItem("Always Show Handles", m_AlwaysShowHandles ? "(Enabled)" : "(Disabled)")) { m_AlwaysShowHandles = !m_AlwaysShowHandles; }
 

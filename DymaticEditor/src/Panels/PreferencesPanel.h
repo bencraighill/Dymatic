@@ -3,6 +3,8 @@
 #include "Dymatic.h"
 #include "Dymatic/Core/Base.h"
 
+#include "Dymatic/Utils/PlatformUtils.h"
+
 #include "Settings/Preferences.h"
 #include "Tools/PluginLoader.h"
 
@@ -23,10 +25,17 @@ namespace Dymatic {
 		FilePaths
 	};
 
-	class PreferencesPannel
+	class PreferencesPanel
 	{
 	public:
-		PreferencesPannel();
+		struct PreferencesPreset
+		{
+			std::string Name;
+			std::filesystem::path Path;
+		};
+
+	public:
+		PreferencesPanel();
 		void OnImGuiRender();
 		bool KeyBindInputButton(Preferences::Keymap::KeyBindEvent event);
 
@@ -48,7 +57,7 @@ namespace Dymatic {
 
 		bool& GetPreferencesPanelVisible() { return m_PreferencesPanelVisible; }
 
-		void LoadPresetLayout();
+		void LoadAvailablePresets();
 	private:
 		void RefreshPlugins();
 		void LoadPluginManifest();
@@ -65,11 +74,15 @@ namespace Dymatic {
 
 		PreferencesCategory m_CurrentCategory = Input;
 
-		std::vector<std::string> m_SelectableThemeNames;
-		std::vector<std::string> m_SelectableThemePaths;
+		// Presets
+		std::vector<PreferencesPreset> m_ThemePresets;
+		std::vector<PreferencesPreset> m_KeymapPresets;
 
-		std::vector<std::string> m_SelectableKeybindNames;
-		std::vector<std::string> m_SelectableKeybindPaths;
+		// Input device data
+		std::vector<Monitor::MonitorInfo> m_MonitorInfo;
+		Network::NetworkInfo m_NetworkInfo;
+
+		std::string m_DefaultApplicationBuffer;
 	};
 
 }

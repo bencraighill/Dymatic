@@ -15,6 +15,7 @@ extern "C" {
 	typedef struct _MonoAssembly MonoAssembly;
 	typedef struct _MonoImage MonoImage;
 	typedef struct _MonoClassField MonoClassField;
+	typedef struct _MonoDomain MonoDomain;
 }
 
 namespace Dymatic {
@@ -26,7 +27,8 @@ namespace Dymatic {
 		Bool, Char, Byte, Short, Int, Long,
 		UShort, UInt, ULong,
 		Vector2, Vector3, Vector4,
-		Entity
+		Entity,
+		Asset, Scene, Texture, VirtualTexture, Mesh, Animation, Audio, Material, VideoPlayer
 	};
 
 	struct ScriptField
@@ -48,7 +50,7 @@ namespace Dymatic {
 		}
 
 		template<typename T>
-		T GetValue()
+		T GetValue() const
 		{
 			static_assert(sizeof(T) <= 16, "Type too large!");
 			return *(T*)m_Buffer;
@@ -77,7 +79,6 @@ namespace Dymatic {
 
 		MonoObject* Instantiate();
 		MonoMethod* GetMethod(const std::string& name, int parameterCount);
-		MonoObject* InvokeMethod(MonoObject* instance, MonoMethod* method, void** params = nullptr);
 
 		const std::map<std::string, ScriptField>& GetFields() const { return m_Fields; }
 	private:
@@ -89,6 +90,7 @@ namespace Dymatic {
 		MonoClass* m_MonoClass = nullptr;
 
 		friend class ScriptEngine;
+		friend class ScriptInstance;
 	};
 
 	class ScriptInstance
@@ -98,7 +100,11 @@ namespace Dymatic {
 
 		void InvokeOnCreate();
 		void InvokeOnUpdate(float ts);
+		void InvokeOnPrePhysicsUpdate(float ts);
 		void InvokeOnDestroy();
+		void InvokeOnContact(Entity other, const glm::vec3& hitPosition, const glm::vec3& normal);
+		void InvokeOnContactPersisted(Entity other, const glm::vec3& hitPosition, const glm::vec3& normal);
+		void InvokeOnContactRemoved(Entity other);
 
 		Ref<ScriptClass> GetScriptClass() { return m_ScriptClass; }
 
@@ -133,7 +139,11 @@ namespace Dymatic {
 		MonoMethod* m_Constructor = nullptr;
 		MonoMethod* m_OnCreateMethod = nullptr;
 		MonoMethod* m_OnUpdateMethod = nullptr;
+		MonoMethod* m_OnPrePhysicsUpdateMethod = nullptr;
 		MonoMethod* m_OnDestroyMethod = nullptr;
+		MonoMethod* m_OnContactMethod = nullptr;
+		MonoMethod* m_OnContactPersistedMethod = nullptr;
+		MonoMethod* m_OnContactRemovedMethod = nullptr;
 
 		inline static char s_FieldValueBuffer[16];
 
@@ -190,8 +200,12 @@ namespace Dymatic {
 
 		static bool EntityClassExists(const std::string& fullClassName);
 		static void OnCreateEntity(Entity entity);
+		static void OnPrePhysicsUpdateEntity(Entity entity, Timestep ts);
 		static void OnUpdateEntity(Entity entity, Timestep ts);
 		static void OnDestroyEntity(Entity entity);
+		static void OnContactEntity(Entity entity, Entity other, const glm::vec3& hitPosition, const glm::vec3& normal);
+		static void OnContactPersistedEntity(Entity entity, Entity other, const glm::vec3& hitPosition, const glm::vec3& normal);
+		static void OnContactRemovedEntity(Entity entity, Entity other);
 
 		static Scene* GetSceneContext();
 		static Ref<ScriptInstance> GetEntityScriptInstance(UUID entityID);
@@ -200,12 +214,21 @@ namespace Dymatic {
 		static const std::unordered_map<std::string, Ref<ScriptClass>>& GetEntityClasses();
 		static ScriptFieldMap& GetScriptFieldMap(Entity entity);
 
+		static void* RegisterThread();
+		static void UnregisterThread(void* context);
+
 		static MonoImage* GetCoreAssemblyImage();
+		static MonoDomain* GetRootDomain();
+		static MonoDomain* GetApplicationDomain();
 
 		static MonoObject* GetManagedInstance(UUID uuid);
+		static MonoObject* GetManagedInstanceOrDefaultEntity(UUID uuid);
+
+		static void ExecuteEntityMethod(UUID entityID, const std::string& methodName, const Buffer& parameterData);
 
 		// Editor only
 		static bool IsDebuggerAttached();
+		static void SetAssemblyReloadCallback(const std::function<void()> callback);
 
 		static std::vector<std::string> GetEntityClassOverridableMethods(const std::string& className);
 		static const std::unordered_map<std::string, std::vector<MethodDeclaration>> GetEntityClassOverridableMethods();
@@ -220,10 +243,13 @@ namespace Dymatic {
 		static MonoObject* InstantiateClass(MonoClass* monoClass);
 		static void LoadAssemblyClasses();
 
+		static MonoObject* InvokeMethod(MonoObject* instance, MonoMethod* method, void** params = nullptr);
+
 		// Editor Only
 		static void GenerateScriptMetadata();
 
 		friend class ScriptClass;
+		friend class ScriptInstance;
 		friend class ScriptGlue;
 	};
 
@@ -233,45 +259,63 @@ namespace Dymatic {
 		{
 			switch (fieldType)
 			{
-			case ScriptFieldType::None:    return "None";
-			case ScriptFieldType::Float:   return "Float";
-			case ScriptFieldType::Double:  return "Double";
-			case ScriptFieldType::Bool:    return "Bool";
-			case ScriptFieldType::Char:    return "Char";
-			case ScriptFieldType::Byte:    return "Byte";
-			case ScriptFieldType::Short:   return "Short";
-			case ScriptFieldType::Int:     return "Int";
-			case ScriptFieldType::Long:    return "Long";
-			case ScriptFieldType::UShort:  return "UShort";
-			case ScriptFieldType::UInt:    return "UInt";
-			case ScriptFieldType::ULong:   return "ULong";
-			case ScriptFieldType::Vector2: return "Vector2";
-			case ScriptFieldType::Vector3: return "Vector3";
-			case ScriptFieldType::Vector4: return "Vector4";
-			case ScriptFieldType::Entity:  return "Entity";
+			case ScriptFieldType::None:				return "None";
+			case ScriptFieldType::Float:			return "Float";
+			case ScriptFieldType::Double:			return "Double";
+			case ScriptFieldType::Bool:				return "Bool";
+			case ScriptFieldType::Char:				return "Char";
+			case ScriptFieldType::Byte:				return "Byte";
+			case ScriptFieldType::Short:			return "Short";
+			case ScriptFieldType::Int:				return "Int";
+			case ScriptFieldType::Long:				return "Long";
+			case ScriptFieldType::UShort:			return "UShort";
+			case ScriptFieldType::UInt:				return "UInt";
+			case ScriptFieldType::ULong:			return "ULong";
+			case ScriptFieldType::Vector2:			return "Vector2";
+			case ScriptFieldType::Vector3:			return "Vector3";
+			case ScriptFieldType::Vector4:			return "Vector4";
+			case ScriptFieldType::Entity:			return "Entity";
+			case ScriptFieldType::Asset:			return "Asset";
+			case ScriptFieldType::Scene:			return "Scene";
+			case ScriptFieldType::Texture:			return "Texture";
+			case ScriptFieldType::VirtualTexture:	return "VirtualTexture";
+			case ScriptFieldType::Mesh:				return "Mesh";
+			case ScriptFieldType::Animation:		return "Animation";
+			case ScriptFieldType::Material:			return "Material";
+			case ScriptFieldType::Audio:			return "Audio";
+			case ScriptFieldType::VideoPlayer:		return "VideoPlayer";
 			}
 			DY_CORE_ASSERT(false, "Unknown ScriptFieldType");
 			return "None";
 		}
 
-		inline ScriptFieldType ScriptFieldTypeFromString(std::string_view fieldType)
+		inline ScriptFieldType ScriptFieldTypeFromString(const std::string& fieldType)
 		{
-			if (fieldType == "None")    return ScriptFieldType::None;
-			if (fieldType == "Float")   return ScriptFieldType::Float;
-			if (fieldType == "Double")  return ScriptFieldType::Double;
-			if (fieldType == "Bool")    return ScriptFieldType::Bool;
-			if (fieldType == "Char")    return ScriptFieldType::Char;
-			if (fieldType == "Byte")    return ScriptFieldType::Byte;
-			if (fieldType == "Short")   return ScriptFieldType::Short;
-			if (fieldType == "Int")     return ScriptFieldType::Int;
-			if (fieldType == "Long")    return ScriptFieldType::Long;
-			if (fieldType == "UShort")  return ScriptFieldType::UShort;
-			if (fieldType == "UInt")    return ScriptFieldType::UInt;
-			if (fieldType == "ULong")   return ScriptFieldType::ULong;
-			if (fieldType == "Vector2") return ScriptFieldType::Vector2;
-			if (fieldType == "Vector3") return ScriptFieldType::Vector3;
-			if (fieldType == "Vector4") return ScriptFieldType::Vector4;
-			if (fieldType == "Entity")  return ScriptFieldType::Entity;
+			if (fieldType == "None")			return ScriptFieldType::None;
+			if (fieldType == "Float")			return ScriptFieldType::Float;
+			if (fieldType == "Double")			return ScriptFieldType::Double;
+			if (fieldType == "Bool")			return ScriptFieldType::Bool;
+			if (fieldType == "Char")			return ScriptFieldType::Char;
+			if (fieldType == "Byte")			return ScriptFieldType::Byte;
+			if (fieldType == "Short")			return ScriptFieldType::Short;
+			if (fieldType == "Int")				return ScriptFieldType::Int;
+			if (fieldType == "Long")			return ScriptFieldType::Long;
+			if (fieldType == "UShort")			return ScriptFieldType::UShort;
+			if (fieldType == "UInt")			return ScriptFieldType::UInt;
+			if (fieldType == "ULong")			return ScriptFieldType::ULong;
+			if (fieldType == "Vector2")			return ScriptFieldType::Vector2;
+			if (fieldType == "Vector3")			return ScriptFieldType::Vector3;
+			if (fieldType == "Vector4")			return ScriptFieldType::Vector4;
+			if (fieldType == "Entity")			return ScriptFieldType::Entity;
+			if (fieldType == "Asset")			return ScriptFieldType::Asset;
+			if (fieldType == "Scene")			return ScriptFieldType::Scene;
+			if (fieldType == "Texture")			return ScriptFieldType::Texture;
+			if (fieldType == "VirtualTexture")	return ScriptFieldType::VirtualTexture;
+			if (fieldType == "Mesh")			return ScriptFieldType::Mesh;
+			if (fieldType == "Animation")		return ScriptFieldType::Animation;
+			if (fieldType == "Material")		return ScriptFieldType::Material;
+			if (fieldType == "Audio")			return ScriptFieldType::Audio;
+			if (fieldType == "VideoPlayer")		return ScriptFieldType::VideoPlayer;
 
 			DY_CORE_ASSERT(false, "Unknown ScriptFieldType");
 			return ScriptFieldType::None;

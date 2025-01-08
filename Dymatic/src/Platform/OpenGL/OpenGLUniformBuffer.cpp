@@ -23,4 +23,9 @@ namespace Dymatic {
 		glNamedBufferSubData(m_RendererID, offset, size, data);
 	}
 
+	void OpenGLUniformBuffer::SetData(const Buffer& buffer, uint32_t offset)
+	{
+		SetData(buffer.Data, buffer.Size, offset);
+	}
+
 }

@@ -10,9 +10,11 @@ namespace Dymatic {
 	struct ButtonData
 	{
 		std::string Name;
-		std::function<void()> OnPressedFunction;
+		std::function<void()> OnPressedFunction = nullptr;
 
-		ButtonData(std::string name, std::function<void()> onPressed)
+		ButtonData() = default;
+
+		ButtonData(std::string name, std::function<void()> onPressed = nullptr)
 			: Name(name), OnPressedFunction(onPressed) {}
 	};
 
@@ -40,10 +42,11 @@ namespace Dymatic {
 	class Notification
 	{
 	public:
-		Notification(const std::string& title, const std::string& message, const std::vector<ButtonData>& buttons, float displayTime, bool loading);
+		Notification(const std::string& title, const std::string& message, const std::vector<ButtonData>& buttons, float displayTime, bool loading, Ref<Texture2D> icon);
 		
 		static void Init();
-		static void Create(const std::string& title, const std::string& message, const std::vector<ButtonData>& buttons = {}, float displayTime = 0.0f, bool loading = false);
+		static void Create(const std::string& title, const std::string& message, const std::vector<ButtonData>& buttons = {},
+			float displayTime = 0.0f, bool loading = false, Ref<Texture2D> icon = nullptr, glm::vec3 taskbarColor = glm::vec3(0.32f, 0.66f, 0.89f));
 		static void Clear();
 
 		static void OnImGuiRender(Timestep ts);
@@ -56,6 +59,7 @@ namespace Dymatic {
 		float Time;
 		float DisplayTime;
 		bool Loading;
+		Ref<Texture2D> Icon;
 		std::string Timestamp;
 
 	private:
@@ -67,13 +71,13 @@ namespace Dymatic {
 		bool _fadeIn = true;
 		float _currentOpacity = 0.0f;
 
-		friend class NotificationsPannel;
+		friend class NotificationsPanel;
 	};
 
-	class NotificationsPannel
+	class NotificationsPanel
 	{
 	public:
-		NotificationsPannel() = default;
+		NotificationsPanel() = default;
 		void OnImGuiRender(Timestep ts);
 	};
 

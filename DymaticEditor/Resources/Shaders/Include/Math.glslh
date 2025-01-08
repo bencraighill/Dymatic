@@ -1,1 +1,64 @@
-// Dymatic Engine shader math library include file
+// Dymatic Engine shader math library header file
+#pragma once
+
+float oneminus(float x) { return      1.0  - x; }
+vec2  oneminus(vec2  x) { return vec2(1.0) - x; }
+vec3  oneminus(vec3  x) { return vec3(1.0) - x; }
+vec4  oneminus(vec4  x) { return vec4(1.0) - x; }
+
+float negate(float x) { return -x; }
+vec2  negate(vec2  x) { return -x; }
+vec3  negate(vec3  x) { return -x; }
+vec4  negate(vec4  x) { return -x; }
+
+float saturate(float x) { return clamp(x,     (0.0),     (1.0)); }
+vec2  saturate(vec2  x) { return clamp(x, vec2(0.0), vec2(1.0)); }
+vec3  saturate(vec3  x) { return clamp(x, vec3(0.0), vec3(1.0)); }
+vec4  saturate(vec4  x) { return clamp(x, vec4(0.0), vec4(1.0)); }
+
+float desaturate(float x) { return x; }
+vec2  desaturate(vec2  x) { return x; }
+vec3  desaturate(vec3  x) { return x; }
+vec4  desaturate(vec4  x) { return x; }
+
+float blendif(float a, float b, float greater, float equal, float less) { return a > b ? greater : a < b ? less : a == b ? equal : float(0.0); }
+vec2  blendif(float a, float b, vec2  greater, vec2  equal, vec2  less) { return a > b ? greater : a < b ? less : a == b ? equal : vec2(0.0);  }
+vec3  blendif(float a, float b, vec3  greater, vec3  equal, vec3  less) { return a > b ? greater : a < b ? less : a == b ? equal : vec3(0.0);  }
+vec4  blendif(float a, float b, vec4  greater, vec4  equal, vec4  less) { return a > b ? greater : a < b ? less : a == b ? equal : vec4(0.0);  }
+
+float boolswitch(float true_value, float false_value, bool condition) { return condition ? true_value : false_value; }
+vec2  boolswitch(vec2  true_value, vec2  false_value, bool condition) { return condition ? true_value : false_value; }
+vec3  boolswitch(vec3  true_value, vec3  false_value, bool condition) { return condition ? true_value : false_value; }
+vec4  boolswitch(vec4  true_value, vec4  false_value, bool condition) { return condition ? true_value : false_value; }
+
+// Utilities
+float LinearDepth(float depth)
+{
+    float depthRange = 2.0 * depth - 1.0;
+    float linear = (2.0 * u_ZNear * u_ZFar) / (u_ZFar + u_ZNear - depthRange * (u_ZFar - u_ZNear));
+    return linear;
+}
+
+float NonLinearDepth(float linearDepth)
+{
+    return ((u_ZFar + u_ZNear) - (2.0 * u_ZNear * u_ZFar) / linearDepth) / (u_ZFar - u_ZNear) * 0.5 + 0.5;
+}
+
+vec3 ViewSpacePositionFromDepth(float depth, vec2 texCoord)
+{
+    float z = depth * 2.0 - 1.0;
+
+    vec4 clipSpacePosition = vec4(texCoord * 2.0 - 1.0, z, 1.0);
+    vec4 viewSpacePosition = u_InverseProjection * clipSpacePosition;
+
+    // Perspective division
+    viewSpacePosition /= viewSpacePosition.w;
+
+    return viewSpacePosition.xyz;
+}
+
+vec3 WorldPosFromDepth(float depth, vec2 texCoord)
+{
+    const vec4 worldSpacePosition = u_InverseView * vec4(ViewSpacePositionFromDepth(depth, texCoord), 1.0);
+    return worldSpacePosition.xyz;
+}

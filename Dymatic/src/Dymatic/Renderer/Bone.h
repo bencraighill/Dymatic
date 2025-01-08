@@ -31,18 +31,26 @@ namespace Dymatic {
 	{
 	public:
 		static Ref<Bone> Create(const std::string& name, int ID, const aiNodeAnim* channel) { return CreateRef<Bone>(name, ID, channel); }
+		static Ref<Bone> Create(const std::string& name, int ID, const std::vector<KeyPosition>& positions, const std::vector<KeyRotation>& rotations, const std::vector<KeyScale>& scales) { return CreateRef<Bone>(name, ID, positions, rotations, scales); }
 
+	public:
 		Bone(const std::string& name, int ID, const aiNodeAnim* channel);
+		Bone(const std::string& name, int ID, const std::vector<KeyPosition>& positions, const std::vector<KeyRotation>& rotations, const std::vector<KeyScale>& scales);
 
-		void Update(float animationTime);
+		glm::mat4 GetLocalTransform(const float animationTime);
 
-		const glm::mat4& GetLocalTransform() { return m_LocalTransform; }
-		const std::string& GetBoneName() const { return m_Name; }
-		int GetBoneID() { return m_ID; }
+		inline const std::string& GetBoneName() const { return m_Name; }
+		inline int GetBoneID() { return m_ID; }
+
 
 		uint32_t GetPositionIndex(float animationTime);
 		uint32_t GetRotationIndex(float animationTime);
 		uint32_t GetScaleIndex(float animationTime);
+
+		// Runtime Serialization only
+		inline const std::vector<KeyPosition>& GetPositions() const { return m_Positions; }
+		inline const std::vector<KeyRotation>& GetRotations() const { return m_Rotations; }
+		inline const std::vector<KeyScale>& GetScales() const { return m_Scales; }
 
 	private:
 		float GetScaleFactor(float lastTimeStamp, float nextTimeStamp, float animationTime);
@@ -54,12 +62,8 @@ namespace Dymatic {
 		std::vector<KeyPosition> m_Positions;
 		std::vector<KeyRotation> m_Rotations;
 		std::vector<KeyScale> m_Scales;
-		uint32_t m_NumPositions;
-		uint32_t m_NumRotations;
-		uint32_t m_NumScalings;
-
-		glm::mat4 m_LocalTransform;
+		
 		std::string m_Name;
-		uint32_t m_ID;
+		int m_ID;
 	};
 }

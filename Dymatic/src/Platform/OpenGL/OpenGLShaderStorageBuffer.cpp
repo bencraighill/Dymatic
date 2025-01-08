@@ -37,12 +37,19 @@ namespace Dymatic {
 			return 0;
 		}
 	}
-
-	OpenGLShaderStorageBuffer::OpenGLShaderStorageBuffer(uint32_t size, uint32_t binding, ShaderStorageBufferUsage usage)
-		: m_Usage(usage)
+	
+	OpenGLShaderStorageBuffer::OpenGLShaderStorageBuffer(uint32_t size, ShaderStorageBufferUsage usage)
+		: m_Usage(usage), m_Size(size)
 	{
 		glCreateBuffers(1, &m_RendererID);
-		glNamedBufferData(m_RendererID, size, nullptr, Utils::DymaticSSBOUsageToGL(usage)); // TODO: investigate usage hint
+		glNamedBufferData(m_RendererID, size, nullptr, Utils::DymaticSSBOUsageToGL(usage));
+	}
+
+	OpenGLShaderStorageBuffer::OpenGLShaderStorageBuffer(uint32_t size, uint32_t binding, ShaderStorageBufferUsage usage)
+		: m_Usage(usage), m_Size(size)
+	{
+		glCreateBuffers(1, &m_RendererID);
+		glNamedBufferData(m_RendererID, size, nullptr, Utils::DymaticSSBOUsageToGL(usage));
 		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, binding, m_RendererID);
 	}
 
@@ -51,14 +58,29 @@ namespace Dymatic {
 		glDeleteBuffers(1, &m_RendererID);
 	}
 
+	void OpenGLShaderStorageBuffer::Bind(uint32_t slot) const
+	{
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, slot, m_RendererID);
+	}
+
+	// This will copy all GPU shader storage data to the CPU.
+	// This is a very expensive operation and should only be used for serialization
+	// Note: Ownership of the lifetime of the returned memory is handed to the function caller
+	Buffer OpenGLShaderStorageBuffer::GetData() const
+	{
+		Buffer buffer(m_Size);
+		GetData(buffer.Data, m_Size);
+		return buffer;
+	}
+
 	// Copies all data into a new buffer
 	// Only use if MapBuffer() is not viable, or unnessisary - don't use for large data retrievals
-	void OpenGLShaderStorageBuffer::GetData(void* data, uint32_t size, uint32_t offset)
+	void OpenGLShaderStorageBuffer::GetData(void* data, uint32_t size, uint32_t offset) const
 	{
 		glGetNamedBufferSubData(m_RendererID, offset, size, data);
 	}
 
-	void OpenGLShaderStorageBuffer::SetData(const void* data, uint32_t size, uint32_t offset)
+	void OpenGLShaderStorageBuffer::SetData(const void* data, uint32_t size, uint32_t offset) const
 	{
 		glNamedBufferSubData(m_RendererID, offset, size, data);
 	}

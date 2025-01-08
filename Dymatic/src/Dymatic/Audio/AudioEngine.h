@@ -12,7 +12,7 @@ namespace Dymatic {
 		static void Shutdown();
 
 		static void SetGlobalVolume(float volume);
-		inline static float GetGlobalVolume();
+		static float GetGlobalVolume();
 	};
 
 }

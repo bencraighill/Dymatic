@@ -37,8 +37,11 @@ namespace Dymatic {
 
 		static void DrawCircle(const glm::mat4& transform, const glm::vec4& color, float thickness = 1.0f, float fade = 0.005f, int entityID = -1);
 
-		static void DrawLine(const glm::vec3& p0, glm::vec3& p1, const glm::vec4& color, int entityID = -1);
+		static void DrawLine(const glm::vec3& p0, const glm::vec3& p1, const glm::vec4& color, int entityID = -1);
+		static void DrawLineDashed(const glm::vec3& p0, const glm::vec3& p1, const glm::vec4& color, float dashRatio = 0.5f, float scale = 1.0f, int entityID = -1);
+		static void DrawPoint(const glm::vec3& point, const glm::vec4& color, int entityID = -1);
 
+		static void DrawText(const glm::mat4& transform, const std::string& text, const TextAlignment alignment, Ref<Font> font, const glm::vec4& color, float kerning = 0.0f, float lineSpacing = 0.0f, float maxWidth = 0.0f, int entityID = -1);
 		static void DrawTextComponent(const glm::mat4& transform, TextComponent& tc, int entityID = -1);
 		
 		static void DrawRect(const glm::vec3& position, const glm::vec2& size, const glm::vec4& color, int entityID = -1);
@@ -66,10 +69,28 @@ namespace Dymatic {
 
 	private:
 		static void StartBatch();
-		static void NextBatch();
+
+		static void FlushQuads();
+		static void StartQuadBatch();
+		static void NextQuadBatch();
+
+		static void FlushCircles();
+		static void StartCircleBatch();
+		static void NextCircleBatch();
+
+		static void FlushLines();
+		static void StartLineBatch();
+		static void NextLineBatch();
+
+		static void FlushPoints();
+		static void StartPointBatch();
+		static void NextPointBatch();
 
 		static void FlushText();
 		static void StartTextBatch();
+		static void NextTextBatch();
+
+		static void UpdateCamera();
 	};
 
 }

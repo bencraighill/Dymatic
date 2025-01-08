@@ -1,0 +1,104 @@
+// PBR Point Lighting Header File
+#pragma once
+
+#include PBRUtils.glslh
+#include SDF.glslh
+
+float PointShadow(vec3 fragPos, vec3 normal, vec3 lightPos, float lightRange, int shadowIndex);
+
+// Note: A modified version of this function exists in Renderer3D_LightPropagationVolume.glsl
+vec3 PointLighting(uint index, vec3 normal, vec3 fragPos,
+                    vec3 viewDir, vec3 albedo, float rough,
+                    float metal, vec3 F0,  float viewDistance)
+{
+    // Point light basics
+    const vec3 position = u_PointLights[index].position.xyz;
+    const float radius  = u_PointLights[index].range;
+
+    // Early exit
+    if (distance(position, fragPos) > radius)
+        return vec3(0.0);
+
+    vec3 color    = u_PointLights[index].color.rgb * u_PointLights[index].intensity;
+    int shadowIndex = u_PointLights[index].shadowIndex;
+
+    // Stuff common to the BRDF subfunctions 
+    vec3 lightDir = normalize(position - fragPos);
+    vec3 halfway  = normalize(lightDir + viewDir);
+    float nDotV = max(dot(normal, viewDir), 0.0);
+    float nDotL = max(dot(normal, lightDir), 0.0);
+
+    // Attenuation calculation that is applied to all
+    float distance    = length(position - fragPos);
+    float attenuation = pow(clamp(1 - pow((distance / radius), 4.0), 0.0, 1.0), 2.0)/(1.0  + (distance * distance) );
+    vec3 radianceIn   = color * attenuation;
+
+    // Cook-Torrance BRDF
+    float NDF = distributionGGX(normal, halfway, rough);
+    float G   = geometrySmith(nDotV, nDotL, rough);
+    vec3  F   = fresnelSchlick(max(dot(halfway,viewDir), 0.0), F0);
+
+    // Finding specular and diffuse component
+    vec3 kS = F;
+    vec3 kD = vec3(1.0) - kS;
+    kD *= 1.0 - metal;
+
+    vec3 numerator = NDF * G * F;
+    float denominator = 4.0 * nDotV * nDotL;
+    vec3 specular = numerator / max(denominator, 0.0000001);
+
+    vec3 radiance = (kD * (albedo / PI) + specular) * radianceIn * nDotL;
+
+    if (shadowIndex != -1)
+    {
+        float shadow = PointShadow(fragPos, normal, position, radius, shadowIndex);
+        radiance *= (1.0 - shadow);
+    }
+
+    return radiance;
+}
+
+// Array of offset direction for sampling
+vec3 gridSamplingDisk[20] = vec3[]
+(
+   vec3(1, 1,  1), vec3( 1, -1,  1), vec3(-1, -1,  1), vec3(-1, 1,  1), 
+   vec3(1, 1, -1), vec3( 1, -1, -1), vec3(-1, -1, -1), vec3(-1, 1, -1),
+   vec3(1, 1,  0), vec3( 1, -1,  0), vec3(-1, -1,  0), vec3(-1, 1,  0),
+   vec3(1, 0,  1), vec3(-1,  0,  1), vec3( 1,  0, -1), vec3(-1, 0, -1),
+   vec3(0, 1,  1), vec3( 0, -1,  1), vec3( 0, -1, -1), vec3( 0, 1, -1)
+);
+
+float PointShadow(vec3 fragPos, vec3 normal, vec3 lightPos, float lightRange, int shadowIndex)
+{
+#ifdef SDF_SHADOWS
+    vec3 fragToLight = lightPos - fragPos;
+    return 1.0 - ShadowRayMarch(fragPos, normalize(fragToLight), length(fragToLight), u_SDFSoftShadowsK);
+#endif
+
+    vec3 fragToLight = fragPos - lightPos;
+    float currentDepth = length(fragToLight);
+
+    float shadow = 0.0;
+
+#ifdef POINT_SHADOW_NO_NORMAL
+    float bias = -0.0001;
+#else
+    float bias = -max(0.0001 * (1.0 - dot(normal, fragToLight)), 0.0001);
+#endif
+
+    int samples = 20;
+    float viewDistance = length(vec3(u_ViewPosition) - fragPos);
+    float diskRadius = (1.0 + (viewDistance / (/*Depth Far Plane*/u_ZFar))) / u_ZFar;
+    for(int i = 0; i < samples; i++)
+    {
+        float closestDepth = texture(u_ShadowMapArray, vec4(vec3(fragToLight + gridSamplingDisk[i] * diskRadius), shadowIndex)).r;
+        closestDepth *= /*Depth Far Plane*/lightRange;   // undo mapping [0;1]
+        if(currentDepth - bias > closestDepth)
+            shadow += 1.0;
+    }
+
+    shadow /= float(samples);
+    shadow = clamp(shadow, 0.0, 1.0);
+        
+    return shadow;
+}

@@ -1,0 +1,8 @@
+# Add any additional theme presets that should be options in the editor below.
+
+# Default Presets:
+Manifest:
+  Dark: DymaticDark.dytheme
+  Light: DymaticLight.dytheme
+  Unreal: Unreal.dytheme
+  Vintage: Vintage.dytheme

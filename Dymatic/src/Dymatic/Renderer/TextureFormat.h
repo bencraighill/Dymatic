@@ -1,8 +1,10 @@
 #pragma once
 
+#include <string>
+
 namespace Dymatic {
 
-	enum class TextureFormat
+	enum class TextureFormat : uint16_t
 	{
 		None = 0,
 
@@ -23,12 +25,21 @@ namespace Dymatic {
 		R32F,
 
 		RED_INTEGER,
+		RED_UNSIGNED_INTEGER,
 
 		// Depth/Stencil
 		DEPTH24STENCIL8,
 
-		// Defaults
+		// Aliases
 		Depth = DEPTH24STENCIL8
 	};
+
+	namespace Utils {
+		bool IsDepthFormat(TextureFormat format);
+		const char* TextureFormatToString(TextureFormat format);
+		TextureFormat TextureFormatFromString(const std::string& formatString);
+		uint32_t GetFormatChannels(const TextureFormat format);
+		uint8_t GetDymaticTextureFormatBPP(TextureFormat format);
+	}
 
 }

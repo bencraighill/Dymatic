@@ -13,20 +13,43 @@
 
 #include <oleidl.h>
 #include <shellapi.h>
+#include <wlanapi.h>
+#include <wtypes.h>
+#include <shlobj.h>
 
 #include "windowsx.h"
+
+#pragma comment(lib, "Propsys.lib")
 
 #include <GLFW/glfw3.h>
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3native.h>
 
+#define MAX_ICON_SIZE 256
+
 namespace Dymatic {
+
+	namespace Utils {
+		
+		static LPCWSTR StringToLPCWSTR(const std::string& str)
+		{
+			int length = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, NULL, 0);
+			wchar_t* buffer = new wchar_t[length];
+			MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, buffer, length);
+			return buffer;
+		}
+		
+	}
 
 #pragma region Platform
 
 	static ITaskbarList3* s_TaskbarList = nullptr;
 	static std::vector<Taskbar::ThumbnailButton> s_ThumbnailButtons;
 	static const uint32_t MaxThumbnailButtons = 7;
+
+	static int s_NumCPUCores = 0;
+
+	static HANDLE s_WLanHandle;
 
 	static HWND GetPlatformWindow()
 	{
@@ -124,16 +147,26 @@ namespace Dymatic {
 		s_TaskbarList->HrInit();
 
 		RegisterDragDrop(GetPlatformWindow(), &s_DropManager);
+
+		SYSTEM_INFO systemInfo;
+		GetSystemInfo(&systemInfo);
+		s_NumCPUCores = systemInfo.dwNumberOfProcessors;
+
+		DWORD version;
+		WlanOpenHandle(2, NULL, &version, &s_WLanHandle);
 	}
 
 	void PlatformUtils::Shutdown()
 	{
+		WlanCloseHandle(s_WLanHandle, NULL);
+		
 		s_TaskbarList->Release();
 		CoUninitialize();
 
 		RevokeDragDrop(GetPlatformWindow());
 
 		OleUninitialize();
+
 	}
 
 	void Taskbar::SetLoading(bool loading)
@@ -187,7 +220,7 @@ namespace Dymatic {
 					unsigned char temp = flippedData[i];
 					flippedData[i] = flippedData[i + 2] * tint.z;
 					flippedData[i + 1] *= tint.y;
-					flippedData[i + 2] = temp * tint.z * tint.x;
+					flippedData[i + 2] = temp * tint.x;
 				}
 
 				hIcon = CreateIcon(hInstance, width, height, 1, 32, NULL, flippedData);
@@ -202,14 +235,31 @@ namespace Dymatic {
 		}
 	}
 
-	void Taskbar::AddThumbnailButton(const ThumbnailButton& button)
+	UUID Taskbar::AddThumbnailButton(const ThumbnailButton& button)
 	{
 		s_ThumbnailButtons.push_back(button);
 		UpdateThumbnailButtons();
+
+		return button.Handle;
 	}
 
-	void Taskbar::RemoveThumbnailButton(uint32_t index)
+	void Taskbar::RemoveThumbnailButton(UUID handle)
 	{
+		// Search the vector for the button with the specified handle.
+		// Note: We don't use a form of map object as we need to maintain submission order.
+		for (uint32_t i = 0; i < s_ThumbnailButtons.size(); i++)
+		{
+			if (s_ThumbnailButtons[i].Handle == handle)
+			{
+				RemoveThumbnailButtonAtIndex(i);
+				break;
+			}
+		}
+	}
+
+	void Taskbar::RemoveThumbnailButtonAtIndex(uint32_t index)
+	{
+		// For internal usage by Dymatic where we can guarantee we know the index.
 		if (index < 0 || index >= s_ThumbnailButtons.size())
 			return;
 
@@ -435,11 +485,105 @@ namespace Dymatic {
 		return monitorCount;
 	}
 
+	Monitor::MonitorInfo Monitor::GetMonitorInfo(int monitor)
+	{
+		return GetMonitorInfo()[monitor];
+	}
+
+	std::vector<Monitor::MonitorInfo> Monitor::GetMonitorInfo()
+	{
+		std::vector<HMONITOR> monitorHandles;
+		std::vector<Monitor::MonitorInfo> monitors;
+		
+		EnumDisplayMonitors(nullptr, nullptr,
+		[](HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMonitor, LPARAM dwData) -> BOOL 
+		{
+			std::vector<HMONITOR>* pMonitors = reinterpret_cast<std::vector<HMONITOR>*>(dwData);
+			pMonitors->push_back(hMonitor);
+			return TRUE;
+		}, reinterpret_cast<LPARAM>(&monitorHandles));
+		
+		monitors.reserve(monitorHandles.size());
+		for (auto& handle : monitorHandles)
+		{
+			auto& monitorInfo = monitors.emplace_back();
+			
+			MONITORINFOEX monitorInfoEx;
+			monitorInfoEx.cbSize = sizeof(MONITORINFOEX);
+			::GetMonitorInfo(handle, reinterpret_cast<LPMONITORINFO>(&monitorInfoEx));
+
+			DISPLAY_DEVICE dd;
+			dd.cb = sizeof(dd);
+			int deviceIndex = 0;
+			while (EnumDisplayDevices(monitorInfoEx.szDevice, deviceIndex, &dd, 0))
+			{
+				if (dd.StateFlags & DISPLAY_DEVICE_ACTIVE)
+				{
+					std::wstring wDeviceString = dd.DeviceString;
+					monitorInfo.Name = std::string(wDeviceString.begin(), wDeviceString.end());
+					break;
+				}
+				++deviceIndex;
+			}
+
+			DEVMODE dm;
+			dm.dmSize = sizeof(DEVMODE);
+			dm.dmDriverExtra = 0;
+			if (EnumDisplaySettings(monitorInfoEx.szDevice, ENUM_CURRENT_SETTINGS, &dm))
+			{
+				monitorInfo.DisplayFrequency = dm.dmDisplayFrequency;
+				monitorInfo.Orientation = (MonitorOrientation)dm.dmDisplayOrientation;
+				monitorInfo.Size = glm::ivec2(dm.dmPelsWidth, dm.dmPelsHeight);
+			}
+		}
+
+		return monitors;
+	}
+
 	glm::vec4 Monitor::GetMonitorWorkArea()
 	{
 		int xpos, ypos, width, height;
 		glfwGetMonitorWorkarea(glfwGetPrimaryMonitor(), &xpos, &ypos, &width, &height);
 		return glm::vec4(xpos, ypos, width, height);
+	}
+#pragma endregion
+
+#pragma region Network
+	Network::NetworkInfo Network::GetNetworkInfo()
+	{
+		WLAN_INTERFACE_INFO_LIST* interfaceList = NULL;
+		if (WlanEnumInterfaces(s_WLanHandle, NULL, &interfaceList) != ERROR_SUCCESS)
+			return {};
+
+		// Print the name and signal strength of each available network
+		for (DWORD i = 0; i < interfaceList->dwNumberOfItems; ++i) {
+			WLAN_INTERFACE_INFO interfaceInfo = interfaceList->InterfaceInfo[i];
+			DWORD connectInfoSize;
+			PWLAN_CONNECTION_ATTRIBUTES connectInfo = NULL;
+
+			// Get the connection info for the interface
+			if (WlanQueryInterface(s_WLanHandle, &interfaceInfo.InterfaceGuid, wlan_intf_opcode_current_connection,
+				NULL, &connectInfoSize, (PVOID*)&connectInfo, NULL) == ERROR_SUCCESS) {
+				std::wstring networkName(connectInfo->wlanAssociationAttributes.dot11Ssid.ucSSID,
+					connectInfo->wlanAssociationAttributes.dot11Ssid.ucSSID + connectInfo->wlanAssociationAttributes.dot11Ssid.uSSIDLength);
+
+				NetworkInfo networkInfo;
+				networkInfo.Name = std::string(networkName.begin(), networkName.end());
+				networkInfo.Strength = connectInfo->wlanAssociationAttributes.wlanSignalQuality;
+
+				WlanFreeMemory(connectInfo);
+				return networkInfo;
+			}
+		}
+
+
+		WlanFreeMemory(interfaceList);
+		return {};
+	}
+
+	void Network::OpenURL(const std::string& url)
+	{
+		ShellExecute(0, 0, Utils::StringToLPCWSTR(url), 0, 0, SW_SHOW);
 	}
 #pragma endregion
 	
@@ -463,14 +607,6 @@ namespace Dymatic {
 	static DWORD s_SplashWidth;
 	static DWORD s_SplashHeight;
 	static int s_SplashDominantRed, s_SplashDominantGreen, s_SplashDominantBlue;
-
-	static LPCWSTR StringToLPCWSTR(const std::string& str)
-	{
-		int length = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, NULL, 0);
-		wchar_t* buffer = new wchar_t[length];
-		MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, buffer, length);
-		return buffer;
-	}
 
 	static void SplashOnPaint(HWND hwnd)
 	{
@@ -527,7 +663,7 @@ namespace Dymatic {
 		return TRUE;
 	}
 
-	void Splash::Init(const std::string& name, const std::string& splash, int rounding)
+	void Splash::Init(const std::string& name, const std::filesystem::path& splash, uint32_t rounding)
 	{
 		// Call Shutdown to close any open splash
 		Shutdown();
@@ -548,7 +684,7 @@ namespace Dymatic {
 		// Set bitmap
 		{
 			HBITMAP    hBitmap = NULL;
-			hBitmap = (HBITMAP)::LoadImage(0, StringToLPCWSTR(splash), IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE);
+			hBitmap = (HBITMAP)::LoadImage(0, Utils::StringToLPCWSTR(splash.string()), IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE);
 
 			int nRetValue;
 			BITMAP  csBitmapSize;
@@ -726,7 +862,7 @@ namespace Dymatic {
 		ReleaseDC(s_SplashHandle, hDC);
 	}
 	
-	void Splash::Update(const std::string& message, int progress)
+	void Splash::Update(const std::string& message, uint32_t progress)
 	{
 		if (!s_SplashHandle)
 			return;
@@ -830,6 +966,143 @@ namespace Dymatic {
 		while (fgets(buffer.data(), buffer.size(), pipe.get()) != nullptr)
 			result += buffer.data();
 		return result;
+	}
+
+	static void IterateStartMenuFolder(const std::wstring& folderPath, std::vector<System::ApplicationInstallDetails>& installedApplications)
+	{
+		// Iterate through the files and folders in the given path
+		std::wstring searchPath = folderPath + L"\\*";
+		WIN32_FIND_DATA findData;
+		HANDLE hFind = FindFirstFile(searchPath.c_str(), &findData);
+		if (hFind != INVALID_HANDLE_VALUE) 
+		{
+			do 
+			{
+				// Skip "." and ".." directories
+				if (wcscmp(findData.cFileName, L".") == 0 || wcscmp(findData.cFileName, L"..") == 0)
+					continue;
+
+				// Construct the full path of the current file or folder
+				std::wstring fullPath = folderPath + L"\\" + findData.cFileName;
+
+				// Check if it's a directory
+				if (findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) 
+				{
+					// Recursively iterate through the subdirectory
+					IterateStartMenuFolder(fullPath, installedApplications);
+				}
+				else {
+					// Check if it's a shortcut file
+					if (PathMatchSpec(findData.cFileName, L"*.lnk")) 
+					{
+						IShellLink* pShellLink;
+						HRESULT hr = CoCreateInstance(CLSID_ShellLink, nullptr, CLSCTX_INPROC_SERVER, IID_IShellLink, reinterpret_cast<void**>(&pShellLink));
+
+						if (SUCCEEDED(hr))
+						{
+							IPersistFile* pPersistFile;
+							hr = pShellLink->QueryInterface(IID_IPersistFile, reinterpret_cast<void**>(&pPersistFile));
+
+							if (SUCCEEDED(hr))
+							{
+								// Load the shortcut file
+								hr = pPersistFile->Load(fullPath.c_str(), STGM_READ);
+
+								if (SUCCEEDED(hr))
+								{
+									// Retrieve the target file path
+									wchar_t targetPath[MAX_PATH];
+									WIN32_FIND_DATAW findDataTarget;
+									hr = pShellLink->GetPath(targetPath, MAX_PATH, &findDataTarget, SLGP_UNCPRIORITY);
+
+									if (SUCCEEDED(hr))
+									{
+										// Check if the target file is an executable
+										if (PathIsExe(targetPath))
+										{
+											System::ApplicationInstallDetails details;
+											details.Path = targetPath;
+											std::wstring wstr = findData.cFileName;
+											details.Name = std::filesystem::path(std::string(wstr.begin(), wstr.end())).stem().string();
+											
+											HICON icon = ExtractIconW(NULL, targetPath, 0);
+											
+											// Get icon width, height and pixels
+											ICONINFO iconInfo;
+											GetIconInfo(icon, &iconInfo);
+											BITMAP bmp;
+											GetObject(iconInfo.hbmColor, sizeof(BITMAP), &bmp);
+											int width = bmp.bmWidth;
+											int height = bmp.bmHeight;
+											int pixels = width * height;
+
+											if (width <= 0 || height <= 0 || width > MAX_ICON_SIZE || height > MAX_ICON_SIZE)
+												continue;
+											
+											// Get icon pixels
+											std::vector<BYTE> iconPixels;
+											iconPixels.resize(pixels * 4);
+											ICONINFOEXW iconInfoEx;
+											iconInfoEx.cbSize = sizeof(ICONINFOEXW);
+											GetIconInfoExW(icon, &iconInfoEx);
+											GetBitmapBits(iconInfoEx.hbmColor, pixels * 4, iconPixels.data());
+
+											// BGRA to RGBA
+											for (int i = 0; i < pixels; i++)
+											{
+												BYTE* pixel = iconPixels.data() + (i * 4);
+												BYTE r = pixel[2];
+												BYTE b = pixel[0];
+												pixel[0] = r;
+												pixel[2] = b;
+											}
+											
+											// Create the internal texture object.
+											TextureSpecification spec;
+											spec.Width = width;
+											spec.Height = height;
+											Ref<Texture2D> texture = Texture2D::Create(spec);
+											
+											// Copy data over to the texture
+											texture->SetData(iconPixels.data(), pixels * 4);
+											details.Icon = texture;
+											
+											// Destroy the texture object.
+											DestroyIcon(icon);
+											
+											installedApplications.push_back(details);
+										}
+									}
+								}
+
+								pPersistFile->Release();
+							}
+
+							pShellLink->Release();
+						}
+					}
+				}
+			} while (FindNextFile(hFind, &findData));
+
+			FindClose(hFind);
+		}
+	}
+
+	std::vector<System::ApplicationInstallDetails> System::GetInstalledApplications()
+	{
+		std::vector<System::ApplicationInstallDetails> installedApplications;
+		WCHAR path[MAX_PATH];
+		if (SUCCEEDED(SHGetFolderPath(NULL, CSIDL_COMMON_STARTMENU, NULL, 0, path)))
+			IterateStartMenuFolder(path, installedApplications);
+		if (SUCCEEDED(SHGetFolderPath(NULL, CSIDL_STARTMENU, NULL, 0, path)))
+			IterateStartMenuFolder(path, installedApplications);
+
+		return installedApplications;
+	}
+
+	const int System::GetCPUCores()
+	{
+		return s_NumCPUCores;
 	}
 #pragma endregion
 

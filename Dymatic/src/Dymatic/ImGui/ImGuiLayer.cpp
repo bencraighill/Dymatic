@@ -36,22 +36,19 @@ namespace Dymatic {
 		//io.ConfigFlags |= ImGuiConfigFlags_ViewportsNoTaskBarIcons;
 		//io.ConfigFlags |= ImGuiConfigFlags_ViewportsNoMerge;
 
-		io.Fonts->AddFontFromFileTTF("assets/fonts/opensans/OpenSans-Bold.ttf", 18.0f);
-		io.Fonts->AddFontFromFileTTF("assets/fonts/opensans/OpenSans-Regular.ttf", 13.0f);
-		io.Fonts->AddFontFromFileTTF("assets/fonts/opensans/OpenSans-Regular.ttf", 60.0f);
-		io.FontDefault = io.Fonts->AddFontFromFileTTF("assets/fonts/opensans/OpenSans-Regular.ttf", 16.0f);
+		// Default font for use with ImGui in Dymatic applications
+		io.FontDefault = io.Fonts->AddFontFromFileTTF("Resources/Fonts/OpenSans-Regular.ttf", 16.0f);
 
 		// Setup Dear ImGui style
 		ImGui::StyleColorsDark();
-		//ImGui::StyleColorsClassic();
 
 		// When viewports are enabled we tweak WindowRounding/WindowBg so platform windows can look identical to regular ones.
 		ImGuiStyle& style = ImGui::GetStyle();
 		if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
 		{
 			style.Colors[ImGuiCol_WindowBg].w = 1.0f;
-			//Total frame rounding
-			//Just makes everything a little softer.
+
+			// Frame rounding to make everything a little softer.
 			style.WindowRounding = 5.0f;
 			style.FrameRounding = 3.0f;
 			style.PopupRounding = 5.0f;
@@ -121,6 +118,14 @@ namespace Dymatic {
 		config.MergeMode = true;
 		config.GlyphMinAdvanceX = size;
 		//static const ImWchar icon_ranges[] = { min_range, max_range, 0 };
+		ImWchar* icon_ranges = new ImWchar[]{ (ImWchar)min_range, (ImWchar)max_range, 0 };
+		ImGui::GetIO().Fonts->AddFontFromFileTTF(path, size, &config, icon_ranges);
+	}
+
+	void ImGuiLayer::AddFontRanges(const char* path, float size, int min_range, int max_range)
+	{
+		ImFontConfig config;
+		config.GlyphMinAdvanceX = size;
 		ImWchar* icon_ranges = new ImWchar[]{ (ImWchar)min_range, (ImWchar)max_range, 0 };
 		ImGui::GetIO().Fonts->AddFontFromFileTTF(path, size, &config, icon_ranges);
 	}

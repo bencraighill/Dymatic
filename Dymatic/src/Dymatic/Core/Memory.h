@@ -35,6 +35,7 @@ namespace Dymatic::Memory
 	const AllocationStats& GetAllocationStats();
 }
 
+#if 0
 inline void* operator new(size_t size)
 {
 	return Dymatic::Memory::Allocator::Allocate(size);
@@ -55,6 +56,7 @@ inline void operator delete(void* ptr)
 {
 	Dymatic::Memory::Allocator::Free(ptr);
 }
+#endif
 
 //#define dynew new(__FUNCTION__)
 #define dynew new(__FILE__, __LINE__)
