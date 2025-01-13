@@ -41,6 +41,7 @@ namespace Dymatic {
 		float m_CameraBaseSpeed = 5.0f;
 		bool m_ViewportHovered = false;
 		bool m_LockMouse = false;
+		int m_Frame = 0;
 
 		// Renderer resources
 		Ref<SceneRendererContext> m_SceneRendererContext;

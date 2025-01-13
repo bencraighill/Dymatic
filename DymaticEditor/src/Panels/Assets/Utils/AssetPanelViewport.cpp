@@ -30,6 +30,10 @@ namespace Dymatic {
 			m_Camera.SetViewportSize(m_ViewportSize.x, m_ViewportSize.y);
 		}
 
+		// Hacky work around so that material viewport panels show objects without being hovered (window is incorrectly sized on frame 0)
+		if (m_Frame == 1)
+			m_ViewportHovered = true;
+
 		// Update the camera
 		m_Camera.SetBlockEvents(!m_ViewportHovered && !m_LockMouse);
 		m_Camera.OnUpdate(ts);
@@ -62,6 +66,7 @@ namespace Dymatic {
 		// End render commands
 		SceneRenderer::RenderScene();
 		SceneRenderer::EndScene();
+		m_Frame++;
 	}
 
 	void AssetPanelViewport::EndViewportRender()

@@ -10,9 +10,6 @@
 [submodule "Dymatic/vendor/spdlog"]
 	path = Dymatic/vendor/spdlog
 	url = https://github.com/gabime/spdlog.git
-[submodule "Dymatic/vendor/ImGuizmo"]
-	path = Dymatic/vendor/ImGuizmo
-	url = https://github.com/bencraighill/ImGuizmo.git
 [submodule "Dymatic/vendor/glm"]
 	path = Dymatic/vendor/glm
 	url = https://github.com/bencraighill/glm.git
@@ -26,3 +23,6 @@
 [submodule "DymaticEditor/SandboxProject"]
 	path = DymaticEditor/SandboxProject
 	url = https://github.com/bencraighill/DymaticSandbox.git
+[submodule "Dymatic/vendor/ImGuizmo"]
+	path = Dymatic/vendor/ImGuizmo
+	url = https://github.com/bencraighill/ImGuizmo.git

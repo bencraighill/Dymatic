@@ -270,7 +270,6 @@ namespace Dymatic {
 
 		// Volumetric Clouds
 		Ref<Texture3D> PerlinWorleyNoise;
-		Ref<Texture2D> CurlNoise;
 
 		// TAA
 		Ref<Shader> TAAShader;
@@ -3625,7 +3624,7 @@ namespace Dymatic {
 			s_Data.LightingBuffer.SkyLightIntensity = lightComponent.Intensity;
 			auto& skyboxHDRIID = s_Data.ActiveContext->SceneContext->SkyboxHDRIID;
 
-			if (lightComponent.Type == 0)
+			if (lightComponent.Type == SkyLightComponent::SkyType::EnvironmentMap)
 			{
 				if (!lightComponent.EnvironmentMap)
 					return;

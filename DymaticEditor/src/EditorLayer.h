@@ -27,6 +27,8 @@
 
 #include "Dymatic/Video/VideoReader.h"
 
+#include "Editor/Gizmo.h"
+
 namespace Dymatic {
 
 	class EditorLayer : public Layer
@@ -104,6 +106,9 @@ namespace Dymatic {
 		void SetRendererVisualizationMode(SceneRendererContext::RendererVisualizationMode visualizationMode);
 		void ToggleRendererVisualizationMode();
 
+		void SetGizmoOperation(const GizmoOperation operation);
+		bool IsGizmoEnabled(const GizmoOperation operation);
+
 		void ReloadAvailableWorkspaces();
 
 		void OnOpenFile(const std::filesystem::path& path);
@@ -162,12 +167,8 @@ namespace Dymatic {
 		glm::vec2 m_ViewportBounds[2];
 		bool m_LockMouse = false;
 
-		int m_GizmoOperation = -1;
-		int m_GizmoMode = 0;
-		enum class GizmoPivotPoint
-		{
-			MedianPoint = 0, IndividualOrigins = 1, ActiveElement = 2
-		};
+		GizmoOperation m_GizmoOperation = GizmoOperation::None;
+		GizmoMode m_GizmoMode = GizmoMode::Local;
 		GizmoPivotPoint m_GizmoPivotPoint = GizmoPivotPoint::MedianPoint;
 
 		//Snap Enabled

@@ -199,6 +199,24 @@ namespace Dymatic {
 			// Note: This only currently loads the FA_PLAYER icon
 			imGuiLayer->AddFontRanges("Resources/Fonts/fontawesome/Font Awesome 6 Pro-Solid-900.otf", 35.0f, 0xF183, 0xF183);
 			imGuiLayer->AddFontRanges("Resources/Fonts/fontawesome/Font Awesome 6 Pro-Regular-400.otf", 35.0f, 0xF183, 0xF183);
+
+			// Setup ImGuizmo
+			auto& style = ImGuizmo::GetStyle();
+			style.Colors[ImGuizmo::COLOR::DIRECTION_X] = ImGui::ColorConvertU32ToFloat4(0xFF715ED8);
+			style.Colors[ImGuizmo::COLOR::DIRECTION_Y] = ImGui::ColorConvertU32ToFloat4(0xFF25AA25);
+			style.Colors[ImGuizmo::COLOR::DIRECTION_Z] = ImGui::ColorConvertU32ToFloat4(0xFFCC532C);
+			style.Colors[ImGuizmo::COLOR::PLANE_X] = ImGui::ColorConvertU32ToFloat4(0xFF7A68D8);
+			style.Colors[ImGuizmo::COLOR::PLANE_Y] = ImGui::ColorConvertU32ToFloat4(0xFF55AB55);
+			style.Colors[ImGuizmo::COLOR::PLANE_Z] = ImGui::ColorConvertU32ToFloat4(0xFFD96742);
+			style.Colors[ImGuizmo::COLOR::SELECTION] = ImGui::ColorConvertU32ToFloat4(0xFF20AACC);
+			style.Colors[ImGuizmo::COLOR::SCALE_LINE] = ImGui::ColorConvertU32ToFloat4(0xFF404040);
+			style.RotationLineThickness = 6.0f;
+			style.RotationOuterLineThickness = 6.0f;
+			style.ScaleLineThickness = 6.0f;
+			style.ScaleLineCircleSize = 12.0f;
+			style.TranslationLineThickness = 6.0f;
+			style.TranslationLineArrowSize = 12.0f;
+			ImGuizmo::SetGizmoSizeClipSpace(0.15f);
 		}
 
 		UI::SetEditorContext(this);
@@ -557,25 +575,62 @@ namespace Dymatic {
 		}
 	}
 
-	static bool BeginMenuWithAlpha(const char* label)
-	{
-		auto& style = ImGui::GetStyle();
+	namespace Utils {
 
-		// Hovered
-		ImVec4 hoveredColor = ImGui::GetStyleColorVec4(ImGuiCol_HeaderHovered);
-		hoveredColor.w = 0.55f;
-		ImGui::PushStyleColor(ImGuiCol_HeaderHovered, hoveredColor);
+		static bool BeginMenuWithAlpha(const char* label)
+		{
+			auto& style = ImGui::GetStyle();
 
-		// Active
-		ImVec4 activeColor = ImGui::GetStyleColorVec4(ImGuiCol_Header);
-		activeColor.w = 0.55f;
-		ImGui::PushStyleColor(ImGuiCol_Header, activeColor);
+			// Hovered
+			ImVec4 hoveredColor = ImGui::GetStyleColorVec4(ImGuiCol_HeaderHovered);
+			hoveredColor.w = 0.55f;
+			ImGui::PushStyleColor(ImGuiCol_HeaderHovered, hoveredColor);
+
+			// Active
+			ImVec4 activeColor = ImGui::GetStyleColorVec4(ImGuiCol_Header);
+			activeColor.w = 0.55f;
+			ImGui::PushStyleColor(ImGuiCol_Header, activeColor);
 
 
-		bool open = ImGui::BeginMenu(label);
-		ImGui::PopStyleColor(2);
+			bool open = ImGui::BeginMenu(label);
+			ImGui::PopStyleColor(2);
 
-		return open;
+			return open;
+		}
+
+		struct SnapValues
+		{
+			const char* Label;
+			float Value;
+		};
+
+		static void DrawGizmoSnappingMenu(const char* id, const char* icon, const SnapValues snapValues[], const uint32_t snapValueCount, bool& snap, float& snapValue, const char* trailer = nullptr)
+		{
+			std::string value = String::FloatToString(snapValue);
+
+			if (trailer)
+				value += trailer;
+
+			const char* items[] = { icon, value.c_str() };
+			int currentScalingValue = snap ? 0 : -1;
+			if (ImGui::SwitchButtonEx(id, items, IM_ARRAYSIZE(items), &currentScalingValue, ImVec2(60, 30)))
+			{
+				if (currentScalingValue == 1)
+					ImGui::OpenPopup(id);
+				else if (currentScalingValue == 0)
+					snap = !snap;
+			}
+
+			if (ImGui::BeginPopup(id))
+			{
+				for (uint32_t valueIndex = 0; valueIndex < snapValueCount; valueIndex++)
+					if (ImGui::MenuItem(snapValues[valueIndex].Label))
+						snapValue = snapValues[valueIndex].Value;
+
+				ImGui::EndPopup();
+			}
+		}
+
 	}
 
 	void EditorLayer::OnImGuiRender()
@@ -720,7 +775,7 @@ namespace Dymatic {
 				ImGui::GetWindowDrawList()->AddPolyline(points, 4, ImGui::GetColorU32(ImGuiCol_MenuBarGripBorder), true, 2.0f);
 			}
 
-			if (BeginMenuWithAlpha(CHARACTER_ICON_DYMATIC))
+			if (Utils::BeginMenuWithAlpha(CHARACTER_ICON_DYMATIC))
 			{
 				if (ImGui::MenuItem(FA_HOUSE " Splash Screen")) { m_ShowSplash = true; }
 				if (ImGui::MenuItem(FA_CIRCLE_QUESTION " About Dymatic"))
@@ -742,7 +797,7 @@ namespace Dymatic {
 				ImGui::EndMenu();
 			}
 
-			if (BeginMenuWithAlpha("File"))
+			if (Utils::BeginMenuWithAlpha("File"))
 			{
 				if (ImGui::MenuItem(CHARACTER_ICON_NEW_FILE " New", Preferences::Keymap::GetBindString(Preferences::Keymap::KeyBindEvent::NewSceneBind).c_str())) NewScene();
 				if (ImGui::MenuItem(CHARACTER_ICON_OPEN_FILE " Open...", Preferences::Keymap::GetBindString(Preferences::Keymap::KeyBindEvent::OpenSceneBind).c_str())) OpenScene();
@@ -886,7 +941,7 @@ namespace Dymatic {
 				ImGui::EndMenu();
 			}
 
-			if (BeginMenuWithAlpha("Edit"))
+			if (Utils::BeginMenuWithAlpha("Edit"))
 			{
 				if (ImGui::MenuItem(FA_UNDO " Undo", Preferences::Keymap::GetBindString(Preferences::Keymap::KeyBindEvent::UndoBind).c_str(), nullptr, TransactionManager::CanUndo()))
 					Undo();
@@ -908,7 +963,7 @@ namespace Dymatic {
 				ImGui::EndMenu();
 			}
 
-			if (BeginMenuWithAlpha("Window"))
+			if (Utils::BeginMenuWithAlpha("Window"))
 			{
 				ImGui::MenuItem(CHARACTER_ICON_VIEWPORT " Viewport", "", &Preferences::GetEditorWindowVisible(Preferences::EditorWindow::Viewport));
 				ImGui::MenuItem(CHARACTER_ICON_TOOLBAR " Toolbar", "", &Preferences::GetEditorWindowVisible(Preferences::EditorWindow::Toolbar));
@@ -941,7 +996,7 @@ namespace Dymatic {
 				ImGui::EndMenu();
 			}
 
-			if (BeginMenuWithAlpha("View"))
+			if (Utils::BeginMenuWithAlpha("View"))
 			{
 				if (ImGui::MenuItem(m_EditorCamera.GetProjectionType() == 0 ? CHARACTER_ICON_PROJECTION_ORTHOGRAPHIC " Orthographic" : CHARACTER_ICON_PROJECTION_PERSPECTIVE " Perspective", Preferences::Keymap::GetBindString(Preferences::Keymap::KeyBindEvent::ViewProjectionBind).c_str())) { m_ProjectionToggled = !m_EditorCamera.GetProjectionType(); m_EditorCamera.SetProjectionType(m_ProjectionToggled); }
 
@@ -964,7 +1019,7 @@ namespace Dymatic {
 				ImGui::EndMenu();
 			}
 
-			if (BeginMenuWithAlpha("Script"))
+			if (Utils::BeginMenuWithAlpha("Script"))
 			{
 				if (ImGui::MenuItem(FILE_ICON_SCRIPT " Compile Assembly", "", nullptr, m_SceneState == SceneState::Edit))
 					Compile();
@@ -977,7 +1032,7 @@ namespace Dymatic {
 				ImGui::EndMenu();
 			}
 
-			if (BeginMenuWithAlpha("Help"))
+			if (Utils::BeginMenuWithAlpha("Help"))
 			{
 				if (ImGui::MenuItem(FA_BOOK " Documentation"))
 					Network::OpenURL("https://docs.dymaticengine.com");
@@ -1989,119 +2044,71 @@ namespace Dymatic {
 					SetRendererVisualizationMode(rendererVisualizationMode);
 
 				ImGui::SameLine();
-				ImGui::Dummy(ImVec2{ ImGui::GetContentRegionAvail().x - 480, 0 });
+				ImGui::Dummy(ImVec2{ ImGui::GetContentRegionAvail().x - 512, 0 });
 				ImGui::SameLine();
 
 				// Viewport gizmo settings
 				{
-					const char* gizmo_type_items[4] = { CHARACTER_ICON_GIZMO_CURSOR, CHARACTER_ICON_GIZMO_TRANSLATE, CHARACTER_ICON_GIZMO_ROTATE, CHARACTER_ICON_GIZMO_SCALE };
-					int currentValue = (int)(m_GizmoOperation)+1;
-					if (ImGui::SwitchButtonEx("##GizmoTypeSwitch", gizmo_type_items, 4, &currentValue, ImVec2(120, 30)))
-						m_GizmoOperation = currentValue - 1;
+					const bool activeOperations[] = {
+						IsGizmoEnabled(GizmoOperation::None),
+						IsGizmoEnabled(GizmoOperation::Translate),
+						IsGizmoEnabled(GizmoOperation::Rotate),
+						IsGizmoEnabled(GizmoOperation::Scale),
+						IsGizmoEnabled(GizmoOperation::Universal),
+					};
+
+					int selectedOperation = -1;
+					const char* gizmoTypeIcons[] = { CHARACTER_ICON_GIZMO_CURSOR, CHARACTER_ICON_GIZMO_TRANSLATE, CHARACTER_ICON_GIZMO_ROTATE, CHARACTER_ICON_GIZMO_SCALE, FA_GROUP_ARROWS_ROTATE };
+					const GizmoOperation gizmoOperations[] = { GizmoOperation::None, GizmoOperation::Translate, GizmoOperation::Rotate, GizmoOperation::Scale, GizmoOperation::Universal };
+					if (ImGui::SwitchButtonEx("##GizmoTypeSwitch", gizmoTypeIcons, IM_ARRAYSIZE(gizmoTypeIcons), &selectedOperation, activeOperations, ImVec2(150, 30)))
+						SetGizmoOperation(gizmoOperations[selectedOperation]);
 
 					ImGui::SameLine();
 
-					if (ImGui::Button(m_GizmoMode == 0 ? CHARACTER_ICON_SPACE_LOCAL : CHARACTER_ICON_SPACE_WORLD, ImVec2(30, 30)))
-						m_GizmoMode = !m_GizmoMode;
+					if (ImGui::Button(m_GizmoMode == GizmoMode::Local ? CHARACTER_ICON_SPACE_LOCAL : CHARACTER_ICON_SPACE_WORLD, ImVec2(30, 30)))
+						m_GizmoMode = (m_GizmoMode == GizmoMode::Local) ? GizmoMode::World : GizmoMode::Local;
+
+					constexpr Utils::SnapValues translationSnapValues[] = {
+						{ "0.01",	0.01f	},
+						{ "0.05",	0.05f	},
+						{ "0.1",	0.1f	},
+						{ "0.5",	0.5f	},
+						{ "1",		1.0f	},
+						{ "5",		5.0f	},
+						{ "10",		10.0f	},
+						{ "50",		50.0f	},
+						{ "100",	100.0f	}
+					};
+
+					constexpr Utils::SnapValues rotationSnapValues[] = {
+						{ "1" CHARACTER_SYMBOL_DEGREE,		1.0f					},
+						{ "5" CHARACTER_SYMBOL_DEGREE,		5.0f					},
+						{ "10" CHARACTER_SYMBOL_DEGREE,		10.0f					},
+						{ "15" CHARACTER_SYMBOL_DEGREE,		15.0f					},
+						{ "30" CHARACTER_SYMBOL_DEGREE,		30.0f					},
+						{ "45" CHARACTER_SYMBOL_DEGREE,		45.0f					},
+						{ "60" CHARACTER_SYMBOL_DEGREE,		60.0f					},
+						{ "90" CHARACTER_SYMBOL_DEGREE,		90.0f					},
+						{ "120" CHARACTER_SYMBOL_DEGREE,	120.0f					},
+						{ "180" CHARACTER_SYMBOL_DEGREE,	180.0f					},
+						{ CHARACTER_SYMBOL_PI,				3.14159265358979323846	}
+					};
+
+					constexpr Utils::SnapValues scaleSnapValues[] = {
+						{ "0.1",	0.1f	},
+						{ "0.25",	0.25f	},
+						{ "0.5",	0.5f	},
+						{ "1",		1.0f	},
+						{ "5",		5.0f	},
+						{ "10",		10.0f	}
+					};
 
 					ImGui::SameLine();
-
-					{
-
-
-						std::string number = String::FloatToString(m_TranslationSnapValue);
-						const char* pchar = number.c_str();
-						const char** items = new const char* [2] { CHARACTER_ICON_SNAP_TRANSLATION, pchar };
-						int currentTranslationValue = m_TranslationSnap ? 0 : -1;
-						if (ImGui::SwitchButtonEx("##TranslationSnapEnabledSwitch", items, 2, &currentTranslationValue, ImVec2(60, 30)))
-						{
-							if (currentTranslationValue == 1)
-								ImGui::OpenPopup("TranslationSnapLevel");
-							else if (currentTranslationValue == 0)
-								m_TranslationSnap = !m_TranslationSnap;
-						}
-						delete[] items;
-					}
-
+					Utils::DrawGizmoSnappingMenu("##TranslationSnapMenu", CHARACTER_ICON_SNAP_TRANSLATION, translationSnapValues, IM_ARRAYSIZE(translationSnapValues), m_TranslationSnap, m_TranslationSnapValue);
 					ImGui::SameLine();
-
-					{
-						std::string number = String::FloatToString(m_RotationSnapValue) + std::string(CHARACTER_SYMBOL_DEGREE);
-						const char* pchar = number.c_str();
-						const char** items = new const char* [2] { CHARACTER_ICON_SNAP_ROTATION, pchar };
-						int currentRotationValue = m_RotationSnap ? 0 : -1;
-						if (ImGui::SwitchButtonEx("##RotationSnapEnabledSwitch", items, 2, &currentRotationValue, ImVec2(60, 30)))
-						{
-							if (currentRotationValue == 1)
-								ImGui::OpenPopup("RotationSnapLevel");
-							else if (currentRotationValue == 0)
-								m_RotationSnap = !m_RotationSnap;
-						}
-						delete[] items;
-					}
-
+					Utils::DrawGizmoSnappingMenu("##RotationSnapMenu", CHARACTER_ICON_SNAP_ROTATION, rotationSnapValues, IM_ARRAYSIZE(rotationSnapValues), m_RotationSnap, m_RotationSnapValue, CHARACTER_SYMBOL_DEGREE);
 					ImGui::SameLine();
-
-					{
-						std::string number = String::FloatToString(m_ScaleSnapValue);
-						const char* pchar = number.c_str();
-						const char** items = new const char* [2] { CHARACTER_ICON_SNAP_SCALING, pchar };
-						int currentScalingValue = m_ScaleSnap ? 0 : -1;
-						if (ImGui::SwitchButtonEx("##ScalingSnapEnabledSwitch", items, 2, &currentScalingValue, ImVec2(60, 30)))
-						{
-							if (currentScalingValue == 1)
-								ImGui::OpenPopup("ScaleSnapLevel");
-							else if (currentScalingValue == 0)
-								m_ScaleSnap = !m_ScaleSnap;
-						}
-						delete[] items;
-					}
-
-					//Snapping Setter Events
-					{
-						if (ImGui::BeginPopup("TranslationSnapLevel"))
-						{
-							if (ImGui::MenuItem("0.01")) m_TranslationSnapValue = 0.01f;
-							if (ImGui::MenuItem("0.05")) m_TranslationSnapValue = 0.05f;
-							if (ImGui::MenuItem("0.1")) m_TranslationSnapValue = 0.1f;
-							if (ImGui::MenuItem("0.5")) m_TranslationSnapValue = 0.5f;
-							if (ImGui::MenuItem("1")) m_TranslationSnapValue = 1.0f;
-							if (ImGui::MenuItem("5")) m_TranslationSnapValue = 5.0f;
-							if (ImGui::MenuItem("10")) m_TranslationSnapValue = 10.0f;
-							if (ImGui::MenuItem("50")) m_TranslationSnapValue = 50.0f;
-							if (ImGui::MenuItem("100")) m_TranslationSnapValue = 100.0f;
-							ImGui::EndPopup();
-						}
-
-						if (ImGui::BeginPopup("RotationSnapLevel"))
-						{
-							if (ImGui::MenuItem("1" CHARACTER_SYMBOL_DEGREE)) m_RotationSnap = 1.0f;
-							if (ImGui::MenuItem("5" CHARACTER_SYMBOL_DEGREE)) m_RotationSnap = 5.0f;
-							if (ImGui::MenuItem("10" CHARACTER_SYMBOL_DEGREE)) m_RotationSnap = 10.0f;
-							if (ImGui::MenuItem("15" CHARACTER_SYMBOL_DEGREE)) m_RotationSnap = 15.0f;
-							if (ImGui::MenuItem("30" CHARACTER_SYMBOL_DEGREE)) m_RotationSnap = 30.0f;
-							if (ImGui::MenuItem("45" CHARACTER_SYMBOL_DEGREE)) m_RotationSnap = 45.0f;
-							if (ImGui::MenuItem("60" CHARACTER_SYMBOL_DEGREE)) m_RotationSnap = 60.0f;
-							if (ImGui::MenuItem("90" CHARACTER_SYMBOL_DEGREE)) m_RotationSnap = 90.0f;
-							if (ImGui::MenuItem("120" CHARACTER_SYMBOL_DEGREE)) m_RotationSnap = 120.0f;
-							if (ImGui::MenuItem("180" CHARACTER_SYMBOL_DEGREE)) m_RotationSnap = 180.0f;
-							ImGui::Separator();
-							if (ImGui::MenuItem(CHARACTER_SYMBOL_PI)) m_RotationSnap = 3.14159265358979323846;
-							
-							ImGui::EndPopup();
-						}
-
-						if (ImGui::BeginPopup("ScaleSnapLevel"))
-						{
-							if (ImGui::MenuItem("0.1")) m_ScaleSnapValue = 0.1f;
-							if (ImGui::MenuItem("0.25")) m_ScaleSnapValue = 0.25f;
-							if (ImGui::MenuItem("0.5")) m_ScaleSnapValue = 0.5f;
-							if (ImGui::MenuItem("1")) m_ScaleSnapValue = 1.0f;
-							if (ImGui::MenuItem("5")) m_ScaleSnapValue = 5.0f;
-							if (ImGui::MenuItem("10")) m_ScaleSnapValue = 10.0f;
-							ImGui::EndPopup();
-						}
-					}
+					Utils::DrawGizmoSnappingMenu("##ScaleSnapMenu", CHARACTER_ICON_SNAP_SCALING, scaleSnapValues, IM_ARRAYSIZE(scaleSnapValues), m_ScaleSnap, m_ScaleSnapValue);
 
 					ImGui::SameLine();
 
@@ -2122,33 +2129,36 @@ namespace Dymatic {
 						const char* gizmoOperationText;
 						switch (m_GizmoOperation)
 						{
-						case -1: gizmoOperationText = FA_ARROW_POINTER " Gizmo Operation"; break;
-						case ImGuizmo::OPERATION::TRANSLATE: gizmoOperationText = FA_UP_DOWN_LEFT_RIGHT " Gizmo Operation"; break;
-						case ImGuizmo::OPERATION::ROTATE: gizmoOperationText = FA_ROTATE " Gizmo Operation"; break;
-						case ImGuizmo::OPERATION::SCALE: gizmoOperationText = FA_EXPAND " Gizmo Operation"; break;
+						case GizmoOperation::None: gizmoOperationText = FA_ARROW_POINTER " Gizmo Operation"; break;
+						case GizmoOperation::Translate: gizmoOperationText = FA_UP_DOWN_LEFT_RIGHT " Gizmo Operation"; break;
+						case GizmoOperation::Rotate: gizmoOperationText = FA_ROTATE " Gizmo Operation"; break;
+						case GizmoOperation::Scale: gizmoOperationText = FA_EXPAND " Gizmo Operation"; break;
+						case GizmoOperation::Universal: gizmoOperationText = FA_GROUP_ARROWS_ROTATE " Gizmo Operation"; break;
 						default: gizmoOperationText = "Gizmo Operation"; break;
 						}
 
 						if (ImGui::BeginMenu(gizmoOperationText))
 						{
-							if (ImGui::MenuItem(FA_ARROW_POINTER " None", nullptr, m_GizmoOperation == -1))
-								m_GizmoOperation = -1;
-							if (ImGui::MenuItem(FA_UP_DOWN_LEFT_RIGHT " Translate", nullptr, m_GizmoOperation == ImGuizmo::OPERATION::TRANSLATE))
-								m_GizmoOperation = ImGuizmo::OPERATION::TRANSLATE;
-							if (ImGui::MenuItem(FA_ROTATE " Rotate", nullptr, m_GizmoOperation == ImGuizmo::OPERATION::ROTATE))
-								m_GizmoOperation = ImGuizmo::OPERATION::ROTATE;
-							if (ImGui::MenuItem(FA_EXPAND " Scale", nullptr, m_GizmoOperation == ImGuizmo::OPERATION::SCALE))
-								m_GizmoOperation = ImGuizmo::OPERATION::SCALE;
+							if (ImGui::MenuItem(FA_ARROW_POINTER " None", nullptr, IsGizmoEnabled(GizmoOperation::None)))
+								SetGizmoOperation(GizmoOperation::None);
+							if (ImGui::MenuItem(FA_UP_DOWN_LEFT_RIGHT " Translate", nullptr, IsGizmoEnabled(GizmoOperation::Translate)))
+								SetGizmoOperation(GizmoOperation::Translate);
+							if (ImGui::MenuItem(FA_ROTATE " Rotate", nullptr, IsGizmoEnabled(GizmoOperation::Rotate)))
+								SetGizmoOperation(GizmoOperation::Rotate);
+							if (ImGui::MenuItem(FA_EXPAND " Scale", nullptr, IsGizmoEnabled(GizmoOperation::Scale)))
+								SetGizmoOperation(GizmoOperation::Scale);
+							if (ImGui::MenuItem(FA_GROUP_ARROWS_ROTATE " Universal", nullptr, IsGizmoEnabled(GizmoOperation::Universal)))
+								SetGizmoOperation(GizmoOperation::Universal);
 
 							ImGui::EndMenu();
 						}
 
-						if (ImGui::BeginMenu(m_GizmoMode == ImGuizmo::MODE::LOCAL ? CHARACTER_ICON_CUBE " Gizmo Type" : FA_GLOBE " World"))
+						if (ImGui::BeginMenu(m_GizmoMode == GizmoMode::Local ? CHARACTER_ICON_CUBE " Gizmo Type" : FA_GLOBE " World"))
 						{
-							if (ImGui::MenuItem(CHARACTER_ICON_CUBE " Local", nullptr, m_GizmoMode == ImGuizmo::MODE::LOCAL))
-								m_GizmoMode = ImGuizmo::MODE::LOCAL;
-							if (ImGui::MenuItem(FA_GLOBE " World", nullptr, m_GizmoMode == ImGuizmo::MODE::WORLD))
-								m_GizmoMode = ImGuizmo::MODE::WORLD;
+							if (ImGui::MenuItem(CHARACTER_ICON_CUBE " Local", nullptr, m_GizmoMode == GizmoMode::Local))
+								m_GizmoMode = GizmoMode::Local;
+							if (ImGui::MenuItem(FA_GLOBE " World", nullptr, m_GizmoMode == GizmoMode::World))
+								m_GizmoMode = GizmoMode::World;
 
 							ImGui::EndMenu();
 						}
@@ -2392,7 +2402,7 @@ namespace Dymatic {
 			{
 				Entity activeEntity = m_SceneHierarchyPanel.GetActiveEntity();
 
-				if (activeEntity && !m_SceneHierarchyPanel.IsEntityLocked(activeEntity) && m_GizmoOperation != -1 && activeEntity.HasComponent<TransformComponent>())
+				if (activeEntity && !m_SceneHierarchyPanel.IsEntityLocked(activeEntity) && m_GizmoOperation != GizmoOperation::None && activeEntity.HasComponent<TransformComponent>())
 				{
 					ImGuizmo::SetOrthographic(false);
 					ImGuizmo::SetDrawlist();
@@ -2411,7 +2421,7 @@ namespace Dymatic {
 					}
 					else
 					{
-						//Editor camera
+						// Editor camera
 						cameraProjection = &m_EditorCamera.GetProjection();
 						cameraView = &m_EditorCamera.GetViewMatrix();
 					}
@@ -2420,14 +2430,14 @@ namespace Dymatic {
 					TransformComponent& activeTransformComponent = activeEntity.GetComponent<TransformComponent>();
 					glm::mat4 modifiedTransformMatrix = m_ActiveScene->GetWorldTransformMatrix(activeEntity);
 
-					//Snapping
-					bool snap = m_GizmoOperation == ImGuizmo::OPERATION::TRANSLATE ? m_TranslationSnap : m_GizmoOperation == ImGuizmo::OPERATION::ROTATE ? m_RotationSnap : m_ScaleSnap;
-					float snapValue = m_GizmoOperation == ImGuizmo::OPERATION::TRANSLATE ? m_TranslationSnapValue : m_GizmoOperation == ImGuizmo::OPERATION::ROTATE ? m_RotationSnapValue : m_ScaleSnapValue;
+					// Snapping
+					const bool snap = IsGizmoEnabled(GizmoOperation::Translate) ? m_TranslationSnap : IsGizmoEnabled(GizmoOperation::Rotate) ? m_RotationSnap : m_ScaleSnap;
+					const float snapValue = IsGizmoEnabled(GizmoOperation::Translate) ? m_TranslationSnapValue : IsGizmoEnabled(GizmoOperation::Rotate) ? m_RotationSnapValue : m_ScaleSnapValue;
 
-					float snapValues[3] = { snapValue, snapValue, snapValue };
+					const float snapValues[3] = { snapValue, snapValue, snapValue };
 
 					ImGuizmo::Manipulate(glm::value_ptr(*cameraView), glm::value_ptr(*cameraProjection),
-						(ImGuizmo::OPERATION)m_GizmoOperation, (ImGuizmo::MODE)m_GizmoMode, glm::value_ptr(modifiedTransformMatrix),
+						Utils::GetImGuizmoOperation(m_GizmoOperation), Utils::GetImGuizmoMode(m_GizmoMode), glm::value_ptr(modifiedTransformMatrix),
 						nullptr, ((Input::IsKeyPressed(Key::LeftControl) ? !snap : snap) ? snapValues : nullptr));
 
 					if (ImGuizmo::IsUsing())
@@ -2844,10 +2854,10 @@ namespace Dymatic {
 			case Preferences::Keymap::SceneStopBind: { if (m_SceneState != SceneState::Edit) OnSceneStop(); } break;
 			case Preferences::Keymap::FocusBind: if (ViewportKeyAllowed() && !ImGuizmo::IsUsing()) OnFocus(); break;
 			case Preferences::Keymap::ReloadAssembly: { if (m_SceneState == SceneState::Edit) ScriptEngine::ReloadAssembly(); } break;
-			case Preferences::Keymap::GizmoNoneBind: { if (ViewportKeyAllowed() && !ImGuizmo::IsUsing()) { m_GizmoOperation = -1; } } break;
-			case Preferences::Keymap::GizmoTranslateBind: { if (ViewportKeyAllowed() && !ImGuizmo::IsUsing()) { m_GizmoOperation = ImGuizmo::OPERATION::TRANSLATE; } } break;
-			case Preferences::Keymap::GizmoRotateBind: { if (ViewportKeyAllowed() && !ImGuizmo::IsUsing()) { m_GizmoOperation = ImGuizmo::OPERATION::ROTATE; } } break;
-			case Preferences::Keymap::GizmoScaleBind: { if (ViewportKeyAllowed() && !ImGuizmo::IsUsing()) { m_GizmoOperation = ImGuizmo::OPERATION::SCALE; } } break;
+			case Preferences::Keymap::GizmoNoneBind: { if (ViewportKeyAllowed() && !ImGuizmo::IsUsing()) { SetGizmoOperation(GizmoOperation::None); } } break;
+			case Preferences::Keymap::GizmoTranslateBind: { if (ViewportKeyAllowed() && !ImGuizmo::IsUsing()) { SetGizmoOperation(GizmoOperation::Translate); } } break;
+			case Preferences::Keymap::GizmoRotateBind: { if (ViewportKeyAllowed() && !ImGuizmo::IsUsing()) { SetGizmoOperation(GizmoOperation::Rotate); } } break;
+			case Preferences::Keymap::GizmoScaleBind: { if (ViewportKeyAllowed() && !ImGuizmo::IsUsing()) { SetGizmoOperation(GizmoOperation::Scale); } } break;
 			case Preferences::Keymap::CreateBind: { if (ViewportKeyAllowed()) { m_SceneHierarchyPanel.ShowCreateMenu(); } } break;
 			case Preferences::Keymap::DuplicateBind: { if (ViewportKeyAllowed() && m_SceneHierarchyPanel.GetActiveEntity()) { m_SceneHierarchyPanel.DuplicateEntities(); } m_NodeEditorPannel.DuplicateNodes(); } break;
 			case Preferences::Keymap::DeleteBind: { if (ViewportKeyAllowed() && m_SceneHierarchyPanel.GetActiveEntity()) { m_SceneHierarchyPanel.DeleteEntities(); } } break;
@@ -3352,6 +3362,23 @@ namespace Dymatic {
 		SceneRendererContext::RendererVisualizationMode visualizationMode = m_SceneRendererContext->VisualizationMode;
 		m_SceneRendererContext->VisualizationMode = m_PreviousVisualizationMode;
 		m_PreviousVisualizationMode = visualizationMode;
+	}
+
+	void EditorLayer::SetGizmoOperation(const GizmoOperation operation)
+	{
+		m_GizmoOperation = ImGui::GetIO().KeyShift ? (m_GizmoOperation ^ operation) : operation;
+	}
+
+	bool EditorLayer::IsGizmoEnabled(const GizmoOperation operation)
+	{
+		switch (operation)
+		{
+		case GizmoOperation::None:		return m_GizmoOperation == GizmoOperation::None;
+		case GizmoOperation::Translate:	return (bool)(m_GizmoOperation & GizmoOperation::Translate);
+		case GizmoOperation::Rotate:	return (bool)(m_GizmoOperation & GizmoOperation::Rotate);
+		case GizmoOperation::Scale:		return (bool)(m_GizmoOperation & GizmoOperation::Scale);
+		case GizmoOperation::Universal:	return m_GizmoOperation == GizmoOperation::Universal;
+		}
 	}
 
 	void EditorLayer::OnScenePlay()
