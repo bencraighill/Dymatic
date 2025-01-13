@@ -1,0 +1,120 @@
+// Dymatic Indirect (VXGI) Lighting Shader Header
+
+#pragma once
+
+#include Ray.glslh
+#include TraceCone.glslh
+#include Sampling.glslh
+#include Random.glslh
+
+vec3 IndirectLight(uvec2 pixel, vec3 position, vec3 incomming, vec3 normal, float roughness, float specular);
+float GetMaterialVariance(float specularChance, float roughness);
+
+vec3 CalculateIndirectLighting(uvec2 pixel, vec3 fragmentPosition, vec3 viewDirection, vec3 normal, float roughness, float metallic)
+{
+#if USE_RANDOM_NOISE
+    InitializeRandomSeed(pixel.x + pixel.y * u_ScreenDimensions.x + u_Frame * (u_ScreenDimensions.x * u_ScreenDimensions.y));
+#endif
+    
+    return IndirectLight(pixel, fragmentPosition, viewDirection, normal, roughness, metallic) * u_GIBoost;
+}
+
+vec3 IndirectLight(uvec2 pixel, vec3 position, vec3 incomming, vec3 normal, float roughness, float metallic)
+{
+    // Convention to make roughness feel more linear perceptually
+    roughness *= roughness;
+    
+    vec3 irradiance = vec3(0.0);
+    float materialVariance = GetMaterialVariance(metallic, roughness);
+    uint samples = uint(mix(1.0, float(u_MaxSamples), materialVariance));
+
+#if !USE_RANDOM_NOISE
+    const bool taaEnabled = u_AntiAliasingMode == ANTI_ALIASING_MODE_TAA || u_AntiAliasingMode == ANTI_ALIASING_MODE_FSR;
+    uint noiseIndex = (u_IsTemporalAccumulation == 1 && taaEnabled) ? (u_Frame % u_TAASampleCount) * u_MaxSamples : 0u;
+#endif
+
+    for (uint i = 0; i < samples; i++)
+    {
+#if USE_RANDOM_NOISE
+
+        // Random noise is unstable but gives better coverage
+        float rnd0 = GetRandomFloat01();
+        float rnd1 = GetRandomFloat01();
+        float rnd2 = GetRandomFloat01();
+
+#else
+
+        float rnd0 = InterleavedGradientNoise(vec2(pixel), noiseIndex + 0);
+        float rnd1 = InterleavedGradientNoise(vec2(pixel), noiseIndex + 1);
+        float rnd2 = InterleavedGradientNoise(vec2(pixel), noiseIndex + 2);
+        noiseIndex++;
+
+#endif
+        
+        Ray coneRay;
+        coneRay.Origin = position;
+        coneRay.Direction;
+
+        float coneAngle;
+        vec3 diffuseDir = CosineSampleHemisphere(normal, rnd0, rnd1);
+
+        if (metallic > rnd2)
+        {
+            vec3 reflectionDir = reflect(incomming, normal);
+            reflectionDir = normalize(mix(reflectionDir, diffuseDir, roughness));
+            coneRay.Direction = reflectionDir;
+            
+            coneAngle = mix(u_MinConeAngle, u_MaxConeAngle, roughness);
+        }
+        else
+        {
+            coneRay.Direction = diffuseDir;
+            coneAngle = u_MaxConeAngle;
+        }
+
+        vec4 coneTrace = TraceCone(coneRay, normal, coneAngle, u_StepMultiplier, u_NormalRayOffset, u_AlphaThreashold);
+        // Warning: Max/Min cone angles has been disabled! (i.e. we don't use the above calculated cone angle)
+        //vec4 coneTrace = TraceCone(u_VoxelGridSampler, coneRay, normal, 0.005, 0.6, u_NormalRayOffset, u_AlphaThreashold);
+
+        if (u_UsingSkyLight == 1)
+            coneTrace += (1.0 - coneTrace.a) * (texture(u_EnvironmentMap, coneRay.Direction) * u_SkyLightIntensity * u_GISkyBoxBoost);
+        
+        irradiance += coneTrace.rgb;
+    }
+
+    irradiance /= float(samples);
+
+    // Calculate and apply a distance-based falloff
+    const vec3 gridMin = u_GridMin[0].xyz;
+    const vec3 gridMax = u_GridMax[0].xyz;
+
+    if (u_ContributionFalloff > 0.0 && all(lessThan(position, gridMax)) && all(greaterThan(position, gridMin)))
+    {
+        const vec3 falloffMax = gridMax - vec3(u_ContributionFalloff);
+        const vec3 falloffMin = gridMin + vec3(u_ContributionFalloff);
+        const vec3 falloffBegin = clamp(position, falloffMin, falloffMax);
+        const float distance = length(falloffBegin - position);
+
+        float falloff;
+        if (distance >= u_ContributionFalloff)
+        {
+            falloff = 0.0;
+        }
+        else
+        {
+            const float t = 1.0 - distance / u_ContributionFalloff;
+            falloff = t * t;
+        }
+        
+        irradiance *= falloff;
+    }
+
+    return irradiance;
+}
+
+float GetMaterialVariance(float specularChance, float roughness)
+{
+    float diffuseChance = 1.0 - specularChance;
+    float perceivedFinalRoughness = 1.0 - (specularChance * (1.0 - roughness));
+    return mix(perceivedFinalRoughness, 1.0, diffuseChance);
+}

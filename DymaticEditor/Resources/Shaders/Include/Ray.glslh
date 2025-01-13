@@ -1,0 +1,14 @@
+// Generic Ray Structure
+
+#pragma once
+
+struct Ray
+{
+    vec3 Origin;
+    vec3 Direction;
+
+#ifdef ENABLE_RAY_INVERSE_DIRECTION
+    // Caching inverse direction can be a useful performance optimization in situations where division is common
+    vec3 InverseDirection;
+#endif
+};

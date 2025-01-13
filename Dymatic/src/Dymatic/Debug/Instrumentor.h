@@ -231,7 +231,10 @@ namespace Dymatic {
 	}
 }
 
-#define DY_PROFILE 1
+#ifndef DY_DIST
+	#define DY_PROFILE 1
+#endif
+
 #if DY_PROFILE
 // Resolve which function signature macro will be used. Note that this only
 // is resolved when the (pre)compiler starts, so the syntax highlighting

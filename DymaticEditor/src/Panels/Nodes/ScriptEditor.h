@@ -7,11 +7,11 @@ namespace Dymatic {
 
 	class ScriptEditorInternal;
 
-	class ScriptEditorPannel
+	class ScriptEditorPanel
 	{
 	public:
-		ScriptEditorPannel();
-		~ScriptEditorPannel();
+		ScriptEditorPanel();
+		~ScriptEditorPanel();
 	
 		void OnEvent(Event& e);
 	

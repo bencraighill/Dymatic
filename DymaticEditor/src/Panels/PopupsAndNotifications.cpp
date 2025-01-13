@@ -1,5 +1,10 @@
 #include "PopupsAndNotifications.h"
 
+#include "EditorResources.h"
+
+#include "Fonts.h"
+#include "TextSymbols.h"
+
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include <imgui/imgui.h>
 #include <imgui/imgui_internal.h>
@@ -15,14 +20,10 @@
 #include <ctime>
 #include <sstream>
 
-#include "TextSymbols.h"
-
 namespace Dymatic {
 
 	static std::vector<Popup> s_PopupList;
 	static std::vector<Notification> s_NotificationList;
-	static Ref<Texture2D> s_DymaticLogo;
-	static Ref<Texture2D> s_NotificationIcon;
 
 	void Popup::Create(const std::string& title, const std::string& message, std::vector<ButtonData> buttons, Ref<Texture2D> icon, bool loading, std::function<void()> onRender, glm::vec2 onRenderSize)
 	{
@@ -189,18 +190,16 @@ namespace Dymatic {
 
 	void Notification::Init()
 	{
-		s_DymaticLogo = Texture2D::Create("Resources/Icons/Branding/DymaticLogo.png");
-		s_NotificationIcon = Texture2D::Create("Resources/Icons/General/NotificationIcon.png");
 	}
 
-	void Notification::Create(const std::string& title, const std::string& message, const std::vector<ButtonData>& buttons, float displayTime, bool loading)
+	void Notification::Create(const std::string& title, const std::string& message, const std::vector<ButtonData>& buttons, float displayTime, bool loading, Ref<Texture2D> icon, glm::vec3 taskbarColor)
 	{
-		s_NotificationList.emplace_back(title, message, buttons,  displayTime, loading);
-		Taskbar::SetNotificationIcon(s_NotificationIcon, glm::vec3(0.32f, 0.66f, 0.89f));
+		s_NotificationList.emplace_back(title, message, buttons,  displayTime, loading, icon);
+		Taskbar::SetNotificationIcon(EditorResources::NotificationIcon, taskbarColor);
 	}
 
-	Notification::Notification(const std::string& title, const std::string& message, const std::vector<ButtonData>& buttons, float displayTime, bool loading)
-		: Title(title), Message(message), Buttons(buttons), DisplayTime(displayTime), Loading(loading)
+	Notification::Notification(const std::string& title, const std::string& message, const std::vector<ButtonData>& buttons, float displayTime, bool loading, Ref<Texture2D> icon)
+		: Title(title), Message(message), Buttons(buttons), DisplayTime(displayTime), Loading(loading), Icon(icon)
 	{
 		// Get Time String
 		auto t = std::time(nullptr);
@@ -231,6 +230,8 @@ namespace Dymatic {
 		for (int i = s_NotificationList.size() - 1; i >= 0; i--)
 		{
 			auto& notification = s_NotificationList[i];
+
+			Ref<Texture2D> icon = notification.Icon ? notification.Icon : EditorResources::DymaticLogo;
 
 			const auto titleSize = ImGui::CalcTextSize(notification.Title.c_str());
 			const auto messageSize = ImGui::CalcTextSize(notification.Message.c_str());
@@ -283,15 +284,17 @@ namespace Dymatic {
 			//Drawing Elements
 			{
 				ImGui::GetForegroundDrawList()->AddRectFilled(WindowPosMin, WindowPosMax, ImGui::ColorConvertFloat4ToU32(popupBgCol), 5.0f);
-				ImGui::GetForegroundDrawList()->AddRect(WindowPosMin, WindowPosMax, ImGui::ColorConvertFloat4ToU32(borderCol), 5.0f, 15, 3.0f);
+				ImGui::GetForegroundDrawList()->AddRect(WindowPosMin, WindowPosMax, ImGui::ColorConvertFloat4ToU32(borderCol), 5.0f, ImDrawFlags_None, 3.0f);
 				auto imageAndCirclePos = ImVec2((WindowPosMin.x + 50.0f), ((WindowPosMin.y + 30.0f) + (WindowPosMax.y - 30.0f)) / 2.0f);
 				float imageWidth = 30.0f;
-				ImGui::GetForegroundDrawList()->AddImage(reinterpret_cast<void*>(s_DymaticLogo->GetRendererID()), ImVec2(imageAndCirclePos.x - imageWidth, imageAndCirclePos.y - imageWidth), ImVec2(imageAndCirclePos.x + imageWidth, imageAndCirclePos.y + imageWidth), ImVec2{ 0, 1 }, ImVec2{ 1, 0 }, ImGui::ColorConvertFloat4ToU32(textCol));
+				ImGui::GetForegroundDrawList()->AddImage((ImTextureID)icon->GetRendererID(), ImVec2(imageAndCirclePos.x - imageWidth, imageAndCirclePos.y - imageWidth), ImVec2(imageAndCirclePos.x + imageWidth, imageAndCirclePos.y + imageWidth), ImVec2{ 0, 1 }, ImVec2{ 1, 0 }, ImGui::ColorConvertFloat4ToU32(textCol));
 				float circleRadius = 40.0f * (((std::sin(ImGui::GetTime() * 5.0f) + 1.0f) / 2.0f) * 0.25f + 0.8f);
 				ImGui::GetForegroundDrawList()->AddCircle(imageAndCirclePos, circleRadius, ImGui::ColorConvertFloat4ToU32(textCol), (int)circleRadius - 1);
 
 				auto textPos = ImVec2(WindowPosMin.x + 100.0f, WindowPosMin.y + 10.0f);
-				ImGui::GetForegroundDrawList()->AddText(ImGui::GetIO().Fonts->Fonts[0], 18, textPos, ImGui::ColorConvertFloat4ToU32(textCol), notification.Title.c_str());
+				UI::PushFont(FontType::Bold);
+				ImGui::GetForegroundDrawList()->AddText(textPos, ImGui::ColorConvertFloat4ToU32(textCol), notification.Title.c_str());
+				UI::PopFont();
 				ImGui::GetForegroundDrawList()->AddText(ImVec2(textPos.x, textPos.y + 22.0f), ImGui::ColorConvertFloat4ToU32(textCol), notification.Message.c_str());
 
 				ImGuiContext& g = *GImGui;
@@ -326,7 +329,9 @@ namespace Dymatic {
 					if (pressed && visible)
 					{
 						notification._fadeOut = true;
-						button.OnPressedFunction();
+
+						if (button.OnPressedFunction)
+							button.OnPressedFunction();
 					}
 				}
 			}
@@ -349,7 +354,7 @@ namespace Dymatic {
 		}
 	}
 
-	void NotificationsPannel::OnImGuiRender(Timestep ts)
+	void NotificationsPanel::OnImGuiRender(Timestep ts)
 	{
 		auto& notificationsVisible = Preferences::GetEditorWindowVisible(Preferences::EditorWindow::Notifications);
 		if (!notificationsVisible)
@@ -358,11 +363,14 @@ namespace Dymatic {
 		auto& style = ImGui::GetStyle();
 
 		ImGui::Begin(CHARACTER_ICON_NOTIFICATIONS " Notifications", &notificationsVisible);
-		ImGui::Text("Number: %d", s_NotificationList.size());
+		ImGui::Text(FA_ENVELOPE " Number: %d", s_NotificationList.size());
 
-		ImGui::SameLine(ImGui::GetContentRegionAvailWidth() - ImGui::CalcTextSize("Clear").x - style.FramePadding.x * 2.0f);
-		if (ImGui::Button("Clear"))
+		const char* text = FA_TRASH " Clear";
+		ImGui::SameLine(ImGui::GetContentRegionAvailWidth() - ImGui::CalcTextSize(text).x - style.FramePadding.x * 2.0f);
+		if (ImGui::Button(text))
 			Notification::Clear();
+
+		ImGui::Separator();
 
 		if (!s_NotificationList.empty())
 		{
@@ -378,12 +386,14 @@ namespace Dymatic {
 					ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2{ 4, 4 });
 					float lineHeight = GImGui->Font->FontSize + GImGui->Style.FramePadding.y * 2.0f;
 					ImGui::Spacing();
-					bool open = ImGui::TreeNodeEx("##NotificationTreeNode", treeNodeFlags, (notification.Timestamp + "  -  " + notification.Title).c_str());
+					bool open = ImGui::TreeNodeEx("##NotificationTreeNode", treeNodeFlags, (FA_CIRCLE_DOT + notification.Timestamp + "  -  " + notification.Title).c_str());
 					ImGui::PopStyleVar();
 
-					ImGui::SameLine(contentRegionAvailable.x - lineHeight * 0.5f);
-					if (ImGui::Button("X", ImVec2{ lineHeight, lineHeight }))
+					const float removeButtonWidth = ImGui::CalcTextSize(FA_CIRCLE_XMARK).x;
+					ImGui::SameLine(contentRegionAvailable.x - removeButtonWidth);
+					if (ImGui::Button(FA_CIRCLE_XMARK, ImVec2(removeButtonWidth + style.FramePadding.x * 2.0f, lineHeight)))
 						notification._fadeOut = true;
+
 					if (open)
 					{
 						ImGui::Dummy(ImVec2{ 0, 5 });

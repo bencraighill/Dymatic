@@ -29,9 +29,12 @@ project "DymaticEditor"
 		"%{IncludeDir.ImGuizmo}",
 		"%{IncludeDir.ImGuiNode}",
 
+		"%{wks.location}/Dymatic/vendor/imgui",
+
 		"%{wks.location}/DymaticEditor/vendor/git2/include",
 		"%{wks.location}/DymaticEditor/vendor/pybind11/include",
-		"%{wks.location}/DymaticEditor/vendor/Python/include"
+		"%{wks.location}/DymaticEditor/vendor/Python/include",
+		"%{wks.location}/DymaticEditor/vendor/json/include"
 	}
 
 	links
@@ -57,12 +60,19 @@ project "DymaticEditor"
 		postbuildcommands
 		{
 			"{COPYDIR} \"%{LibraryDir.VulkanSDK_DebugDLL}\" \"%{cfg.targetdir}\"",
-			"{COPYDIR} \"%{LibraryDir.PhysX_DebugDLL}\" \"%{cfg.targetdir}\"",
 			"{COPYDIR} \"%{LibraryDir.assimp_DebugDLL}\" \"%{cfg.targetdir}\"",
 			"{COPYDIR} \"%{LibraryDir.irrKlang_DLL}\" \"%{cfg.targetdir}\"",
+			"{COPYDIR} \"%{LibraryDir.OpenAL_DebugDLL}\" \"%{cfg.targetdir}\"",
+			"{COPYDIR} \"%{LibraryDir.ffmpeg_DLL}\" \"%{cfg.targetdir}\"",
+			"{COPYDIR} \"%{LibraryDir.GameNetworkingSockets_DebugDLL}\" \"%{cfg.targetdir}\"",
 
 			"{COPYDIR} \"%{wks.location}/DymaticEditor/vendor/git2/Bin/git2.dll\" \"%{cfg.targetdir}\"",
 			"{COPYDIR} \"%{wks.location}/DymaticEditor/vendor/Python/bin/\" \"%{cfg.targetdir}\""
+		}
+
+		buildoptions
+		{
+			"/bigobj"
 		}
 
 	filter "configurations:Release"
@@ -72,9 +82,11 @@ project "DymaticEditor"
 
 		postbuildcommands
 		{
-			"{COPYDIR} \"%{LibraryDir.PhysX_ReleaseDLL}\" \"%{cfg.targetdir}\"",
 			"{COPYDIR} \"%{LibraryDir.assimp_ReleaseDLL}\" \"%{cfg.targetdir}\"",
 			"{COPYDIR} \"%{LibraryDir.irrKlang_DLL}\" \"%{cfg.targetdir}\"",
+			"{COPYDIR} \"%{LibraryDir.OpenAL_ReleaseDLL}\" \"%{cfg.targetdir}\"",
+			"{COPYDIR} \"%{LibraryDir.ffmpeg_DLL}\" \"%{cfg.targetdir}\"",
+			"{COPYDIR} \"%{LibraryDir.GameNetworkingSockets_ReleaseDLL}\" \"%{cfg.targetdir}\"",
 
 			"{COPYDIR} \"%{wks.location}/DymaticEditor/vendor/git2/Bin/git2.dll\" \"%{cfg.targetdir}\"",
 			"{COPYDIR} \"%{wks.location}/DymaticEditor/vendor/Python/bin/\" \"%{cfg.targetdir}\""
@@ -87,9 +99,11 @@ project "DymaticEditor"
 
 		postbuildcommands
 		{
-			"{COPYDIR} \"%{LibraryDir.PhysX_ReleaseDLL}\" \"%{cfg.targetdir}\"",
 			"{COPYDIR} \"%{LibraryDir.assimp_ReleaseDLL}\" \"%{cfg.targetdir}\"",
 			"{COPYDIR} \"%{LibraryDir.irrKlang_DLL}\" \"%{cfg.targetdir}\"",
+			"{COPYDIR} \"%{LibraryDir.OpenAL_ReleaseDLL}\" \"%{cfg.targetdir}\"",
+			"{COPYDIR} \"%{LibraryDir.ffmpeg_DLL}\" \"%{cfg.targetdir}\"",
+			"{COPYDIR} \"%{LibraryDir.GameNetworkingSockets_ReleaseDLL}\" \"%{cfg.targetdir}\"",
 
 			"{COPYDIR} \"%{wks.location}/DymaticEditor/vendor/git2/Bin/git2.dll\" \"%{cfg.targetdir}\"",
 			"{COPYDIR} \"%{wks.location}/DymaticEditor/vendor/Python/bin/\" \"%{cfg.targetdir}\""

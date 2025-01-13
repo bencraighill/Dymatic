@@ -1,0 +1,30 @@
+// Blend Shape Offset Calculation Header
+
+#pragma once
+
+#include Buffers.glslh
+
+vec3 BlendShapeOffset(uint globalIndex)
+{
+    // Early exit if we are not using blend shapes
+    if (u_BlendShapeCount == 0)
+        return vec3(0.0);
+
+    vec3 blendShapeOffset = vec3(0.0);
+
+    
+    for (uint i = 0; i < u_BlendShapeCount; i++)
+    {
+        // Iterate over all blend shapes accessing the respective offset
+        uint blendShapeIndex = globalIndex + (u_BlendShapeVertexCount * i);
+
+        // Reconstruct the packed vector 3 and the blend shape weight packed into a vec4 array
+        blendShapeOffset += vec3(
+            u_BlendShapeComponents[blendShapeIndex * 3 + 0],
+            u_BlendShapeComponents[blendShapeIndex * 3 + 1],
+            u_BlendShapeComponents[blendShapeIndex * 3 + 2]
+        ) * u_BlendShapeWeights[i / 4][i % 4];
+    }
+
+    return blendShapeOffset;
+}

@@ -2,45 +2,101 @@
 #include "Dymatic.h"
 
 #include "Filesystem/FileManager.h"
+#include "Dymatic/Renderer/EditorCamera.h"
 
 namespace Dymatic {
 
 	class Preferences
 	{
 	public:
+		struct PythonPluginInformation
+		{
+		public:
+			PythonPluginInformation(const std::filesystem::path& pluginPath, bool enabled = true);
+
+		public:
+			struct PluginMetadata
+			{
+				std::string Name;
+				std::string Description;
+				Ref<Texture2D> Icon;
+				std::string Author;
+				std::string CompanyName;
+				std::string Version;
+				std::string Dependencies;
+				std::string BuildDate;
+				std::string EngineVersionRequirements;
+				std::string LegalCopyright;
+				std::string LegalTrademarks;
+				std::string License;
+			};
+
+		public:
+			std::filesystem::path PluginPath;
+			bool Enabled = true;
+			PluginMetadata Metadata;
+		};
+
+		struct ViewportBookmark
+		{
+			std::string Name;
+			EditorCamera::EditorCameraTransform Transform;
+		};
+
+		enum class BoneAttachmentEditMode
+		{
+			Hierarchy,
+			Component,
+		};
+
 		struct PreferencesData
 		{
 			PreferencesData() = default;
 
-			//--- Main Preferences ---//
+			// Main Preferences
+			bool AutosavePreferences = true;
+
+			bool ShowSplashStartup = true;
+			bool AdvancedEditMode = false;
+			BoneAttachmentEditMode BoneAttachmentEditMode = BoneAttachmentEditMode::Hierarchy;
+			bool LockViewportMouse = true;
+
+			int TooltipHoverDelay = 500;
 			int DoubleClickSpeed = 300;
 			bool EmulateNumpad = false;
 
-			bool AutosavePreferences = true;
 			bool AutosaveEnabled = true;
-
 			int AutosaveTime = 5;
-			int RecentFileCount = 10;
 
-			bool ShowSplashStartup = true;
+			int RecentFileCount = 10;
 
 			bool ManualDevenv = false;
 			std::string DevenvPath;
 			std::string GitExecutablePath;
 
-			std::vector<std::filesystem::path> PythonPluginPaths;
+			std::vector<PythonPluginInformation> PythonPlugins;
 
-			//--- Editor Preferences ---//
+			std::unordered_map<std::string, std::filesystem::path> DefaultApplications;
+
+			// Editor Preferences
 			float EditorVolume = 1.0f;
 			bool ShowTransformGizmo = true;
+			bool ShowGrid = true;
 
 			// Viewport
 			bool ShowViewportUI = true;
 			int FrameStepCount = 1;
 			bool ShowFPS = false;
-			glm::vec3 ViewportBookmarks[9];
+			bool ShowCameraPreview = true;
+			std::vector<ViewportBookmark> ViewportBookmarks;
 
 			// Content Browser
+			enum class ContentBrowserLayoutType
+			{
+				Grid,
+				List
+			};
+			ContentBrowserLayoutType LayoutType = ContentBrowserLayoutType::Grid;
 			bool DirectoriesFirst = true;
 			bool Ascending = true;
 			enum ContentBrowserSortType
@@ -54,7 +110,12 @@ namespace Dymatic {
 			bool Filters[FILE_TYPE_SIZE];
 			bool ShowThumbnails = true;
 			int ThumbnailSize = 128;
+			int ListItemSpacing = 0;
 
+			// Log
+			bool LogClearOnPlay = true;
+			bool LogScrollToBottom = true;
+			bool LogFilters[6]{true};
 		};
 
 		enum EditorWindow
@@ -66,6 +127,7 @@ namespace Dymatic {
 			Info,
 			Profiler,
 			ScriptEditor,
+			SceneSettings,
 			SceneHierarchy,
 			Properties,
 			Notifications,
@@ -73,8 +135,7 @@ namespace Dymatic {
 			TextEditor,
 			CurveEditor,
 			ImageEditor,
-			MaterialEditor,
-			Console,
+			Log,
 			AssetManager,
 			EDITOR_WINDOW_COUNT
 		};
@@ -86,8 +147,8 @@ namespace Dymatic {
 		static PreferencesData& GetData();
 
 		// Preferences
-		static bool LoadPreferences(const std::filesystem::path& filepath);
-		static void SavePreferences(const std::filesystem::path& filepath);
+		static bool LoadPreferences(const std::filesystem::path& filepath = "");
+		static void SavePreferences(const std::filesystem::path& filepath = "");
 
 		// Themes
 		static std::string GetThemeColorName(uint8_t idx);
@@ -145,6 +206,7 @@ namespace Dymatic {
 				SceneStartBind,
 				SceneSimulateBind,
 				SceneStopBind,
+				FocusBind,
 				ReloadAssembly,
 				GizmoNoneBind,
 				GizmoTranslateBind,
@@ -153,6 +215,8 @@ namespace Dymatic {
 				CreateBind,
 				DuplicateBind,
 				DeleteBind,
+				UndoBind,
+				RedoBind,
 				VisualizationRenderedBind,
 				VisualizationWireframeBind,
 				VisualizationLightingOnlyBind,

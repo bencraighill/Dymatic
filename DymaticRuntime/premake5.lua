@@ -44,9 +44,10 @@ project "DymaticRuntime"
 		postbuildcommands
 		{
 			"{COPYDIR} \"%{LibraryDir.VulkanSDK_DebugDLL}\" \"%{cfg.targetdir}\"",
-			"{COPYDIR} \"%{LibraryDir.PhysX_DebugDLL}\" \"%{cfg.targetdir}\"",
 			"{COPYDIR} \"%{LibraryDir.assimp_DebugDLL}\" \"%{cfg.targetdir}\"",
-			"{COPYDIR} \"%{LibraryDir.irrKlang_DLL}\" \"%{cfg.targetdir}\""
+			"{COPYDIR} \"%{LibraryDir.irrKlang_DLL}\" \"%{cfg.targetdir}\"",
+			"{COPYDIR} \"%{LibraryDir.ffmpeg_DLL}\" \"%{cfg.targetdir}\"",
+			"{COPYDIR} \"%{LibraryDir.GameNetworkingSockets_DebugDLL}\" \"%{cfg.targetdir}\""
 		}
 
 	filter "configurations:Release"
@@ -56,9 +57,10 @@ project "DymaticRuntime"
 
 		postbuildcommands
 		{
-			"{COPYDIR} \"%{LibraryDir.PhysX_ReleaseDLL}\" \"%{cfg.targetdir}\"",
 			"{COPYDIR} \"%{LibraryDir.assimp_ReleaseDLL}\" \"%{cfg.targetdir}\"",
-			"{COPYDIR} \"%{LibraryDir.irrKlang_DLL}\" \"%{cfg.targetdir}\""
+			"{COPYDIR} \"%{LibraryDir.irrKlang_DLL}\" \"%{cfg.targetdir}\"",
+			"{COPYDIR} \"%{LibraryDir.ffmpeg_DLL}\" \"%{cfg.targetdir}\"",
+			"{COPYDIR} \"%{LibraryDir.GameNetworkingSockets_ReleaseDLL}\" \"%{cfg.targetdir}\""
 		}
 
 	filter "configurations:Dist"
@@ -68,7 +70,8 @@ project "DymaticRuntime"
 
 		postbuildcommands
 		{
-			"{COPYDIR} \"%{LibraryDir.PhysX_ReleaseDLL}\" \"%{cfg.targetdir}\"",
 			"{COPYDIR} \"%{LibraryDir.assimp_ReleaseDLL}\" \"%{cfg.targetdir}\"",
-			"{COPYDIR} \"%{LibraryDir.irrKlang_DLL}\" \"%{cfg.targetdir}\""
+			"{COPYDIR} \"%{LibraryDir.irrKlang_DLL}\" \"%{cfg.targetdir}\"",
+			"{COPYDIR} \"%{LibraryDir.ffmpeg_DLL}\" \"%{cfg.targetdir}\"",
+			"{COPYDIR} \"%{LibraryDir.GameNetworkingSockets_ReleaseDLL}\" \"%{cfg.targetdir}\""
 		}

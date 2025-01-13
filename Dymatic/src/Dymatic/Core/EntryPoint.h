@@ -23,4 +23,11 @@ int main(int argc, char** argv)
 	DY_PROFILE_END_SESSION();
 }
 
+#if defined(_WIN32) && defined(DY_DIST)
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
+{
+	return main(__argc, __argv);
+}
+#endif
+
 #endif

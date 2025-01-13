@@ -108,6 +108,13 @@ int main(int argc, char* argv[])
 		delete[] logData;
 }
 
+#ifdef _WIN32
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
+{
+	return main(__argc, __argv);
+}
+#endif
+
 namespace Dymatic {
 
 	class CrashManagerLayer : public Layer
@@ -254,22 +261,6 @@ namespace Dymatic {
 
 		ImGui::Dummy({0.0f, 10.0f});
 
-		{
-			float cPos = ImGui::GetCursorScreenPos().y;
-			drawList->AddRectFilled(ImVec2(windowPos.x, cPos), ImVec2(windowPos.x + windowSize.x, cPos + 10.0f), ImGui::ColorConvertFloat4ToU32(ProgressBarColorA));
-			unsigned int total = 0;
-			float space = 0.0f;
-			while (space < windowSize.x)
-			{
-				float value = fmod(10.0f * ImGui::GetTime(), 10.0f);
-				ImVec2 points[4] = { ImVec2(windowPos.x + std::min(total * 10.0f + value, windowSize.x), cPos), ImVec2(windowPos.x + std::min(total * 10.0f + 5.0f + value, windowSize.x), cPos), ImVec2(windowPos.x + std::min(total * 10.0f + value, windowSize.x), cPos + 10.0f), ImVec2(windowPos.x + std::min(total * 10.0f - 5.0f + value, windowSize.x), cPos + 10.0f) };
-				drawList->AddConvexPolyFilled(points, 4, ImGui::ColorConvertFloat4ToU32(ProgressBarColorB));
-
-				space += 10.0f;
-				total++;
-			}
-		}
-
 		ImGui::Dummy({ 0.0f, 75.0f });
 
 		const float radius = 120.0f;
@@ -345,22 +336,6 @@ namespace Dymatic {
 
 		ImGui::Dummy({0.0f, 10.0f});
 
-		{
-			float cPos = ImGui::GetCursorScreenPos().y;
-			drawList->AddRectFilled(ImVec2(windowPos.x, cPos), ImVec2(windowPos.x + windowSize.x, cPos + 10.0f), ImGui::ColorConvertFloat4ToU32(ProgressBarColorA));
-			unsigned int total = 0;
-			float space = 0.0f;
-			while (space < windowSize.x)
-			{
-				float value = fmod(10.0f * ImGui::GetTime(), 10.0f);
-				ImVec2 points[4] = { ImVec2(windowPos.x + std::min(total * 10.0f + value, windowSize.x), cPos), ImVec2(windowPos.x + std::min(total * 10.0f + 5.0f + value, windowSize.x), cPos), ImVec2(windowPos.x + std::min(total * 10.0f + value, windowSize.x), cPos + 10.0f), ImVec2(windowPos.x + std::min(total * 10.0f - 5.0f + value, windowSize.x), cPos + 10.0f) };
-				drawList->AddConvexPolyFilled(points, 4, ImGui::ColorConvertFloat4ToU32(ProgressBarColorB));
-
-				space += 10.0f;
-				total++;
-			}
-		}
-
 		ImGui::Dummy({0.0f, 10.0f});
 
 		if (windowWidth > windowConstraintWidth)
@@ -411,6 +386,7 @@ namespace Dymatic {
 		spec.CommandLineArgs = args;
 		spec.ConsoleVisible = false;
 		spec.WindowStartHidden = true;
+		spec.EnableEngineSystems = false;
 		spec.ApplicationIcon = "Resources/Icons/Branding/DymaticLogoBorderSmall.png";
 
 		return new CrashManager(spec);

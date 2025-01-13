@@ -52,7 +52,7 @@ namespace Dymatic::String {
 		}
 	}
 
-	void ReplaceAll(std::string& str, const char& from, const char& to)
+	void ReplaceAll(std::string& str, const char from, const char to)
 	{
 		for (auto& character : str)
 			if (character == from)
@@ -131,4 +131,59 @@ namespace Dymatic::String {
 		delete[] buf;
 		return r;
 	}
+
+	std::string FormatBytes(size_t bytes)
+	{
+		if (bytes < 1024)
+			return fmt::format("{} B", bytes);
+		else if (bytes < 1024 * 1024)
+			return fmt::format("{:.2f} KB", bytes / 1024.0f);
+		else if (bytes < 1024 * 1024 * 1024)
+			return fmt::format("{:.2f} MB", bytes / (1024.0f * 1024.0f));
+		else if (bytes < 1024 * 1024 * 1024 * 1024)
+			return fmt::format("{:.2f} GB", bytes / (1024.0f * 1024.0f * 1024.0f));
+		else
+			return fmt::format("{:.2f} TB", bytes / (1024.0f * 1024.0f * 1024.0f * 1024.0f));
+	}
+
+	int ToInteger(const std::string& string)
+	{
+		try
+		{
+			size_t pos;
+			int value = std::stoi(string, &pos);
+
+			if (pos < string.length())
+				throw std::invalid_argument("Trailing characters after number: " + string.substr(pos));
+
+			return value;
+		}
+		catch (const std::invalid_argument& e)
+		{
+			DY_CORE_ERROR("Invalid argument: {}", e.what());
+		}
+		catch (const std::out_of_range& e)
+		{
+			DY_CORE_ERROR("Out of range: {}", e.what());
+		}
+
+		return 0;
+	}
+
+	bool TryGetHandleFromString(const char* string, const std::function<void(uint64_t)>& callback)
+	{
+		if (!string || *string == '\0')
+			return false;
+
+		char* end = nullptr;
+		errno = 0;
+		uint64_t result = std::strtoull(string, &end, 10);
+
+		if (end == string || *end != '\0' || errno == ERANGE || result > ULLONG_MAX)
+			return false;
+
+		callback(result);
+		return true;
+	}
+
 }

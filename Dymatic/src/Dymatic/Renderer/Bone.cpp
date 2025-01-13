@@ -1,16 +1,14 @@
 #include "dypch.h"
 #include "Dymatic/Renderer/Bone.h"
 
-#include "Dymatic/Renderer/AssimpGLMHelpers.h"
+#include "Dymatic/Renderer/Utils/AssimpGLMHelpers.h"
 
 namespace Dymatic {
 
 	Bone::Bone(const std::string& name, int ID, const aiNodeAnim* channel)
-		: m_Name(name), m_ID(ID), m_LocalTransform(1.0f)
+		: m_Name(name), m_ID(ID)
 	{
-		m_NumPositions = channel->mNumPositionKeys;
-
-		for (uint32_t positionIndex = 0; positionIndex < m_NumPositions; ++positionIndex)
+		for (uint32_t positionIndex = 0; positionIndex < channel->mNumPositionKeys; ++positionIndex)
 		{
 			aiVector3D aiPosition = channel->mPositionKeys[positionIndex].mValue;
 			float timeStamp = channel->mPositionKeys[positionIndex].mTime;
@@ -19,9 +17,8 @@ namespace Dymatic {
 			data.timeStamp = timeStamp;
 			m_Positions.push_back(data);
 		}
-
-		m_NumRotations = channel->mNumRotationKeys;
-		for (uint32_t rotationIndex = 0; rotationIndex < m_NumRotations; ++rotationIndex)
+		
+		for (uint32_t rotationIndex = 0; rotationIndex < channel->mNumRotationKeys; ++rotationIndex)
 		{
 			aiQuaternion aiOrientation = channel->mRotationKeys[rotationIndex].mValue;
 			float timeStamp = channel->mRotationKeys[rotationIndex].mTime;
@@ -30,9 +27,8 @@ namespace Dymatic {
 			data.timeStamp = timeStamp;
 			m_Rotations.push_back(data);
 		}
-
-		m_NumScalings = channel->mNumScalingKeys;
-		for (uint32_t keyIndex = 0; keyIndex < m_NumScalings; ++keyIndex)
+		
+		for (uint32_t keyIndex = 0; keyIndex < channel->mNumScalingKeys; ++keyIndex)
 		{
 			aiVector3D scale = channel->mScalingKeys[keyIndex].mValue;
 			float timeStamp = channel->mScalingKeys[keyIndex].mTime;
@@ -43,41 +39,48 @@ namespace Dymatic {
 		}
 	}
 
-	void Bone::Update(float animationTime)
+	Bone::Bone(const std::string& name, int ID, const std::vector<KeyPosition>& positions, const std::vector<KeyRotation>& rotations, const std::vector<KeyScale>& scales)
+		: m_Name(name), m_ID(ID), m_Positions(positions), m_Rotations(rotations), m_Scales(scales)
+	{}
+
+	glm::mat4 Bone::GetLocalTransform(const float animationTime)
 	{
 		glm::mat4 translation = InterpolatePosition(animationTime);
 		glm::mat4 rotation = InterpolateRotation(animationTime);
 		glm::mat4 scale = InterpolateScaling(animationTime);
-		m_LocalTransform = translation * rotation * scale;
+		return translation * rotation * scale;
 	}
 
 	uint32_t Bone::GetPositionIndex(float animationTime)
 	{
-		for (uint32_t index = 0; index < m_NumPositions - 1; ++index)
+		for (uint32_t index = 0; index < m_Positions.size() - 1; ++index)
 		{
 			if (animationTime < m_Positions[index + 1].timeStamp)
 				return index;
 		}
+		
 		DY_CORE_ASSERT(false);
 	}
 
 	uint32_t Bone::GetRotationIndex(float animationTime)
 	{
-		for (uint32_t index = 0; index < m_NumRotations - 1; ++index)
+		for (uint32_t index = 0; index < m_Rotations.size() - 1; ++index)
 		{
 			if (animationTime < m_Rotations[index + 1].timeStamp)
 				return index;
 		}
+		
 		DY_CORE_ASSERT(false);
 	}
 
 	uint32_t Bone::GetScaleIndex(float animationTime)
 	{
-		for (uint32_t index = 0; index < m_NumScalings - 1; ++index)
+		for (uint32_t index = 0; index < m_Scales.size() - 1; ++index)
 		{
 			if (animationTime < m_Scales[index + 1].timeStamp)
 				return index;
 		}
+		
 		DY_CORE_ASSERT(false);
 	}
 
@@ -92,7 +95,7 @@ namespace Dymatic {
 
 	glm::mat4 Bone::InterpolatePosition(float animationTime)
 	{
-		if (m_NumPositions == 1)
+		if (m_Positions.size() == 1)
 			return glm::translate(glm::mat4(1.0f), m_Positions[0].position);
 
 		uint32_t p0Index = GetPositionIndex(animationTime);
@@ -104,7 +107,7 @@ namespace Dymatic {
 
 	glm::mat4 Bone::InterpolateRotation(float animationTime)
 	{
-		if (m_NumRotations == 1)
+		if (m_Rotations.size() == 1)
 		{
 			auto rotation = glm::normalize(m_Rotations[0].orientation);
 			return glm::toMat4(rotation);
@@ -120,7 +123,7 @@ namespace Dymatic {
 
 	glm::mat4 Bone::InterpolateScaling(float animationTime)
 	{
-		if (m_NumScalings == 1)
+		if (m_Scales.size() == 1)
 			return glm::scale(glm::mat4(1.0f), m_Scales[0].scale);
 
 		uint32_t p0Index = GetScaleIndex(animationTime);

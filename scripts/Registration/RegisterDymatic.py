@@ -64,20 +64,7 @@ if is_admin():
     # Shell New
     shell_new_key = winreg.CreateKey(dymatic_filetype_key, "ShellNew")
     winreg.SetValueEx(shell_new_key, "FileName", 0, winreg.REG_SZ, cwd + "\..\..\DymaticEditor\saved\presets\scenes\EmptySceneTemplate.dymatic")
-
-    # Use High GPU Performance
-    reply = str(input("Enable GPU High Performance? (Recommended) [Y/N]: ")).lower().strip()[:1]
-    if reply == 'y':
-        print("Setting up Dymatic for High GPU Performance...")
-        gpu_preferences = winreg.OpenKey(
-            winreg.HKEY_CURRENT_USER,
-            r"Software\Microsoft\DirectX\UserGpuPreferences",
-            0, winreg.KEY_SET_VALUE)
-        winreg.SetValueEx(gpu_preferences, os.path.abspath(cwd + "\\..\\..\\bin\\Debug-windows-x86_64\\DymaticEditor\\DymaticEditor.exe"), 0, winreg.REG_SZ, "AutoHDREnable=1;GpuPreference=2;")
-        winreg.SetValueEx(gpu_preferences, os.path.abspath(cwd + "\\..\\..\\bin\\Debug-windows-x86_64\\DymaticRuntime\\DymaticRuntime.exe"), 0, winreg.REG_SZ, "AutoHDREnable=1;GpuPreference=2;")
-        winreg.SetValueEx(gpu_preferences, os.path.abspath(cwd + "\\..\\..\\bin\\Release-windows-x86_64\\DymaticEditor\\DymaticEditor.exe"), 0, winreg.REG_SZ, "AutoHDREnable=1;GpuPreference=2;")
-        winreg.SetValueEx(gpu_preferences, os.path.abspath(cwd + "\\..\\..\\bin\\Release-windows-x86_64\\DymaticRuntime\\DymaticRuntime.exe"), 0, winreg.REG_SZ, "AutoHDREnable=1;GpuPreference=2;")
-
+    
     # Set .dymatic default
     subprocess.call([os.path.abspath("RegisterFiletype.bat"), "nopause"])
 

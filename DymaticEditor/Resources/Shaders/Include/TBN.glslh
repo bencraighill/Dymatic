@@ -1,0 +1,11 @@
+#pragma once
+
+mat3 CalculateTBN(vec3 normal, vec3 tangent)
+{
+    vec3 T = normalize(mat3(u_Normal) * tangent);
+    vec3 N = normalize(mat3(u_Normal) * normal);
+    T = normalize(T - dot(T, N) * N);
+    vec3 B = cross(N, T);
+	
+    return mat3(T, B, N);
+}

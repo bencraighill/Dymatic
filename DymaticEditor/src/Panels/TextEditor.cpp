@@ -1,5 +1,17 @@
 #include "TextEditor.h"
 
+#include "Dymatic.h"
+#include "Dymatic/Core/Base.h"
+
+#include "Fonts.h"
+#include "TextSymbols.h"
+#include "Settings/Preferences.h"
+
+//Opening Files
+#include "Dymatic/Utils/PlatformUtils.h"
+#include "Dymatic/Math/StringUtils.h"
+#include "Dymatic/Core/Input.h"
+
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include <imgui/imgui.h>
 #include <imgui/imgui_internal.h>
@@ -12,17 +24,6 @@
 
 #include <locale>
 #include <codecvt>
-
-#include "Dymatic.h"
-#include "Dymatic/Core/Base.h"
-
-#include "Settings/Preferences.h"
-#include "TextSymbols.h"
-
-//Opening Files
-#include "Dymatic/Utils/PlatformUtils.h"
-#include "Dymatic/Math/StringUtils.h"
-#include "Dymatic/Core/Input.h"
 
 // TODO
 // - multiline comments vs single-line: latter is blocking start of a ML
@@ -3756,11 +3757,11 @@ namespace Dymatic {
 		}
 	}
 
-	TextEditorPannel::TextEditorPannel()
+	TextEditorPanel::TextEditorPanel()
 	{
 	}
 
-	void TextEditorPannel::OnImGuiRender()
+	void TextEditorPanel::OnImGuiRender()
 	{
 		auto& textEditorVisible = Preferences::GetEditorWindowVisible(Preferences::EditorWindow::TextEditor);
 
@@ -3844,7 +3845,7 @@ namespace Dymatic {
 			ImGuiTabBar* tab_bar = g.TabBars.GetOrAddByKey(id);
 			ImRect tab_bar_bb = ImRect(window->DC.CursorPos.x, window->DC.CursorPos.y, window->WorkRect.Max.x, window->DC.CursorPos.y + g.FontSize + g.Style.FramePadding.y * 2);
 			tab_bar->ID = id;
-			if (ImGui::BeginTabBarEx(tab_bar, tab_bar_bb, tab_bar_flags | ImGuiTabBarFlags_IsFocused, NULL))
+			if (ImGui::BeginTabBarEx(tab_bar, tab_bar_bb, tab_bar_flags | ImGuiTabBarFlags_IsFocused))
 				//--- End Internal Code ---//
 			// {ORIGINAL} if (ImGui::BeginTabBar("##TextEditorTabs", tab_bar_flags))
 			{
@@ -3887,9 +3888,9 @@ namespace Dymatic {
 					else if (visible)
 					{
 						m_SelectedEditor = &m_TextEditors[n];
-						ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[2]);
+						UI::PushFont(FontType::ExtraLarge);
 						m_TextEditors[n].textEditor.Render("##TextEditorWindow", m_Zoom);
-						ImGui::PopFont();
+						UI::PopFont();
 						if (ImGui::BeginPopupContextItem("##EditorContextItem"))
 						{
 							if (ImGui::MenuItem("Copy")) { m_TextEditors[n].textEditor.Copy(); }
@@ -3933,30 +3934,30 @@ namespace Dymatic {
 		}
 	}
 
-	void TextEditorPannel::OnEvent(Event& e)
+	void TextEditorPanel::OnEvent(Event& e)
 	{
 		EventDispatcher dispatcher(e);
-		dispatcher.Dispatch<MouseScrolledEvent>(DY_BIND_EVENT_FN(TextEditorPannel::OnMouseScrolled));
+		dispatcher.Dispatch<MouseScrolledEvent>(DY_BIND_EVENT_FN(TextEditorPanel::OnMouseScrolled));
 	}
 
-	bool TextEditorPannel::OnMouseScrolled(MouseScrolledEvent& e)
+	bool TextEditorPanel::OnMouseScrolled(MouseScrolledEvent& e)
 	{
 		return false;
 	}
 
-	void TextEditorPannel::Duplicate()
+	void TextEditorPanel::Duplicate()
 	{
 		if (Preferences::GetEditorWindowVisible(Preferences::EditorWindow::TextEditor) && m_SelectedEditor && !m_SelectedEditor->textEditor.IsReadOnly())
 			m_SelectedEditor->textEditor.Duplicate();
 	}
 
-	void TextEditorPannel::SwapLineUp()
+	void TextEditorPanel::SwapLineUp()
 	{
 		if (Preferences::GetEditorWindowVisible(Preferences::EditorWindow::TextEditor) && m_SelectedEditor && !m_SelectedEditor->textEditor.IsReadOnly())
-			m_SelectedEditor->textEditor.SwapLineDown();
+			m_SelectedEditor->textEditor.SwapLineUp();
 	}
 
-	void TextEditorPannel::SwapLineDown()
+	void TextEditorPanel::SwapLineDown()
 	{
 		if (Preferences::GetEditorWindowVisible(Preferences::EditorWindow::TextEditor) && m_SelectedEditor && !m_SelectedEditor->textEditor.IsReadOnly())
 			m_SelectedEditor->textEditor.SwapLineDown();
@@ -3966,7 +3967,7 @@ namespace Dymatic {
 	void SwapLineUp() {  }
 	void SwapLineDown() {  }
 
-	void TextEditorPannel::SwitchCStyleHeader()
+	void TextEditorPanel::SwitchCStyleHeader()
 	{
 		if (m_SelectedEditor != nullptr && Preferences::GetEditorWindowVisible(Preferences::EditorWindow::TextEditor))
 		{
@@ -3994,7 +3995,7 @@ namespace Dymatic {
 		return filepath;
 	}
 	
-	void TextEditorPannel::NewTextFile()
+	void TextEditorPanel::NewTextFile()
 	{
 		auto id = GetNextTextEditorID();
 
@@ -4019,7 +4020,7 @@ namespace Dymatic {
 		m_TextEditors[0].SetSelected = true;
 	}
 	
-	void TextEditorPannel::OpenTextFile()
+	void TextEditorPanel::OpenTextFile()
 	{
 		std::string filepath = FileDialogs::OpenFile("");
 		if (!filepath.empty())
@@ -4028,7 +4029,7 @@ namespace Dymatic {
 		}
 	}
 	
-	void TextEditorPannel::OpenTextFileByFilepath(std::string filepath)
+	void TextEditorPanel::OpenTextFileByFilepath(std::string filepath)
 	{
 		for (int i = 0; i < m_TextEditors.size(); i++)
 		{
@@ -4046,12 +4047,12 @@ namespace Dymatic {
 		UpdateLanguage(&m_TextEditors[0]);
 	}
 
-	void TextEditorPannel::SaveTextFile()
+	void TextEditorPanel::SaveTextFile()
 	{
 		SaveTextFileByReference(m_SelectedEditor);
 	}
 
-	bool TextEditorPannel::SaveTextFileByReference(TextEditorInformation* reference)
+	bool TextEditorPanel::SaveTextFileByReference(TextEditorInformation* reference)
 	{
 		if (!reference->Untitled)
 		{
@@ -4064,7 +4065,7 @@ namespace Dymatic {
 		}
 	}
 
-	bool TextEditorPannel::SaveAsTextFile()
+	bool TextEditorPanel::SaveAsTextFile()
 	{
 		std::string filepath = FileDialogs::SaveFile("");
 		if (!filepath.empty())
@@ -4075,7 +4076,7 @@ namespace Dymatic {
 		return false;
 	}
 
-	void TextEditorPannel::SaveFileToFilePath(std::string filepath)
+	void TextEditorPanel::SaveFileToFilePath(std::string filepath)
 	{
 		std::ofstream outfile;
 
@@ -4089,7 +4090,7 @@ namespace Dymatic {
 		UpdateLanguage(m_SelectedEditor);
 	}
 
-	bool TextEditorPannel::DeleteTextEditor(TextEditorInformation* reference)
+	bool TextEditorPanel::DeleteTextEditor(TextEditorInformation* reference)
 	{
 		for (int i = 0; i < m_TextEditors.size(); i++)
 		{
@@ -4109,7 +4110,7 @@ namespace Dymatic {
 		}
 	}
 
-	void TextEditorPannel::UpdateLanguage(TextEditorInformation* reference)
+	void TextEditorPanel::UpdateLanguage(TextEditorInformation* reference)
 	{
 		if (reference->Filename.find_last_of(".") != std::string::npos)
 		{
@@ -4139,7 +4140,7 @@ namespace Dymatic {
 		}
 	}
 
-	void TextEditorPannel::SetShowWhitespaces(bool show)
+	void TextEditorPanel::SetShowWhitespaces(bool show)
 	{
 		m_ShowWhitespaces = show;
 		for (auto& textEditor : m_TextEditors)

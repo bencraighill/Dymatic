@@ -18,6 +18,8 @@
 #define DY_DEBUGBREAK()
 #endif
 
+#define DY_ENABLE_VERIFY
+
 #include "Dymatic/Core/PreprocessorUtils.h"
 
 #define DY_BIND_EVENT_FN(fn) [this](auto&&... args) -> decltype(auto) { return this->fn(std::forward<decltype(args)>(args)...); }
@@ -47,12 +49,7 @@ namespace Dymatic {
 		return std::make_shared<T>(std::forward<Args>(args)...);
 	}
 	template<typename T, typename U>
-	constexpr Ref<T>& As(Ref<U>& ref)
-	{
-		return std::static_pointer_cast<T>(ref);
-	}
-	template<typename T, typename U>
-	constexpr const Ref<T>& As(const Ref<U>& ref)
+	constexpr Ref<T> As(const Ref<U>& ref)
 	{
 		return std::static_pointer_cast<T>(ref);
 	}
@@ -61,7 +58,7 @@ namespace Dymatic {
 	template<typename T>
 	using WeakRef = std::weak_ptr<T>;
 	template<typename T, typename U>
-	constexpr WeakRef<T>& As(WeakRef<U>& ref)
+	constexpr WeakRef<T> As(WeakRef<U>& ref)
 	{
 		return std::static_pointer_cast<T>(ref);
 	}

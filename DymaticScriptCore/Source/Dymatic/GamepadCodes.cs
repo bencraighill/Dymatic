@@ -5,26 +5,25 @@
         // From glfw3.h
         Invalid = -1,
 
-        A = 0,
-        B = 1,
-        X = 2,
-        Y = 3,
+        Cross = 0,
+        Circle = 1,
+        Square = 2,
+        Triangle = 3,
         LeftBumper = 4,
         RightBumper = 5,
-        Back = 6,
-        Start = 7,
-        Guide = 8,
-        LeftThumb = 9,
-        RightThumb = 10,
-        DPadUp = 11,
-        DPadRight = 12,
-        DPadDown = 13,
-        DPadLeft = 14,
-
-        Cross = A,
-        Circle = B,
-        Square = X,
-        Triangle = Y
+        LeftTrigger = 6,
+        RightTrigger = 7,
+        Share = 8,
+        Options = 9,
+        LeftThumb = 10,
+        RightThumb = 11,
+        Playstation = 12,
+        TouchPad = 13,
+        Mic = 14,
+        DPadUp = 15,
+        DPadRight = 16,
+        DPadDown = 17,
+        DPadLeft = 18
     }
 
     public enum GamepadAxisCode
@@ -32,12 +31,12 @@
         // From glfw3.h
         Invalid = -1,
 
-        LeftX = 0,
-        LeftY = 1,
-        RightX = 2,
-        RightY = 3,
-        LeftTrigger = 4,
-        RightTrigger = 5
+        LeftXAxis = 0,
+        LeftYAxis = 1,
+        RightXAxis = 2,
+        RightYAxis = 3,
+        LeftTriggerAxis = 4,
+        RightTriggerAxis = 5
     }
 
     public enum GamepadSensorCode

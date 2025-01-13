@@ -12,8 +12,11 @@ namespace Dymatic {
 	public:
 		static FileType GetFileType(const std::string& extension);
 		static FileType GetFileType(const std::filesystem::path& path);
-		static AssetType GetAssetType(const FileType& type);
+		static FileType GetFileType(const AssetType type);
+		static AssetType GetAssetType(const FileType type);
 		static AssetType GetAssetType(const std::string& extension);
+		
+		static const char* GetFileTypeCharacterIcon(const FileType type);
 
 		static bool Equivalent(const std::filesystem::path& a, const std::filesystem::path& b);
 

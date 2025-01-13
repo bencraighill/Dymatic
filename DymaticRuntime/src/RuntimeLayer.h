@@ -17,10 +17,24 @@ namespace Dymatic {
 		virtual void OnEvent(Event& e) override;
 
 	private:
-		Ref<Framebuffer> m_Framebuffer;
+		Ref<SceneRendererContext> m_SceneRendererContext;
 		Ref<Scene> m_Scene;
 
+		Ref<Texture2D> m_StartupLogo = nullptr;
+		float m_StartupDisplayTime = 0.0f;
+
+		std::vector<UUID> m_PostUpdateQueue;
+
+#ifndef DY_DIST
+		struct DebugMessage
+		{
+			std::string Text;
+			int Level;
+		};
+		std::vector<DebugMessage> m_DebugMessages;
+
 		float m_DeltaTime;
+#endif
 	};
 
 }

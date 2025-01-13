@@ -1,0 +1,3 @@
+Please note that these fontawesome font files have been modified to work with Dymatic. The Following changes were applied in FontForge:
+- Scale Uniformly (50%) with Origin: "Glyph Origin"
+- Can Adjust Move-Y to move downwards but current files do not do this.

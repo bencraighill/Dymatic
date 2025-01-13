@@ -5,7 +5,8 @@
 #include "Settings/Preferences.h"
 #include "PopupsAndNotifications.h"
 
-#include "../TextSymbols.h"
+#include "Fonts.h"
+#include "TextSymbols.h"
 
 #include "Dymatic/Math/StringUtils.h"
 
@@ -57,9 +58,8 @@ namespace Dymatic {
 		// Setup
 		git_config* config;
 		git_config_open_default(&config);
-		git_buf buffer;
-		buffer.ptr = new char[256];
-		buffer.size = 256;
+
+		git_buf buffer = { 0 }; // Initialize the buffer
 
 		// Retrieve Global Values
 		memset(buffer.ptr, 0, buffer.size);
@@ -70,9 +70,7 @@ namespace Dymatic {
 		git_config_get_string_buf(&buffer, config, "user.email");
 		s_Data.Email = buffer.ptr;
 
-		// Cleanup
 		git_config_free(config);
-		delete[] buffer.ptr;
 
 		if (g_ActiveRepository)
 		{
@@ -370,12 +368,12 @@ namespace Dymatic {
 		}
 
 		{
-			ImGui::PushFont(io.Fonts->Fonts[0]);
+			UI::PushFont(FontType::Bold);
 			const char* text = "Source Control";
 			ImGui::Dummy(ImVec2((ImGui::GetWindowContentRegionWidth() - ImGui::CalcTextSize(text).x) * 0.5f, 0.0f));
 			ImGui::SameLine();
 			ImGui::TextDisabled(text);
-			ImGui::PopFont();
+			UI::PopFont();
 		}
 
 		ImGui::Dummy(ImVec2(0.0f, 10.0f));

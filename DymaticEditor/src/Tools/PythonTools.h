@@ -11,6 +11,7 @@ namespace Dymatic {
 	enum PythonUIRenderStage
 	{
 		Main = 0,
+		PluginPreferences,
 		MenuBar,
 		MenuBar_File,
 		MenuBar_Edit,
@@ -36,8 +37,11 @@ namespace Dymatic {
 		static void UnloadPlugin(std::filesystem::path path);
 		static void ReloadPlugin(const std::filesystem::path& path);
 		
+		// UI Updates
 		static void OnUpdate(Timestep ts);
 		static void OnImGuiRender(PythonUIRenderStage stage);
+		static void OnImGuiRender(const std::filesystem::path& path, PythonUIRenderStage stage);
+		static void OnImGuiRenderContentBrowser(const std::string& extension);
 	};
 	
 }

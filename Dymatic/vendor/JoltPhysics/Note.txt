@@ -1,0 +1,5 @@
+This is a precompiled version of Jolt Physics Release Build 5.1.0
+
+Note:
+	- Whole Program Optimization (under C++/Optimizations) is disabled for ALL configurations
+	- Runtime Library is set to DLL equivalents

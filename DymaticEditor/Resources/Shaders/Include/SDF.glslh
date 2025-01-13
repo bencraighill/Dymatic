@@ -1,0 +1,89 @@
+#pragma once
+
+const float u_SDFTMin = 0.05;
+const float u_SDFTMax = 100.0;
+const bool u_SDFSoftShadows = true;
+const float u_SDFSoftShadowsK = 5.7;
+
+float EvaluateSceneSDF(vec3 worldPosition)
+{
+    float closestSDFValue = FLT_MAX;
+    
+    for (uint i = 0; i < u_MeshInstanceCount; i++)
+    {
+        const vec3 localPosition = vec3(u_MeshInstances[i].InverseModelMatrix * vec4(worldPosition, 1.0));
+
+        const vec3 aabbMin = u_MeshInstances[i].Min.xyz;
+        const vec3 aabbMax = u_MeshInstances[i].Max.xyz;
+
+        float distanceToBox;
+        vec3 samplePoint;
+
+        // Check if the point is within the AABB
+        if (localPosition.x < aabbMin.x || localPosition.y < aabbMin.y || localPosition.z < aabbMin.z ||
+            localPosition.x > aabbMax.x || localPosition.y > aabbMax.y || localPosition.z > aabbMax.z)
+        {
+            // Outside AABB, find closest point
+            samplePoint = clamp(localPosition, aabbMin, aabbMax);
+            vec3 closestBoxWorld = vec3(u_MeshInstances[i].ModelMatrix * vec4(samplePoint, 1.0));
+            distanceToBox = distance(worldPosition, closestBoxWorld);
+        }
+        else
+        {
+            samplePoint = localPosition;
+            distanceToBox = 0.0f;
+        }
+
+        // Sample the SDF in the local space
+        const vec3 sdfUV = (samplePoint - aabbMin) / (aabbMax - aabbMin);
+        const float localSdf = textureLod(u_MeshSDFs[u_MeshInstances[i].SDFIndex], sdfUV, 0.0).r;
+        
+        // Compute the SDF gradient in local space
+        const float sampleDelta = 1e-3;
+        const float sdfXOffset = textureLod(u_MeshSDFs[u_MeshInstances[i].SDFIndex], sdfUV + vec3(sampleDelta, 0.0, 0.0), 0.0).r - localSdf;
+        const float sdfYOffset = textureLod(u_MeshSDFs[u_MeshInstances[i].SDFIndex], sdfUV + vec3(0.0, sampleDelta, 0.0), 0.0).r - localSdf;
+        const float sdfZOffset = textureLod(u_MeshSDFs[u_MeshInstances[i].SDFIndex], sdfUV + vec3(0.0, 0.0, sampleDelta), 0.0).r - localSdf;
+        const vec3 sdfGradient = normalize(vec3(sdfXOffset, sdfYOffset, sdfZOffset));
+
+        // Extract non-uniform scale from the model matrix
+        const mat3 modelMatrix3x3 = mat3(u_MeshInstances[i].ModelMatrix);
+        const vec3 scaleFactors = vec3(length(modelMatrix3x3[0]), length(modelMatrix3x3[1]), length(modelMatrix3x3[2]));
+        
+        // Adjust the SDF distance based on anisotropic scaling
+        const float scaleAlongGradient = dot(abs(sdfGradient), 1.0 / scaleFactors);
+        const float worldSdf = localSdf;
+
+        const float sdfValue = distanceToBox + worldSdf;
+
+        // Update if this instance is closer
+        if (abs(sdfValue) < abs(closestSDFValue))
+            closestSDFValue = sdfValue;
+    }
+
+    return closestSDFValue;
+}
+
+float ShadowRayMarch(vec3 origin, vec3 direction, float dist, float k)
+{
+    float shadow = 1.0;
+
+    for (float t = u_SDFTMin; t < dist;)
+    {
+        const vec3 p = origin + direction * t;
+
+        float h = EvaluateSceneSDF(p);
+
+        if (h < 0.001f)
+            return 0.0f;
+
+        if (u_SDFSoftShadows)
+            shadow = min(shadow, k * h / t);
+
+        t += h;
+
+        if (shadow < 0.01f)
+            break;
+    }
+
+    return shadow;
+}

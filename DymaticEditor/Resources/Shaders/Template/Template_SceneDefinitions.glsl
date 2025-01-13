@@ -1,0 +1,13 @@
+CompilerDefine(Scene Position, WorldPosFromDepth(texture(g_Depth, __TEX__).r, __TEX__));
+CompilerDefine(Scene Color, (texture(g_Color, __TEX__).rgba));
+CompilerDefine(Scene Albedo, (texture(g_Albedo, __TEX__).rgba));
+CompilerDefine(Scene Depth, texture(g_Depth, __TEX__).r);
+CompilerDefine(Scene Linear Depth, LinearDepth(texture(g_Depth, __TEX__).r));
+CompilerDefine(Scene Normal, (texture(g_Normal, __TEX__).rgb));
+CompilerDefine(Scene Emissive, (texture(g_Emissive, __TEX__).rgb));
+CompilerDefine(Scene Roughness, (texture(g_Roughness_Metallic_Specular_AO, __TEX__).r));
+CompilerDefine(Scene Metallic, (texture(g_Roughness_Metallic_Specular_AO, __TEX__).g));
+CompilerDefine(Scene Specular, (texture(g_Roughness_Metallic_Specular_AO, __TEX__).b));
+CompilerDefine(Scene Ambient Occlusion, (texture(g_Roughness_Metallic_Specular_AO, __TEX__).a));
+CompilerDefine(Scene Entity ID, float(texture(g_EntityID, __TEX__).r));
+CompilerDefine(Scene Submesh Index, float(texture(g_SubmeshIndex, __TEX__).r));

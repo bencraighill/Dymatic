@@ -60,6 +60,13 @@
   Ctrl: false
   Alt: false
   Shift: false
+- Bind: Focus
+  Enabled: true
+  Key: F
+  Repeats: false
+  Ctrl: false
+  Alt: false
+  Shift: false
 - Bind: Reload Assembly
   Enabled: true
   Key: R
@@ -116,6 +123,20 @@
   Ctrl: false
   Alt: false
   Shift: false
+- Bind: Undo
+  Enabled: true
+  Key: Z
+  Repeats: false
+  Ctrl: true
+  Alt: false
+  Shift: false
+- Bind: Redo
+  Enabled: true
+  Key: Z
+  Repeats: false
+  Ctrl: true
+  Alt: false
+  Shift: true
 - Bind: Visualization Rendered
   Enabled: true
   Key: F1

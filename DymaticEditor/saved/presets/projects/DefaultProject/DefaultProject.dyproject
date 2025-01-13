@@ -1,6 +1,7 @@
 Project:
   Name: {projectName}
-  StartScene: "Scenes/DefaultScene.dymatic"
-  AssetDirectory: "Assets"
-  CoreModulePath: "Scripts/Binaries/DymaticScriptCore.dll"
-  ScriptModulePath: "Scripts/Binaries/{projectName}.dll"
+  StartScene: 0
+  AssetDirectory: Assets
+  CacheDirectory: Cache
+  CoreModulePath: Scripts/Binaries/DymaticScriptCore.dll
+  ScriptModulePath: Scripts/Binaries/{projectName}.dll

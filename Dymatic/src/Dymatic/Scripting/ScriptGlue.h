@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Dymatic/Core/UUID.h"
+
 namespace Dymatic {
 
 	class ScriptGlue
@@ -7,6 +9,11 @@ namespace Dymatic {
 	public:
 		static void RegisterComponents();
 		static void RegisterFunctions();
+		
+		static void SetOpenSceneCallback(const std::function<void(UUID)>& callback);
+
+		static void OnRuntimeStart();
+		static void OnRuntimeStop();
 	};
 	
 }

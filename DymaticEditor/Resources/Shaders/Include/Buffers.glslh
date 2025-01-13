@@ -1,0 +1,409 @@
+// Shader Buffers and Defines Header File
+#pragma once
+
+// The engine requires the bindless textures graphics API extension
+// All other non-core hardware extensions have (less-optimal) alternatives
+#extension GL_ARB_bindless_texture: require
+
+// Definitions
+#include Constants.glslh
+
+// Structures
+
+// Lighting
+struct DirectionalLight
+{
+    vec4 direction;
+    vec4 color; // w = intensity
+};
+
+struct PointLight
+{
+    vec4 position;
+    vec4 color;
+    uint enabled;
+    float intensity;
+    float range;
+	int shadowIndex;
+};
+
+struct LightGrid
+{
+    uint offset;
+    uint count;
+};
+
+struct VolumeTileAABB
+{
+    vec4 minPoint;
+    vec4 maxPoint;
+};
+
+struct Volume
+{
+    vec4 min;
+    vec4 max;
+
+    vec4 color;
+
+    int blend;
+    float scatteringDistribution;
+    float scatteringIntensity;
+    float extinctionScale;
+};
+
+struct BokehPoint
+{
+    vec2 position;
+    float size;
+    vec3 color;
+};
+
+// Particle Systems
+struct Particle
+{
+    vec4 position;
+    vec4 velocity;
+    float lifeTime;
+    float lifeRemaining;
+};
+
+// Path Tracing
+struct HitRecord
+{
+    vec3 Position;
+    vec3 Normal;
+    vec2 TexCoord;
+    float Distance;
+    uint Material;
+    int ID;
+    bool FrontFace;
+};
+
+struct RayTriangle
+{
+    // Note: X/Y Texture Coordinates are packed into the Position/Normal w component 
+    vec4 Position[3];
+    vec4 Normal[3];
+};
+
+struct BVHNode
+{
+    vec3 Min;
+    uint TriangleCount;
+    vec3 Max;
+
+    // We know that the second child will be stored at the next index after the first index (so no need to store one for each)
+    // NOTE: Index represents the triangleIndex if a leaf node and otherwise the childIndex (is leaf node if TriangleCount > 0)
+    uint TriangleIndex;
+    uint ChildIndex;
+
+    uint PADD[3];
+};
+
+struct BVHSubmesh
+{
+    vec3 Min;
+    uint NodeIndex;
+    vec3 Max;
+    uint Material;
+};
+
+struct BVHModel
+{
+    mat4 Model;
+    mat4 InverseModel;
+    int EntityID;
+    uint SubmeshIndex;
+    uint SubmeshCount;
+
+    uint PADD[1];
+};
+
+struct MeshInstance
+{
+    mat4 ModelMatrix;
+    mat4 InverseModelMatrix;
+    vec3 Min;
+    float PADD;
+    vec3 Max;
+    uint SDFIndex;
+};
+
+// Buffers
+
+layout(std140, binding = CAMERA_BUFFER_BINDING) uniform Camera
+{
+	mat4 u_ViewProjection;
+	vec4 u_ViewPosition;
+    
+    mat4 u_Projection;
+    mat4 u_InverseProjection;
+    mat4 u_View;
+    mat4 u_InverseView;
+    mat4 u_PreviousViewProjection;
+    mat4 u_InverseViewProjection;
+
+    vec4 u_Forward;
+    vec4 u_Right;
+    vec4 u_Up;
+	uvec4 u_TileSizes;
+    uvec2 u_ScreenDimensions;
+    vec2 u_PixelSize;
+    float u_Scale;
+    float u_Bias;
+	float u_ZNear;
+	float u_ZFar;
+};
+
+layout(std140, binding = LIGHTING_BUFFER_BINDING) uniform Lighting
+{
+	DirectionalLight u_DirectionalLight;
+    mat4 u_LightSpaceMatrices[MaxCascadeCount];
+    vec4 u_CascadePlaneDistances[MaxCascadeCount/4];
+	int u_UsingDirectionalLight;
+    int u_CascadeCount;
+    int u_UsingSkyLight;
+    int u_UsingFlowMap;
+    float u_SkyLightIntensity;
+    float u_Ambient;
+    
+    float BUFF1[2];
+};
+
+layout(std140, binding = OBJECT_BUFFER_BINDING) uniform Object
+{
+	mat4 u_Model;
+	mat4 u_ModelInverse;
+    mat4 u_PreviousModel;
+    mat4 u_Normal;
+	int u_EntityID;
+	int u_Animated;
+    float BUFF2[2];
+};
+
+layout(std140, binding = ANIMATION_BUFFER_BINDING) uniform Animation
+{
+    mat4 u_FinalBonesMatrices[MAX_BONES];
+};
+
+layout(std140, binding = GBUFFER_BUFFER_BINDING) uniform GBuffer
+{
+    // G-Buffer Attachments
+    sampler2D g_Albedo;
+    isampler2D g_EntityID;
+    sampler2D g_Normal;
+    sampler2D g_Emissive;
+    sampler2D g_Roughness_Metallic_Specular_AO;
+    isampler2D g_SubmeshIndex;
+    sampler2D g_Velocity;
+    sampler2D g_Depth;
+
+    // Fixed Environment Map Textures
+    samplerCube u_EnvironmentMap;
+    samplerCube u_IrradianceMap;
+    samplerCube u_PrefilterMap;
+    sampler2D u_brdfLUT;
+    samplerCube u_FlowMap;
+
+    // VXGI Cascade Textures
+    sampler3D u_VXGICascades[VXGI_CASCADE_COUNT];
+};
+
+layout(std140, binding = VOLUMETRIC_BUFFER_BINDING) uniform Volumetric
+{
+    Volume u_Volumes[MAX_VOLUMES];
+    int u_VolumeCount;
+    float u_VolumetricGridSize;
+
+    float BUFF5[2];
+};
+
+layout(std140, binding = POST_PROCESSING_BUFFER_BINDING) uniform PostProcessing
+{
+    vec4 u_SSAOSamples[64];
+
+    int u_VisualizationMode;
+
+    uint u_Frame;
+    float u_Time;
+    float u_DeltaTime;
+
+    float u_Gamma;
+    float u_LensDistortion;
+    float u_AberrationAmount;
+    float u_GrainAmount;
+    float u_VignetteIntensity;
+    float u_VignettePower;
+    uint u_UsingLUT;
+
+    float u_BloomThreshold;
+
+    float u_FocusNearStart;
+    float u_FocusNearEnd;
+    float u_FocusFarStart;
+    float u_FocusFarEnd;
+    float u_FocusScale;
+
+    float u_BokehThreshold;
+    float u_BokehSize;
+
+    uint u_AntiAliasingMode;
+    uint u_TAASampleCount;
+
+    int u_UsingVXGI;
+    int u_UsingVolumetricClouds;
+
+    float BUFF6[1];
+};
+
+layout (std430, binding = CLUSTER_AABB_BUFFER_BINDING) buffer ClusterAABB
+{
+    VolumeTileAABB u_Cluster[];
+};
+
+layout (std430, binding = POINT_LIGHT_BUFFER_BINDING) buffer PointLightSSBO
+{
+    PointLight u_PointLights[];
+};
+
+layout (std430, binding = LIGHT_INDEX_BUFFER_BINDING) buffer LightIndexSSBO
+{
+    uint u_GlobalLightIndexList[];
+};
+
+layout (std430, binding = LIGHT_GRID_BUFFER_BINDING) buffer LightGridSSBO
+{
+    LightGrid u_LightGrid[];
+};
+
+layout (std430, binding = LIGHT_COUNT_BUFFER_BINDING) buffer LightCountSSBO
+{
+    uint u_GlobalIndexCount;
+    uint u_PointLightCount;
+};
+
+layout (std140, binding = BOKEH_BUFFER_BINDING) buffer BokehSSBO
+{
+    uint u_GlobalBokehIndex;
+    BokehPoint u_BokehList[MAX_BOKEH];
+};
+
+layout (std430, binding = PARTICLE_SYSTEM_BUFFER_BINDING) buffer ParticleSystemSSBO
+{
+    // Note: This is padded on the CPU to fix alignment
+    uint u_ParticleCount;
+    uint PADD[3];
+
+    vec4 u_MinimumPosition;
+    vec4 u_MaximumPosition;
+    vec4 u_MinimumVelocity;
+    vec4 u_MaximumVelocity;
+    vec4 u_Acceleration;
+    uint u_MaxParticles;
+    uint u_EmissionCount;
+    float u_Lifetime;
+    float u_CollisionRadius;
+
+    Particle u_Particles[];
+};
+
+layout(std140, binding = SUBMESH_BUFFER_BINDING) uniform Submesh
+{
+    int u_SubmeshIndex;
+    float BUFF15[3];
+};
+
+layout (std430, binding = PATH_TRACE_GEOMETRY_BUFFER_BINDING) buffer PathTraceGeometrySSBO
+{
+    uint u_TriangleCount;
+    uint u_AccumulatedFrames;
+    uint BUFF16[2];
+
+    RayTriangle u_Triangles[];
+};
+
+layout (std430, binding = PATH_TRACE_BVH_BUFFER_BINDING) buffer PathTraceBVHSSBO
+{
+    BVHNode u_BVHNodes[];
+};
+
+layout (std430, binding = PATH_TRACE_SUBMESH_BUFFER_BINDING) buffer PathTraceSubmeshSSBO
+{
+    BVHSubmesh u_BVHSubmeshes[];
+};
+
+layout (std430, binding = PATH_TRACE_MODEL_BUFFER_BINDING) buffer PathTraceModelSSBO
+{
+    uint u_BVHModelCount;
+    uint BUFF19[3];
+
+    BVHModel u_BVHModels[];
+};
+
+// Culling
+
+layout (std430, binding = MESH_INSTANCE_BUFFER_BINDING) readonly buffer MeshInstanceSSBO
+{
+    uint u_MeshInstanceCount;
+    uint BUFF20[3];
+
+    MeshInstance u_MeshInstances[];
+};
+
+layout (std430, binding = MESH_VISIBILITY_BUFFER_BINDING) buffer MeshVisibilitySSBO
+{
+    uint u_VisibleMeshCount;
+    uint u_VisibleMeshIndices[];
+};
+
+layout (std140, binding = VXGI_BUFFER_BINDING) uniform VXGI
+{
+    vec4 u_GridMin[VXGI_CASCADE_COUNT];
+    vec4 u_GridMax[VXGI_CASCADE_COUNT];
+
+    // Pack grid resolution uints into a uvec4 for alignment purposes
+    // Note: We need to be carful if we ever change cascade count
+    uvec4 u_GridResolution;
+
+    // Used for voxelization
+    uint u_RenderCascade;
+    uint u_RenderAxis;
+
+    float u_StepMultiplier;
+    float u_ConeAngle;
+
+    uint u_MaxSamples;
+    float u_GIBoost;
+    float u_GISkyBoxBoost;
+    float u_NormalRayOffset;
+    float u_AlphaThreashold;
+    float u_MaxConeAngle;
+    float u_MinConeAngle;
+    float u_ContributionFalloff;
+    int u_IsTemporalAccumulation;
+    
+    float BUFF22[3];
+};
+
+layout (std140, binding = BLEND_SHAPE_WEIGHT_BUFFER_BINDING) uniform BlendShapeWeightBuffer
+{
+    uint u_BlendShapeCount;
+    uint u_BlendShapeVertexCount;
+
+    // Due to how uniform buffer's are packed, the C++ side has additional padding above this array.
+    // We also use vec4's to represent an array of floats in an compact format.
+    vec4 u_BlendShapeWeights[MAX_BLEND_SHAPES / 4];
+};
+
+layout (std430, binding = BLEND_SHAPE_COMPONENTS_BUFFER_BINDING) buffer BlendShapeComponentBuffer
+{
+    // To minimise wasted GPU memory we don't do the normal vec4 to represent vec3 hack
+    // This does mean all vec3s must be reconstructed in shaders and require a * 3 multiplication for lookups.
+    float u_BlendShapeComponents[];
+};
+
+layout (std430, binding = MESH_SDF_BUFFER_BINDING) buffer MeshSDFBuffer
+{
+    sampler3D u_MeshSDFs[];
+};

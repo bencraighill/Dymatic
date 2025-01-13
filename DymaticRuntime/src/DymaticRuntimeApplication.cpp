@@ -21,10 +21,21 @@ namespace Dymatic {
 		
 		spec.Name = "Dymatic Runtime";
 		spec.CommandLineArgs = args;
+		spec.Runtime = true;
 		spec.ConsoleVisible = false;
 		spec.WindowDecorated = true;
 		spec.WindowStartHidden = true;
 		spec.ApplicationIcon = "Resources/Icons/Branding/DymaticLogoBorderSmall.png";
+
+		RendererConfig config;
+		config.ShaderPackPath = "Resources/ShaderPack.dysp";
+		Renderer::SetConfig(config);
+
+		AssetManager::DeserializeAssetPack("Assets/AssetPack.dyap");
+
+#ifdef DY_DIST
+		spec.EnableImGui = false;
+#endif
 
 		return new DymaticRuntime(spec);
 	}

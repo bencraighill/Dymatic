@@ -1,0 +1,24 @@
+#pragma once
+
+#include <glm/glm.hpp>
+
+namespace Dymatic {
+
+	enum class ShapeCastType
+	{
+		Cube,
+		Sphere,
+		Capsule,
+		Cylinder,
+	};
+
+	struct RaycastHit
+	{
+		bool Hit = false;
+		uint64_t EntityID = 0;
+		float Distance = 0.0f;
+		glm::vec3 Position = glm::vec3(0.0f);
+		glm::vec3 Normal = glm::vec3(0.0f);
+	};
+
+}

@@ -2,9 +2,9 @@
 
 #include "Dymatic/Core/PreprocessorUtils.h"
 
-#define DY_VERSION_MAJOR 23
+#define DY_VERSION_MAJOR 25
 #define DY_VERSION_MINOR 1
-#define DY_VERSION_PATCH 1
+#define DY_VERSION_PATCH 0
 
 #define DY_VERSION_SUFFIX "Development"
 
@@ -15,6 +15,6 @@
 
 #define DY_VERSION DY_VERSION_STRING " (" DY_VERSION_SUFFIX ")"
 
-#define DY_VERSION_COPYRIGHT "© 2023 Dymatic Technologies"
-#define DY_VERSION_COPYRIGHT_SAFE "(c) 2023 Dymatic Technologies"
+#define DY_VERSION_COPYRIGHT "© 2025 Dymatic Technologies"
+#define DY_VERSION_COPYRIGHT_SAFE "(c) 2025 Dymatic Technologies"
 #define DY_VERSION_TRADEMARK "Dymatic Engine®, All Rights Reserved"

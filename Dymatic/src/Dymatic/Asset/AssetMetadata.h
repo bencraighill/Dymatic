@@ -20,6 +20,7 @@ namespace Dymatic {
 		UUID Handle;
 		AssetType Type;
 		std::filesystem::path FilePath;
+		bool MemoryOnly = false;
 	};
 
 }

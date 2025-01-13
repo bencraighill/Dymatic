@@ -2,6 +2,7 @@
 
 #include <imgui/imgui.h>
 #include <yaml-cpp/yaml.h>
+#include "Dymatic/Utils/YAMLUtils.h"
 
 namespace YAML
 {
@@ -47,6 +48,7 @@ namespace Dymatic {
 	static std::array<bool, Preferences::EditorWindow::EDITOR_WINDOW_COUNT> s_EditorWindowVisible = {};
 
 	static const char* s_WorkspaceSaveFilepath = "saved/SavedWorkspace.workspace";
+	static const char* s_PreferencesSaveFilepath = "saved/SavedPreferences.prefs";
 	
 	namespace
 	{
@@ -70,6 +72,32 @@ namespace Dymatic {
 			Button0, Button1, Button2, Button3, Button4, Button5, Button6, Button7,
 			ButtonLast, ButtonLeft, ButtonRight, ButtonMiddle
 		};
+
+	}
+
+	namespace Utils {
+
+		static const char* BoneAttachmentEditModeToString(const Preferences::BoneAttachmentEditMode mode)
+		{
+			switch (mode)
+			{
+			case Preferences::BoneAttachmentEditMode::Hierarchy:	return "Hierarchy";
+			case Preferences::BoneAttachmentEditMode::Component:	return "Component";
+			}
+			
+			DY_CORE_ASSERT(false, "Unknown bone attachment edit mode");
+			return {};
+		}
+
+		static Preferences::BoneAttachmentEditMode BoneAttachmentEditModeFromString(const std::string& modeString)
+		{
+			if (modeString == "Hierarchy")	return Preferences::BoneAttachmentEditMode::Hierarchy;
+			if (modeString == "Component")	return Preferences::BoneAttachmentEditMode::Component;
+
+			DY_CORE_ASSERT(false, "Unknown bone attachment edit mode");
+			return {};
+		}
+
 	}
 
 	void Preferences::Init()
@@ -77,10 +105,13 @@ namespace Dymatic {
 		// Initialize Data
 		for (uint32_t i = 0; i < FILE_TYPE_SIZE; i++)
 			s_PreferencesData.Filters[i] = true;
+
+		for (uint32_t i = 0; i < 6; i++)
+			s_PreferencesData.LogFilters[i] = true;
 		
 		// Load save data from disk
 		LoadPreferences("saved/presets/DefaultPreferences.prefs");
-		LoadPreferences("saved/SavedPreferences.prefs");
+		LoadPreferences(s_PreferencesSaveFilepath);
 
 		LoadTheme("saved/presets/themes/DymaticDark.dytheme");
 		LoadTheme("saved/SavedTheme.dytheme");
@@ -99,13 +130,15 @@ namespace Dymatic {
 
 	bool Preferences::LoadPreferences(const std::filesystem::path& filepath)
 	{
-		if (!std::filesystem::exists(filepath))
+		std::filesystem::path path = filepath.empty() ? s_PreferencesSaveFilepath : filepath;
+
+		if (!std::filesystem::exists(path))
 			return false;
 
 		YAML::Node prefs;
 		try
 		{
-			prefs = YAML::LoadFile(filepath.string());
+			prefs = YAML::LoadFile(path.string());
 		}
 		catch (YAML::ParserException e)
 		{
@@ -114,55 +147,171 @@ namespace Dymatic {
 
 		if (prefs)
 		{
-			auto autosavePreferences = prefs["Autosave Preferences"];
-			if (autosavePreferences)
+			if (auto autosavePreferences = prefs["Autosave Preferences"])
 				GetData().AutosavePreferences = autosavePreferences.as<bool>();
 
-			auto autosaveEnabled = prefs["Autosave Enabled"];
-			if (autosaveEnabled)
-				GetData().AutosaveEnabled = autosaveEnabled.as<bool>();
-
-			auto autosaveTime = prefs["Autosave Time"];
-			if (autosaveTime)
-				GetData().AutosaveTime = autosaveTime.as<int>();
-
-			auto recentFiles = prefs["Recent Files"];
-			if (recentFiles)
-				GetData().RecentFileCount = recentFiles.as<int>();
-
-			auto showSplash = prefs["Show Splash"];
-			if (showSplash)
+			if (auto showSplash = prefs["Show Splash"])
 				GetData().ShowSplashStartup = showSplash.as<bool>();
 
-			auto doubleClickSpeed = prefs["Double Click Speed"];
-			if (doubleClickSpeed)
+			if (auto lockViewportMouse = prefs["Lock Viewport Mouse"])
+				GetData().LockViewportMouse = lockViewportMouse.as<bool>();
+
+			if (auto advancedEditMode = prefs["Advanced Edit Mode"])
+				GetData().AdvancedEditMode = advancedEditMode.as<bool>();
+
+			if (auto boneAttachmentEditMode = prefs["Bone Attachment Edit Mode"])
+				GetData().BoneAttachmentEditMode = Utils::BoneAttachmentEditModeFromString(boneAttachmentEditMode.as<std::string>());
+			
+			if (auto autosaveEnabled = prefs["Autosave Enabled"])
+				GetData().AutosaveEnabled = autosaveEnabled.as<bool>();
+			
+			if (auto autosaveTime = prefs["Autosave Time"])
+				GetData().AutosaveTime = autosaveTime.as<int>();
+			
+			if (auto recentFiles = prefs["Recent Files"])
+				GetData().RecentFileCount = recentFiles.as<int>();
+
+			if (auto tooltipHoverDelay = prefs["Tooltip Hover Delay"])
+				GetData().TooltipHoverDelay = tooltipHoverDelay.as<int>();
+
+			if (auto doubleClickSpeed = prefs["Double Click Speed"])
 			{
 				GetData().DoubleClickSpeed = doubleClickSpeed.as<int>();
 				ImGui::GetIO().MouseDoubleClickTime = GetData().DoubleClickSpeed / 1000.0f;
 			}
-
-			auto emulateNumpad = prefs["Emulate Numpad"];
-			if (emulateNumpad)
+			
+			if (auto emulateNumpad = prefs["Emulate Numpad"])
 				GetData().EmulateNumpad = emulateNumpad.as<bool>();
-
-			auto manualDevenv = prefs["Manual Devenv"];
-			if (manualDevenv)
+			
+			if (auto manualDevenv = prefs["Manual Devenv"])
 				GetData().ManualDevenv = manualDevenv.as<bool>();
 
-			auto devenvPath = prefs["Devenv Path"];
-			if (devenvPath)
+			if (auto devenvPath = prefs["Devenv Path"])
 				GetData().DevenvPath = devenvPath.as<std::string>();
 
-			auto gitExecutablePath = prefs["Git Executable Path"];
-			if (gitExecutablePath)
+			if (auto gitExecutablePath = prefs["Git Executable Path"])
 				GetData().GitExecutablePath = gitExecutablePath.as<std::string>();
 
-			auto pythonPluginPaths = prefs["Python Plugin Paths"];
-			if (pythonPluginPaths)
+			if (auto pythonPluginPaths = prefs["Python Plugins"])
 			{
-				GetData().PythonPluginPaths.clear();
+				GetData().PythonPlugins.clear();
 				for (auto& path : pythonPluginPaths)
-					GetData().PythonPluginPaths.push_back(path.as<std::string>());
+				{
+					std::filesystem::path filepath = path["Path"].as<std::string>();
+					bool enabled = path["Enabled"].as<bool>();
+					
+					GetData().PythonPlugins.push_back(Preferences::PythonPluginInformation(filepath, enabled));
+				}
+			}
+			
+			if (auto defaultApplications = prefs["Default Applications"])
+			{
+				GetData().DefaultApplications.clear();
+				for (auto application : defaultApplications)
+					GetData().DefaultApplications[application.first.as<std::string>()] = application.second.as<std::string>();
+			}
+
+			// Editor
+			if (auto editor = prefs["Editor"])
+			{
+				if (auto volume = editor["Volume"])
+					GetData().EditorVolume = volume.as<float>();
+
+				if (auto showTransformGizmo = editor["Show Transform Gizmo"])
+					GetData().ShowTransformGizmo = showTransformGizmo.as<bool>();
+
+				if (auto showGrid = editor["Show Grid"])
+					GetData().ShowGrid = showGrid.as<bool>();
+			}
+
+			// Viewport
+			if (auto viewport = prefs["Viewport"])
+			{
+				if (auto showViewportUI = viewport["Show Viewport UI"])
+					GetData().ShowViewportUI = showViewportUI.as<bool>();
+
+				if (auto frameStepCount = viewport["Frame Step Count"])
+					GetData().FrameStepCount = frameStepCount.as<int>();
+
+				if (auto showFPS = viewport["Show FPS"])
+					GetData().ShowFPS = showFPS.as<bool>();
+
+				if (auto showCameraPreview = viewport["Show Camera Preview"])
+					GetData().ShowCameraPreview = showCameraPreview.as<bool>();
+
+				if (auto viewportBookmarks = viewport["Viewport Bookmarks"])
+				{
+					for (auto& bookmark : viewportBookmarks)
+					{
+						ViewportBookmark newBookmark;
+						newBookmark.Name = bookmark["Name"].as<std::string>();
+						
+						// Deserialize all camera transform data
+						if (auto& transform = bookmark["Transform"])
+						{
+							newBookmark.Transform.Position = transform["Position"].as<glm::vec3>();
+							newBookmark.Transform.FocalPoint = transform["FocalPoint"].as<glm::vec3>();
+							newBookmark.Transform.Distance = transform["Distance"].as<float>();
+							newBookmark.Transform.Pitch = transform["Pitch"].as<float>();
+							newBookmark.Transform.Yaw = transform["Yaw"].as<float>();
+						}
+						
+						GetData().ViewportBookmarks.push_back(newBookmark);
+					}
+				}
+			}
+			
+			// Content Browser
+			if (auto contentBrowser = prefs["Content Browser"])
+			{
+				if (auto layoutType = contentBrowser["Layout Type"])
+					GetData().LayoutType = layoutType.as<std::string>() == "List" ? PreferencesData::ContentBrowserLayoutType::List : PreferencesData::ContentBrowserLayoutType::Grid;
+
+				if (auto directoriesFirst = contentBrowser["Directories First"])
+					GetData().DirectoriesFirst = directoriesFirst.as<bool>();
+
+				if (auto ascending = contentBrowser["Ascending"])
+					GetData().Ascending = ascending.as<bool>();
+
+				if (auto sortType = contentBrowser["Sort Type"])
+					GetData().ContentBrowserSortType = (enum Preferences::PreferencesData::ContentBrowserSortType)sortType.as<int>();
+
+				if (auto filters = contentBrowser["Filters"])
+				{
+					for (int i = 0; i < FILE_TYPE_SIZE; i++)
+					{
+						if (auto filter = filters[i])
+							GetData().Filters[i] = filter.as<bool>();
+					}
+				}
+
+				if (auto showThumbnails = contentBrowser["Show Thumbnails"])
+					GetData().ShowThumbnails = showThumbnails.as<bool>();
+
+				if (auto thumbnailSize = contentBrowser["Thumbnail Size"])
+					GetData().ThumbnailSize = thumbnailSize.as<int>();
+
+				if (auto listItemSpacing = contentBrowser["List Item Spacing"])
+					GetData().ListItemSpacing = listItemSpacing.as<int>();
+			}
+
+			// Log
+			if (auto log = prefs["Log"])
+			{
+				if (auto logClearOnPlay = log["Clear On Play"])
+					GetData().LogClearOnPlay = logClearOnPlay.as<bool>();
+
+				if (auto logScrollToBottom = log["Scroll To Bottom"])
+					GetData().LogScrollToBottom = logScrollToBottom.as<bool>();
+
+				if (auto logFilters = log["Filters"])
+				{
+					for (int i = 0; i < 6; i++)
+					{
+						if (auto filter = logFilters[i])
+							GetData().LogFilters[i] = filter.as<bool>();
+					}
+				}
 			}
 		}
 	}
@@ -173,24 +322,95 @@ namespace Dymatic {
 		out << YAML::BeginMap;
 
 		out << YAML::Key << "Autosave Preferences" << YAML::Value << GetData().AutosavePreferences;
+		out << YAML::Key << "Show Splash" << YAML::Value << GetData().ShowSplashStartup;
+		out << YAML::Key << "Lock Viewport Mouse" << YAML::Value << GetData().LockViewportMouse;
+		out << YAML::Key << "Advanced Edit Mode" << YAML::Value << GetData().AdvancedEditMode;
+		out << YAML::Key << "Bone Attachment Edit Mode" << YAML::Value << Utils::BoneAttachmentEditModeToString(GetData().BoneAttachmentEditMode);
 		out << YAML::Key << "Autosave Enabled" << YAML::Value << GetData().AutosaveEnabled;
 		out << YAML::Key << "Autosave Time" << YAML::Value << GetData().AutosaveTime;
 		out << YAML::Key << "Recent Files" << YAML::Value << GetData().RecentFileCount;
-		out << YAML::Key << "Show Splash" << YAML::Value << GetData().ShowSplashStartup;
+		out << YAML::Key << "Tooltip Hover Delay" << YAML::Value << GetData().TooltipHoverDelay;
 		out << YAML::Key << "Double Click Speed" << YAML::Value << GetData().DoubleClickSpeed;
 		out << YAML::Key << "Emulate Numpad" << YAML::Value << GetData().EmulateNumpad;
 		out << YAML::Key << "Manual Devenv" << YAML::Value << GetData().ManualDevenv;
 		out << YAML::Key << "Devenv Path" << YAML::Value << GetData().DevenvPath;
 		out << YAML::Key << "Git Executable Path" << YAML::Value << GetData().GitExecutablePath;
 
-		out << YAML::Key << "Python Plugin Paths" << YAML::Value << YAML::BeginSeq;
-		for (auto& path : GetData().PythonPluginPaths)
-			out << YAML::Value << path.string();
+		out << YAML::Key << "Python Plugins" << YAML::Value << YAML::BeginSeq;
+		for (auto& path : GetData().PythonPlugins)
+		{
+			out << YAML::BeginMap;
+			out << YAML::Key << "Path" << YAML::Value << path.PluginPath.string();
+			out << YAML::Key << "Enabled" << YAML::Value << path.Enabled;
+			out << YAML::EndMap;
+		}
 		out << YAML::EndSeq;
 
+		out << YAML::Key << "Default Applications" << YAML::Value << YAML::BeginMap;
+		for (auto& [extension, application] : GetData().DefaultApplications)
+			out << YAML::Key << extension << YAML::Value << application.string();
 		out << YAML::EndMap;
 
-		std::ofstream fout(filepath);
+		// Editor
+		out << YAML::Key << "Editor" << YAML::Value << YAML::BeginMap;
+		out << YAML::Key << "Volume" << YAML::Value << GetData().EditorVolume;
+		out << YAML::Key << "Show Transform Gizmo" << YAML::Value << GetData().ShowTransformGizmo;
+		out << YAML::Key << "Show Grid" << YAML::Value << GetData().ShowGrid;
+		out << YAML::EndMap;
+
+		// Viewport
+		out << YAML::Key << "Viewport" << YAML::Value << YAML::BeginMap;
+		out << YAML::Key << "Show Viewport UI" << YAML::Value << GetData().ShowViewportUI;
+		out << YAML::Key << "Frame Step Count" << YAML::Value << GetData().FrameStepCount;
+		out << YAML::Key << "Show FPS" << YAML::Value << GetData().ShowFPS;
+		out << YAML::Key << "Show Camera Preview" << YAML::Value << GetData().ShowCameraPreview;
+		out << YAML::Key << "Viewport Bookmarks" << YAML::Value << YAML::BeginSeq;
+		for (auto& bookmark : GetData().ViewportBookmarks)
+		{
+			out << YAML::BeginMap;
+			out << YAML::Key << "Name" << YAML::Value << bookmark.Name;
+
+			// Serialize all camera transform data
+			out << YAML::Key << "Transform" << YAML::Value << YAML::BeginMap;
+			out << YAML::Key << "Position" << YAML::Value << bookmark.Transform.Position;
+			out << YAML::Key << "FocalPoint" << YAML::Value << bookmark.Transform.FocalPoint;
+			out << YAML::Key << "Distance" << YAML::Value << bookmark.Transform.Distance;
+			out << YAML::Key << "Pitch" << YAML::Value << bookmark.Transform.Pitch;
+			out << YAML::Key << "Yaw" << YAML::Value << bookmark.Transform.Yaw;
+			out << YAML::EndMap; // Transform
+			
+			out << YAML::EndMap; // Bookmark
+		}
+		out << YAML::EndSeq;
+		out << YAML::EndMap;
+
+		// Content Browser
+		out << YAML::Key << "Content Browser" << YAML::Value << YAML::BeginMap;
+		out << YAML::Key << "Layout Type" << YAML::Value << (GetData().LayoutType == PreferencesData::ContentBrowserLayoutType::List ? "List" : "Grid");
+		out << YAML::Key << "Directories First" << YAML::Value << GetData().DirectoriesFirst;
+		out << YAML::Key << "Ascending" << YAML::Value << GetData().Ascending;
+		out << YAML::Key << "Sort Type" << YAML::Value << GetData().ContentBrowserSortType;
+		out << YAML::Key << "Filters" << YAML::Value << YAML::BeginSeq;
+		for (int i = 0; i < FILE_TYPE_SIZE; i++)
+			out << GetData().Filters[i];
+		out << YAML::EndSeq;
+		out << YAML::Key << "Show Thumbnails" << YAML::Value << GetData().ShowThumbnails;
+		out << YAML::Key << "Thumbnail Size" << YAML::Value << GetData().ThumbnailSize;
+		out << YAML::Key << "List Item Spacing" << YAML::Value << GetData().ListItemSpacing;
+		out << YAML::EndMap;
+		
+		// Log
+		out << YAML::Key << "Log" << YAML::Value << YAML::BeginMap;
+		out << YAML::Key << "Clear On Play" << YAML::Value << GetData().LogClearOnPlay;
+		out << YAML::Key << "Scroll To Bottom" << YAML::Value << GetData().LogScrollToBottom;
+		out << YAML::Key << "Filters" << YAML::Value << YAML::BeginSeq;
+		for (int i = 0; i < 6; i++)
+			out << GetData().LogFilters[i];
+		out << YAML::EndSeq;
+		out << YAML::EndMap;
+
+		// Write the final YAML file to disk.
+		std::ofstream fout(filepath.empty() ? s_PreferencesSaveFilepath : filepath);
 		fout << out.c_str();
 	}
 
@@ -544,6 +764,7 @@ namespace Dymatic {
 		case EditorWindow::Info: return "Info";
 		case EditorWindow::Profiler: return "Profiler";
 		case EditorWindow::ScriptEditor: return "Script Editor";
+		case EditorWindow::SceneSettings: return "Scene Settings";
 		case EditorWindow::SceneHierarchy: return "Scene Hierarchy";
 		case EditorWindow::Properties: return "Properties";
 		case EditorWindow::Notifications: return "Notifications";
@@ -551,8 +772,7 @@ namespace Dymatic {
 		case EditorWindow::TextEditor: return "Text Editor";
 		case EditorWindow::CurveEditor: return "Curve Editor";
 		case EditorWindow::ImageEditor: return "Image Editor";
-		case EditorWindow::MaterialEditor: return "Material Editor";
-		case EditorWindow::Console: return "Console";
+		case EditorWindow::Log: return "Log";
 		case EditorWindow::AssetManager: return "Asset Manager";
 		}
 
@@ -568,6 +788,7 @@ namespace Dymatic {
 		if (name == "Info") return EditorWindow::Info;
 		if (name == "Profiler") return EditorWindow::Profiler;
 		if (name == "Script Editor") return EditorWindow::ScriptEditor;
+		if (name == "Scene Settings") return EditorWindow::SceneSettings;
 		if (name == "Scene Hierarchy") return EditorWindow::SceneHierarchy;
 		if (name == "Properties") return EditorWindow::Properties;
 		if (name == "Notifications") return EditorWindow::Notifications;
@@ -575,8 +796,7 @@ namespace Dymatic {
 		if (name == "Text Editor") return EditorWindow::TextEditor;
 		if (name == "Curve Editor") return EditorWindow::CurveEditor;
 		if (name == "Image Editor") return EditorWindow::ImageEditor;
-		if (name == "Material Editor") return EditorWindow::MaterialEditor;
-		if (name == "Console") return EditorWindow::Console;
+		if (name == "Log") return EditorWindow::Log;
 		if (name == "Asset Manager") return EditorWindow::AssetManager;		
 
 		DY_CORE_ASSERT(false, "Editor Window does not exist.");
@@ -667,6 +887,9 @@ namespace Dymatic {
 
 	void Preferences::Shutdown()
 	{
+		if (GetData().AutosavePreferences)
+			SavePreferences();
+
 		SaveWorkspace(s_WorkspaceSaveFilepath);
 	}
 
@@ -756,6 +979,7 @@ namespace Dymatic {
 		else if (event == SceneStartBind) return "Scene Start";
 		else if (event == SceneSimulateBind) return "Scene Simulate";
 		else if (event == SceneStopBind) return "Scene Stop";
+		else if (event == FocusBind) return "Focus";
 		else if (event == ReloadAssembly) return "Reload Assembly";
 		else if (event == GizmoNoneBind) return "Gizmo None";
 		else if (event == GizmoTranslateBind) return "Gizmo Translate";
@@ -764,6 +988,8 @@ namespace Dymatic {
 		else if (event == CreateBind) return "Create";
 		else if (event == DuplicateBind) return "Duplicate";
 		else if (event == DeleteBind) return "Delete";
+		else if (event == UndoBind) return "Undo";
+		else if (event == RedoBind) return "Redo";
 		else if (event == VisualizationRenderedBind) return "Visualization Rendered";
 		else if (event == VisualizationWireframeBind) return "Visualization Wireframe";
 		else if (event == VisualizationLightingOnlyBind) return "Visualization Lighting Only";
@@ -798,6 +1024,7 @@ namespace Dymatic {
 		else if (name == "Scene Start") return Preferences::Keymap::SceneStartBind;
 		else if (name == "Scene Simulate") return Preferences::Keymap::SceneSimulateBind;
 		else if (name == "Scene Stop") return Preferences::Keymap::SceneStopBind;
+		else if (name == "Focus") return Preferences::Keymap::FocusBind;
 		else if (name == "Reload Assembly") return Preferences::Keymap::ReloadAssembly;
 		else if (name == "Gizmo None") return Preferences::Keymap::GizmoNoneBind;
 		else if (name == "Gizmo Translate") return Preferences::Keymap::GizmoTranslateBind;
@@ -806,6 +1033,8 @@ namespace Dymatic {
 		else if (name == "Create") return Preferences::Keymap::CreateBind;
 		else if (name == "Duplicate") return Preferences::Keymap::DuplicateBind;
 		else if (name == "Delete") return Preferences::Keymap::DeleteBind;
+		else if (name == "Undo") return Preferences::Keymap::UndoBind;
+		else if (name == "Redo") return Preferences::Keymap::RedoBind;
 		else if (name == "Visualization Rendered") return Preferences::Keymap::VisualizationRenderedBind;
 		else if (name == "Visualization Wireframe") return Preferences::Keymap::VisualizationWireframeBind;
 		else if (name == "Visualization Lighting Only") return Preferences::Keymap::VisualizationLightingOnlyBind;
@@ -1161,6 +1390,89 @@ namespace Dymatic {
 	const std::array<MouseCode, 12>& Preferences::Keymap::GetAllMouseButtons()
 	{
 		return s_AllMouseButtons;
+	}
+
+	Preferences::PythonPluginInformation::PythonPluginInformation(const std::filesystem::path& pluginPath, bool enabled)
+		: PluginPath(pluginPath), Enabled(enabled)
+	{
+		// Confirm the file exists
+		if (!std::filesystem::exists(pluginPath))
+		{
+			DY_CORE_WARN("Python plugin '{}' has no detected metadata!", pluginPath.string());
+			return;
+		}
+
+		// Extract the metadata from the python file.
+		std::ifstream file(pluginPath);
+		std::string line, metadataString;
+
+		// Read up to the line marking the metadata beginning
+		while (std::getline(file, line))
+		{
+			if (line.find("BEGIN_PLUGIN_METADATA") != std::string::npos)
+				break;
+		}
+
+		// Extract all metadata lines up until the end
+		while (std::getline(file, line))
+		{
+			if (line.find("END_PLUGIN_METADATA") != std::string::npos)
+				break;
+
+			metadataString += line + '\n';
+		}
+
+		// We now have a complete set of extracted metadata to parse using YAML
+		YAML::Node metadata;
+		try
+		{
+			metadata = YAML::Load(metadataString);
+		}
+		catch (YAML::ParserException e)
+		{
+			DY_CORE_ERROR("Python plugin '{}' had invalid metadata:\n		{}", pluginPath.string(), e.what());
+			return;
+		}
+
+		if (auto name = metadata["Name"])
+			Metadata.Name = name.as<std::string>();
+
+		if (auto description = metadata["Description"])
+			Metadata.Description = description.as<std::string>();
+
+		if (auto icon = metadata["Icon"])
+		{
+			const std::filesystem::path filepath = pluginPath.parent_path() / icon.as<std::string>();
+			if (std::filesystem::exists(filepath))
+				Metadata.Icon = Texture2D::Create(filepath);
+		}
+
+		if (auto author = metadata["Author"])
+			Metadata.Author = author.as<std::string>();
+
+		if (auto companyName = metadata["Company Name"])
+			Metadata.CompanyName = companyName.as<std::string>();
+
+		if (auto version = metadata["Version"])
+			Metadata.Version = version.as<std::string>();
+
+		if (auto dependencies = metadata["Dependencies"])
+			Metadata.Dependencies = dependencies.as<std::string>();
+
+		if (auto buildDate = metadata["BuildDate"])
+			Metadata.BuildDate = buildDate.as<std::string>();
+
+		if (auto engineVersionRequirements = metadata["Engine Version Requirements"])
+			Metadata.EngineVersionRequirements = engineVersionRequirements.as<std::string>();
+
+		if (auto legalCopyright = metadata["Legal Copyright"])
+			Metadata.LegalCopyright = legalCopyright.as<std::string>();
+
+		if (auto legalTrademarks1 = metadata["Legal Trademarks"])
+			Metadata.LegalTrademarks = legalTrademarks1.as<std::string>();
+
+		if (auto license = metadata["License"])
+			Metadata.License = license.as<std::string>();
 	}
 
 }

@@ -22,6 +22,8 @@
 #include <stb_image.h>
 #include <SDL.h>
 
+extern GLFWimage g_ApplicationWindowIconImage[1];
+
 namespace Dymatic {
 
 	static uint8_t s_GLFWWindowCount = 0;
@@ -53,7 +55,7 @@ namespace Dymatic {
 		m_Data.Width = props.Width;
 		m_Data.Height = props.Height;
 
-		DY_CORE_INFO("Creating window {0} ({1}, {2})", props.Title, props.Width, props.Height);
+		DY_CORE_INFO("Creating window {} ({}, {})", props.Title, props.Width, props.Height);
 
 		if (s_GLFWWindowCount == 0)
 		{
@@ -78,24 +80,29 @@ namespace Dymatic {
 			if (Renderer::GetAPI() == RendererAPI::API::OpenGL)
 				glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
 #endif
+			if (RendererAPI::GetAPI() == RendererAPI::API::Vulkan)
+				glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+
+			// Window Decorations
 			glfwWindowHint(GLFW_DECORATED, true);
 			glfwWindowHint(GLFW_VISIBLE, !props.StartHidden);
 			glfwWindowHint(GLFW_DECORATION_VISIBLE, props.Decorated);
+
+			// Create Window
 			m_Window = glfwCreateWindow(props.Width - 1, props.Height, m_Data.Title.c_str(), nullptr, nullptr);
+			
 			// Trigger a resize event
 			glfwSetWindowSize(m_Window, props.Width, props.Height);
 			s_GLFWWindowCount++;
 
 			if (!props.Icon.empty())
 			{
-				GLFWimage images[1];
-				images[0].pixels = stbi_load(props.Icon.c_str(), &images[0].width, &images[0].height, 0, 4); //rgba channels 
-				glfwSetWindowIcon(m_Window, 1, images);
-				stbi_image_free(images[0].pixels);
+				g_ApplicationWindowIconImage[0].pixels = stbi_load(props.Icon.string().c_str(), &g_ApplicationWindowIconImage[0].width, &g_ApplicationWindowIconImage[0].height, 0, 4); //rgba channels 
+				glfwSetWindowIcon(m_Window, 1, g_ApplicationWindowIconImage);
 			}
 		}
 
-		m_Context = GraphicsContext::Create(m_Window);
+		m_Context = RendererContext::Create(m_Window);
 		m_Context->Init();
 
 		glfwSetWindowUserPointer(m_Window, &m_Data);
@@ -214,12 +221,14 @@ namespace Dymatic {
 			{
 				GamepadConnectedEvent event(gamepad);
 				Application::Get().OnEvent(event);
+				Input::OnGamepadConnected(gamepad);
 				break;
 			}
 			case GLFW_DISCONNECTED:
 			{
 				GamepadDisconnectedEvent event(gamepad);
 				Application::Get().OnEvent(event);
+				Input::OnGamepadDisconnected(gamepad);
 				break;
 			}
 			}
@@ -344,7 +353,7 @@ namespace Dymatic {
 
 	void WindowsWindow::LockCursor(bool locked) const
 	{
-		glfwSetInputMode(m_Window, GLFW_CURSOR, locked ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
+		Utils::SetWindowCursorLocked(m_Window, locked);
 	}
 
 	void WindowsWindow::SetTitlebarHoveredQueryCallback(void (*query)(int*))
@@ -371,8 +380,13 @@ namespace Dymatic {
 	{
 		DY_PROFILE_FUNCTION();
 
+		m_Context->Shutdown();
+
 		glfwDestroyWindow(m_Window);
 		--s_GLFWWindowCount;
+
+		// Free the image icon memory
+		stbi_image_free(g_ApplicationWindowIconImage[0].pixels);
 
 		if (s_GLFWWindowCount == 0)
 		{
@@ -404,6 +418,15 @@ namespace Dymatic {
 	bool WindowsWindow::IsVSync() const
 	{
 		return m_Data.VSync;
+	}
+
+	namespace Utils {
+
+		void SetWindowCursorLocked(void* window, const bool locked)
+		{
+			glfwSetInputMode((GLFWwindow*)window, GLFW_CURSOR, locked ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
+		}
+	
 	}
 
 }

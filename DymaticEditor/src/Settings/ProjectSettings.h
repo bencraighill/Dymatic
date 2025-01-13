@@ -15,6 +15,7 @@ namespace Dymatic {
 		{
 			std::vector<std::filesystem::path> RecentScenePaths;
 			std::unordered_map<std::filesystem::path, glm::vec3> ColoredFolders;
+			bool EnablePhysicsLogging = false;
 		};
 
 		ProjectSettings() = delete;
@@ -28,6 +29,10 @@ namespace Dymatic {
 		static bool HasFolderColor(const std::filesystem::path& path);
 		static glm::vec3 GetFolderColor(const std::filesystem::path& path);
 		static void SetFolderColor(const std::filesystem::path& path, const glm::vec3& color);
+		static void ClearFolderColor(const std::filesystem::path& path);
+
+		static bool GetEnablePhysicsLogging();
+		static void SetEnablePhysicsLogging(const bool enabled);
 	};
 
 }

@@ -1,0 +1,48 @@
+// PBR utility functions header file
+#pragma once
+
+vec3 fresnelSchlick(float cosTheta, vec3 F0)
+{
+    float val = 1.0 - cosTheta;
+    return F0 + (1.0 - F0) * (val*val*val*val*val); // Faster than pow
+}
+
+vec3 fresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness)
+{
+    float val = 1.0 - cosTheta;
+    return F0 + (max(vec3(1.0 - roughness), F0) - F0) * (val*val*val*val*val); // Faster than pow
+}
+
+float distributionGGX(vec3 N, vec3 H, float rough)
+{
+    float a  = rough * rough;
+    float a2 = a * a;
+
+    float nDotH  = max(dot(N, H), 0.0);
+    float nDotH2 = nDotH * nDotH;
+
+    float num = a2; 
+    float denom = (nDotH2 * (a2 - 1.0) + 1.0);
+    denom = 1 / (PI * denom * denom);
+
+    return num * denom;
+}
+
+float geometrySchlickGGX(float nDotV, float rough)
+{
+    float r = (rough + 1.0);
+    float k = r*r / 8.0;
+
+    float num = nDotV;
+    float denom = 1 / (nDotV * (1.0 - k) + k);
+
+    return num * denom;
+}
+
+float geometrySmith(float nDotV, float nDotL, float rough)
+{
+    float ggx2  = geometrySchlickGGX(nDotV, rough);
+    float ggx1  = geometrySchlickGGX(nDotL, rough);
+
+    return ggx1 * ggx2;
+}

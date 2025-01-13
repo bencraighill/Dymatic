@@ -1,10 +1,14 @@
 #pragma once
 
+#define GLM_ENABLE_EXPERIMENTAL
 #include <glm/glm.hpp>
+#include <glm/gtx/compatibility.hpp>
 
 namespace Dymatic::Math {
 
 	bool DecomposeTransform(const glm::mat4& transform, glm::vec3& translation, glm::vec3& rotation, glm::vec3& scale);
+	void ComposeTransform(glm::mat4& transform, const glm::vec3& translation, const glm::vec3& rotation, const glm::vec3& scale);
+
 	unsigned int GetRandomInRange(int min, int max);
 	float RandomRange(float min, float max);
 	float NormalizeAngle(const float value, const float shift, const float size = 360.0f);

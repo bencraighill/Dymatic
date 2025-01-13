@@ -1,0 +1,106 @@
+// Cone Tracing Utilities
+
+#pragma once
+
+#include Ray.glslh
+#include Transformations.glslh
+
+vec4 TraceCone(Ray ray, vec3 normal, float coneAngle, float stepMultiplier, float normalRayOffset, float alphaThreshold)
+{
+    vec4 accumulatedColor = vec4(0.0);
+    float distFromStart;
+
+    for (uint cascadeIndex = 0; cascadeIndex < VXGI_CASCADE_COUNT; cascadeIndex++)
+    {
+        const vec3 gridMin = u_GridMin[cascadeIndex].xyz;
+        const vec3 gridMax = u_GridMax[cascadeIndex].xyz;
+        sampler3D samplerVoxels = u_VXGICascades[cascadeIndex];
+
+        vec3 voxelGridWorldSpaceSize = gridMax - gridMin;
+        vec3 voxelWorldSpaceSize = voxelGridWorldSpaceSize / textureSize(samplerVoxels, 0);
+        float voxelMaxLength = max(voxelWorldSpaceSize.x, max(voxelWorldSpaceSize.y, voxelWorldSpaceSize.z));
+        float voxelMinLength = min(voxelWorldSpaceSize.x, min(voxelWorldSpaceSize.y, voxelWorldSpaceSize.z));
+        uint maxLevel = textureQueryLevels(samplerVoxels) - 1;
+
+        // Initialize the ray by offsetting along normal to avoid self-intersection (only on first cascade)
+        if (cascadeIndex == 0)
+        {
+            distFromStart = voxelMaxLength;
+            ray.Origin += normal * voxelMaxLength * normalRayOffset;
+        }
+
+        uint stepCount = 0;
+        while (accumulatedColor.a < alphaThreshold)
+        {
+            float coneDiameter = 2.0 * tan(coneAngle) * distFromStart;
+            float sampleDiameter = max(voxelMinLength, coneDiameter);
+            float sampleLod = log2(sampleDiameter / voxelMinLength);
+
+            vec3 worldPos = ray.Origin + ray.Direction * distFromStart;
+            vec3 sampleUVW = MapToZeroOne(worldPos, gridMin, gridMax);
+
+            if (any(lessThan(sampleUVW, vec3(0.0))) || any(greaterThanEqual(sampleUVW, vec3(1.0))) /* || sampleLod > maxLevel*/)
+                break;
+
+            vec4 newSample = textureLod(samplerVoxels, sampleUVW, sampleLod);
+
+            float weightOfNewSample = (1.0 - accumulatedColor.a);
+            accumulatedColor += weightOfNewSample * newSample;
+
+            distFromStart += sampleDiameter * stepMultiplier;
+        }
+
+        // If we have already gathered enough alpha, break the loop (don't need other cascades)
+        if (accumulatedColor.a >= alphaThreshold)
+            break;
+    }
+
+    return accumulatedColor;
+}
+
+/*
+vec4 TraceCone(sampler3D samplerVoxels, Ray ray, vec3 normal, float coneAngle, float stepMultiplier, float normalRayOffset, float alphaThreshold)
+{
+    const vec3 gridMin = u_GridMin[0].xyz;
+    const vec3 gridMax = u_GridMax[0].xyz;
+
+    vec3 voxelGridWorldSpaceSize = gridMax - gridMin;
+    vec3 voxelWorldSpaceSize = voxelGridWorldSpaceSize / textureSize(samplerVoxels, 0);
+    float voxelMaxLength = max(voxelWorldSpaceSize.x, max(voxelWorldSpaceSize.y, voxelWorldSpaceSize.z));
+    float voxelMinLength = min(voxelWorldSpaceSize.x, min(voxelWorldSpaceSize.y, voxelWorldSpaceSize.z));
+    uint maxLevel = textureQueryLevels(samplerVoxels) - 1;
+    vec4 accumulatedColor = vec4(0.0);
+
+    ray.Origin += normal * voxelMaxLength * normalRayOffset;
+
+    float distFromStart = voxelMaxLength;
+    while (accumulatedColor.a < alphaThreshold)
+    {
+        float coneDiameter = 2.0 * tan(coneAngle) * distFromStart;
+        float sampleDiameter = max(voxelMinLength, coneDiameter);
+        float sampleLod = log2(sampleDiameter / voxelMinLength);
+        
+        vec3 worldPos = ray.Origin + ray.Direction * distFromStart;
+        vec3 sampleUVW = MapToZeroOne(worldPos, gridMin, gridMax);
+
+        if (any(lessThan(sampleUVW, vec3(0.0))) || any(greaterThanEqual(sampleUVW, vec3(1.0))) || sampleLod > maxLevel)
+            break;
+
+        vec4 newSample = textureLod(samplerVoxels, sampleUVW, sampleLod);
+
+        float weightOfNewSample = (1.0 - accumulatedColor.a);
+        accumulatedColor += weightOfNewSample * newSample;
+        
+        distFromStart += sampleDiameter * stepMultiplier;
+    }
+
+    return accumulatedColor;
+}
+*/
+
+vec4 TraceCone(Ray ray, float coneAngle, float stepMultiplier)
+{
+    const vec3 normal = vec3(0.0);
+    const float normalRayOffset = 0.0;
+    return TraceCone(ray, normal, coneAngle, stepMultiplier, normalRayOffset, 1.0);
+}
